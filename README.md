@@ -33,6 +33,11 @@ None
 
 ## Release Notes
 
+### 1.1.0
+
+- Added assign highlighting like create
+- Treating Capital Object Literals like a class.
+
 ### 1.0.3 - 1.0.6
 
 - Added TODO syntax highlight.
