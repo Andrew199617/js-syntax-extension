@@ -13,6 +13,24 @@ A comment with an issue contains a #[0-9]
 
 ![Foo.create Highlighting](./images/comments.png)
 
+Change the color using these in your settings
+
+  "editor.tokenColorCustomizations": {
+      "textMateRules": [
+          {
+              "scope": "comment.todo",
+              "settings": {
+                  "foreground": "#EE82EE"
+              }
+          },
+          {
+              "scope": "comment.issue",
+              "settings": {
+                  "foreground": "#5555EE"
+              }
+          }
+      ]
+  }
 
 ## Requirements
 
