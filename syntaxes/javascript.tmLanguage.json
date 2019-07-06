@@ -1,0 +1,24 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "LGDJavascript",
+	"scopeName": "source.lgd.js",
+	"injectionSelector": "L:source.js",
+	"patterns": [
+		{
+			"include": "#constructor"
+		},
+		{
+			"include": "#class"
+		}
+	],
+	"repository": {
+    "constructor": {
+      "match": "(?<=\\.)create(?=\\()",
+      "name": "keyword.create"
+    },
+    "class": {
+      "match": "(?<=\\s|)\\w+(?=\\.create)",
+      "name": "support.class.create"
+    }
+	}
+}

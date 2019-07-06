@@ -1,0 +1,21 @@
+{
+    "name": "js-syntax-extension",
+    "displayName": "JS Syntax Highlight Extension",
+    "publisher": "Learn Game Development",
+    "icon": "https://www.learngamedevelopment.net/static/images/ImgnAsset.png",
+    "description": "More Syntax highlighting for JS files.",
+    "version": "1.0.0",
+    "engines": {
+        "vscode": "^1.36.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "grammars": [{
+            "scopeName": "source.lgd.js",
+            "injectTo": ["source.js"],
+            "path": "./syntaxes/javascript.tmLanguage.json"
+        }]
+    }
+}
