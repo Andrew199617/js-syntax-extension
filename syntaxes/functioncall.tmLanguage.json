@@ -2,18 +2,25 @@
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "LGDJavascript",
 	"scopeName": "source.function.call.injection",
-	"injectionSelector": "L:meta.var.expr.js",
+	"injectionSelector": "L:meta.function-call.js",
 	"patterns": [
 		{
 			"include": "#objectAssign"
 		},
 		{
 			"include": "#objectCreate"
+		},
+		{
+			"include": "#class"
 		}
 	],
 	"repository": {
+    "class": {
+      "match": "\\w+(?=\\.create\\()",
+      "name": "support.class.create"
+    },
 		"objectCreate": {
-			"match": "create(?=\\()",
+			"match": "(?<=\\.)create(?=\\()",
 			"name": "keyword.create"
 		},
 		"objectAssign": {

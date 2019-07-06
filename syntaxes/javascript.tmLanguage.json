@@ -4,21 +4,7 @@
 	"scopeName": "source.lgd.js",
 	"injectionSelector": "L:source.js",
 	"patterns": [
-		{
-			"include": "#createNew"
-		},
-		{
-			"include": "#class"
-		}
 	],
 	"repository": {
-    "createNew": {
-      "match": "(?!\\/\\/)(?<=\\.)create(?=\\()",
-      "name": "keyword.create"
-    },
-    "class": {
-      "match": "(?<=\\s|)\\w+(?=\\.create\\()",
-      "name": "support.class.create"
-    }
 	}
 }

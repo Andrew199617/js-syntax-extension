@@ -9,9 +9,6 @@
 		},
 		{
 			"include": "#todo"
-		},
-		{
-			"include": "#comment"
 		}
 	],
 	"repository": {
@@ -22,10 +19,6 @@
     "todo": {
       "match": "TODO:|TODO",
 			"name": "comment.todo.js"
-    },
-    "comment": {
-      "match": "(.{1})\\w*.create.*",
-      "name": "comment.create.js"
     }
 	}
 }
