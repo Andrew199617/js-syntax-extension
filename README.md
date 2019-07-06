@@ -4,33 +4,22 @@ Provide syntax highlighting for scenarios we encounter a lot in our codebase.
 
 ## Features
 
-Highlight Foo.create() like new Foo(). 
+### Highlight Foo.create() like new Foo(). 
 
 ![Foo.create Highlighting](./images/objectcreate.png)
 
-code highlighting for comments with issues in them.
-A comment with an issue contains a #[0-9]
+### Code highlighting for comments with issues in them.
+### A comment with an issue contains a #[0-9]
 
-![Foo.create Highlighting](./images/comments.png)
+![TODO && Issues](./images/comments.png)
 
-Change the color using these in your settings
+### Highlighting our way of creating classes.
 
-  "editor.tokenColorCustomizations": {
-      "textMateRules": [
-          {
-              "scope": "comment.todo",
-              "settings": {
-                  "foreground": "#EE82EE"
-              }
-          },
-          {
-              "scope": "comment.issue",
-              "settings": {
-                  "foreground": "#5555EE"
-              }
-          }
-      ]
-  }
+![Foo.create Highlighting](./images/classcreation.png)
+
+### Change the color using these in your settings
+
+![Color Settings](./images/colorsettings.png)
 
 ## Requirements
 

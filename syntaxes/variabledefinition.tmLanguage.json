@@ -1,0 +1,17 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "LGDJavascript",
+	"scopeName": "source.variable.injection",
+	"injectionSelector": "L:meta.var.expr.js",
+	"patterns": [
+		{
+			"include": "#class"
+		}
+	],
+	"repository": {
+		"class": {
+			"match": "(?<=const |var |let )[A-Z]{1}\\w*(?=\\s=\\s{)",
+			"name": "support.class.create"
+		}
+	}
+}

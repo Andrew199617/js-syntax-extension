@@ -30,6 +30,18 @@
             "scopeName": "source.comment.line.injection.js",
             "injectTo": ["source.js"],
             "path": "./syntaxes/comment.tmLanguage.json"
+        },{
+            "scopeName": "source.objectliteral.injection",
+            "injectTo": ["source.js"],
+            "path": "./syntaxes/objectliteral.tmLanguage.json"
+        },{
+            "scopeName": "source.variable.injection",
+            "injectTo": ["source.js"],
+            "path": "./syntaxes/variabledefinition.tmLanguage.json"
+        },{
+            "scopeName": "source.function.call.injection",
+            "injectTo": ["source.js"],
+            "path": "./syntaxes/functioncall.tmLanguage.json"
         }]
     }
 }

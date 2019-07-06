@@ -1,0 +1,17 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "LGDJavascript",
+	"scopeName": "source.objectliteral.injection",
+	"injectionSelector": "L:meta.objectliteral.js",
+	"patterns": [
+		{
+			"include": "#createConstructor"
+		}
+	],
+	"repository": {
+    "createConstructor": {
+      "match": "create(?=\\s*\\()",
+      "name": "keyword.create"
+    }
+	}
+}

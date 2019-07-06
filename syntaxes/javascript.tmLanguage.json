@@ -5,14 +5,14 @@
 	"injectionSelector": "L:source.js",
 	"patterns": [
 		{
-			"include": "#constructor"
+			"include": "#createNew"
 		},
 		{
 			"include": "#class"
 		}
 	],
 	"repository": {
-    "constructor": {
+    "createNew": {
       "match": "(?!\\/\\/)(?<=\\.)create(?=\\()",
       "name": "keyword.create"
     },
