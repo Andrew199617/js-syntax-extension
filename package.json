@@ -1,13 +1,20 @@
 {
     "name": "js-syntax-extension",
     "displayName": "JS Syntax Highlight Extension",
-    "publisher": "Learn Game Development",
-    "icon": "https://www.learngamedevelopment.net/static/images/ImgnAsset.png",
-    "description": "More Syntax highlighting for JS files.",
-    "version": "1.0.0",
+    "publisher": "learn-game-development",
+    "icon": "ImgnAsset.jpg",
+    "repository": "https://github.com/Andrew199617/js-syntax-extension",
+    "description": "Extra Syntax highlighting for JS files.",
+    "version": "1.0.1",
     "engines": {
-        "vscode": "^1.36.0"
+        "vscode": "^1.35.0"
     },
+    "keywords": [
+        "js-syntax",
+        "js",
+        "javascript",
+        "Learn Game Development"
+    ],
     "categories": [
         "Programming Languages"
     ],

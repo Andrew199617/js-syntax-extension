@@ -6,23 +6,23 @@ Provide syntax highlighting for scenarios we encounter a lot in our codebase.
 
 Highlight Foo.create() like new Foo(). 
 
-<!-- \!\[Foo.create() Highlighting\]\(images/objectcreate.png\) -->
-
+\!\[Foo.create() Highlighting\]\(./images/objectcreate.png\)
 
 ## Requirements
 
+None
+
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-* `myExtension.enable`: enable/disable this extension
+None
 
 ## Known Issues
 
-
+None
 
 ## Release Notes
 
 ### 1.0.0
 
 Initial release
+- Added foo.create syntax highlighting.
