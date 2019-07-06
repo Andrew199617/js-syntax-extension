@@ -13,11 +13,11 @@
 	],
 	"repository": {
     "constructor": {
-      "match": "(?<=\\.)create(?=\\()",
+      "match": "(?!\\/\\/)(?<=\\.)create(?=\\()",
       "name": "keyword.create"
     },
     "class": {
-      "match": "(?<=\\s|)\\w+(?=\\.create)",
+      "match": "(?<=\\s|)\\w+(?=\\.create\\()",
       "name": "support.class.create"
     }
 	}

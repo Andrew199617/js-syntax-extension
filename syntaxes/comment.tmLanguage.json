@@ -1,0 +1,31 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "LGDJavascript",
+	"scopeName": "source.comment.line.injection.js",
+	"injectionSelector": ["L:comment.block", "L:comment.line"],
+	"patterns": [
+		{
+			"include": "#issue"
+		},
+		{
+			"include": "#todo"
+		},
+		{
+			"include": "#comment"
+		}
+	],
+	"repository": {
+    "issue": {
+      "match": "#[0-9]+.*",
+      "name": "comment.issue.js"
+    },
+    "todo": {
+      "match": "TODO:|TODO",
+			"name": "comment.todo.js"
+    },
+    "comment": {
+      "match": "(.{1})\\w*.create.*",
+      "name": "comment.create.js"
+    }
+	}
+}

@@ -3,9 +3,12 @@
     "displayName": "JS Syntax Highlight Extension",
     "publisher": "learn-game-development",
     "icon": "ImgnAsset.jpg",
-    "repository": "https://github.com/Andrew199617/js-syntax-extension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Andrew199617/js-syntax-extension"
+    },
     "description": "Extra Syntax highlighting for JS files.",
-    "version": "1.0.1",
+    "version": "1.0.4",
     "engines": {
         "vscode": "^1.35.0"
     },
@@ -23,6 +26,10 @@
             "scopeName": "source.lgd.js",
             "injectTo": ["source.js"],
             "path": "./syntaxes/javascript.tmLanguage.json"
+        },{
+            "scopeName": "source.comment.line.injection.js",
+            "injectTo": ["source.js"],
+            "path": "./syntaxes/comment.tmLanguage.json"
         }]
     }
 }
