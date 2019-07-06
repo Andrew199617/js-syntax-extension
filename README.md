@@ -44,7 +44,7 @@ None
 
 ## Release Notes
 
-### 1.0.3 - 1.0.4
+### 1.0.3 - 1.0.6
 
 - Added TODO syntax highlight.
   - scopename: comment.todo.js

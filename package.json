@@ -2,13 +2,13 @@
     "name": "js-syntax-extension",
     "displayName": "JS Syntax Highlight Extension",
     "publisher": "learn-game-development",
-    "icon": "ImgnAsset.jpg",
+    "icon": "LGDLogo.png",
     "repository": {
         "type": "git",
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS files.",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "engines": {
         "vscode": "^1.35.0"
     },
