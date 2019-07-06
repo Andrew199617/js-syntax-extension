@@ -10,8 +10,8 @@
 	],
 	"repository": {
     "createConstructor": {
-      "match": "create(?=\\s*\\()",
-      "name": "keyword.create"
+			"name": "keyword.create",
+			"match": "(?<!^|\\/)(create)(?=\\s*\\([\\s\\S]*\\))"
     }
 	}
 }

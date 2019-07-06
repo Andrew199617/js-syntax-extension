@@ -9,6 +9,9 @@
 		},
 		{
 			"include": "#todo"
+		},
+		{
+			"include": "#createConstructorComment"
 		}
 	],
 	"repository": {
@@ -19,6 +22,10 @@
     "todo": {
       "match": "TODO:|TODO",
 			"name": "comment.todo.js"
-    }
+		},
+		"createConstructorComment": {
+      "match": "create(?=\\s*\\()",
+      "name": "comment.create.js"
+		}
 	}
 }

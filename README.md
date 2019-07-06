@@ -33,6 +33,10 @@ None
 
 ## Release Notes
 
+### 1.1.1 - 1.1.2
+
+- Fixed bug where create whould highlight in object literal comments.
+
 ### 1.1.0
 
 - Added assign highlighting like create
