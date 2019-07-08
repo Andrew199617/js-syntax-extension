@@ -30,7 +30,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 ### React & Next
 
-![React & Next Builtins](./images/reactbuiltins.png)
+![React & Next Builtins](./images/reactnextbuiltins.png)
 
 # Change Color
 
@@ -66,7 +66,7 @@ None
 
 ## Release Notes
 
-### 2.0.0
+### 2.0.0 - 2.0.1
 
 - Compile a js file into a .d.ts file. 
   - This will allow you to have intellisense throughout the whole project.
