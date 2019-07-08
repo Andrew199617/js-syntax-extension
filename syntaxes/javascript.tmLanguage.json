@@ -10,7 +10,7 @@
 	],
 	"repository": {
 		"reactBuiltin": {
-			"match": "(?<!\\s)([A-Z]+\\w+)(\\.)(proptypes|defaultProps|getInitialProps)",
+			"match": "(?<!\\s)([A-Z]+\\w+)(\\.)(propTypes|defaultProps|getInitialProps)",
 			"captures": {
 				"1": {
 					"name": "support.class.proptypes"
@@ -28,7 +28,7 @@
 			}
 		},
 		"builtins": {
-			"match": "(proptypes|defaultProps)|(getInitialProps)",
+			"match": "(propTypes|defaultProps)|(getInitialProps)",
 			"captures": {
 				"1": {
 					"name": "variable.react.builtins"

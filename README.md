@@ -49,7 +49,7 @@ None
 
 ## Release Notes
 
-### 1.1.3 - 1.1.4
+### 1.1.3 - 1.1.5
 
 - Add highlighting for react keywords. proptypes, and defaultProptypes.
 - Add highlighting for next keyword. getInitialProps.
