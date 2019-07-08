@@ -1,6 +1,5 @@
 const  mkpath = require('mkpath');
 const  path = require('path');
-const extend = require('extend');
 const  fs = require('fs');
 const  vscode = require('vscode');
 
