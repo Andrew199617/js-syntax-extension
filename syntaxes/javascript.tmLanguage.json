@@ -4,7 +4,39 @@
 	"scopeName": "source.lgd.js",
 	"injectionSelector": "L:source.js",
 	"patterns": [
+		{
+			"include": "#reactBuiltin"
+		}
 	],
 	"repository": {
+		"reactBuiltin": {
+			"match": "(?<!\\s)([A-Z]+\\w+)(\\.)(proptypes|defaultProps|getInitialProps)",
+			"captures": {
+				"1": {
+					"name": "support.class.proptypes"
+				},
+				"2": {
+					"name": "punctuation.accessor.js"
+				},
+				"3": {
+					"patterns": [
+						{
+							"include": "#builtins"
+						}
+					]
+				}
+			}
+		},
+		"builtins": {
+			"match": "(proptypes|defaultProps)|(getInitialProps)",
+			"captures": {
+				"1": {
+					"name": "keyword.react.builtins"
+				},
+				"2": {
+					"name": "keyword.next.builtins"
+				}
+			}
+		}
 	}
 }
