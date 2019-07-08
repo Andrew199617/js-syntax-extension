@@ -21,27 +21,82 @@
     "categories": [
         "Programming Languages"
     ],
+    "activationEvents": [
+        "onLanguage:javascript",
+        "onCommand:lgd.generateTypings"
+    ],
+    "main": "./src/LGD",
     "contributes": {
-        "grammars": [{
-            "scopeName": "source.lgd.js",
-            "injectTo": ["source.js"],
-            "path": "./syntaxes/javascript.tmLanguage.json"
-        },{
-            "scopeName": "source.comment.line.injection.js",
-            "injectTo": ["source.js"],
-            "path": "./syntaxes/comment.tmLanguage.json"
-        },{
-            "scopeName": "source.objectliteral.injection",
-            "injectTo": ["source.js"],
-            "path": "./syntaxes/objectliteral.tmLanguage.json"
-        },{
-            "scopeName": "source.variable.injection",
-            "injectTo": ["source.js"],
-            "path": "./syntaxes/variabledefinition.tmLanguage.json"
-        },{
-            "scopeName": "source.function.call.injection",
-            "injectTo": ["source.js"],
-            "path": "./syntaxes/functioncall.tmLanguage.json"
-        }]
+        "commands": [
+            {
+                "command": "lgd.generateTypings",
+                "title": "Compile js file to ts file."
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "LGD JS Syntax configuration",
+            "properties": {
+                "lgd.options": {
+                    "type": "object",
+                    "description": "Configuration options for LGD JS Syntax extension.",
+                    "properties": {
+                        "files": {
+                            "type": "array",
+                            "description": "All the files that we will create typings for automatically.",
+                            "default": null
+                        },
+                        "generateTypings": {
+                            "type": "boolean",
+                            "description": "All the files that we will create typings for automatically.",
+                            "default": false
+                        }
+                    }
+                }
+            }
+        },
+        "grammars": [
+            {
+                "scopeName": "source.lgd.js",
+                "injectTo": [
+                    "source.js"
+                ],
+                "path": "./syntaxes/javascript.tmLanguage.json"
+            },
+            {
+                "scopeName": "source.comment.line.injection.js",
+                "injectTo": [
+                    "source.js"
+                ],
+                "path": "./syntaxes/comment.tmLanguage.json"
+            },
+            {
+                "scopeName": "source.objectliteral.injection",
+                "injectTo": [
+                    "source.js"
+                ],
+                "path": "./syntaxes/objectliteral.tmLanguage.json"
+            },
+            {
+                "scopeName": "source.variable.injection",
+                "injectTo": [
+                    "source.js"
+                ],
+                "path": "./syntaxes/variabledefinition.tmLanguage.json"
+            },
+            {
+                "scopeName": "source.function.call.injection",
+                "injectTo": [
+                    "source.js"
+                ],
+                "path": "./syntaxes/functioncall.tmLanguage.json"
+            }
+        ]
+    },
+    "dependencies": {
+        "mkpath": "^1.0.0"
+    },
+    "devDependencies": {
+        "vscode": "^1.1.0"
     }
 }
