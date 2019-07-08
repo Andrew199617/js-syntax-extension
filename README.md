@@ -35,8 +35,8 @@ and take advantage of the builtin Object.create and Object.assign functions to c
 
 - comment.issue
 - comment.todo
-- keyword.next
-- keyword.react
+- variable.next
+- variable.react
 - keyword.create
 
 ## Requirements
@@ -49,7 +49,7 @@ None
 
 ## Release Notes
 
-### 1.1.3
+### 1.1.3 - 1.1.4
 
 - Add highlighting for react keywords. proptypes, and defaultProptypes.
 - Add highlighting for next keyword. getInitialProps.

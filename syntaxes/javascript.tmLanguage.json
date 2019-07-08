@@ -31,10 +31,10 @@
 			"match": "(proptypes|defaultProps)|(getInitialProps)",
 			"captures": {
 				"1": {
-					"name": "keyword.react.builtins"
+					"name": "variable.react.builtins"
 				},
 				"2": {
-					"name": "keyword.next.builtins"
+					"name": "variable.next.builtins"
 				}
 			}
 		}
