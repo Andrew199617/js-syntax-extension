@@ -9,6 +9,13 @@ and take advantage of the builtin Object.create and Object.assign functions to c
 
 # Features
 
+## Compile .js file into .ts file automagically.
+
+The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings.
+
+![Auto compile JS](./images/autocompile.gif)
+
+
 ### Highlight Foo.create() like new Foo(). 
 
 ![Foo.create Highlighting](./images/objectcreate.png)
@@ -39,6 +46,16 @@ and take advantage of the builtin Object.create and Object.assign functions to c
 - variable.react
 - keyword.create
 
+## Settings
+
+Automatically enerate type file using this setting. You can all call the command, lgd.generateTypings.
+
+`
+lgd.options = {
+  generateTypings: true
+}
+`
+
 ## Requirements
 
 None
@@ -48,6 +65,12 @@ None
 None
 
 ## Release Notes
+
+### 2.0.0
+
+- Compile a js file into a .d.ts file. 
+  - This will allow you to have intellisense throughout the whole project.
+  - Activate auto compile with settings.
 
 ### 1.1.3 - 1.1.5
 
