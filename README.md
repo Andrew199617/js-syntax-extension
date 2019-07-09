@@ -11,7 +11,10 @@ and take advantage of the builtin Object.create and Object.assign functions to c
 
 ## Compile .js file into .ts file automagically.
 
-The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings.
+The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings. 
+- Add compilerOptions.checkJs = true to your jsconfig.json or allowJs in tsconfig.json
+- The autocompile is sensitive to tab size. It currently only allows a tab size of 2. Future release will allow you to modify this.
+- You have to use Stroustrup or Allman style brackets.
 
 ![Auto compile JS](./images/autocompile.gif)
 
