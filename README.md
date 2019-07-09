@@ -69,9 +69,10 @@ None
 
 ## Release Notes
 
-### 2.0.3
+### 2.0.3 - 2.0.4
 
 - Add async and prevent breaking on nested functions
+- Add ability to parse defaultValue in function paramaters.
 
 ### 2.0.0 - 2.0.2
 

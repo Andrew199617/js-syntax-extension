@@ -28,7 +28,16 @@ const FileParser = {
         continue;
       }
       let type = commentParams[variables[i]];
-      functionCall += `${variables[i]}: ${type || 'any'}${i < variables.length - 1 ? ', ' : ''}`;
+      
+      // The type gotten from the default value.
+      let parsedType = null;
+      if(variables[i].includes('=')) {
+        let expr = variables[i].split('=').map(val => val.trim());
+        variables[i] = expr[0];
+        const defaultValue = expr[1];
+        parsedType = this.parseValue(defaultValue);
+      }
+      functionCall += `${variables[i]}: ${type || parsedType || 'any'}${i < variables.length - 1 ? ', ' : ''}`;
     }
 
     functionCall += ')';
