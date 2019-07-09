@@ -37,6 +37,7 @@ const FileParser = {
         const defaultValue = expr[1];
         parsedType = this.parseValue(defaultValue);
       }
+      
       functionCall += `${variables[i]}: ${type || parsedType || 'any'}${i < variables.length - 1 ? ', ' : ''}`;
     }
 
@@ -193,15 +194,16 @@ const FileParser = {
     if(Allman) {
       console.warn('Allman not implemented');
     }
+    const tabSize = lgd.configuration.options.tabSize;
 
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
-    const tabSize = '^(?<tabs>\\s*)';
+    const tabRegex = '^(?<tabs>\\s*)';
     const functionKeywords = '(?<keyword>async\\s*|)';
     const varaibleName = '(?<name>\\w+?)';
-    const functionRegex = '((?<params>\\(.*?\\))\\s*?{(?<function>.*?)^\\s{2}(}|},)$';
-    const valueRegex = '|\\s*:\\s*(\\[(?<array>.*?)^\\s{2}\\]|(?<value>.*?)))(,|$)';
+    const functionRegex = `((?<params>\\(.*?\\))\\s*?{(?<function>.*?)^\\s{${tabSize}}(}|},)$`;
+    const valueRegex = `|\\s*:\\s*(\\[(?<array>.*?)^\\s{${tabSize}}\\]|(?<value>.*?)))(,|$)`;
     const propertiesRegex = new RegExp([
-      comment, tabSize, 
+      comment, tabRegex, 
       functionKeywords, varaibleName, 
       functionRegex, valueRegex
     ].join(''),'gms');
