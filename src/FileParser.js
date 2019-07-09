@@ -62,9 +62,7 @@ const FileParser = {
 
     let values = valuesStr.split(',').map(val => val.trim());
 
-    let types = {
-      length: 0
-    };
+    let types = [];
 
     for(let i = 0; i < values.length; ++i) {
       const type = this.parseValue(values[i]);
@@ -72,16 +70,16 @@ const FileParser = {
         return 'any[]'
       }
 
-      if(!types[type]) {
-        types[type] = 1;
-        types.length++;
+      if(!types.includes(type)) {
+        types.push(type);
       }
     }
     
     if(types.length === 1) {
-      delete types.length;
-      typeKeys = Object.keys(types);
-      return `${typeKeys[0]}[]`;
+      return `${types[0]}[]`;
+    }
+    else if(types.length > 1) {
+      return `(${types.join(' | ')})[]`;
     }
 
     return 'any[]';
@@ -90,23 +88,31 @@ const FileParser = {
   /**
    * @description Parses any property values.
    * @param {*} value the value of the property.
+   * @param {*} type the property type.
    * @returns {any} the type.
    */
-  parseValue(value) {
+  parseValue(value, type) {
     if(typeof value === 'undefined') {
       return null;
     }
+    valueTrimed = value.trim();
 
-    if(value === 'true' || value === 'false') {
+    if(valueTrimed === 'true' || valueTrimed === 'false') {
       return 'boolean';
     }
-    if(value.includes("'") || value.includes('"')) {
+    else if(value.includes('[') && value.includes(']')) {
+      return this.parseArray(value.replace('[', '').replace(/](?!.*])/, ''));
+    }
+    else if(value.includes("'") || value.includes('"') || value.includes('`')) {
       return 'string';
     }
     else if(!isNaN(parseInt(value))) {
       return 'number';
     }
-    else if(value === 'null' || value === 'undefined') {
+    else if(valueTrimed === 'null' || valueTrimed === 'undefined') {
+      if(type) {
+        return type;
+      }
       return 'any';
     }
     else if(value.includes('{') && value.includes('}')) {
@@ -117,9 +123,7 @@ const FileParser = {
   },
 
   parseComment(comment, options, isAsync) {
-    let description = /@description(?!$)\s*(?<description>.*?(\s|\*)(?=@|\*\/)|.*?$)/gms;
-    let jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
-    let typesRegex = /.*?(?<type>\s*{.*?}+)/g;
+    let jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}(?!})|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
 
     let doc;
     let numReturns = 0;
@@ -185,7 +189,7 @@ const FileParser = {
    * @param {string} object 
    * @returns {string} parsed object.
    */
-  parseObject(object) {
+  parseObject(object, tabLevel = 1) {
     // Block \s*?\(\s*?\)\s*?{.*?}
     // If Statement if\s*\(((?!\s*\{).*?)\)\s*\{.*?\}$
     // if statement on same line ^(?<tabs>\s*)if\s*\(((?!\s*{).*?)\)\s*{.*?(?P=tabs)}$
@@ -194,14 +198,15 @@ const FileParser = {
     if(Allman) {
       console.warn('Allman not implemented');
     }
-    const tabSize = lgd.configuration.options.tabSize;
+    const tabSize = lgd.configuration.options.tabSize * tabLevel;
 
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
     const tabRegex = '^(?<tabs>\\s*)';
     const functionKeywords = '(?<keyword>async\\s*|)';
     const varaibleName = '(?<name>\\w+?)';
     const functionRegex = `((?<params>\\(.*?\\))\\s*?{(?<function>.*?)^\\s{${tabSize}}(}|},)$`;
-    const valueRegex = `|\\s*:\\s*(\\[(?<array>.*?)^\\s{${tabSize}}\\]|(?<value>.*?)))(,|$)`;
+    const end = `((,|)[[:blank:]]*?($|\/\/|\/\*))`
+    const valueRegex = `|\\s*:\\s*(\\[(?<array>.*?)^\\s{${tabSize}}\\]|{(?<object>.*?)^\\s{${tabSize}}}|(?<value>.*?)))(,|$)`;
     const propertiesRegex = new RegExp([
       comment, tabRegex, 
       functionKeywords, varaibleName, 
@@ -217,27 +222,39 @@ const FileParser = {
         isFunction: false,
         params: {}
       };
+
       const isAsync = properties.groups.keyword && properties.groups.keyword.includes('async');
       property += `\n\t`;
       property += this.parseComment(properties.groups.comment, options, isAsync);
+
       let functionParamaters = '';
       if(properties.groups.params) {
         functionParamaters = this.parseFunction(properties.groups.params, options.params);
       }
       
       if(!options.type) {
-        options.type = (properties.groups.function 
-          ? (properties.groups.function.includes('return') 
-            ? 'any'
-            : 'void')
-          : 'void');
+        if (properties.groups.object) {
+          options.type = '{';
+          options.type += this.parseObject(properties.groups.object, tabLevel + 1)
+            .split('\n')
+            .map(str => `\t${str}`)
+            .join('\n');
+          options.type += '}';
+        }
+        else {
+          options.type = (properties.groups.function 
+            ? (properties.groups.function.includes('return') 
+              ? 'any'
+              : 'void')
+            : 'void');
+        }
       }
       else {
         options.type = this.parseType(options.type);
       }
       options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
 
-      const type = this.parseValue(properties.groups.value) 
+      const type = this.parseValue(properties.groups.value, options.type) 
         || this.parseArray(properties.groups.array)
         || options.type;
       property += `${properties.groups.name}${functionParamaters}: ${type};`;

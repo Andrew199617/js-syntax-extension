@@ -13,7 +13,8 @@ and take advantage of the builtin Object.create and Object.assign functions to c
 
 The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings. 
 - Add compilerOptions.checkJs = true to your jsconfig.json or allowJs in tsconfig.json
-- The autocompile is sensitive to tab size. It picks up your tab size from editor.tabSize.
+- The autocompile is sensitive to tab size. It picks up your tab size from editor.tabSize. 
+- Set "editor.detectIndentation": false
 - You have to use Stroustrup or Allman style brackets.
 
 ![Auto compile JS](./images/autocompile.gif)
