@@ -7,6 +7,9 @@ these keywords.
 The is also many ways to create a class in JavaScript since there is not such thing as a class only objects. We like to use Object literals 
 and take advantage of the builtin Object.create and Object.assign functions to create classes from the Object literals.
 
+### Other Extensions:
+- JS/React Snippet Extension
+
 # Features
 
 ## Compile .js file into .ts file automagically.
