@@ -13,6 +13,14 @@ global.lgd = {
 
 let lgdDiagnosticCollection;
 
+// TODO: add generate propTypes command.
+// "keybindings": [{
+//     "command": "lgd.generateTypings",
+//     "key": "ctrl+shift+c",
+//     "mac": "cmd+shift+c",
+//     "when": "editorTextFocus"
+// }],
+
 function activate(context)
 {
     if(!lgd.configuration.options.generateTypings) {

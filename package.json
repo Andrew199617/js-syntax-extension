@@ -30,7 +30,8 @@
         "commands": [
             {
                 "command": "lgd.generateTypings",
-                "title": "Compile js file to ts file."
+                "title": "Compile js file to ts file.",
+                "category": "LGD"
             }
         ],
         "configuration": {
