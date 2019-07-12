@@ -23,9 +23,6 @@ let lgdDiagnosticCollection;
 
 function activate(context)
 {
-    if(!lgd.configuration.options.generateTypings) {
-        return;
-    }
 
     lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
 
@@ -38,7 +35,7 @@ function activate(context)
 
             if (document.fileName.endsWith(JS_EXT))
             {
-                document.save();
+                GenerateTypings.create(document, lgdDiagnosticCollection).execute()
             }
             else
             {
@@ -54,15 +51,31 @@ function activate(context)
     // compile less on save when file is dirty
     const didSaveEvent = vscode.workspace.onDidSaveTextDocument(document =>
     {
+        global.lgd = {
+            configuration: Configuration.create()
+        }
+
+        if(!lgd.configuration.options.generateTypings) {
+            return;
+        }
+
         if (document.fileName.endsWith(JS_EXT))
         {
             GenerateTypings.create(document, lgdDiagnosticCollection).execute()
         }
     });
 
-    // compile less on save when file is clean (clean saves don't trigger onDidSaveTextDocument, so use this as fallback)
+    // compile js on save when file is clean (clean saves don't trigger onDidSaveTextDocument, so use this as fallback)
     const willSaveEvent = vscode.workspace.onWillSaveTextDocument(e =>
     {
+        global.lgd = {
+            configuration: Configuration.create()
+        }
+
+        if(!lgd.configuration.options.generateTypings) {
+            return;
+        }
+        
         if (e.document.fileName.endsWith(JS_EXT) && !e.document.isDirty)
         {
             GenerateTypings.create(e.document, lgdDiagnosticCollection).execute()

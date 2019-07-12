@@ -2,6 +2,13 @@
 
 All notable changes to the "js-syntax-extension" extension will be documented in this file.
 
+## V2
+
+### 2.0.5 - 2.0.6 
+
+- Command works now even if you dont have generateTypings set.
+- Fixed typed file. interface needs to have a different name than the object for vscode to pick up.
+
 ### 2.0.3 - 2.0.4
 
 - Add async and prevent breaking on nested functions
@@ -12,6 +19,8 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Compile a js file into a .d.ts file. 
   - This will allow you to have intellisense throughout the whole project.
   - Activate auto compile with settings.
+
+## V1
 
 ### 1.1.3 - 1.1.5
 

@@ -12,8 +12,8 @@ const Configuration = {
 
   create() {
     const configuration = Object.assign({}, Configuration);
-    configuration.options = vscode.workspace.getConfiguration("lgd").get("options");
-    configuration.options.tabSize = vscode.workspace.getConfiguration("editor").get("tabSize");
+    configuration.options = vscode.workspace.getConfiguration("lgd", null).get("options");
+    configuration.options.tabSize = vscode.workspace.getConfiguration("editor", null).get("tabSize");
     return configuration; 
   }
 }

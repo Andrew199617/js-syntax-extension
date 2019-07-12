@@ -259,11 +259,11 @@ const FileParser = {
     while((object = objectLiterals.exec(content)) !== null) {
       typeFile += `\n`;
       typeFile += object.groups.comment;
-      typeFile += `declare interface ${object.groups.name} {`;
+      typeFile += `declare interface ${object.groups.name}Type {`;
       typeFile += this.parseObject(object.groups.object);
       typeFile += `}\n`;
     } 
-
+    
     return typeFile;
   }
 }

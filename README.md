@@ -12,12 +12,15 @@ and take advantage of the builtin Object.create and Object.assign functions to c
 
 # Features
 
-## Compile .js file into .ts file automagically.
+## Compile .js file into .ts file automagically. Read below to use!
 
 The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings. 
-- Add compilerOptions.checkJs = true to your jsconfig.json or allowJs in tsconfig.json
+- You need to have a jsconfig or tsconfig for vscode to pick up your typings automatically.
 - The autocompile is sensitive to tab size. It picks up your tab size from editor.tabSize.
 - You have to use Stroustrup or Allman style brackets.
+### Make sure you set your @type tag corrrectly. 
+- We will generate a interface like {classname}Type. Add @type {{classname}Type} to the object literal.
+- This is how it will work for now V3 will add these types to your file automagically.
 
 ![Auto compile JS](./images/autocompile.gif)
 
@@ -54,7 +57,8 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 ## Settings
 
-Automatically enerate type file using this setting. You can all call the command, lgd.generateTypings.
+You can all call the command, Compile js file into ts file.
+Automatically enerate type file using this setting. 
 
 `
 lgd.options = {
@@ -68,9 +72,19 @@ None
 
 ## Known Issues
 
-None
+Everything is thrown in the typings folder.
+We need to add option to keep directory structure in typings folder.
+
+Manual Adding of Class type.
 
 ## Release Notes
+
+## V2
+
+### 2.0.5 - 2.0.6 
+
+- Command works now even if you dont have generateTypings set.
+- Fixed typed file. interface needs to have a different name than the object for vscode to pick up.
 
 ### 2.0.3 - 2.0.4
 
@@ -82,6 +96,8 @@ None
 - Compile a js file into a .d.ts file. 
   - This will allow you to have intellisense throughout the whole project.
   - Activate auto compile with settings.
+
+## V1
 
 ### 1.1.3 - 1.1.5
 

@@ -1,4 +1,3 @@
-const  mkpath = require('mkpath');
 const  path = require('path');
 const  fs = require('fs');
 const  vscode = require('vscode');
@@ -31,8 +30,7 @@ function writeFileContents(filepath, content)
 {
     return new Promise((resolve, reject) =>
     {
-        mkpath(path.dirname(filepath), err =>
-        {
+        const write = err => {
             if (err)
             {
                 return reject(err);
@@ -49,7 +47,9 @@ function writeFileContents(filepath, content)
                     resolve()
                 }
             });
-        });
+        };
+
+        fs.existsSync(path.dirname(filepath)) ? write(null) : fs.mkdir(path.dirname(filepath), { recursive: true }, write);
     });
 }
 
