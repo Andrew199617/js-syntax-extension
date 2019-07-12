@@ -24,7 +24,6 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 ![Auto compile JS](./images/autocompile.gif)
 
-
 ### Highlight Foo.create() like new Foo(). 
 
 ![Foo.create Highlighting](./images/objectcreate.png)
@@ -45,7 +44,36 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 ### Change the color using these in your settings
 
-![Color Settings](./images/colorsettings.png)
+``` json
+"editor.tokenColorCustomizations": {
+    "textMateRules": [
+        {
+            "scope": "comment.todo",
+            "settings": {
+                "foreground": "#EE82EE"
+            }
+        },
+        {
+            "scope": "comment.issue",
+            "settings": {
+                "foreground": "#5555EE"
+            }
+        },
+        {
+            "scope": "variable.react",
+            "settings": {
+                "foreground": "#9370DB"
+            }
+        },
+        {
+            "scope": "variable.next",
+            "settings": {
+                "foreground": "#9370DB"
+            }
+        }
+    ]
+},
+```
 
 ## All Scopes
 
@@ -60,15 +88,19 @@ The .ts file will be placed into the typings folder in your root directory. This
 You can all call the command, Compile js file into ts file.
 Automatically enerate type file using this setting. 
 
-`
-lgd.options = {
-  generateTypings: true
+``` json
+{
+  "lgd.options": {
+    "generateTypings": true
+  }
 }
-`
+```
 
-## Requirements
+## Goals for 2019
 
-None
+- Auto Compile whole project into typings folder.
+- Auto Compile React Class.
+- AutoComplete for React Proptypes.
 
 ## Known Issues
 
