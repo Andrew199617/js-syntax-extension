@@ -101,6 +101,7 @@ Automatically enerate type file using this setting.
 - Auto Compile whole project into typings folder.
 - Auto Compile React Class.
 - AutoComplete for React Proptypes.
+- Classes with Type at the end need to show as error.
 
 ## Known Issues
 
