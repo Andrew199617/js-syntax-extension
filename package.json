@@ -8,7 +8,7 @@
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS files. Support React + Next.js.",
-    "version": "2.0.7",
+    "version": "2.1.0",
     "engines": {
         "vscode": "^1.1.0"
     },
@@ -16,7 +16,8 @@
         "js-syntax",
         "js", "javascript",
         "Learn Game Development", "LGD",
-        "react", "next"
+        "react", "next",
+        "typescript", "ts", ".ts"
     ],
     "categories": [
         "Programming Languages"

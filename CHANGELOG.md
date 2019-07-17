@@ -4,6 +4,13 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ## V2
 
+### 2.1.0
+
+- Compile to js to ts now working with inline array.
+- Add static keyword.
+- Problems being shown for you to fix.
+- Create method being parsed for non static variables.
+
 ### 2.0.5 - 2.0.7 
 
 - Command works now even if you dont have generateTypings set.
