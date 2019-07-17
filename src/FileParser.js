@@ -57,7 +57,7 @@ const FileParser = {
 
     if(valuesStr.includes('[') && valuesStr.includes(']')) {
       console.warn('No array of array implemented yet.');
-      return 'any[]';
+      return '(any | any[])[]';
     }
 
     let values = valuesStr.split(',').map(val => val.trim());
@@ -82,6 +82,17 @@ const FileParser = {
       delete types.length;
       typeKeys = Object.keys(types);
       return `${typeKeys[0]}[]`;
+    }
+    else if (types.length > 1) {
+      delete types.length;
+      typeKeys = Object.keys(types);
+      let typeStr = '(';
+      for(let i = 0; i < typeKeys.length; ++i) {
+        typeStr += typeKeys[i];
+        typeStr += i < typeKeys.length - 1 ? ' | ' : '';
+      }
+      typeStr += ')[]';
+      return typeStr;
     }
 
     return 'any[]';
@@ -119,7 +130,7 @@ const FileParser = {
   parseComment(comment, options, isAsync) {
     let description = /@description(?!$)\s*(?<description>.*?(\s|\*)(?=@|\*\/)|.*?$)/gms;
     let jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
-    let typesRegex = /.*?(?<type>\s*{.*?}+)/g;
+    let typesRegex = /.*?(?<type>{.*?})/g;
 
     let doc;
     let numReturns = 0;
@@ -173,6 +184,12 @@ const FileParser = {
     return comment;
   },
 
+  /**
+   * @description Change any obvious types to typescript types.
+   * bool -> boolean
+   * @param {string} type
+   * @returns {string}
+   */
   parseType(type) {
     let newType = type
     newType = newType.replace(/bool(?!ean)/g, 'boolean');
@@ -180,12 +197,72 @@ const FileParser = {
     return newType;
   },
 
+  getClassInCreate(insideFunction) {
+    const classNameRegex = /(const|let|var) (?<name>\w+?)\s*=\s*Object\.(create|assign)\s*?\(/ms;
+    let className = classNameRegex.exec(insideFunction);
+    return className && className.groups.name;
+  },
+
+  /**
+   * @description parse the create funciton for variables.
+   * These varaibles are treated like normal variables 
+   * variables on the object literal are treated like static.
+   * @returns {string}
+   */
+  parseCreate(tabSize, insideFunction) {
+    const className = this.getClassInCreate(insideFunction);
+
+    if(!className) {
+      throw new Error('Could not parse class name in create.');
+      return '';
+    }
+
+    const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
+    const tabRegex = `^(?<tabs>\\s{${tabSize}})`;
+    const varaibleName = `${className}\\.(?<name>\\w+?)\\s*?=\\s*?`;
+    const valueRegex = `((\\[(?<array>.*?)^\\s{${tabSize}}\\]|(?<value>.*?)))(;|$)`;
+    const variablesRegex = new RegExp([
+      comment, tabRegex, 
+      varaibleName, valueRegex
+    ].join(''),'gms');
+
+    let variable;
+    let variables = '';
+    while((variable = variablesRegex.exec(insideFunction)) !== null) {
+      const options = {
+        type: undefined      
+      };
+
+      let comment = this.parseComment(variable.groups.comment, options, false);
+
+      if(options.type) {
+        options.type = this.parseType(options.type);
+      }
+
+      const type = this.parseValue(variable.groups.value) 
+        || this.parseArray(variable.groups.array)
+        || options.type;
+
+      // Must be a es6 function.
+      if(typeof type === 'undefined') {
+        throw new Error(`Could not parse ${variable.groups.name} in create function. No functions declarations in create()`);
+      }
+
+      variables += `\n\t`;
+      variables += comment;
+      variables += `${variable.groups.name}: ${type};`;
+      variables += `\n`;
+    }
+
+    return variables || '';
+  },
+
   /**
    * Parse an object literal into properties for a ts file.
    * @param {string} object 
    * @returns {string} parsed object.
    */
-  parseObject(object) {
+  parseClass(object) {
     // Block \s*?\(\s*?\)\s*?{.*?}
     // If Statement if\s*\(((?!\s*\{).*?)\)\s*\{.*?\}$
     // if statement on same line ^(?<tabs>\s*)if\s*\(((?!\s*{).*?)\)\s*{.*?(?P=tabs)}$
@@ -196,15 +273,22 @@ const FileParser = {
     }
     const tabSize = lgd.configuration.options.tabSize;
 
+    const varName = '\\w+?';
+    const varDeliminator = '\\s*?:\\s*';
+    const varEnd = `(,|$)(?=\\s*(\\/|}|${varName}${varDeliminator}))`;
+    const tab = `\\s{${tabSize}}`;
+
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
-    const tabRegex = '^(?<tabs>\\s*)';
+    const tabRegex = `^(?<tabs>${tab})`;
     const functionKeywords = '(?<keyword>async\\s*|)';
-    const varaibleName = '(?<name>\\w+?)';
-    const functionRegex = `((?<params>\\(.*?\\))\\s*?{(?<function>.*?)^\\s{${tabSize}}(}|},)$`;
-    const valueRegex = `|\\s*:\\s*(\\[(?<array>.*?)^\\s{${tabSize}}\\]|(?<value>.*?)))(,|$)`;
+    const varaibleNameRegex = `(?<name>${varName})`;
+    const functionRegex = `((?<params>\\(.*?\\))\\s*?{(?<function>.*?)^${tab}(}|},)$`;
+    const arrayRegex = `\\[(?<array>.*?)\\](${varEnd}|,\\s*$)`
+    const valueRegex = `|${varDeliminator}(${arrayRegex}|(?<value>.*?)${varEnd}))`;
+
     const propertiesRegex = new RegExp([
       comment, tabRegex, 
-      functionKeywords, varaibleName, 
+      functionKeywords, varaibleNameRegex, 
       functionRegex, valueRegex
     ].join(''),'gms');
 
@@ -212,17 +296,27 @@ const FileParser = {
     let property = '';
 
     while((properties = propertiesRegex.exec(object)) !== null) {
+      let keywords = '';
       const options = {
         type: undefined,
         isFunction: false,
         params: {}
       };
       const isAsync = properties.groups.keyword && properties.groups.keyword.includes('async');
+
+      if(properties.groups.name === 'create') {
+        const tabLevel = 2;
+        property += this.parseCreate(tabSize * tabLevel, properties.groups.function);
+      }
+
       property += `\n\t`;
       property += this.parseComment(properties.groups.comment, options, isAsync);
       let functionParamaters = '';
       if(properties.groups.params) {
         functionParamaters = this.parseFunction(properties.groups.params, options.params);
+      }
+      else {
+        keywords = 'static '
       }
       
       if(!options.type) {
@@ -237,10 +331,16 @@ const FileParser = {
       }
       options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
 
-      const type = this.parseValue(properties.groups.value) 
+      let type = this.parseValue(properties.groups.value) 
         || this.parseArray(properties.groups.array)
         || options.type;
-      property += `${properties.groups.name}${functionParamaters}: ${type};`;
+
+      // Use comment type if not parsed type.
+      if(type === 'any' || !type) {
+        type = options.type;
+      }
+
+      property += `${keywords}${properties.groups.name}${functionParamaters}: ${type};`;
       property += `\n`;
     } 
 
@@ -260,7 +360,7 @@ const FileParser = {
       typeFile += `\n`;
       typeFile += object.groups.comment;
       typeFile += `declare interface ${object.groups.name}Type {`;
-      typeFile += this.parseObject(object.groups.object);
+      typeFile += this.parseClass(object.groups.object);
       typeFile += `}\n`;
     } 
     
