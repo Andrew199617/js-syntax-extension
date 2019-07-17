@@ -2,11 +2,19 @@ const  vscode = require('vscode');
 
 /**
  * @description get the configuration for vscode.
+ * @type {FileParserType}
  */
 const FileParser = {
 
   create() {
     const fileParser = Object.assign({}, FileParser);
+
+    /**
+     * @description the variables that the class contains.
+     * @type {string[]}
+     */
+    fileParser.variables = null;
+
     return fileParser;
   },
 
@@ -123,6 +131,9 @@ const FileParser = {
     else if(value.includes('{') && value.includes('}')) {
       return 'object';
     }
+    else if(value.includes('[') && value.includes(']')) {
+      return 'any[]';
+    }
 
     return null;
   },
@@ -214,7 +225,6 @@ const FileParser = {
 
     if(!className) {
       throw new Error('Could not parse class name in create.');
-      return '';
     }
 
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
@@ -246,6 +256,10 @@ const FileParser = {
       // Must be a es6 function.
       if(typeof type === 'undefined') {
         throw new Error(`Could not parse ${variable.groups.name} in create function. No functions declarations in create()`);
+      }
+
+      if(this.variables.includes(variable.groups.name)) {
+        throw new Error(`Already defined ${variable.groups.name} as static variable.`);
       }
 
       variables += `\n\t`;
@@ -340,6 +354,7 @@ const FileParser = {
         type = options.type;
       }
 
+      this.variables.push(properties.groups.name);
       property += `${keywords}${properties.groups.name}${functionParamaters}: ${type};`;
       property += `\n`;
     } 
@@ -353,6 +368,7 @@ const FileParser = {
    * @returns {string} the the type file to write to disk.
    */
   parse(content) {
+    this.variables = [];
     const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(const|let|var) (?<name>\w+?) = {(?<object>.*?)^}/gms;
     let object;
     let typeFile = '';
