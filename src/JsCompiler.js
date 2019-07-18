@@ -12,8 +12,15 @@ async function compile(jsFile, content)
 {
     const typeFile = FileParser.parse(content);
     
-    const baseFilename = path.parse(jsFile).name;
-    const typeFilePath = `${vscode.workspace.rootPath}\\${DEFAULT_DIR}\\${baseFilename}${DEFAULT_EXT}`;
+    const parsedPath = path.parse(jsFile);
+    
+    let dirInRoot = "";
+    if(lgd.configuration.options.maintainHierarchy) {
+        dirInRoot = parsedPath.dir.replace(vscode.workspace.rootPath, "");
+    }
+
+    const baseFilename = parsedPath.name;
+    const typeFilePath = `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${dirInRoot}\\${baseFilename}${DEFAULT_EXT}`;
 
     await writeFileContents(typeFilePath, typeFile);
     return;

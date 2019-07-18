@@ -4,8 +4,9 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ## V2
 
-### 2.1.1
+### 2.1.1 - 2.1.2
 
+- Added maintainHierarchy to settings.
 - Improved parsing of create method.
 
 ### 2.1.0

@@ -8,7 +8,7 @@
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS files. Support React + Next.js.",
-    "version": "2.1.1",
+    "version": "2.1.2",
     "engines": {
         "vscode": "^1.1.0"
     },
@@ -45,8 +45,13 @@
                     "properties": {
                         "generateTypings": {
                             "type": "boolean",
-                            "description": "Whether we should automaticall compile js files into ts files.",
+                            "description": "Whether we should automatically compile js files into ts files.",
                             "default": false
+                        },
+                        "maintainHierarchy": {
+                            "type": "boolean",
+                            "description": "When compiling the js file should we keep the directory structure.",
+                            "default": true
                         }
                     }
                 }

@@ -22,7 +22,11 @@ The .ts file will be placed into the typings folder in your root directory. This
 - We will generate a interface like {classname}Type. Add @type {{classname}Type} to the object literal.
 - This is how it will work for now V3 will add these types to your file automagically.
 
+### Auto Compile
 ![Auto compile JS](./images/autocompile.gif)
+
+### Maintain Hierarchy
+![Auto compile JS](./images/maintainhierarchy.gif)
 
 ### Highlight Foo.create() like new Foo(). 
 
@@ -91,7 +95,8 @@ Automatically enerate type file using this setting.
 ``` json
 {
   "lgd.options": {
-    "generateTypings": true
+    "generateTypings": true,
+    "maintainHierarchy": true
   }
 }
 ```
@@ -105,8 +110,8 @@ Automatically enerate type file using this setting.
 
 ## Known Issues
 
-Everything is thrown in the typings folder.
-We need to add option to keep directory structure in typings folder.
+~~Everything is thrown in the typings folder.~~
+~~We need to add option to keep directory structure in typings folder.~~
 
 Manual Adding of Class type.
 
@@ -114,8 +119,9 @@ Manual Adding of Class type.
 
 ## V2
 
-### 2.1.1
+### 2.1.1 - 2.1.2
 
+- Added maintainHierarchy to settings.
 - Improved parsing of create method.
 
 ### 2.1.0
