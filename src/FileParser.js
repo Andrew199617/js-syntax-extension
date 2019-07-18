@@ -211,13 +211,19 @@ const FileParser = {
   getClassInCreate(insideFunction) {
     const classNameRegex = /(const|let|var) (?<name>\w+?)\s*=\s*Object\.(create|assign)\s*?\(/ms;
     let className = classNameRegex.exec(insideFunction);
-    return className && className.groups.name;
+
+    if(!className) {
+      throw new Error('Could not find class instance in create method. Are you creating the instance using Object.create of Object.assign.');
+    }
+
+    return className.groups.name;
   },
 
   /**
    * @description parse the create funciton for variables.
    * These varaibles are treated like normal variables 
    * variables on the object literal are treated like static.
+   * @param {string} insideFunction
    * @returns {string}
    */
   parseCreate(tabSize, insideFunction) {
@@ -227,10 +233,21 @@ const FileParser = {
       throw new Error('Could not parse class name in create.');
     }
 
-    const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
-    const tabRegex = `^(?<tabs>\\s{${tabSize}})`;
-    const varaibleName = `${className}\\.(?<name>\\w+?)\\s*?=\\s*?`;
-    const valueRegex = `((\\[(?<array>.*?)^\\s{${tabSize}}\\]|(?<value>.*?)))(;|$)`;
+    const thisRegex = /this\./m;
+    if(thisRegex.test(insideFunction)) {
+      throw new Error("Don't use this in create method. This has unintended consequenses.");
+    }
+    
+    const varName = '\\w+?';
+    const varDeliminator = '\\s*?=\\s*';
+    const varEnd = `(;|$)(?=\\s*(\\/|\\w+?))`;
+    const tab = `\\s{${tabSize}}`;
+
+    const comment = '(?<comment>(\\/\\*\\*.*?\\*\\/.*?|))';
+    const tabRegex = `^(?<tabs>${tab})`;
+    const varaibleName = `${className}\\.(?<name>${varName})${varDeliminator}`;
+    const arrayRegex = `\\[(?<array>.*?)\\](${varEnd}|;\\s*$)`
+    const valueRegex = `((${arrayRegex}|(?<value>.*?)${varEnd}))`;
     const variablesRegex = new RegExp([
       comment, tabRegex, 
       varaibleName, valueRegex
@@ -259,9 +276,9 @@ const FileParser = {
       }
 
       if(this.variables.includes(variable.groups.name)) {
-        throw new Error(`Already defined ${variable.groups.name} as static variable.`);
+        throw new Error(`Already defined ${variable.groups.name} as static variable or function.`);
       }
-
+      
       variables += `\n\t`;
       variables += comment;
       variables += `${variable.groups.name}: ${type};`;

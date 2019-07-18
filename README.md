@@ -114,6 +114,10 @@ Manual Adding of Class type.
 
 ## V2
 
+### 2.1.1
+
+- Improved parsing of create method.
+
 ### 2.1.0
 
 - Compile to js to ts now working with inline array.
