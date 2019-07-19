@@ -52,7 +52,7 @@ const GenerateTypings = {
                 case 'EACCES':
                 case 'ENOENT':
                     message = `Cannot open file '${fileSystemError.path}'`;
-                    const firstLin = this.document.lineAt(0);
+                    const firstLine = this.document.lineAt(0);
                     range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
             }
         }

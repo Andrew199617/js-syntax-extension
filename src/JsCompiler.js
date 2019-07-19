@@ -23,13 +23,29 @@ async function compile(jsFile, content)
     const typeFilePath = `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${dirInRoot}\\${baseFilename}${DEFAULT_EXT}`;
 
     await writeFileContents(typeFilePath, typeFile);
-    return;
 
+    return;
 }
 
-function intepolatePath(path)
-{
-    return (path).replace(/\$\{workspaceRoot\}/g, vscode.workspace.rootPath);
+async function mkdirRecursive(fullDir, callback) {
+    let dirs = fullDir.replace(`${vscode.workspace.rootPath}\\`, "");
+    dirs = dirs.split(/\\/)
+        .map((dir, index, array) => {
+            let subDir = '';
+            for(let i = 0; i < index; ++i) {
+                subDir += `${array[i]}\\`;
+            }
+
+            return `${vscode.workspace.rootPath}\\${subDir}${dir}`;
+        })
+        
+    for(let currentDir = 0; currentDir < dirs.length; currentDir++) {
+        if(!fs.existsSync(dirs[currentDir])) {
+            await fs.mkdir(dirs[currentDir], { recursive: true }, err => { throw err });
+        }
+    }
+
+    callback();
 }
 
 // writes a file's contents in a path where directories may or may not yet exist
@@ -56,52 +72,9 @@ function writeFileContents(filepath, content)
             });
         };
 
-        fs.existsSync(path.dirname(filepath)) ? write(null) : fs.mkdir(path.dirname(filepath), { recursive: true }, write);
+        const dir = path.dirname(filepath);
+        fs.existsSync(dir) ? write(null) : mkdirRecursive(dir, write);
     });
-}
-
-function readFilePromise(filename, encoding)
-{
-    return new Promise((resolve, reject) =>
-    {
-        fs.readFile(filename, encoding, (err, data) =>
-        {
-            if (err) 
-            {
-                reject(err)
-            }
-            else
-            {
-                resolve(data);
-            }
-        });
-    });
-}
-
-function chooseExtension(options)
-{
-    if (options && options.outExt)
-    {
-        if (options.outExt === "")
-        {
-            // special case for no extension (no idea if anyone would really want this?)
-            return "";
-        }
-
-        return ensureDotPrefixed(options.outExt) || DEFAULT_EXT;
-    }
-
-    return DEFAULT_EXT;
-}
-
-function ensureDotPrefixed(extension)
-{
-    if (extension.startsWith("."))
-    {
-        return extension;
-    }
-
-    return extension ? `.${extension}` : "";
 }
 
 module.exports = {

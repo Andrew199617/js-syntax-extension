@@ -8,7 +8,7 @@
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS files. Support React + Next.js.",
-    "version": "2.1.2",
+    "version": "2.1.3",
     "engines": {
         "vscode": "^1.1.0"
     },

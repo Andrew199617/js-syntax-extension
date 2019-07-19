@@ -8,10 +8,9 @@ const JS_EXT = ".js";
 const COMPILE_COMMAND = "lgd.generateTypings";
 
 global.lgd = {
-    configuration: Configuration.create()
+    configuration: Configuration.create(),
+    lgdDiagnosticCollection: null
 }
-
-let lgdDiagnosticCollection;
 
 // TODO: add generate propTypes command.
 // "keybindings": [{
@@ -24,7 +23,7 @@ let lgdDiagnosticCollection;
 function activate(context)
 {
 
-    lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
+    lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
 
     const compileLessSub = vscode.commands.registerCommand(COMPILE_COMMAND, () =>
     {
@@ -35,7 +34,7 @@ function activate(context)
 
             if (document.fileName.endsWith(JS_EXT))
             {
-                GenerateTypings.create(document, lgdDiagnosticCollection).execute()
+                GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
             }
             else
             {
@@ -52,7 +51,8 @@ function activate(context)
     const didSaveEvent = vscode.workspace.onDidSaveTextDocument(document =>
     {
         global.lgd = {
-            configuration: Configuration.create()
+            configuration: Configuration.create(),
+            lgdDiagnosticCollection: lgd.lgdDiagnosticCollection
         }
 
         if(!lgd.configuration.options.generateTypings) {
@@ -61,7 +61,7 @@ function activate(context)
 
         if (document.fileName.endsWith(JS_EXT))
         {
-            GenerateTypings.create(document, lgdDiagnosticCollection).execute()
+            GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
         }
     });
 
@@ -69,7 +69,8 @@ function activate(context)
     const willSaveEvent = vscode.workspace.onWillSaveTextDocument(e =>
     {
         global.lgd = {
-            configuration: Configuration.create()
+            configuration: Configuration.create(),
+            lgdDiagnosticCollection: lgd.lgdDiagnosticCollection
         }
 
         if(!lgd.configuration.options.generateTypings) {
@@ -78,7 +79,7 @@ function activate(context)
         
         if (e.document.fileName.endsWith(JS_EXT) && !e.document.isDirty)
         {
-            GenerateTypings.create(e.document, lgdDiagnosticCollection).execute()
+            GenerateTypings.create(e.document, lgd.lgdDiagnosticCollection).execute()
         }
     });
 
@@ -87,7 +88,7 @@ function activate(context)
     {
         if (doc.fileName.endsWith(JS_EXT))
         {
-            lgdDiagnosticCollection.delete(doc.uri);
+            lgd.lgdDiagnosticCollection.delete(doc.uri);
         }
     })
 
@@ -100,9 +101,9 @@ function activate(context)
 // this method is called when your extension is deactivated
 function deactivate()
 {
-    if (lgdDiagnosticCollection)
+    if (lgd.lgdDiagnosticCollection)
     {
-        lgdDiagnosticCollection.dispose();
+        lgd.lgdDiagnosticCollection.dispose();
     }
 
     if(lgd) {
