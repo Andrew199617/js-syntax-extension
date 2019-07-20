@@ -125,7 +125,7 @@ const FileParser = {
       return 'boolean';
     }
 
-    const stringRegex = /^".*?"\s*?(;|$)/m;
+    const stringRegex = /^("|').*?("|')\s*?(;$|$)/m;
     if(stringRegex.test(value)) {
       return 'string';
     }
