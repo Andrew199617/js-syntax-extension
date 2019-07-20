@@ -2,7 +2,7 @@
 const StatusBarMessage = require("./StatusBarMessage");
 const JsCompiler = require('./JsCompiler');
 const StatusBarMessageTypes = require('./StatusBarMessageTypes');
-const  vscode = require('vscode');
+const vscode = require('vscode');
 
 /**
  * 
@@ -15,6 +15,7 @@ const GenerateTypings = {
 
   /**
    * @description diagnostics
+   * @type {vscode.DiagnosticCollection}
    */
   lgdDiagnosticCollection: null,
 

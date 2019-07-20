@@ -1,4 +1,3 @@
-const  vscode = require('vscode');
 
 /**
  * @description get the configuration for vscode.
@@ -14,6 +13,12 @@ const FileParser = {
      * @type {string[]}
      */
     fileParser.variables = null;
+
+    /**
+     * @description the static variables that the class contains.
+     * @type {string[]}
+     */
+    fileParser.staticVariables = null;
 
     return fileParser;
   },
@@ -108,31 +113,65 @@ const FileParser = {
 
   /**
    * @description Parses any property values.
-   * @param {*} value the value of the property.
-   * @returns {any} the type.
+   * @param {string} value the value of the property.
+   * @returns {string | null} the type.
    */
   parseValue(value) {
     if(typeof value === 'undefined') {
       return null;
     }
 
-    if(value === 'true' || value === 'false') {
+    if(value === 'true' || value === 'false' || value.includes('!!')) {
       return 'boolean';
     }
-    if(value.includes("'") || value.includes('"')) {
+
+    const stringRegex = /^".*?"\s*?(;|$)/m;
+    if(stringRegex.test(value)) {
       return 'string';
     }
-    else if(!isNaN(parseInt(value))) {
-      return 'number';
-    }
-    else if(value === 'null' || value === 'undefined') {
+    if(value === 'null' || value === 'undefined') {
       return 'any';
     }
-    else if(value.includes('{') && value.includes('}')) {
+    if(value.includes('{') && value.includes('}')) {
       return 'object';
     }
-    else if(value.includes('[') && value.includes(']')) {
+
+    if(value.includes('[') && value.includes(']')) {
       return 'any[]';
+    }
+
+    if((/(function\s*?\(|=>)/m).test(value)) {
+      return 'Function';
+    }
+
+    let className = (/new\s+(?<className>\w+)\(/m).exec(value);
+    if(className !== null && className.groups.className) {
+      return className.groups.className;
+    }
+    className = (/(?<className>\w+)\.create\s*\(/m).exec(value);
+    if(className !== null && className.groups.className) {
+      return `${className.groups.className}Type`;
+    }
+
+    const ops = ['+', '-\\s+', '*', '/', '=', '<', '>', '<=', '>=', '&', '|', '^']
+      .map(op => `\\${op}`)
+      .join('|');
+    
+    const operationRegex = new RegExp(`(${ops})`,'m');
+    if(operationRegex.test(value)) {
+      try {
+        let val = eval(value);
+        return this.parseType(typeof val);
+      }
+      catch (err) {
+        console.error(err);
+      }
+
+      return 'any';
+    }
+
+    if(!isNaN(parseInt(value))) {
+      return 'number';
     }
 
     return null;
@@ -205,15 +244,21 @@ const FileParser = {
     let newType = type
     newType = newType.replace(/bool(?!ean)/g, 'boolean');
     newType = newType.replace(/\*/g, 'any');
+    newType = newType.replace(/function/g, 'Function');
     return newType;
   },
 
+  /**
+   * @description returns the class name.
+   * @param {string} insideFunction
+   * @returns {string}
+   */
   getClassInCreate(insideFunction) {
     const classNameRegex = /(const|let|var) (?<name>\w+?)\s*=\s*Object\.(create|assign)\s*?\(/ms;
     let className = classNameRegex.exec(insideFunction);
 
     if(!className) {
-      throw new Error('Could not find class instance in create method. Are you creating the instance using Object.create of Object.assign.');
+      throw new Error('JS -> TS: Could not find class instance in create method. Are you creating the instance using Object.create of Object.assign.');
     }
 
     return className.groups.name;
@@ -227,15 +272,16 @@ const FileParser = {
    * @returns {string}
    */
   parseCreate(tabSize, insideFunction) {
+    this.variables = [];
     const className = this.getClassInCreate(insideFunction);
 
     if(!className) {
-      throw new Error('Could not parse class name in create.');
+      throw new Error('JS -> TS: Could not parse class name in create.');
     }
 
     const thisRegex = /this\./m;
     if(thisRegex.test(insideFunction)) {
-      throw new Error("Don't use this in create method. This has unintended consequenses.");
+      throw new Error(`JS -> TS: Don't use 'this' in create method. This has unintended consequenses. Use ${className} instead of this.`);
     }
     
     const varName = '\\w+?';
@@ -266,19 +312,25 @@ const FileParser = {
         options.type = this.parseType(options.type);
       }
 
-      const type = this.parseValue(variable.groups.value) 
-        || this.parseArray(variable.groups.array)
-        || options.type;
+      let type = options.type 
+        || this.parseValue(variable.groups.value) 
+        || this.parseArray(variable.groups.array);
 
+      
       // Must be a es6 function.
       if(typeof type === 'undefined') {
-        throw new Error(`Could not parse ${variable.groups.name} in create function. No functions declarations in create()`);
+        throw new Error(`JS -> TS: Could not parse ${variable.groups.name} in create function. No functions declarations in create()`);
       }
 
-      if(this.variables.includes(variable.groups.name)) {
-        throw new Error(`Already defined ${variable.groups.name} as static variable or function.`);
+      if(this.staticVariables.includes(variable.groups.name)) {
+        throw new Error(`JS -> TS: Already defined ${variable.groups.name} as static variable or function.`);
       }
-      
+      else if(this.variables.includes(variable.groups.name)) {
+        console.log('Skipping', variable.groups.name);
+        continue;
+      }
+      this.variables.push(variable.groups.name);
+
       variables += `\n\t`;
       variables += comment;
       variables += `${variable.groups.name}: ${type};`;
@@ -366,12 +418,17 @@ const FileParser = {
         || this.parseArray(properties.groups.array)
         || options.type;
 
+      if(this.staticVariables.includes(properties.groups.name)) {
+        // throw ParsingError.create(`Already defined ${variable.groups.name} as static variable or function.`);
+        throw new Error(`JS -> TS: Already defined ${properties.groups.name} as static variable or function.`);
+      }
+
       // Use comment type if not parsed type.
       if(type === 'any' || !type) {
         type = options.type;
       }
 
-      this.variables.push(properties.groups.name);
+      this.staticVariables.push(properties.groups.name);
       property += `${keywords}${properties.groups.name}${functionParamaters}: ${type};`;
       property += `\n`;
     } 
@@ -385,7 +442,7 @@ const FileParser = {
    * @returns {string} the the type file to write to disk.
    */
   parse(content) {
-    this.variables = [];
+    this.staticVariables = [];
     const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(const|let|var) (?<name>\w+?) = {(?<object>.*?)^}/gms;
     let object;
     let typeFile = '';

@@ -119,7 +119,7 @@ Manual Adding of Class type.
 
 ## V2
 
-### 2.1.1 - 2.1.3
+### 2.1.1 - 2.1.4
 
 - Added maintainHierarchy to settings.
 - Improved parsing of create method.
