@@ -92,7 +92,7 @@ const FileParser = {
 
     if(valuesStr.includes('[') && valuesStr.includes(']')) {
       console.warn('No array of array implemented yet.');
-      throw VscodeError.create('No array of array implemented yet.', 1, 2, 2, 2, ErrorTypes.HINT);
+      // throw VscodeError.create('No array of array implemented yet.', this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.WARNING);
       return '(any | any[])[]';
     }
 
@@ -281,10 +281,34 @@ const FileParser = {
     let className = classNameRegex.exec(insideFunction);
 
     if(!className) {
-      throw VscodeError.create('JS -> TS: Could not find class instance in create method. Are you creating the instance using Object.create of Object.assign.', 0, 0, 0, 0, ErrorTypes.ERROR);
+      throw VscodeError.create('LGD: Could not find class instance in create method. Are you creating the instance using Object.create of Object.assign.', this.beginLine, 0, this.endLine, 0, ErrorTypes.ERROR);
+    }
+
+    if(!className.groups.name) {
+      throw VscodeError.create('LGD: Could not parse class name in create.', this.beginLine, 0, this.endLine, 0, ErrorTypes.ERROR);
     }
 
     return className.groups.name;
+  },
+
+  /**
+   * @description notify the user if they use Create incorrectly.
+   * @param {string} insideFunction the inside of the create() funciton.
+   * @param {string} className the name of the class.
+   * @param {number} lastBeginLine the last begin line.
+   */
+  checkForThisInCreate(insideFunction, className, lastBeginLine) {
+    const thisKeywordRegex = /(?<this>this\.)/m;
+    let object;
+    if((object = thisKeywordRegex.exec(insideFunction)) !== null) {
+      // this.updatePosition(insideFunction, object, 'this', lastBeginLine);
+      throw VscodeError.create(`LGD: Don't use 'this' in create method. This has unintended consequenses. Use ${className}. instead of this.`,
+        this.beginLine,
+        this.beginCharacter,
+        this.endLine,
+        this.endCharacter,
+        ErrorTypes.Error);
+    }
   },
 
   /**
@@ -297,15 +321,9 @@ const FileParser = {
   parseCreate(tabSize, insideFunction) {
     this.variables = [];
     const className = this.getClassInCreate(insideFunction);
+    const lastBeginLine = this.beginLine;
 
-    if(!className) {
-      throw new Error('JS -> TS: Could not parse class name in create.');
-    }
-
-    const thisRegex = /this\./m;
-    if(thisRegex.test(insideFunction)) {
-      throw new Error(`JS -> TS: Don't use 'this' in create method. This has unintended consequenses. Use ${className} instead of this.`);
-    }
+    this.checkForThisInCreate(insideFunction, className, lastBeginLine);
 
     const varName = '\\w+?';
     const varDeliminator = '\\s*?=\\s*';
@@ -342,11 +360,11 @@ const FileParser = {
 
       // Must be a es6 function.
       if(typeof type === 'undefined') {
-        throw new Error(`JS -> TS: Could not parse ${variable.groups.name} in create function. No functions declarations in create()`);
+        throw VscodeError.create(`LGD: Could not parse ${variable.groups.name} in create function. No functions declarations in create()`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR);
       }
 
       if(this.staticVariables.includes(variable.groups.name)) {
-        throw new Error(`JS -> TS: Already defined ${variable.groups.name} as static variable or function.`);
+        throw VscodeError.create(`LGD: Already defined ${variable.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR);
       }
       else if(this.variables.includes(variable.groups.name)) {
         console.log('Skipping', variable.groups.name);
@@ -369,16 +387,8 @@ const FileParser = {
    * @returns {string} parsed object.
    */
   parseClass(object) {
-    // Block \s*?\(\s*?\)\s*?{.*?}
-    // If Statement if\s*\(((?!\s*\{).*?)\)\s*\{.*?\}$
-    // if statement on same line ^(?<tabs>\s*)if\s*\(((?!\s*{).*?)\)\s*{.*?(?P=tabs)}$
-    const Allman = false;
-    const stroustrup = true;
-    if(Allman) {
-      console.warn('Allman not implemented');
-    }
-
     const tabSize = lgd.configuration.options.tabSize;
+    const lastBeginLine = this.beginLine;
 
     const varName = '\\w+?';
     const varDeliminator = '\\s*?:\\s*';
@@ -412,6 +422,7 @@ const FileParser = {
       const isAsync = properties.groups.keyword && properties.groups.keyword.includes('async');
 
       if(properties.groups.name === 'create') {
+        this.updatePosition(object, properties, "function", lastBeginLine);
         const tabLevel = 2;
         property += this.parseCreate(tabSize * tabLevel, properties.groups.function);
       }
@@ -443,7 +454,7 @@ const FileParser = {
         || options.type;
 
       if(this.staticVariables.includes(properties.groups.name)) {
-        throw VscodeError.create(`Already defined ${properties.groups.name} as static variable or function.`, 0, 0, 0, 0, ErrorTypes.ERROR);
+        throw VscodeError.create(`LGD: Already defined ${properties.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR);
       }
 
       // Use comment type if not parsed type.
@@ -464,28 +475,44 @@ const FileParser = {
    * @param {string} str the string that was parsed.
    * @param {RegExpExecArray} regExpExecArray the object that was produced from exec.
    * @param {string} group the group that we are updating to.
+   * @param {number} lastBegin The last begin line we were parsing.
    */
-  updatePosition(str, regExpExecArray, group) {
+  updatePosition(str, regExpExecArray, group, lastBegin = 0) {
     const lines = str.split(/\r\n|\r|\n/);
     const linesNoGroup = str.replace(regExpExecArray.groups[group], '').split(/\r\n|\r|\n/);
+    let localBeginLine = 0;
+    let localEndLine = 0;
 
     for(let i = 0; i < lines.length; ++i) {
       if(lines[i] !== linesNoGroup[i]) {
-        this.beginLine = i;
+        this.beginLine = lastBegin + i;
+        localBeginLine = i;
         break;
       }
     }
 
-    if(linesNoGroup.length === this.beginLine + 1) {
-      this.endLine = lines.length - 1;
+    if(linesNoGroup.length === localBeginLine + 1) {
+      this.endLine = lastBegin + lines.length - 1;
       return;
     }
 
-    for(let i = this.beginLine; i < lines.length; ++i) {
-      if(lines[i] === linesNoGroup[this.beginLine + 1]) {
-        this.endLine = i;
+    let numMatched = 0;
+    for(let i = localBeginLine; i < lines.length; ++i) {
+      if(lines[i] !== linesNoGroup[localBeginLine + numMatched + 1]) {
+        numMatched = 0;
+      }
+      else if(numMatched < 2) {
+        localEndLine = lastBegin + i;
+        numMatched++;
+      }
+      else {
+        this.endLine = lastBegin + i - numMatched;
         return;
       }
+    }
+
+    if(numMatched > 0) {
+      this.endLine = localEndLine;
     }
   },
 
@@ -498,7 +525,7 @@ const FileParser = {
     let object;
     if((object = classKeywordRegex.exec(content)) !== null) {
       this.updatePosition(content, object, 'class');
-      throw VscodeError.create("JS -> TS: There is currently no parsing for Class.", this.beginLine, 0, this.endLine, 0, ErrorTypes.HINT);
+      throw VscodeError.create("LGD: There is currently no parsing for Class.", this.beginLine, 0, this.endLine, 0, ErrorTypes.HINT);
     }
   },
 
