@@ -1,3 +1,5 @@
+const VscodeError = require('./Errors/VscodeError');
+const ErrorTypes = require('./Errors/ErrorTypes');
 
 /**
  * @description get the configuration for vscode.
@@ -20,12 +22,32 @@ const FileParser = {
      */
     fileParser.staticVariables = null;
 
+    /**
+     * @description The current begin line being parsed.
+     */
+    fileParser.beginLine = 0;
+
+    /**
+     * @description The character that is the beinning of the current parse. "This line is being parsed" <- T in "This" is the endCharacter.
+     */
+    fileParser.beginCharacter = 0;
+
+    /**
+     * @description The current end line being parsed.
+     */
+    fileParser.endLine = 0;
+
+    /**
+     * @description The character that ends the parse. "This line is being parsed" <- d is the endCharacter.
+     */
+    fileParser.endCharacter = 0;
+
     return fileParser;
   },
 
   /**
    * Parse the function paramaters.
-   * @param {string} params 
+   * @param {string} params
    */
   parseFunction(params, commentParams) {
     if(typeof params === 'undefined') {
@@ -41,7 +63,7 @@ const FileParser = {
         continue;
       }
       let type = commentParams[variables[i]];
-      
+
       // The type gotten from the default value.
       let parsedType = null;
       if(variables[i].includes('=')) {
@@ -50,7 +72,7 @@ const FileParser = {
         const defaultValue = expr[1];
         parsedType = this.parseValue(defaultValue);
       }
-      
+
       functionCall += `${variables[i]}: ${type || parsedType || 'any'}${i < variables.length - 1 ? ', ' : ''}`;
     }
 
@@ -70,6 +92,7 @@ const FileParser = {
 
     if(valuesStr.includes('[') && valuesStr.includes(']')) {
       console.warn('No array of array implemented yet.');
+      throw VscodeError.create('No array of array implemented yet.', 1, 2, 2, 2, ErrorTypes.HINT);
       return '(any | any[])[]';
     }
 
@@ -90,7 +113,7 @@ const FileParser = {
         types.length++;
       }
     }
-    
+
     if(types.length === 1) {
       delete types.length;
       typeKeys = Object.keys(types);
@@ -156,7 +179,7 @@ const FileParser = {
     const ops = ['+', '-\\s+', '*', '/', '=', '<', '>', '<=', '>=', '&', '|', '^']
       .map(op => `\\${op}`)
       .join('|');
-    
+
     const operationRegex = new RegExp(`(${ops})`,'m');
     if(operationRegex.test(value)) {
       try {
@@ -225,7 +248,7 @@ const FileParser = {
         params[doc.groups.name] = doc.groups.type;
         params.length++;
       }
-    } 
+    }
     options.params = params;
 
     if(comment.length > 0) {
@@ -258,7 +281,7 @@ const FileParser = {
     let className = classNameRegex.exec(insideFunction);
 
     if(!className) {
-      throw new Error('JS -> TS: Could not find class instance in create method. Are you creating the instance using Object.create of Object.assign.');
+      throw VscodeError.create('JS -> TS: Could not find class instance in create method. Are you creating the instance using Object.create of Object.assign.', 0, 0, 0, 0, ErrorTypes.ERROR);
     }
 
     return className.groups.name;
@@ -266,7 +289,7 @@ const FileParser = {
 
   /**
    * @description parse the create funciton for variables.
-   * These varaibles are treated like normal variables 
+   * These varaibles are treated like normal variables
    * variables on the object literal are treated like static.
    * @param {string} insideFunction
    * @returns {string}
@@ -283,7 +306,7 @@ const FileParser = {
     if(thisRegex.test(insideFunction)) {
       throw new Error(`JS -> TS: Don't use 'this' in create method. This has unintended consequenses. Use ${className} instead of this.`);
     }
-    
+
     const varName = '\\w+?';
     const varDeliminator = '\\s*?=\\s*';
     const varEnd = `(;|$)(?=\\s*(\\/|\\w+?))`;
@@ -295,7 +318,7 @@ const FileParser = {
     const arrayRegex = `\\[(?<array>.*?)\\](${varEnd}|;\\s*$)`
     const valueRegex = `((${arrayRegex}|(?<value>.*?)${varEnd}))`;
     const variablesRegex = new RegExp([
-      comment, tabRegex, 
+      comment, tabRegex,
       varaibleName, valueRegex
     ].join(''),'gms');
 
@@ -303,7 +326,7 @@ const FileParser = {
     let variables = '';
     while((variable = variablesRegex.exec(insideFunction)) !== null) {
       const options = {
-        type: undefined      
+        type: undefined
       };
 
       let comment = this.parseComment(variable.groups.comment, options, false);
@@ -312,11 +335,11 @@ const FileParser = {
         options.type = this.parseType(options.type);
       }
 
-      let type = options.type 
-        || this.parseValue(variable.groups.value) 
+      let type = options.type
+        || this.parseValue(variable.groups.value)
         || this.parseArray(variable.groups.array);
 
-      
+
       // Must be a es6 function.
       if(typeof type === 'undefined') {
         throw new Error(`JS -> TS: Could not parse ${variable.groups.name} in create function. No functions declarations in create()`);
@@ -342,7 +365,7 @@ const FileParser = {
 
   /**
    * Parse an object literal into properties for a ts file.
-   * @param {string} object 
+   * @param {string} object
    * @returns {string} parsed object.
    */
   parseClass(object) {
@@ -354,6 +377,7 @@ const FileParser = {
     if(Allman) {
       console.warn('Allman not implemented');
     }
+
     const tabSize = lgd.configuration.options.tabSize;
 
     const varName = '\\w+?';
@@ -370,8 +394,8 @@ const FileParser = {
     const valueRegex = `|${varDeliminator}(${arrayRegex}|(?<value>.*?)${varEnd}))`;
 
     const propertiesRegex = new RegExp([
-      comment, tabRegex, 
-      functionKeywords, varaibleNameRegex, 
+      comment, tabRegex,
+      functionKeywords, varaibleNameRegex,
       functionRegex, valueRegex
     ].join(''),'gms');
 
@@ -401,10 +425,10 @@ const FileParser = {
       else {
         keywords = 'static '
       }
-      
+
       if(!options.type) {
-        options.type = (properties.groups.function 
-          ? (properties.groups.function.includes('return') 
+        options.type = (properties.groups.function
+          ? (properties.groups.function.includes('return')
             ? 'any'
             : 'void')
           : 'void');
@@ -414,13 +438,12 @@ const FileParser = {
       }
       options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
 
-      let type = this.parseValue(properties.groups.value) 
+      let type = this.parseValue(properties.groups.value)
         || this.parseArray(properties.groups.array)
         || options.type;
 
       if(this.staticVariables.includes(properties.groups.name)) {
-        // throw ParsingError.create(`Already defined ${variable.groups.name} as static variable or function.`);
-        throw new Error(`JS -> TS: Already defined ${properties.groups.name} as static variable or function.`);
+        throw VscodeError.create(`Already defined ${properties.groups.name} as static variable or function.`, 0, 0, 0, 0, ErrorTypes.ERROR);
       }
 
       // Use comment type if not parsed type.
@@ -431,9 +454,52 @@ const FileParser = {
       this.staticVariables.push(properties.groups.name);
       property += `${keywords}${properties.groups.name}${functionParamaters}: ${type};`;
       property += `\n`;
-    } 
+    }
 
     return property;
+  },
+
+  /**
+   * @description Update our position in the document to be able to log to the user where an error occurs.
+   * @param {string} str the string that was parsed.
+   * @param {RegExpExecArray} regExpExecArray the object that was produced from exec.
+   * @param {string} group the group that we are updating to.
+   */
+  updatePosition(str, regExpExecArray, group) {
+    const lines = str.split(/\r\n|\r|\n/);
+    const linesNoGroup = str.replace(regExpExecArray.groups[group], '').split(/\r\n|\r|\n/);
+
+    for(let i = 0; i < lines.length; ++i) {
+      if(lines[i] !== linesNoGroup[i]) {
+        this.beginLine = i;
+        break;
+      }
+    }
+
+    if(linesNoGroup.length === this.beginLine + 1) {
+      this.endLine = lines.length - 1;
+      return;
+    }
+
+    for(let i = this.beginLine; i < lines.length; ++i) {
+      if(lines[i] === linesNoGroup[this.beginLine + 1]) {
+        this.endLine = i;
+        return;
+      }
+    }
+  },
+
+  /**
+   * @description Notify user we don't parse Class.
+   * @param {*} content the document string.
+   */
+  checkForClassKeyword(content) {
+    const classKeywordRegex = /(?<class>^class.*?$)/gms;
+    let object;
+    if((object = classKeywordRegex.exec(content)) !== null) {
+      this.updatePosition(content, object, 'class');
+      throw VscodeError.create("JS -> TS: There is currently no parsing for Class.", this.beginLine, 0, this.endLine, 0, ErrorTypes.HINT);
+    }
   },
 
   /**
@@ -442,18 +508,24 @@ const FileParser = {
    * @returns {string} the the type file to write to disk.
    */
   parse(content) {
+
+    this.checkForClassKeyword(content);
+
     this.staticVariables = [];
     const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(const|let|var) (?<name>\w+?) = {(?<object>.*?)^}/gms;
     let object;
     let typeFile = '';
     while((object = objectLiterals.exec(content)) !== null) {
+
+      this.updatePosition(content, object, 'object');
+
       typeFile += `\n`;
       typeFile += object.groups.comment;
       typeFile += `declare interface ${object.groups.name}Type {`;
       typeFile += this.parseClass(object.groups.object);
       typeFile += `}\n`;
-    } 
-    
+    }
+
     return typeFile;
   }
 }
