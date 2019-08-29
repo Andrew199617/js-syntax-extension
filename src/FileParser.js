@@ -1,9 +1,10 @@
 const VscodeError = require('./Errors/VscodeError');
 const ErrorTypes = require('./Errors/ErrorTypes');
 const Logger = require('./Logging/Logger');
+const StaticAccessorCheck = require('./FunctionChecks/StaticAccessorCheck');
 
 /**
- * @description get the configuration for vscode.
+ * @description Parse a JS file and convert it to a TS file.
  * @type {FileParserType}
  */
 const FileParser = {
@@ -22,6 +23,9 @@ const FileParser = {
      * @type {string[]}
      */
     fileParser.staticVariables = null;
+
+    /** @description The name of the class we parsed. */
+    fileParser.className = null;
 
     /**
      * @description The current begin line being parsed.
@@ -174,6 +178,7 @@ const FileParser = {
     if(className !== null && className.groups.className) {
       return className.groups.className;
     }
+
     className = (/(?<className>\w+)\.create\s*\(/m).exec(value);
     if(className !== null && className.groups.className) {
       return `${className.groups.className}Type`;
@@ -434,7 +439,12 @@ const FileParser = {
       property += this.parseComment(properties.groups.comment, options, isAsync);
       let functionParamaters = '';
       if(properties.groups.params) {
+        if(properties.groups.name !== 'create') {
+          this.updatePosition(object, properties, "function", lastBeginLine);
+        }
+
         functionParamaters = this.parseFunction(properties.groups.params, options.params);
+        StaticAccessorCheck.execute.bind(this)(properties.groups.function);
       }
       else {
         keywords = 'static '
@@ -551,6 +561,9 @@ const FileParser = {
 
       typeFile += `\n`;
       typeFile += object.groups.comment;
+
+      this.className = object.groups.name;
+
       typeFile += `declare interface ${object.groups.name}Type {`;
       typeFile += this.parseClass(object.groups.object);
       typeFile += `}\n`;

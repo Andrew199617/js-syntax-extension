@@ -3,7 +3,7 @@ const DEFAULT_DIR = "typings";
 const FileIO = require('./FileIO');
 
 /**
-* @description
+* @description Log to a file on disc.
 * @type {LoggerType}
 */
 const Logger = {
@@ -20,7 +20,7 @@ const Logger = {
     logger.log = [];
 
     /**
-     * @description
+     * @description the name of the logger file.
      */
     logger._fileName = filename;
 

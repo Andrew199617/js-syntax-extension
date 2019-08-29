@@ -3,7 +3,7 @@ const StatusBarMessage = require("../Logging/StatusBarMessage");
 const SeverityConverter = require('../ServerityConverter');
 
 /**
-* @description
+* @description An error occured that should be logged to the user and we can specify the line in the document that error occured.
 * @type {VscodeErrorType}
 */
 const VscodeError = {
