@@ -8,7 +8,7 @@ const JS_EXT = ".js";
 const COMPILE_COMMAND = "lgd.generateTypings";
 
 global.lgd = {
-    configuration: Configuration.create(),
+    configuration: null,
     lgdDiagnosticCollection: null
 }
 
@@ -24,6 +24,7 @@ function activate(context)
 {
 
     lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
+    lgd.configuration = Configuration.create();
 
     const compileLessSub = vscode.commands.registerCommand(COMPILE_COMMAND, () =>
     {
@@ -50,11 +51,6 @@ function activate(context)
     // compile less on save when file is dirty
     const didSaveEvent = vscode.workspace.onDidSaveTextDocument(document =>
     {
-        global.lgd = {
-            configuration: Configuration.create(),
-            lgdDiagnosticCollection: lgd.lgdDiagnosticCollection
-        }
-
         if(!lgd.configuration.options.generateTypings) {
             return;
         }
@@ -68,22 +64,17 @@ function activate(context)
     // compile js on save when file is clean (clean saves don't trigger onDidSaveTextDocument, so use this as fallback)
     const willSaveEvent = vscode.workspace.onWillSaveTextDocument(e =>
     {
-        global.lgd = {
-            configuration: Configuration.create(),
-            lgdDiagnosticCollection: lgd.lgdDiagnosticCollection
-        }
-
         if(!lgd.configuration.options.generateTypings) {
             return;
         }
-        
+
         if (e.document.fileName.endsWith(JS_EXT) && !e.document.isDirty)
         {
             GenerateTypings.create(e.document, lgd.lgdDiagnosticCollection).execute()
         }
     });
 
-    // dismiss less errors on file close
+    // dismiss errors on file close
     const didCloseEvent = vscode.workspace.onDidCloseTextDocument((doc) =>
     {
         if (doc.fileName.endsWith(JS_EXT))
@@ -92,10 +83,15 @@ function activate(context)
         }
     })
 
+    const configurationChanged = vscode.workspace.onDidChangeConfiguration(() => {
+        lgd.configuration = Configuration.create();
+    });
+
     context.subscriptions.push(compileLessSub);
     context.subscriptions.push(willSaveEvent);
     context.subscriptions.push(didSaveEvent);
     context.subscriptions.push(didCloseEvent);
+    context.subscriptions.push(configurationChanged);
 }
 
 // this method is called when your extension is deactivated

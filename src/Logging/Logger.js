@@ -31,7 +31,7 @@ const Logger = {
    * @description Convert the log to a string to be written to a file.
    */
   toString() {
-    let str = '';
+    let str = 'Stop logging by changing setting "lgd.options.createDebugLog"\nIf you have any problems or requests please create an issue on Github.\n\n';
 
     for(let i = 0; i < this.log.length; ++i) {
       str += this.log[i] + '\n';
