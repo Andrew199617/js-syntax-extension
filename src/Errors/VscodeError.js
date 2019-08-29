@@ -1,3 +1,7 @@
+const  vscode = require('vscode');
+const StatusBarMessage = require("../Logging/StatusBarMessage");
+const SeverityConverter = require('../ServerityConverter');
+
 /**
 * @description
 * @type {VscodeErrorType}
@@ -19,9 +23,9 @@ const VscodeError = {
         vscodeError.message = message;
 
         vscodeError.startLine = startLine;
-        vscodeError.startCharacter = startCharacter;
+        vscodeError.startCharacter = startCharacter || 0;
         vscodeError.endLine = endLine;
-        vscodeError.endCharacter = endCharacter;
+        vscodeError.endCharacter = endCharacter || 0;
 
         vscodeError.severity = severity;
 
@@ -29,6 +33,26 @@ const VscodeError = {
         Error.captureStackTrace(vscodeError, {message});
 
         return vscodeError;
+    },
+
+    /**
+     * @description Don't throw the error and stop compiling.
+     */
+    notifyUser() {
+        const activeEditor = vscode.window.activeTextEditor;
+
+        if(!activeEditor) {
+            throw this;
+        }
+
+        const document = activeEditor.document;
+
+        let range = new vscode.Range(this.startLine, this.startCharacter, this.endLine, this.endCharacter);
+
+        const diagnosis = new vscode.Diagnostic(range, this.message, SeverityConverter.getDiagnosticSeverity(this.severity));
+        lgd.lgdDiagnosticCollection.set(document.uri, [diagnosis]);
+
+        StatusBarMessage.show(SeverityConverter.getStatusBarMessage(this.severity), SeverityConverter.getMessageType(this.severity));
     }
 };
 

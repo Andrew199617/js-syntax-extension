@@ -4,6 +4,11 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ## V2
 
+### 2.2.0
+
+- Improved Error reporting. Specify exact line error and warnings occur on for you to easily fix.
+- Logging Errors that occure that aren't breaking to a log file in typings folder.
+
 ### 2.1.1 - 2.1.5
 
 - Added maintainHierarchy to settings.
@@ -16,7 +21,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Problems being shown for you to fix.
 - Create method being parsed for non static variables.
 
-### 2.0.5 - 2.0.7 
+### 2.0.5 - 2.0.7
 
 - Command works now even if you dont have generateTypings set.
 - Fixed typed file. interface needs to have a different name than the object for vscode to pick up.
@@ -28,7 +33,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ### 2.0.0 - 2.0.2
 
-- Compile a js file into a .d.ts file. 
+- Compile a js file into a .d.ts file.
   - This will allow you to have intellisense throughout the whole project.
   - Activate auto compile with settings.
 

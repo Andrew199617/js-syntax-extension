@@ -1,5 +1,5 @@
 /**
-* @description 
+* @description
 * @type {ErrorTypesType}
 */
 const ErrorTypes = {

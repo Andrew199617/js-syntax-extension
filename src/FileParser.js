@@ -1,5 +1,6 @@
 const VscodeError = require('./Errors/VscodeError');
 const ErrorTypes = require('./Errors/ErrorTypes');
+const Logger = require('./Logging/Logger');
 
 /**
  * @description get the configuration for vscode.
@@ -41,6 +42,9 @@ const FileParser = {
      * @description The character that ends the parse. "This line is being parsed" <- d is the endCharacter.
      */
     fileParser.endCharacter = 0;
+
+    /** @type {LoggerType} */
+    fileParser.logger = Logger.create('LGD.FileParser');
 
     return fileParser;
   },
@@ -91,8 +95,7 @@ const FileParser = {
     }
 
     if(valuesStr.includes('[') && valuesStr.includes(']')) {
-      console.warn('No array of array implemented yet.');
-      // throw VscodeError.create('No array of array implemented yet.', this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.WARNING);
+      this.logger.log.push('LGD: ' + valuesStr + ' | No array of array implemented yet.');
       return '(any | any[])[]';
     }
 

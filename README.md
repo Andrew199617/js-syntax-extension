@@ -1,10 +1,12 @@
 # js-syntax README
 
+If it looks like a file is being generated incorrectly check the log file and file an issue on Github.
+
 Provide syntax highlighting for scenarios we encounter a lot in our codebase. This allows us to easily know what is going on in a file
 and avoid errors with naming. Things like proptypes and defaultProps gets used very often so its a good idea to have syntax highlighting for
-these keywords. 
+these keywords.
 
-The is also many ways to create a class in JavaScript since there is not such thing as a class only objects. We like to use Object literals 
+The is also many ways to create a class in JavaScript since there is not such thing as a class only objects. We like to use Object literals
 and take advantage of the builtin Object.create and Object.assign functions to create classes from the Object literals.
 
 ### Other Extensions:
@@ -14,13 +16,14 @@ and take advantage of the builtin Object.create and Object.assign functions to c
 
 ## Compile .js file into .ts file automagically. Read below to use!
 
-The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings. 
+You can call the command "Compile js file into ts file" or turn generateTypings setting to true.
+
+The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings.
 - You need to have a jsconfig or tsconfig for vscode to pick up your typings automatically.
 - The autocompile is sensitive to tab size. It picks up your tab size from editor.tabSize.
 - You have to use Stroustrup or Allman style brackets.
-### Make sure you set your @type tag corrrectly. 
+### Make sure you set your @type tag corrrectly.
 - We will generate a interface like {classname}Type. Add @type {{classname}Type} to the object literal.
-- This is how it will work for now V3 will add these types to your file automagically.
 
 ### Auto Compile
 ![Auto compile JS](./images/autocompile.gif)
@@ -28,7 +31,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 ### Maintain Hierarchy
 ![Auto compile JS](./images/maintainhierarchy.gif)
 
-### Highlight Foo.create() like new Foo(). 
+### Highlight Foo.create() like new Foo().
 
 ![Foo.create Highlighting](./images/objectcreate.png)
 
@@ -89,14 +92,12 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 ## Settings
 
-You can all call the command, Compile js file into ts file.
-Automatically enerate type file using this setting. 
-
 ``` json
 {
   "lgd.options": {
     "generateTypings": true,
-    "maintainHierarchy": true
+    "maintainHierarchy": true,
+    "createDebugLog": true
   }
 }
 ```
@@ -119,6 +120,10 @@ Manual Adding of Class type.
 
 ## V2
 
+### 2.2.0
+
+- Improved Error reporting. Specify exact line error and warnings occur on for you to easily fix.
+
 ### 2.1.1 - 2.1.5
 
 - Added maintainHierarchy to settings.
@@ -131,7 +136,7 @@ Manual Adding of Class type.
 - Problems being shown for you to fix.
 - Create method being parsed for non static variables.
 
-### 2.0.5 - 2.0.6 
+### 2.0.5 - 2.0.6
 
 - Command works now even if you dont have generateTypings set.
 - Fixed typed file. interface needs to have a different name than the object for vscode to pick up.
@@ -143,7 +148,7 @@ Manual Adding of Class type.
 
 ### 2.0.0 - 2.0.2
 
-- Compile a js file into a .d.ts file. 
+- Compile a js file into a .d.ts file.
   - This will allow you to have intellisense throughout the whole project.
   - Activate auto compile with settings.
 

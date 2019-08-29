@@ -1,31 +1,30 @@
 
-const StatusBarMessage = require("./StatusBarMessage");
+const StatusBarMessage = require("./Logging/StatusBarMessage");
 const JsCompiler = require('./JsCompiler');
-const StatusBarMessageTypes = require('./StatusBarMessageTypes');
+const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 const vscode = require('vscode');
 
-const ErrorTypes = require('./Errors/ErrorTypes');
+const SeverityConverter = require('./ServerityConverter');
 
 /**
- * 
+ *
  */
 const GenerateTypings = {
-  /**
-   * @description The document that was saved.
-   */
-  document: null,
-
-  /**
-   * @description diagnostics
-   * @type {vscode.DiagnosticCollection}
-   */
-  lgdDiagnosticCollection: null,
-
   create(document, lgdDiagnosticCollection) {
     const generateTypings = Object.assign({}, GenerateTypings);
+
+    /**
+     * @description The document that was saved.
+     */
     generateTypings.document = document;
+
+    /**
+     * @description diagnostics
+     * @type {vscode.DiagnosticCollection}
+     */
     generateTypings.lgdDiagnosticCollection = lgdDiagnosticCollection;
-    return generateTypings; 
+
+    return generateTypings;
   },
 
   async execute() {
@@ -74,49 +73,10 @@ const GenerateTypings = {
       }
 
       compilingMessage.dispose();
-      const diagnosis = new vscode.Diagnostic(range, message, this.getDiagnosticSeverity(severity));
+      const diagnosis = new vscode.Diagnostic(range, message, SeverityConverter.getDiagnosticSeverity(severity));
       this.lgdDiagnosticCollection.set(this.document.uri, [diagnosis]);
 
-      StatusBarMessage.show(this.getStatusBarMessage(severity), this.getMessageType(severity));
-    }
-  },
-  
-  getDiagnosticSeverity(severity) {
-    switch(severity) {
-      case ErrorTypes.HINT:
-        return vscode.DiagnosticSeverity.Information;
-
-      case ErrorTypes.WARNING:
-        return vscode.DiagnosticSeverity.Warning;
-
-      case ErrorTypes.ERROR:
-        return vscode.DiagnosticSeverity.Error;
-    }
-  },
-  
-  getMessageType(severity) {
-    switch(severity) {
-      case ErrorTypes.HINT:
-        return StatusBarMessageTypes.HINT;
-
-      case ErrorTypes.WARNING:
-        return StatusBarMessageTypes.WARNING;
-
-      case ErrorTypes.ERROR:
-        return StatusBarMessageTypes.ERROR;
-    }
-  },
-
-  getStatusBarMessage(severity) {
-    switch(severity) {
-      case ErrorTypes.HINT:
-        return "$(alert) Hint can be found in Problems window ctrl+shift+M";
-
-      case ErrorTypes.WARNING:
-        return "$(alert) Warning occured compiling JS to TS (more detail in Problems window ctrl+shift+M)";
-
-      case ErrorTypes.ERROR:
-        return "$(alert) Error compiling JS to TS (more detail in Problems window ctrl+shift+M)";
+      StatusBarMessage.show(SeverityConverter.getStatusBarMessage(severity), SeverityConverter.getMessageType(severity));
     }
   }
 }
