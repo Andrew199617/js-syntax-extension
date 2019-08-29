@@ -13,6 +13,10 @@ const StaticAccessorCheck = {
    * @this {FileParserType}
    */
   execute(insideFunction) {
+    if(this.staticVariables.length === 0) {
+      return;
+    }
+
     const staticVariables = this.staticVariables.reduce((accumulator, val) => {
       let lastVal = accumulator == '' ? '' : accumulator + '|';
       return lastVal + val;

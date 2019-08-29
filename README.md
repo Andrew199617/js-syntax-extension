@@ -121,7 +121,7 @@ Manual Adding of Class type.
 
 ## V2
 
-### 2.2.0
+### 2.2.0 - 2.2.1
 
 - Added the ability to compile on change.
 - Improved Error reporting. Specify exact line error and warnings occur on for you to easily fix.
