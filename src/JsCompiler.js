@@ -8,7 +8,7 @@ const FileIO = require('./Logging/FileIO');
 const DEFAULT_EXT = ".d.ts";
 const DEFAULT_DIR = "typings";
 
-// compile the given less file
+// compile the given file
 async function compile(jsFile, content)
 {
     const fileParser = FileParser.create();

@@ -6,6 +6,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ### 2.2.0
 
+- Added the ability to compile on change.
 - Improved Error reporting. Specify exact line error and warnings occur on for you to easily fix.
 - Logging Errors that occure that aren't breaking to a log file in typings folder.
 

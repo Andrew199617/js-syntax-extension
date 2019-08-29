@@ -45,8 +45,13 @@
                     "properties": {
                         "generateTypings": {
                             "type": "boolean",
-                            "description": "Whether we should automatically compile js files into ts files.",
-                            "default": false
+                            "description": "Whether we should automatically compile js files into ts files when you save the document.",
+                            "default": true
+                        },
+                        "generateTypingsOnChange": {
+                            "type": "boolean",
+                            "description": "Whether we should automatically compile js files into ts files when you change the document.",
+                            "default": true
                         },
                         "maintainHierarchy": {
                             "type": "boolean",

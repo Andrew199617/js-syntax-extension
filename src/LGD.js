@@ -26,7 +26,7 @@ function activate(context)
     lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
     lgd.configuration = Configuration.create();
 
-    const compileLessSub = vscode.commands.registerCommand(COMPILE_COMMAND, () =>
+    const compileCommand = vscode.commands.registerCommand(COMPILE_COMMAND, () =>
     {
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor)
@@ -48,7 +48,7 @@ function activate(context)
         }
     });
 
-    // compile less on save when file is dirty
+    // compile on save when file is dirty
     const didSaveEvent = vscode.workspace.onDidSaveTextDocument(document =>
     {
         if(!lgd.configuration.options.generateTypings) {
@@ -74,6 +74,20 @@ function activate(context)
         }
     });
 
+    // compile file when we change the document
+    const didChangeEvent = vscode.workspace.onDidChangeTextDocument((TextChangedEvent) =>
+    {
+        if(!lgd.configuration.options.generateTypingsOnChange) {
+            return;
+        }
+
+        const document = TextChangedEvent.document;
+        if (document.fileName.endsWith(JS_EXT))
+        {
+            GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
+        }
+    })
+
     // dismiss errors on file close
     const didCloseEvent = vscode.workspace.onDidCloseTextDocument((doc) =>
     {
@@ -87,9 +101,10 @@ function activate(context)
         lgd.configuration = Configuration.create();
     });
 
-    context.subscriptions.push(compileLessSub);
+    context.subscriptions.push(compileCommand);
     context.subscriptions.push(willSaveEvent);
     context.subscriptions.push(didSaveEvent);
+    context.subscriptions.push(didChangeEvent);
     context.subscriptions.push(didCloseEvent);
     context.subscriptions.push(configurationChanged);
 }

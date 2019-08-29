@@ -96,6 +96,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 {
   "lgd.options": {
     "generateTypings": true,
+    "generateTypingsOnChange": true,
     "maintainHierarchy": true,
     "createDebugLog": true
   }
@@ -122,7 +123,9 @@ Manual Adding of Class type.
 
 ### 2.2.0
 
+- Added the ability to compile on change.
 - Improved Error reporting. Specify exact line error and warnings occur on for you to easily fix.
+- Logging Errors that occure that aren't breaking to a log file in typings folder.
 
 ### 2.1.1 - 2.1.5
 

@@ -64,13 +64,6 @@ const GenerateTypings = {
                   range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
           }
       }
-      else if (error.line !== undefined && error.column !== undefined)
-      {
-          // less errors, try to highlight the affected range
-          const lineIndex = error.line - 1;
-          const affectedLine = this.document.lineAt(lineIndex);
-          range = new vscode.Range(lineIndex, error.column, lineIndex, affectedLine.range.end.character);
-      }
 
       compilingMessage.dispose();
       const diagnosis = new vscode.Diagnostic(range, message, SeverityConverter.getDiagnosticSeverity(severity));
