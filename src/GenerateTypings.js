@@ -53,16 +53,16 @@ const GenerateTypings = {
 
       if (error.code)
       {
-          // fs errors
-          const fileSystemError = error;
-          switch (fileSystemError.code)
-          {
-              case 'EACCES':
-              case 'ENOENT':
-                  message = `Cannot open file '${fileSystemError.path}'`;
-                  const firstLine = this.document.lineAt(0);
-                  range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
-          }
+        // fs errors
+        const fileSystemError = error;
+        switch (fileSystemError.code)
+        {
+          case 'EACCES':
+          case 'ENOENT':
+            message = `Cannot open file '${fileSystemError.path}'`;
+            const firstLine = this.document.lineAt(0);
+            range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
+        }
       }
 
       compilingMessage.dispose();
