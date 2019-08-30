@@ -1,5 +1,5 @@
 const vscode = require('vscode');
-const StatusBarMessage = require("../Logging/StatusBarMessage");
+const StatusBarMessage = require('../Logging/StatusBarMessage');
 const SeverityConverter = require('../ServerityConverter');
 
 /**
@@ -41,18 +41,27 @@ const VscodeError = {
   notifyUser() {
     const activeEditor = vscode.window.activeTextEditor;
 
-    if (!activeEditor) {
+    if(!activeEditor) {
+      // eslint-disable-next-line no-throw-literal
       throw this;
     }
 
     const document = activeEditor.document;
 
-    let range = new vscode.Range(this.startLine, this.startCharacter, this.endLine, this.endCharacter);
+    const range = new vscode.Range(this.startLine, this.startCharacter, this.endLine, this.endCharacter);
 
-    const diagnosis = new vscode.Diagnostic(range, this.message, SeverityConverter.getDiagnosticSeverity(this.severity));
+    const diagnosis = new vscode.Diagnostic(
+      range,
+      this.message,
+      SeverityConverter.getDiagnosticSeverity(this.severity)
+    );
+
     lgd.lgdDiagnosticCollection.set(document.uri, [diagnosis]);
 
-    StatusBarMessage.show(SeverityConverter.getStatusBarMessage(this.severity), SeverityConverter.getMessageType(this.severity));
+    StatusBarMessage.show(
+      SeverityConverter.getStatusBarMessage(this.severity),
+      SeverityConverter.getMessageType(this.severity)
+    );
   }
 };
 

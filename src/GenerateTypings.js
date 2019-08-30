@@ -1,5 +1,4 @@
-
-const StatusBarMessage = require("./Logging/StatusBarMessage");
+const StatusBarMessage = require('./Logging/StatusBarMessage');
 const JsCompiler = require('./JsCompiler');
 const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 const vscode = require('vscode');
@@ -28,40 +27,38 @@ const GenerateTypings = {
   },
 
   async execute() {
-
-    const compilingMessage = StatusBarMessage.show("$(zap) Compiling .js --> .d.ts", StatusBarMessageTypes.INDEFINITE);
+    const compilingMessage = StatusBarMessage.show('$(zap) Compiling .js --> .d.ts', StatusBarMessageTypes.INDEFINITE);
     const startTime = Date.now();
-    try
-    {
+
+    try {
       await JsCompiler.compile(this.document.fileName, this.document.getText());
-      const elapsedTime = (Date.now() - startTime);
+      const elapsedTime = Date.now() - startTime;
       compilingMessage.dispose();
       this.lgdDiagnosticCollection.set(this.document.uri, []);
 
       StatusBarMessage.show(`$(check) LGD compiled in ${elapsedTime}ms`, StatusBarMessageTypes.SUCCESS);
     }
-    catch (error)
-    {
-      let startLine = error.startLine || 0;
-      let startCharacter = error.startCharacter || 0;
-      let endLine = error.endLine || 0;
-      let endCharacter = error.endCharacter || 0;
+    catch(error) {
+      const startLine = error.startLine || 0;
+      const startCharacter = error.startCharacter || 0;
+      const endLine = error.endLine || 0;
+      const endCharacter = error.endCharacter || 0;
 
       let message = error.message;
       let range = new vscode.Range(startLine, startCharacter, endLine, endCharacter);
-      let severity = error.severity;
+      const severity = error.severity;
 
-      if (error.code)
-      {
+      if(error.code) {
         // fs errors
         const fileSystemError = error;
-        switch (fileSystemError.code)
-        {
+        switch(fileSystemError.code) {
           case 'EACCES':
           case 'ENOENT':
+          {
             message = `Cannot open file '${fileSystemError.path}'`;
             const firstLine = this.document.lineAt(0);
             range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
+          }
         }
       }
 
@@ -69,9 +66,12 @@ const GenerateTypings = {
       const diagnosis = new vscode.Diagnostic(range, message, SeverityConverter.getDiagnosticSeverity(severity));
       this.lgdDiagnosticCollection.set(this.document.uri, [diagnosis]);
 
-      StatusBarMessage.show(SeverityConverter.getStatusBarMessage(severity), SeverityConverter.getMessageType(severity));
+      StatusBarMessage.show(
+        SeverityConverter.getStatusBarMessage(severity),
+        SeverityConverter.getMessageType(severity)
+      );
     }
   }
-}
+};
 
 module.exports = GenerateTypings;

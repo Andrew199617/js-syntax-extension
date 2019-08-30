@@ -37,13 +37,13 @@ const ServerityConverter = {
   getStatusBarMessage(severity) {
     switch(severity) {
       case ErrorTypes.HINT:
-        return "$(alert) Hint can be found in Problems window ctrl+shift+M";
+        return '$(alert) Hint can be found in Problems window ctrl+shift+M';
 
       case ErrorTypes.WARNING:
-        return "$(alert) Warning occured compiling JS to TS (more detail in Problems window ctrl+shift+M)";
+        return '$(alert) Warning occured compiling JS to TS (more detail in Problems window ctrl+shift+M)';
 
       case ErrorTypes.ERROR:
-        return "$(alert) Error compiling JS to TS (more detail in Problems window ctrl+shift+M)";
+        return '$(alert) Error compiling JS to TS (more detail in Problems window ctrl+shift+M)';
     }
   }
 };

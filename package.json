@@ -14,10 +14,17 @@
     },
     "keywords": [
         "js-syntax",
-        ".js", "js", "javascript",
-        "Learn Game Development", "LGD",
-        "react", "next", "next.js",
-        "typescript", "ts", ".ts"
+        ".js",
+        "js",
+        "javascript",
+        "Learn Game Development",
+        "LGD",
+        "react",
+        "next",
+        "next.js",
+        "typescript",
+        "ts",
+        ".ts"
     ],
     "categories": [
         "Programming Languages"
@@ -105,9 +112,10 @@
             }
         ]
     },
-    "dependencies": {
-    },
+    "dependencies": {},
     "devDependencies": {
+        "babel-eslint": "^10.0.3",
+        "eslint": "^6.2.2",
         "vscode": "^1.1.0"
     }
 }
