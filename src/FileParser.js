@@ -430,7 +430,7 @@ const FileParser = {
       const isAsync = properties.groups.keyword && properties.groups.keyword.includes('async');
 
       if(properties.groups.name === 'create') {
-        this.updatePosition(object, properties, "function", lastBeginLine);
+        this.updatePosition(object, properties, 'function', lastBeginLine);
         const tabLevel = 2;
         property += this.parseCreate(tabSize * tabLevel, properties.groups.function);
       }
@@ -440,7 +440,7 @@ const FileParser = {
       let functionParamaters = '';
       if(properties.groups.params) {
         if(properties.groups.name !== 'create') {
-          this.updatePosition(object, properties, "function", lastBeginLine);
+          this.updatePosition(object, properties, 'function', lastBeginLine);
         }
 
         functionParamaters = this.parseFunction(properties.groups.params, options.params);
@@ -475,7 +475,10 @@ const FileParser = {
         type = options.type;
       }
 
-      this.staticVariables.push(properties.groups.name);
+      if(!properties.groups.function) {
+        this.staticVariables.push(properties.groups.name);
+      }
+
       property += `${keywords}${properties.groups.name}${functionParamaters}: ${type};`;
       property += `\n`;
     }
@@ -538,7 +541,7 @@ const FileParser = {
     let object;
     if((object = classKeywordRegex.exec(content)) !== null) {
       this.updatePosition(content, object, 'class');
-      throw VscodeError.create("LGD: There is currently no parsing for Class.", this.beginLine, 0, this.endLine, 0, ErrorTypes.HINT);
+      throw VscodeError.create('LGD: There is currently no parsing for Class.', this.beginLine, 0, this.endLine, 0, ErrorTypes.HINT);
     }
   },
 
@@ -548,15 +551,14 @@ const FileParser = {
    * @returns {string} the the type file to write to disk.
    */
   parse(content) {
-
     this.checkForClassKeyword(content);
 
-    this.staticVariables = [];
-    const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(const|let|var) (?<name>\w+?) = {(?<object>.*?)^}/gms;
+    const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(?<var>const|let|var) (?<name>\w+?) = {(?<object>.*?)^}/gms;
     let object;
     let typeFile = '';
     while((object = objectLiterals.exec(content)) !== null) {
 
+      this.staticVariables = [];
       this.updatePosition(content, object, 'object');
 
       typeFile += `\n`;
@@ -571,6 +573,6 @@ const FileParser = {
 
     return typeFile;
   }
-}
+};
 
 module.exports = FileParser;
