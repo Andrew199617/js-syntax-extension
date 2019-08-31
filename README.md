@@ -109,6 +109,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 - Auto Compile React Class.
 - AutoComplete for React Proptypes.
 - Classes with Type at the end need to show as error.
+- Save Enum as ts enum.
 
 ## Known Issues
 

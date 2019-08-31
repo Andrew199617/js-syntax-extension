@@ -400,7 +400,7 @@ const FileParser = {
 
     const varName = '\\w+?';
     const varDeliminator = '\\s*?:\\s*';
-    const varEnd = `(,|$)(?=\\s*(\\/|}|${varName}${varDeliminator}))`;
+    const varEnd = `(,|$)(?=\\s*(\\/|}|$|${varName}\\s*?:))`;
     const tab = `\\s{${tabSize}}`;
 
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
