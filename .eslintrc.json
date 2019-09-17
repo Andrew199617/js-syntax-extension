@@ -360,6 +360,7 @@
         "const": { "after": true },
         "let": { "after": true },
         "var": { "after": true },
+        "finally": { "after": true },
         "try": { "after": true }
       }
     }],

@@ -16,7 +16,7 @@ and take advantage of the builtin Object.create and Object.assign functions to c
 
 ## Compile .js file into .ts file automagically. Read below to use!
 
-You can call the command "Compile js file into ts file" or turn generateTypings setting to true.
+Search for commands under LGD ctrl+shift+P. You can call the command "Compile js file into ts file" or turn generateTypings setting to true.
 
 The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings.
 - You need to have a jsconfig or tsconfig for vscode to pick up your typings automatically.
@@ -49,7 +49,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 # Change Color
 
-### Change the color using these in your settings
+## Change the color using these in your settings
 
 ``` json
 "editor.tokenColorCustomizations": {
@@ -90,7 +90,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 - variable.react
 - keyword.create
 
-## Settings
+# Settings
 
 ``` json
 {
@@ -103,24 +103,30 @@ The .ts file will be placed into the typings folder in your root directory. This
 }
 ```
 
-## Goals for 2019
+# Goals for 2019
 
-- Auto Compile whole project into typings folder.
+~~Auto Compile whole project into typings folder.~~
 - Auto Compile React Class.
 - AutoComplete for React Proptypes.
 - Classes with Type at the end need to show as error.
 - Save Enum as ts enum.
+- File rename updates typings file.
 
-## Known Issues
+# Known Issues
 
 ~~Everything is thrown in the typings folder.~~
+
 ~~We need to add option to keep directory structure in typings folder.~~
 
 Manual Adding of Class type.
 
-## Release Notes
+# Release Notes
 
 ## V2
+
+### 2.2.3 - 2.2.4
+
+- Added ability to compile every js file in your project.
 
 ### 2.2.0 - 2.2.1
 

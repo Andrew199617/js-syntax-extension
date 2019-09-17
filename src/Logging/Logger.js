@@ -1,6 +1,7 @@
 const vscode = require('vscode');
-const DEFAULT_DIR = "typings";
 const FileIO = require('./FileIO');
+
+const DEFAULT_DIR = 'typings';
 
 /**
 * @description Log to a file on disc.
@@ -27,14 +28,26 @@ const Logger = {
     return logger;
   },
 
+  logInfo(info) {
+    this.log.push(`INFO: ${info}`);
+  },
+
+  logWarning(warning) {
+    this.log.push(`WARNING: ${warning}`);
+  },
+
+  logError(error) {
+    this.log.push(`ERROR: ${error}`);
+  },
+
   /**
    * @description Convert the log to a string to be written to a file.
    */
-  toString() {
+  _toString() {
     let str = 'Stop logging by changing setting "lgd.options.createDebugLog"\nIf you have any problems or requests please create an issue on Github.\n\n';
 
     for(let i = 0; i < this.log.length; ++i) {
-      str += this.log[i] + '\n';
+      str += `${this.log[i]}\n`;
     }
 
     return str;
@@ -44,20 +57,19 @@ const Logger = {
    * @description write the file to disk.
    */
   async write() {
-
     if(!lgd.configuration.options.createDebugLog) {
       return;
     }
 
-    const logFile = this.toString();
-    const filePath = `${this.logFolder()}\\${this._fileName}.log`;
+    const logFile = this._toString();
+    const filePath = `${this._logFolder()}\\${this._fileName}.log`;
     await FileIO.writeFileContents(filePath, logFile);
   },
 
   /**
    * @description where we save the logger.
    */
-  logFolder() {
+  _logFolder() {
     return `${vscode.workspace.rootPath}\\${DEFAULT_DIR}`;
   }
 

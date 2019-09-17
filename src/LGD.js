@@ -2,23 +2,21 @@
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
 const GenerateTypings = require('./GenerateTypings');
-const Configuration = require('./Configuration');
+const Configuration = require('./Core/Configuration');
+
+const fs = require('fs');
+const path = require('path');
+
+const Document = require('./Core/Document');
 
 const JS_EXT = ".js";
 const COMPILE_COMMAND = "lgd.generateTypings";
+const COMPILE_ALL_COMMAND = "lgd.generateTypingsForAll";
 
 global.lgd = {
   configuration: null,
   lgdDiagnosticCollection: null
 }
-
-// TODO: add generate propTypes command.
-// "keybindings": [{
-//     "command": "lgd.generateTypings",
-//     "key": "ctrl+shift+c",
-//     "mac": "cmd+shift+c",
-//     "when": "editorTextFocus"
-// }],
 
 function activate(context) {
 
@@ -31,7 +29,7 @@ function activate(context) {
       const document = activeEditor.document;
 
       if (document.fileName.endsWith(JS_EXT)) {
-        GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
+        GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
       }
       else {
         vscode.window.showWarningMessage("This command only works for .js files.");
@@ -39,6 +37,22 @@ function activate(context) {
     }
     else {
       vscode.window.showInformationMessage("This command is only available when a .js editor is open.");
+    }
+  });
+
+  const compileAllCommand = vscode.commands.registerCommand(COMPILE_ALL_COMMAND, async () => {
+    const uris = await vscode.workspace.findFiles('**/*.js', '**/node_modules/**')
+
+    for(let i = 0; i < uris.length; ++i) {
+      const fileName = uris[i].fsPath;
+
+      fs.readFile(uris[i].fsPath, 'utf8', (err, text) => {
+        if(err) {
+          throw err;
+        }
+
+        GenerateTypings.create(Document.create(fileName, text, uris[i]), lgd.lgdDiagnosticCollection).execute();
+      });
     }
   });
 
@@ -88,6 +102,7 @@ function activate(context) {
   });
 
   context.subscriptions.push(compileCommand);
+  context.subscriptions.push(compileAllCommand);
   context.subscriptions.push(willSaveEvent);
   context.subscriptions.push(didSaveEvent);
   context.subscriptions.push(didChangeEvent);

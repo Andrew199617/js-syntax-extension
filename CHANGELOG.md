@@ -4,7 +4,11 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ## V2
 
-### 2.2.0 - 2.2.1
+### 2.2.3 - 2.2.4
+
+- Added ability to compile every js file in your project.
+
+### 2.2.0 - 2.2.2
 
 - Added the ability to compile on change.
 - Improved Error reporting. Specify exact line error and warnings occur on for you to easily fix.

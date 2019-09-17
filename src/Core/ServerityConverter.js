@@ -1,6 +1,6 @@
-const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
+const StatusBarMessageTypes = require('../Logging/StatusBarMessageTypes');
 const vscode = require('vscode');
-const ErrorTypes = require('./Errors/ErrorTypes');
+const ErrorTypes = require('../Errors/ErrorTypes');
 
 /**
 * @description

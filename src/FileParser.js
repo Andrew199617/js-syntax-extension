@@ -1,6 +1,9 @@
 const VscodeError = require('./Errors/VscodeError');
 const ErrorTypes = require('./Errors/ErrorTypes');
+
 const Logger = require('./Logging/Logger');
+const EnumParser = require('./EnumParser');
+
 const StaticAccessorCheck = require('./FunctionChecks/StaticAccessorCheck');
 
 /**
@@ -49,6 +52,9 @@ const FileParser = {
 
     /** @type {LoggerType} */
     fileParser.logger = Logger.create('LGD.FileParser');
+
+    /** @type {EnumParserType} */
+    fileParser.enumParser = EnumParser.create(this);
 
     return fileParser;
   },
@@ -560,6 +566,10 @@ const FileParser = {
 
       this.staticVariables = [];
       this.updatePosition(content, object, 'object');
+
+      if(this.enumParser.isEnum(object.groups.comment)) {
+        this.logger.logWarning('Saving enum as interface for now! Fix coming soon.');
+      }
 
       typeFile += `\n`;
       typeFile += object.groups.comment;

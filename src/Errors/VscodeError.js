@@ -1,6 +1,6 @@
 const vscode = require('vscode');
 const StatusBarMessage = require('../Logging/StatusBarMessage');
-const SeverityConverter = require('../ServerityConverter');
+const SeverityConverter = require('../Core/ServerityConverter');
 
 /**
 * @description An error occured that should be logged to the user and we can specify the line in the document that error occured.

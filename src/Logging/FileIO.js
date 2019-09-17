@@ -49,7 +49,7 @@ const FileIO = {
     }
 
     callback();
-  },
+  }
 };
 
 module.exports = FileIO;

@@ -1,14 +1,14 @@
 {
     "name": "js-syntax-extension",
-    "displayName": "JS Syntax Highlight Extension",
+    "displayName": "JS -> TS Compiler & Syntax Highlighter",
     "publisher": "learn-game-development",
     "icon": "LGDLogo.png",
     "repository": {
         "type": "git",
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
-    "description": "Extra Syntax highlighting for JS files. Support React + Next.js.",
-    "version": "2.2.3",
+    "description": "Extra Syntax highlighting for JS files. Compile JS files to TS files. Support React + Next.js.",
+    "version": "2.2.4",
     "engines": {
         "vscode": "^1.1.0"
     },
@@ -31,14 +31,20 @@
     ],
     "activationEvents": [
         "onLanguage:javascript",
-        "onCommand:lgd.generateTypings"
+        "onCommand:lgd.generateTypings",
+        "onCommand:lgd.generateTypingsForAll"
     ],
     "main": "./src/LGD",
     "contributes": {
         "commands": [
             {
                 "command": "lgd.generateTypings",
-                "title": "Compile js file to ts file.",
+                "title": "Compile current js file to a ts file.",
+                "category": "LGD"
+            },
+            {
+                "command": "lgd.generateTypingsForAll",
+                "title": "Compile all js files in project to ts files.",
                 "category": "LGD"
             }
         ],

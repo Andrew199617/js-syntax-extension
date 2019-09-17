@@ -3,10 +3,10 @@ const JsCompiler = require('./JsCompiler');
 const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 const vscode = require('vscode');
 
-const SeverityConverter = require('./ServerityConverter');
+const SeverityConverter = require('./Core/ServerityConverter');
 
 /**
- *
+ * @type {GenerateTypingsType}
  */
 const GenerateTypings = {
   create(document, lgdDiagnosticCollection) {
@@ -14,6 +14,7 @@ const GenerateTypings = {
 
     /**
      * @description The document that was saved.
+     * @type {DocumentType}
      */
     generateTypings.document = document;
 
