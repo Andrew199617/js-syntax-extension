@@ -38,6 +38,7 @@ const GenerateTypings = {
       // Reset diagnostics every time with parse a file.
       VscodeError.diagnostics = [];
       VscodeError.currentDocument = this.document;
+      lgd.logger.opendedNewDocument(this.document);
 
       const compiled = await JsCompiler.compile(this.document.fileName, this.document.getText());
 

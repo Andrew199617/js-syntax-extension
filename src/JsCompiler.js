@@ -16,7 +16,7 @@ async function compile(jsFile, content) {
     typeFile = fileParser.parse(content);
   }
   finally {
-    await fileParser.logger.write();
+    await lgd.logger.write();
   }
 
   if(fileParser.errorOccured) {

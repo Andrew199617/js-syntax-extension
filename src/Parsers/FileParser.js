@@ -2,7 +2,6 @@
 const VscodeError = require('../Errors/VscodeError');
 const ErrorTypes = require('../Errors/ErrorTypes');
 
-const Logger = require('../Logging/Logger');
 const EnumParser = require('./EnumParser');
 const ClassParser = require('./ClassParser');
 
@@ -58,9 +57,6 @@ const FileParser = {
      * @description The character that ends the parse. "This line is being parsed" <- d is the endCharacter.
      */
     fileParser.endCharacter = 0;
-
-    /** @type {LoggerType} */
-    fileParser.logger = Logger.create('LGD.FileParser');
 
     /** @type {EnumParserType} */
     fileParser.enumParser = EnumParser.create(fileParser);
@@ -122,7 +118,7 @@ const FileParser = {
     }
 
     if(valuesStr.includes('[') && valuesStr.includes(']')) {
-      this.logger.log.push(`LGD: ${valuesStr} | No array of array implemented yet.`);
+      lgd.logger.logInfo(`${valuesStr} | No array of array implemented yet.`);
       return '(any | any[])[]';
     }
 
@@ -221,7 +217,7 @@ const FileParser = {
         return this.parseType(typeof val);
       }
       catch(err) {
-        this.logger.logError(err);
+        lgd.logger.logError(err);
       }
 
       return 'any';
@@ -256,7 +252,7 @@ const FileParser = {
         }
 
         if(typeof doc.groups.type === 'undefined') {
-          this.logger.logWarning('Empty Type tag.');
+          lgd.logger.logWarning('Empty Type tag.');
         }
 
         numTypes++;
@@ -272,13 +268,13 @@ const FileParser = {
       }
       else if(jsdoc === 'param') {
         if(typeof doc.groups.name === 'undefined') {
-          this.logger.logWarning('Empty param tag.');
+          lgd.logger.logWarning('Empty param tag.');
           continue;
         }
         else if(typeof doc.groups.type === 'undefined') {
           params[doc.groups.name] = 'any';
           params.length++;
-          this.logger.logWarning(`Param type for ${doc.groups.name} not given, using any.`);
+          lgd.logger.logWarning(`Param type for ${doc.groups.name} not given, using any.`);
           continue;
         }
 
@@ -596,7 +592,7 @@ const FileParser = {
       this.updatePosition(content, object, 'object');
 
       if(this.enumParser.isEnum(object.groups.comment)) {
-        this.logger.logWarning('Saving enum as interface for now! Fix coming soon.');
+        lgd.logger.logWarning('Saving enum as interface for now! Fix coming soon.');
       }
 
       typeFile += `\n`;

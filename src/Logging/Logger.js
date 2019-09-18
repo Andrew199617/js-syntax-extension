@@ -25,18 +25,45 @@ const Logger = {
      */
     logger._fileName = filename;
 
+    /**
+     * @description whether we have already logged heading for file we are currently parsing.
+     */
+    logger._loggedHeading = false;
+
+    /** @type {DocumentType} */
+    logger.document = null;
+
     return logger;
   },
 
+  /**
+   * @description Whenever we open a new docuemnt we need to specify in logger.
+   * @param {DocumentType} document
+   */
+  opendedNewDocument(document) {
+    this._loggedHeading = false;
+    this.document = document;
+  },
+
+  logHeader() {
+    if(!this._loggedHeading) {
+      this.log.push(`\n${this.document.fileName}: \n`);
+      this._loggedHeading = true;
+    }
+  },
+
   logInfo(info) {
+    this.logHeader();
     this.log.push(`INFO: ${info}`);
   },
 
   logWarning(warning) {
+    this.logHeader();
     this.log.push(`WARNING: ${warning}`);
   },
 
   logError(error) {
+    this.logHeader();
     this.log.push(`ERROR: ${error}`);
   },
 
@@ -44,7 +71,7 @@ const Logger = {
    * @description Convert the log to a string to be written to a file.
    */
   _toString() {
-    let str = 'Stop logging by changing setting "lgd.options.createDebugLog"\nIf you have any problems or requests please create an issue on Github.\n\n';
+    let str = 'Stop logging by changing setting "lgd.options.createDebugLog"\nIf you have any problems or requests please create an issue on Github.\n';
 
     for(let i = 0; i < this.log.length; ++i) {
       str += `${this.log[i]}\n`;

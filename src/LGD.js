@@ -5,7 +5,7 @@ const GenerateTypings = require('./GenerateTypings');
 const Configuration = require('./Core/Configuration');
 
 const fs = require('fs');
-const path = require('path');
+const Logger = require('./Logging/Logger');
 
 const Document = require('./Core/Document');
 
@@ -13,15 +13,13 @@ const JS_EXT = ".js";
 const COMPILE_COMMAND = "lgd.generateTypings";
 const COMPILE_ALL_COMMAND = "lgd.generateTypingsForAll";
 
-global.lgd = {
-  configuration: null,
-  lgdDiagnosticCollection: null
-}
+lgd = require('./Globals');
 
 function activate(context) {
 
   lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
   lgd.configuration = Configuration.create();
+  lgd.logger = Logger.create('LGD.FileParser');
 
   const compileCommand = vscode.commands.registerCommand(COMPILE_COMMAND, () => {
     const activeEditor = vscode.window.activeTextEditor;
@@ -29,6 +27,7 @@ function activate(context) {
       const document = activeEditor.document;
 
       if (document.fileName.endsWith(JS_EXT)) {
+        lgd.logger.log = [];
         GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
       }
       else {
@@ -45,6 +44,8 @@ function activate(context) {
 
     for(let i = 0; i < uris.length; ++i) {
       const fileName = uris[i].fsPath;
+
+      lgd.logger.log = [];
 
       fs.readFile(uris[i].fsPath, 'utf8', (err, text) => {
         if(err) {
@@ -63,6 +64,7 @@ function activate(context) {
     }
 
     if (document.fileName.endsWith(JS_EXT)) {
+      lgd.logger.log = [];
       GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
     }
   });
@@ -74,6 +76,7 @@ function activate(context) {
     }
 
     if (e.document.fileName.endsWith(JS_EXT) && !e.document.isDirty) {
+      lgd.logger.log = [];
       GenerateTypings.create(e.document, lgd.lgdDiagnosticCollection).execute()
     }
   });
@@ -86,6 +89,7 @@ function activate(context) {
 
     const document = TextChangedEvent.document;
     if (document.fileName.endsWith(JS_EXT)) {
+      lgd.logger.log = [];
       GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
     }
   })
