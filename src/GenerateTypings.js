@@ -3,6 +3,9 @@ const JsCompiler = require('./JsCompiler');
 const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 const vscode = require('vscode');
 
+const ErrorTypes = require('./Errors/ErrorTypes');
+const VscodeError = require('./Errors/VscodeError');
+
 const SeverityConverter = require('./Core/ServerityConverter');
 
 /**
@@ -32,12 +35,30 @@ const GenerateTypings = {
     const startTime = Date.now();
 
     try {
-      await JsCompiler.compile(this.document.fileName, this.document.getText());
-      const elapsedTime = Date.now() - startTime;
-      compilingMessage.dispose();
-      this.lgdDiagnosticCollection.set(this.document.uri, []);
+      // Reset diagnostics every time with parse a file.
+      VscodeError.diagnostics = [];
+      VscodeError.currentDocument = this.document;
 
-      StatusBarMessage.show(`$(check) LGD compiled in ${elapsedTime}ms`, StatusBarMessageTypes.SUCCESS);
+      const compiled = await JsCompiler.compile(this.document.fileName, this.document.getText());
+
+      if(compiled) {
+        const elapsedTime = Date.now() - startTime;
+        compilingMessage.dispose();
+        this.lgdDiagnosticCollection.set(this.document.uri, []);
+
+        StatusBarMessage.show(
+          `$(check) LGD compiled in ${elapsedTime}ms`,
+          StatusBarMessageTypes.SUCCESS
+        );
+      }
+      else {
+        compilingMessage.dispose();
+
+        StatusBarMessage.show(
+          SeverityConverter.getStatusBarMessage(ErrorTypes.ERROR),
+          StatusBarMessageTypes.ERROR
+        );
+      }
     }
     catch(error) {
       const startLine = error.startLine || 0;

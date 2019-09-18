@@ -1,7 +1,7 @@
 const path = require('path');
 const vscode = require('vscode');
 
-const FileParser = require('./FileParser');
+const FileParser = require('./Parsers/FileParser');
 const FileIO = require('./Logging/FileIO');
 
 const DEFAULT_EXT = '.d.ts';
@@ -19,6 +19,10 @@ async function compile(jsFile, content) {
     await fileParser.logger.write();
   }
 
+  if(fileParser.errorOccured) {
+    return false;
+  }
+
   const parsedPath = path.parse(jsFile);
 
   let dirInRoot = '';
@@ -30,6 +34,8 @@ async function compile(jsFile, content) {
   const typeFilePath = `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${dirInRoot}\\${baseFilename}${DEFAULT_EXT}`;
 
   await FileIO.writeFileContents(typeFilePath, typeFile);
+
+  return true;
 }
 
 module.exports = {

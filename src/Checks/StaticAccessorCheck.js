@@ -10,7 +10,6 @@ const StaticAccessorCheck = {
   /**
    * @description notify the user if they use static variable incorrectly
    * @param {string} insideFunction the inside of a funciton.
-   * @this {FileParserType}
    */
   execute(insideFunction) {
     if(this.staticVariables.length === 0) {
@@ -18,20 +17,21 @@ const StaticAccessorCheck = {
     }
 
     const staticVariables = this.staticVariables.reduce((accumulator, val) => {
-      let lastVal = accumulator == '' ? '' : accumulator + '|';
+      const lastVal = accumulator === '' ? '' : `${accumulator}|`;
       return lastVal + val;
     });
 
-    const staticCheck = new RegExp(`this\\.(?<variableName>(${staticVariables}))`, 'm')
+    const staticCheck = new RegExp(`this\\.(?<variableName>(${staticVariables}))`, 'm');
     let object;
     if((object = staticCheck.exec(insideFunction)) !== null) {
-
-      throw VscodeError.create(`LGD: Using static varaible in non static way. Use ${this.className}.${object.groups.variableName} instead of this.${object.groups.variableName}`,
+      VscodeError.create(
+        `LGD: Using static varaible in non static way. Use ${this.className}.${object.groups.variableName} instead of this.${object.groups.variableName}`,
         this.beginLine,
         this.beginCharacter,
         this.endLine,
         this.endCharacter,
-        ErrorTypes.Error);
+        ErrorTypes.Error
+      ).notifyUser(this.fileParser || this);
     }
   }
 };

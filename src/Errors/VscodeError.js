@@ -1,3 +1,4 @@
+/* eslint-disable max-params */
 const vscode = require('vscode');
 const StatusBarMessage = require('../Logging/StatusBarMessage');
 const SeverityConverter = require('../Core/ServerityConverter');
@@ -7,6 +8,16 @@ const SeverityConverter = require('../Core/ServerityConverter');
 * @type {VscodeErrorType}
 */
 const VscodeError = {
+  /**
+   * @description all the errors that have occured for current document.
+   */
+  diagnostics: [],
+
+  /**
+   * @description the current document we are parsing.
+   */
+  currentDocument: null,
+
   /**
   * @description Initialize an instace of VscodeError.
   * @param {string} message The message to tell the user.
@@ -38,15 +49,13 @@ const VscodeError = {
   /**
    * @description Don't throw the error and stop compiling.
    */
-  notifyUser() {
-    const activeEditor = vscode.window.activeTextEditor;
+  notifyUser(fileParser) {
+    const document = VscodeError.currentDocument;
 
-    if(!activeEditor) {
+    if(!document) {
       // eslint-disable-next-line no-throw-literal
       throw this;
     }
-
-    const document = activeEditor.document;
 
     const range = new vscode.Range(this.startLine, this.startCharacter, this.endLine, this.endCharacter);
 
@@ -55,13 +64,16 @@ const VscodeError = {
       this.message,
       SeverityConverter.getDiagnosticSeverity(this.severity)
     );
+    VscodeError.diagnostics.push(diagnosis);
 
-    lgd.lgdDiagnosticCollection.set(document.uri, [diagnosis]);
+    lgd.lgdDiagnosticCollection.set(document.uri, VscodeError.diagnostics);
 
     StatusBarMessage.show(
       SeverityConverter.getStatusBarMessage(this.severity),
       SeverityConverter.getMessageType(this.severity)
     );
+
+    fileParser.errorOccured = true;
   }
 };
 

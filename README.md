@@ -111,6 +111,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 - Classes with Type at the end need to show as error.
 - Save Enum as ts enum.
 - File rename updates typings file.
+- Make it so Static Variables only show as an option when you are calling them without using the 'this' keyword. Using class keyword in ts file gets us half the way there.
 
 # Known Issues
 
