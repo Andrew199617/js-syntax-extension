@@ -13,7 +13,7 @@ const JS_EXT = ".js";
 const COMPILE_COMMAND = "lgd.generateTypings";
 const COMPILE_ALL_COMMAND = "lgd.generateTypingsForAll";
 
-lgd = require('./Globals');
+lgd = require('./Core/Globals');
 
 function activate(context) {
 

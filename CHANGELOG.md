@@ -4,9 +4,11 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ## V2
 
-### 2.2.3 - 2.2.4
+### 2.2.3 - 2.2.5
 
 - Added ability to compile every js file in your project.
+- Improved Error Reporting and logging.
+- Auto Compile React Class.
 
 ### 2.2.0 - 2.2.2
 

@@ -106,7 +106,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 # Goals for 2019
 
 ~~Auto Compile whole project into typings folder.~~
-- Auto Compile React Class.
+~~Auto Compile React Class.~~
 - AutoComplete for React Proptypes.
 - Classes with Type at the end need to show as error.
 - Save Enum as ts enum.
@@ -125,9 +125,11 @@ Manual Adding of Class type.
 
 ## V2
 
-### 2.2.3 - 2.2.4
+### 2.2.3 - 2.2.5
 
 - Added ability to compile every js file in your project.
+- Improved Error Reporting and logging.
+- Auto Compile React Class.
 
 ### 2.2.0 - 2.2.1
 
