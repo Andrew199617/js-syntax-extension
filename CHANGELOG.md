@@ -9,6 +9,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Added ability to compile every js file in your project.
 - Improved Error Reporting and logging.
 - Auto Compile React Class.
+- Nested Objects. Very useful for Creating the state object in React.
 
 ### 2.2.0 - 2.2.2
 

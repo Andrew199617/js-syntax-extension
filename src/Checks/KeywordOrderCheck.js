@@ -20,6 +20,11 @@ const KeywordOrderCheck = {
     if(getterCheck.test(property)) {
       KeywordOrderCheck.throwError.bind(this)('LGD: Getter method should not be async.');
     }
+
+    const setterCheck = /async\s+set\s+/m;
+    if(setterCheck.test(property)) {
+      KeywordOrderCheck.throwError.bind(this)('LGD: Setter method should not be async.');
+    }
   },
 
   throwError(message) {
@@ -29,7 +34,7 @@ const KeywordOrderCheck = {
       this.beginCharacter,
       this.endLine,
       this.endCharacter,
-      ErrorTypes.Error
+      ErrorTypes.ERROR
     ).notifyUser(this.fileParser || this);
   }
 };

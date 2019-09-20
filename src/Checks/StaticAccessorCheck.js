@@ -30,7 +30,7 @@ const StaticAccessorCheck = {
         this.beginCharacter,
         this.endLine,
         this.endCharacter,
-        ErrorTypes.Error
+        ErrorTypes.ERROR
       ).notifyUser(this.fileParser || this);
     }
   }

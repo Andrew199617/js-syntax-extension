@@ -27,6 +27,12 @@ const ClassParser = {
 
     classParser.className = '';
 
+    /** @type {number} */
+    classParser.defaultTabSize = lgd.configuration.options.tabSize;
+
+    /** @type {number} */
+    classParser.tabSize = 0;
+
     return classParser;
   },
 
@@ -61,8 +67,12 @@ const ClassParser = {
     return this.fileParser.parseValue.bind(this)(...arguments);
   },
 
+  fixType(type) {
+    return this.fileParser.fixType.bind(this)(type);
+  },
+
   parseType(options, properties) {
-    if(!options.type) {
+    if(options && !options.type) {
       options.type = Types.ANY;
       if(properties.groups.function) {
         if(properties.groups.name === 'render') {
@@ -79,8 +89,8 @@ const ClassParser = {
         }
       }
     }
-    else {
-      options.type = this.fileParser.parseType.bind(this)(options.type);
+    else if(options) {
+      options.type = this.fixType(options.type);
     }
   },
 
@@ -117,21 +127,28 @@ const ClassParser = {
    * @returns {string} parsed object.
    */
   parseClass(object) {
-    const tabSize = lgd.configuration.options.tabSize;
+    this.tabSize += this.defaultTabSize;
     const lastBeginLine = this.beginLine;
+
+    const tab = `\\s{${this.tabSize}}`;
+    const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
 
     const varName = '\\w+?';
     const varDeliminator = '\\s*?=\\s*';
-    const varEnd = `(;|$)(?=\\s*(\\/|}|$|${varName}\\s*?:))`;
-    const tab = `\\s{${tabSize}}`;
-    const arrayRegex = `\\[(?<array>.*?)\\](${varEnd}|,\\s*$)`;
-    const invalidKeyword = '(?<invalid>async\\s+static\\s+|async\\s+get\\s+|)';
+
+    const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.{1})))`;
+    const varEnd = `(;|$)${varEndLookAhead}`;
+    const functionEnd = `(};|}|$)${varEndLookAhead}`;
+
+    const arrayRegex = `\\[(?<array>.*?)${varEnd}`;
+
+    const invalidKeyword = '(?<invalid>(async\\s+(static|get|set)\\s+|))';
+    const keywordsRegex = `${invalidKeyword}(?<static>static\\s+|)(?<async>async\\s+|)`;
 
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
     const tabRegex = `^(?<tabs>${tab})`;
-    const keywordsRegex = `${invalidKeyword}(?<static>static\\s+|)(?<async>async\\s+|)`;
     const varaibleNameRegex = `(?<name>${varName})`;
-    const functionRegex = `((?<params>\\(.*?\\))\\s*?{(?<function>.*?)^${tab}}$`;
+    const functionRegex = `((?<params>\\(.*?\\))\\s*?{(?<function>.*?)${functionEnd}`;
     const valueRegex = `|${varDeliminator}(${arrayRegex}|(?<value>.*?)${varEnd})|;|$)`;
 
     const propertiesRegex = new RegExp(
@@ -167,8 +184,7 @@ const ClassParser = {
 
       if(properties.groups.name === ConstructorMethodName) {
         this.updatePosition(object, properties, 'function', lastBeginLine);
-        const tabLevel = 2;
-        property += this.parseCreate(tabSize * tabLevel, properties.groups.function);
+        property += this.parseCreate(properties.groups.function);
       }
 
       property += `\n\t`;
@@ -184,7 +200,8 @@ const ClassParser = {
         functionParamaters = this.parseFunction(properties.groups.params, options.params);
         StaticAccessorCheck.execute.bind(this)(properties.groups.function);
       }
-      else if(isStatic) {
+
+      if(isStatic) {
         keywords = 'static ';
       }
 
@@ -214,6 +231,7 @@ const ClassParser = {
       property += `\n`;
     }
 
+    this.tabSize -= this.defaultTabSize;
     return property;
   },
 

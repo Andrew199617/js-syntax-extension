@@ -2,6 +2,7 @@
 const vscode = require('vscode');
 const StatusBarMessage = require('../Logging/StatusBarMessage');
 const SeverityConverter = require('../Core/ServerityConverter');
+const ErrorTypes = require('./ErrorTypes');
 
 /**
 * @description An error occured that should be logged to the user and we can specify the line in the document that error occured.
@@ -73,7 +74,9 @@ const VscodeError = {
       SeverityConverter.getMessageType(this.severity)
     );
 
-    fileParser.errorOccured = true;
+    if(this.severity === ErrorTypes.ERROR) {
+      fileParser.errorOccured = true;
+    }
   }
 };
 

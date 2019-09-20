@@ -1,13 +1,17 @@
-# js-syntax README
+# Learn Game Development JS to TS Compiler and JS Syntax Highlighter.
 
-If it looks like a file is being generated incorrectly check the log file and file an issue on Github.
+### Issues
+- If it looks like a file is being generated incorrectly check the log file and file an issue on Github.
 
-Provide syntax highlighting for scenarios we encounter a lot in our codebase. This allows us to easily know what is going on in a file
-and avoid errors with naming. Things like proptypes and defaultProps gets used very often so its a good idea to have syntax highlighting for
-these keywords.
+### Compilation
+- There is many ways to create a class in JavaScript, there is no such thing as a 'class' only objects.
+- We like to use Object literals and take advantage of the builtin Object.create and Object.assign functions to create classes from the Object literals.
+- You can also use class for support with React.
 
-The is also many ways to create a class in JavaScript since there is not such thing as a class only objects. We like to use Object literals
-and take advantage of the builtin Object.create and Object.assign functions to create classes from the Object literals.
+### Syntax
+- Provide syntax highlighting for scenarios we encounter a lot in our codebase.
+- This allows us to easily know what is going on in a file and avoid errors with naming.
+- Things like proptypes and defaultProps gets used very often so its a good idea to have syntax highlighting for these keywords.
 
 ### Other Extensions:
 - JS/React Snippet Extension
@@ -20,7 +24,7 @@ Search for commands under LGD ctrl+shift+P. You can call the command "Compile js
 
 The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings.
 - You need to have a jsconfig or tsconfig for vscode to pick up your typings automatically.
-- The autocompile is sensitive to tab size. It picks up your tab size from editor.tabSize.
+- The autocompile is sensitive to tab size. It picks up your tab size from editor.tabSize. It is highly recommended that you use ESLINT with indent set to error.
 - You have to use Stroustrup or Allman style brackets.
 ### Make sure you set your @type tag corrrectly.
 - We will generate a interface like {classname}Type. Add @type {{classname}Type} to the object literal.
@@ -95,9 +99,17 @@ The .ts file will be placed into the typings folder in your root directory. This
 ``` json
 {
   "lgd.options": {
+
+    // Generate typescript file whenever you save a JS f=File.
     "generateTypings": true,
+
+    // Generate typescript file whenever you change a JS File.
     "generateTypingsOnChange": true,
+
+    // Place typescript in folder that relates to JS file in typings folder.
     "maintainHierarchy": true,
+
+    // Whether to write debug info to file in Typings folder.
     "createDebugLog": true
   }
 }
@@ -106,6 +118,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 # Goals for 2019
 
 ~~Auto Compile whole project into typings folder.~~
+
 ~~Auto Compile React Class.~~
 - AutoComplete for React Proptypes.
 - Classes with Type at the end need to show as error.
@@ -119,6 +132,10 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 ~~We need to add option to keep directory structure in typings folder.~~
 
+Function is not created correctly when initilized inside of create and constructor.
+
+Array of Array does not generate type properly defaults to any[].
+
 Manual Adding of Class type.
 
 # Release Notes
@@ -130,6 +147,7 @@ Manual Adding of Class type.
 - Added ability to compile every js file in your project.
 - Improved Error Reporting and logging.
 - Auto Compile React Class.
+- Nested Objects. Very useful for Creating the state object in React.
 
 ### 2.2.0 - 2.2.1
 

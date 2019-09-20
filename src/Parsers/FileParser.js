@@ -1,11 +1,15 @@
 /* eslint-disable max-lines-per-function */
 const VscodeError = require('../Errors/VscodeError');
+
 const ErrorTypes = require('../Errors/ErrorTypes');
+const Types = require('./Types');
 
 const EnumParser = require('./EnumParser');
 const ClassParser = require('./ClassParser');
 
 const StaticAccessorCheck = require('../Checks/StaticAccessorCheck');
+const CheckForThisInConstructor = require('../Checks/CheckForThisInConstructor');
+const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
 
 const ConstructorMethodName = 'create';
 
@@ -66,6 +70,12 @@ const FileParser = {
 
     /** @description Compilation was not a success don't reset problems. */
     fileParser.errorOccured = false;
+
+    /** @type {number} */
+    fileParser.defaultTabSize = lgd.configuration.options.tabSize;
+
+    /** @type {number} */
+    fileParser.tabSize = 0;
 
     return fileParser;
   },
@@ -171,34 +181,39 @@ const FileParser = {
       return null;
     }
 
-    if(value === 'true' || value === 'false' || value.includes('!!')) {
-      return 'boolean';
+    // Parse recursive object.
+    if(value.includes('{') && value.includes(':')) {
+      const tempParser = FileParser.create();
+      tempParser.staticVariables = [];
+      tempParser.tabSize = this.tabSize;
+
+      const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
+      const tabs = new Array(tabSize / this.defaultTabSize)
+        .fill('\t')
+        .join('');
+      return `{${tempParser.parseClass(value)}${tabs}}`;
     }
 
-    const stringRegex = /^("|').*?("|')\s*?(;$|$)/m;
-    if(stringRegex.test(value)) {
-      return 'string';
-    }
-
-    if(value === 'null' || value === 'undefined') {
-      return 'any';
-    }
-
-    if((/(function\s*?\(|=>)/m).test(value)) {
-      return 'Function';
-    }
-
-    if(value.includes('{') && value.includes('}')) {
-      return 'object';
-    }
-
-    if(value.includes('[') && value.includes(']')) {
-      return 'any[]';
+    if((/function\s*?\(|=>/m).test(value)) {
+      return Types.FUNCTION;
     }
 
     let className = (/new\s+(?<className>\w+)\(/m).exec(value);
     if(className !== null && className.groups.className) {
       return className.groups.className;
+    }
+
+    const stringRegex = /^("|').*?("|')\s*?(;$|$)/m;
+    if(stringRegex.test(value)) {
+      return Types.STRING;
+    }
+
+    if(value === 'null' || value === 'undefined') {
+      return Types.ANY;
+    }
+
+    if(value.includes('[') && value.includes(']')) {
+      return Types.ANYARRAY;
     }
 
     className = (/(?<className>\w+)\.create\s*\(/m).exec(value);
@@ -214,26 +229,37 @@ const FileParser = {
     if(operationRegex.test(value)) {
       try {
         const val = eval(value);
-        return this.parseType(typeof val);
+        let valType = typeof val;
+        if(valType === 'object' && val === null) {
+          valType = Types.ANY;
+        }
+
+        return this.fixType(valType);
       }
       catch(err) {
         lgd.logger.logError(err);
       }
 
-      return 'any';
+      return Types.ANY;
+    }
+
+    if(value === 'true' || value === 'false' || value.includes('!!')) {
+      return Types.BOOLEAN;
     }
 
     if(!isNaN(parseInt(value))) {
-      return 'number';
+      return Types.NUMBER;
     }
 
-    return null;
+    if(value.includes('{') && value.includes('}')) {
+      return Types.OBJECT;
+    }
+
+    return Types.ANY;
   },
 
-  parseComment(comment, options, isAsync) {
-    const description = /@description(?!$)\s*(?<description>.*?(\s|\*)(?=@|\*\/)|.*?$)/gms;
+  parseComment(comment, options) {
     const jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
-    const typesRegex = /.*?(?<type>{.*?})/g;
 
     let doc;
     let numReturns = 0;
@@ -278,7 +304,7 @@ const FileParser = {
           continue;
         }
 
-        doc.groups.type = this.parseType(doc.groups.type);
+        doc.groups.type = this.fixType(doc.groups.type);
         params[doc.groups.name] = doc.groups.type;
         params.length++;
       }
@@ -287,7 +313,8 @@ const FileParser = {
     options.params = params;
 
     if(comment.length > 0) {
-      comment += '\t';
+      const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
+      comment += `${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
     }
 
     return comment;
@@ -299,11 +326,12 @@ const FileParser = {
    * @param {string} type
    * @returns {string}
    */
-  parseType(type) {
+  fixType(type) {
     let newType = type;
-    newType = newType.replace(/bool(?!ean)/g, 'boolean');
-    newType = newType.replace(/\*/g, 'any');
-    newType = newType.replace(/function/g, 'Function');
+    newType = newType.replace(/bool(?!ean)/g, Types.BOOLEAN);
+    newType = newType.replace(/\*/g, Types.ANY);
+    newType = newType.replace(/function/g, Types.FUNCTION);
+    newType = newType.replace(/undefined/g, Types.ANY);
     return newType;
   },
 
@@ -327,20 +355,9 @@ const FileParser = {
   /**
    * @description notify the user if they use Create incorrectly.
    * @param {string} insideFunction the inside of the create() funciton.
-   * @param {string} className the name of the class.
    */
-  checkForThisInCreate(insideFunction, className) {
-    const thisKeywordRegex = /(?<this>this\.)/m;
-    if(thisKeywordRegex.test(insideFunction)) {
-      VscodeError.create(
-        `LGD: Don't use 'this' in create method. This has unintended consequenses. Use ${className}. instead of this.`,
-        this.beginLine,
-        this.beginCharacter,
-        this.endLine,
-        this.endCharacter,
-        ErrorTypes.Error
-      ).notifyUser(this);
-    }
+  checkForThisInCreate(insideFunction) {
+    CheckForThisInConstructor.execute.bind(this)(insideFunction);
   },
 
   /**
@@ -350,7 +367,8 @@ const FileParser = {
    * @param {string} insideFunction
    * @returns {string}
    */
-  parseCreate(tabSize, insideFunction) {
+  parseCreate(insideFunction) {
+    this.tabSize += this.defaultTabSize;
     this.variables = [];
     const className = this.getClassInCreate(insideFunction);
 
@@ -358,20 +376,21 @@ const FileParser = {
       return;
     }
 
-    const lastBeginLine = this.beginLine;
+    this.checkForThisInCreate(insideFunction);
 
-    this.checkForThisInCreate(insideFunction, className, lastBeginLine);
+    const tab = `\\s{${this.tabSize}}`;
+    const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
 
     const varName = '\\w+?';
     const varDeliminator = '\\s*?=\\s*';
-    const varEnd = `(;|$)(?=\\s*(\\/|\\w+?))`;
-    const tab = `\\s{${tabSize}}`;
+    const varEnd = `(;|$)(?=\\s*(^${tab}\\/|^${tab}${varName}|^${previousTab}}))`;
+    const arrayRegex = `\\[(?<array>.*?)${varEnd}`;
 
     const commentRegex = '(?<comment>(\\/\\*\\*.*?\\*\\/.*?|))';
     const tabRegex = `^(?<tabs>${tab})`;
     const varaibleName = `${className}\\.(?<name>${varName})${varDeliminator}`;
-    const arrayRegex = `\\[(?<array>.*?)\\](${varEnd}|;\\s*$)`;
-    const valueRegex = `((${arrayRegex}|(?<value>.*?)${varEnd}))`;
+    const valueRegex = `(${arrayRegex}|(?<value>.*?)${varEnd})`;
+
     const variablesRegex = new RegExp(
       [
         commentRegex,
@@ -392,7 +411,7 @@ const FileParser = {
       const comment = this.parseComment(variable.groups.comment, options, false);
 
       if(options.type) {
-        options.type = this.parseType(options.type);
+        options.type = this.fixType(options.type);
       }
 
       const type = options.type
@@ -422,6 +441,7 @@ const FileParser = {
       variables += `\n`;
     }
 
+    this.tabSize -= this.defaultTabSize;
     return variables || '';
   },
 
@@ -431,30 +451,38 @@ const FileParser = {
    * @returns {string} parsed object.
    */
   parseClass(object) {
-    const tabSize = lgd.configuration.options.tabSize;
+    this.tabSize += this.defaultTabSize;
     const lastBeginLine = this.beginLine;
+
+    const tab = `\\s{${this.tabSize}}`;
+    const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
 
     const varName = '\\w+?';
     const varDeliminator = '\\s*?:\\s*';
-    const varEnd = `(,|$)(?=\\s*(\\/|}|$|${varName}\\s*?:))`;
-    const tab = `\\s{${tabSize}}`;
+    const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.{1})))`;
+    const valueEnd = `(,|$)${varEndLookAhead}`;
+    const functionEnd = `(},|}|$)${varEndLookAhead}`;
+
+    const invalidKeyword = '(?<invalid>(async\\s+(get|set)\\s+|))';
+    const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s*|)`;
 
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
     const tabRegex = `^(?<tabs>${tab})`;
-    const functionKeywords = '(?<keyword>async\\s*|)';
     const varaibleNameRegex = `(?<name>${varName})`;
-    const functionRegex = `((?<params>\\(.*?\\))\\s*?{(?<function>.*?)^${tab}(}|},)$`;
-    const arrayRegex = `\\[(?<array>.*?)\\](${varEnd}|,\\s*$)`;
-    const valueRegex = `|${varDeliminator}(${arrayRegex}|(?<value>.*?)${varEnd}))`;
+    const functionRegex = `(?<params>\\(.*?\\))\\s*?{(?<function>.*?)${functionEnd}`;
+    const arrayRegex = `\\[(?<array>.*?)${valueEnd}`;
+    const valueRegex = `|${varDeliminator}(${arrayRegex}|(?<value>.*?)${valueEnd})`;
 
     const propertiesRegex = new RegExp(
       [
         comment,
         tabRegex,
-        functionKeywords,
+        keywordsRegex,
         varaibleNameRegex,
+        '(',
         functionRegex,
-        valueRegex
+        valueRegex,
+        ')'
       ].join(''),
       'gms'
     );
@@ -469,15 +497,21 @@ const FileParser = {
         isFunction: false,
         params: {}
       };
+
+      if(properties.groups.invalid) {
+        this.updatePosition(object, properties, 'name', lastBeginLine);
+        KeywordOrderCheck.execute.bind(this)(properties[0]);
+      }
+
       const isAsync = properties.groups.keyword && properties.groups.keyword.includes('async');
 
       if(properties.groups.name === ConstructorMethodName) {
         this.updatePosition(object, properties, 'function', lastBeginLine);
-        const tabLevel = 2;
-        property += this.parseCreate(tabSize * tabLevel, properties.groups.function);
+        property += this.parseCreate(properties.groups.function);
       }
 
-      property += `\n\t`;
+      const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
+      property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
       property += this.parseComment(properties.groups.comment, options, isAsync);
       let functionParamaters = '';
       if(properties.groups.params) {
@@ -494,13 +528,16 @@ const FileParser = {
       }
 
       if(!options.type) {
-        options.type = 'void';
-        if(properties.groups.function && properties.groups.function.includes('return')) {
-          options.type = 'any';
+        options.type = 'any';
+        if(properties.groups.function) {
+          options.type = 'void';
+          if(properties.groups.function.includes('return')) {
+            options.type = 'any';
+          }
         }
       }
       else {
-        options.type = this.parseType(options.type);
+        options.type = this.fixType(options.type);
       }
 
       options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
@@ -527,6 +564,7 @@ const FileParser = {
       property += `\n`;
     }
 
+    this.tabSize -= this.defaultTabSize;
     return property;
   },
 
