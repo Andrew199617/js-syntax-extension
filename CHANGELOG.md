@@ -4,6 +4,11 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ## V2
 
+### 2.2.6 - 2.2.7
+
+- Added notification to check log. Disabled if createDebugLog is false.
+- Added support for getter and setters in Object Literal.
+
 ### 2.2.3 - 2.2.5
 
 - Added ability to compile every js file in your project.

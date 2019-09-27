@@ -1,6 +1,9 @@
 const vscode = require('vscode');
 const FileIO = require('./FileIO');
 
+const VscodeError = require('../Errors/VscodeError');
+const ErrorTypes = require('../Errors/ErrorTypes');
+
 const DEFAULT_DIR = 'typings';
 
 /**
@@ -91,6 +94,19 @@ const Logger = {
     const logFile = this._toString();
     const filePath = `${this._logFolder()}\\${this._fileName}.log`;
     await FileIO.writeFileContents(filePath, logFile);
+  },
+
+  /**
+   * @description notify user if log has any value to check.
+   */
+  notifyUser() {
+    if(!lgd.configuration.options.createDebugLog) {
+      return;
+    }
+
+    if(this.log.length > 0) {
+      VscodeError.create('LGD: Check log!', 0, 0, 0, 0, ErrorTypes.HINT).notifyUser(null);
+    }
   },
 
   /**

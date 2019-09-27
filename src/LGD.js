@@ -21,14 +21,15 @@ function activate(context) {
   lgd.configuration = Configuration.create();
   lgd.logger = Logger.create('LGD.FileParser');
 
-  const compileCommand = vscode.commands.registerCommand(COMPILE_COMMAND, () => {
+  const compileCommand = vscode.commands.registerCommand(COMPILE_COMMAND, async () => {
     const activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
       const document = activeEditor.document;
 
       if (document.fileName.endsWith(JS_EXT)) {
         lgd.logger.log = [];
-        GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
+        await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
+        lgd.logger.notifyUser();
       }
       else {
         vscode.window.showWarningMessage("This command only works for .js files.");
@@ -42,47 +43,42 @@ function activate(context) {
   const compileAllCommand = vscode.commands.registerCommand(COMPILE_ALL_COMMAND, async () => {
     const uris = await vscode.workspace.findFiles('**/*.js', '**/node_modules/**')
 
+    let completed = 0;
     for(let i = 0; i < uris.length; ++i) {
       const fileName = uris[i].fsPath;
 
       lgd.logger.log = [];
 
-      fs.readFile(uris[i].fsPath, 'utf8', (err, text) => {
+      fs.readFile(uris[i].fsPath, 'utf8', async (err, text) => {
         if(err) {
           throw err;
         }
 
-        GenerateTypings.create(Document.create(fileName, text, uris[i]), lgd.lgdDiagnosticCollection).execute();
+        await GenerateTypings.create(Document.create(fileName, text, uris[i]), lgd.lgdDiagnosticCollection).execute();
+
+        completed++;
+        if(completed === uris.length) {
+          lgd.logger.notifyUser();
+        }
       });
     }
   });
 
   // compile on save when file is dirty
-  const didSaveEvent = vscode.workspace.onDidSaveTextDocument(document => {
+  const didSaveEvent = vscode.workspace.onDidSaveTextDocument(async document => {
     if (!lgd.configuration.options.generateTypings) {
       return;
     }
 
     if (document.fileName.endsWith(JS_EXT)) {
       lgd.logger.log = [];
-      GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
-    }
-  });
-
-  // compile js on save when file is clean (clean saves don't trigger onDidSaveTextDocument, so use this as fallback)
-  const willSaveEvent = vscode.workspace.onWillSaveTextDocument(e => {
-    if (!lgd.configuration.options.generateTypings) {
-      return;
-    }
-
-    if (e.document.fileName.endsWith(JS_EXT) && !e.document.isDirty) {
-      lgd.logger.log = [];
-      GenerateTypings.create(e.document, lgd.lgdDiagnosticCollection).execute()
+      await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
+      lgd.logger.notifyUser();
     }
   });
 
   // compile file when we change the document
-  const didChangeEvent = vscode.workspace.onDidChangeTextDocument((TextChangedEvent) => {
+  const didChangeEvent = vscode.workspace.onDidChangeTextDocument(async (TextChangedEvent) => {
     if (!lgd.configuration.options.generateTypingsOnChange) {
       return;
     }
@@ -90,7 +86,8 @@ function activate(context) {
     const document = TextChangedEvent.document;
     if (document.fileName.endsWith(JS_EXT)) {
       lgd.logger.log = [];
-      GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
+      await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
+      lgd.logger.notifyUser();
     }
   })
 
@@ -107,7 +104,6 @@ function activate(context) {
 
   context.subscriptions.push(compileCommand);
   context.subscriptions.push(compileAllCommand);
-  context.subscriptions.push(willSaveEvent);
   context.subscriptions.push(didSaveEvent);
   context.subscriptions.push(didChangeEvent);
   context.subscriptions.push(didCloseEvent);

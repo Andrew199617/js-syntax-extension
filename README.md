@@ -1,5 +1,7 @@
 # Learn Game Development JS to TS Compiler and JS Syntax Highlighter.
 
+#### Have you ever felt like Visual Studio Code intellisense is lacking for JavaScript? If so, then this extension is for you. You will be able to leverage the typings folder and be able to more easily access types from other classes. This extension is a huge productivity boost i hope you enjoy :)
+
 ### Have Issues?
 - If it looks like a file is being generated incorrectly check the log file and file an issue on Github.
 
@@ -110,6 +112,7 @@ The .ts file will be placed into the typings folder in your root directory. This
     "maintainHierarchy": true,
 
     // Whether to write debug info to file in Typings folder.
+    // Also determines if you are notified about debug log.
     "createDebugLog": true
   }
 }
@@ -143,8 +146,9 @@ Manual Adding of Class type.
 
 ## V2
 
-### 2.2.6
+### 2.2.6 - 2.2.7
 
+- Added notification to check log. Disabled if createDebugLog is false.
 - Added support for getter and setters in Object Literal.
 
 ### 2.2.3 - 2.2.5

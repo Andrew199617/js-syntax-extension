@@ -203,7 +203,7 @@ const FileParser = {
         return this.fixType(valType);
       }
       catch(err) {
-        lgd.logger.logError(err);
+        lgd.logger.logError(`Error occured parsing value using "any": ${err}`);
       }
 
       return Types.ANY;
