@@ -5,9 +5,9 @@ const ErrorTypes = require('../Errors/ErrorTypes');
 const Types = require('./Types');
 
 const EnumParser = require('./EnumParser');
+const FunctionParser = require('./FunctionParser');
 const ClassParser = require('./ClassParser');
 
-const StaticAccessorCheck = require('../Checks/StaticAccessorCheck');
 const CheckForThisInConstructor = require('../Checks/CheckForThisInConstructor');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
 
@@ -65,6 +65,9 @@ const FileParser = {
     /** @type {EnumParserType} */
     fileParser.enumParser = EnumParser.create(fileParser);
 
+    /** @type {FunctionParserType} */
+    fileParser.functionParser = FunctionParser.create(this.parseValue.bind(fileParser));
+
     /** @type {ClassParserType} */
     fileParser.classParser = ClassParser.create(fileParser);
 
@@ -84,7 +87,7 @@ const FileParser = {
    * Parse the function paramaters.
    * @param {string} params
    */
-  parseFunction(params, commentParams) {
+  parseFunctionParam(params, commentParams) {
     if(typeof params === 'undefined') {
       return '';
     }
@@ -361,6 +364,29 @@ const FileParser = {
   },
 
   /**
+   * @description Add varaible to local variables of class.
+   * Do checks before adding.
+   * @param {string} variableName
+   * @param {boolean} strict whether another variable of same name can exist.
+   */
+  addVaraible(variableName, strict = false) {
+    if(this.staticVariables.includes(variableName)) {
+      VscodeError.create(`LGD: Already defined ${variableName} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
+        .notifyUser(this);
+    }
+    else if(this.variables.includes(variableName)) {
+      if(strict) {
+        VscodeError.create(`LGD: Defined ${variableName} as property already.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
+          .notifyUser(this);
+      }
+
+      return;
+    }
+
+    this.variables.push(variableName);
+  },
+
+  /**
    * @description parse the create funciton for variables.
    * These varaibles are treated like normal variables
    * variables on the object literal are treated like static.
@@ -425,15 +451,7 @@ const FileParser = {
           .notifyUser(this);
       }
 
-      if(this.staticVariables.includes(variable.groups.name)) {
-        VscodeError.create(`LGD: Already defined ${variable.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
-          .notifyUser(this);
-      }
-      else if(this.variables.includes(variable.groups.name)) {
-        continue;
-      }
-
-      this.variables.push(variable.groups.name);
+      this.addVaraible(variable.groups.name);
 
       variables += `\n\t`;
       variables += comment;
@@ -464,7 +482,7 @@ const FileParser = {
     const functionEnd = `(},|}|$)${varEndLookAhead}`;
 
     const invalidKeyword = '(?<invalid>(async\\s+(get|set)\\s+|))';
-    const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s*|)`;
+    const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s*|)(?<getter>get\\s*|)(?<setter>get\\s*|)`;
 
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
     const tabRegex = `^(?<tabs>${tab})`;
@@ -504,6 +522,12 @@ const FileParser = {
       }
 
       const isAsync = properties.groups.keyword && properties.groups.keyword.includes('async');
+      const isGetter = !!properties.groups.getter && properties.groups.getter.includes('get');
+      const isSetter = !!properties.groups.setter && properties.groups.setter.includes('set');
+
+      if(isSetter) {
+        continue;
+      }
 
       if(properties.groups.name === ConstructorMethodName) {
         this.updatePosition(object, properties, 'function', lastBeginLine);
@@ -520,8 +544,15 @@ const FileParser = {
           this.updatePosition(object, properties, 'function', lastBeginLine);
         }
 
-        functionParamaters = this.parseFunction(properties.groups.params, options.params);
-        StaticAccessorCheck.execute.bind(this)(properties.groups.function);
+        if(isGetter) {
+          keywords = 'readonly ';
+          this.addVaraible(properties.groups.name, true);
+        }
+        else {
+          functionParamaters = this.parseFunctionParam(properties.groups.params, options.params);
+        }
+
+        this.functionParser.checkFunction(properties.groups.function, this);
       }
       else {
         keywords = 'static ';
@@ -530,8 +561,8 @@ const FileParser = {
       if(!options.type) {
         options.type = 'any';
         if(properties.groups.function) {
-          options.type = 'void';
-          if(properties.groups.function.includes('return')) {
+          options.type = this.functionParser.parseFunctionReturn(properties.groups.function);
+          if(isGetter && options.type === 'void') {
             options.type = 'any';
           }
         }

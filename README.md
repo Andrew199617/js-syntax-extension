@@ -1,6 +1,6 @@
 # Learn Game Development JS to TS Compiler and JS Syntax Highlighter.
 
-### Issues
+### Have Issues?
 - If it looks like a file is being generated incorrectly check the log file and file an issue on Github.
 
 ### Compilation
@@ -124,6 +124,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 - Classes with Type at the end need to show as error.
 - Save Enum as ts enum.
 - File rename updates typings file.
+- Parse return for methods.
 - Make it so Static Variables only show as an option when you are calling them without using the 'this' keyword. Using class keyword in ts file gets us half the way there.
 
 # Known Issues

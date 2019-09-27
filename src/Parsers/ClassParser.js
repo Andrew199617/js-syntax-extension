@@ -59,8 +59,8 @@ const ClassParser = {
     return this.fileParser.parseComment.bind(this)(...arguments);
   },
 
-  parseFunction() {
-    return this.fileParser.parseFunction.bind(this)(...arguments);
+  parseFunctionParams() {
+    return this.fileParser.parseFunctionParams.bind(this)(...arguments);
   },
 
   parseValue() {
@@ -197,7 +197,7 @@ const ClassParser = {
           this.updatePosition(object, properties, 'function', lastBeginLine);
         }
 
-        functionParamaters = this.parseFunction(properties.groups.params, options.params);
+        functionParamaters = this.parseFunctionParams(properties.groups.params, options.params);
         StaticAccessorCheck.execute.bind(this)(properties.groups.function);
       }
 
