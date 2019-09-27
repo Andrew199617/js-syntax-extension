@@ -55,12 +55,16 @@ const ClassParser = {
 
   },
 
+  addVariable() {
+    return this.fileParser.addVariable.bind(this)(...arguments);
+  },
+
   parseComment() {
     return this.fileParser.parseComment.bind(this)(...arguments);
   },
 
   parseFunctionParams() {
-    return this.fileParser.parseFunctionParams.bind(this)(...arguments);
+    return this.fileParser.functionParser.parseFunctionParams(...arguments);
   },
 
   parseValue() {

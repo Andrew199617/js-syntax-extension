@@ -84,43 +84,6 @@ const FileParser = {
   },
 
   /**
-   * Parse the function paramaters.
-   * @param {string} params
-   */
-  parseFunctionParam(params, commentParams) {
-    if(typeof params === 'undefined') {
-      return '';
-    }
-
-    let functionCall = '(';
-
-    let variables = params.replace('(', '').replace(')', '');
-    variables = variables.split(',').map(val => val.trim());
-
-    for(let i = 0; i < variables.length; ++i) {
-      if(!variables[i]) {
-        continue;
-      }
-
-      const type = commentParams[variables[i]];
-
-      // The type gotten from the default value.
-      let parsedType = null;
-      if(variables[i].includes('=')) {
-        const expr = variables[i].split('=').map(val => val.trim());
-        variables[i] = expr[0];
-        const defaultValue = expr[1];
-        parsedType = this.parseValue(defaultValue);
-      }
-
-      functionCall += `${variables[i]}: ${type || parsedType || 'any'}${i < variables.length - 1 ? ', ' : ''}`;
-    }
-
-    functionCall += ')';
-    return functionCall;
-  },
-
-  /**
    * @description Parses any property values.
    * @param {string} valuesStr the value of the property.
    * @returns {any} the type.
@@ -369,7 +332,7 @@ const FileParser = {
    * @param {string} variableName
    * @param {boolean} strict whether another variable of same name can exist.
    */
-  addVaraible(variableName, strict = false) {
+  addVariable(variableName, strict = false) {
     if(this.staticVariables.includes(variableName)) {
       VscodeError.create(`LGD: Already defined ${variableName} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
         .notifyUser(this);
@@ -451,7 +414,7 @@ const FileParser = {
           .notifyUser(this);
       }
 
-      this.addVaraible(variable.groups.name);
+      this.addVariable(variable.groups.name);
 
       variables += `\n\t`;
       variables += comment;
@@ -546,10 +509,10 @@ const FileParser = {
 
         if(isGetter) {
           keywords = 'readonly ';
-          this.addVaraible(properties.groups.name, true);
+          this.addVariable(properties.groups.name, true);
         }
         else {
-          functionParamaters = this.parseFunctionParam(properties.groups.params, options.params);
+          functionParamaters = this.functionParser.parseFunctionParams(properties.groups.params, options.params);
         }
 
         this.functionParser.checkFunction(properties.groups.function, this);
