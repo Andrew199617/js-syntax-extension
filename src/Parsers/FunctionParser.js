@@ -34,7 +34,7 @@ const FunctionParser = {
    * @returns {string} the type that was parsed.
    */
   parseFunctionReturn(insideFunction) {
-    const returnRegex = /return(\s+(?<return>.*?);|)/g;
+    const returnRegex = /return(\s+(?<return>.*?);|)/gm;
 
     let type = 'void';
     let returns;
