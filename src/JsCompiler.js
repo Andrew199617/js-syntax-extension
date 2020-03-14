@@ -1,102 +1,43 @@
-const  mkpath = require('mkpath');
-const  path = require('path');
-const  fs = require('fs');
-const  vscode = require('vscode');
+const path = require('path');
+const vscode = require('vscode');
 
-const FileParser = require("./FileParser");
+const FileParser = require('./Parsers/FileParser');
+const FileIO = require('./Logging/FileIO');
 
-const DEFAULT_EXT = ".d.ts";
-const DEFAULT_DIR = "typings"
+const DEFAULT_EXT = '.d.ts';
+const DEFAULT_DIR = 'typings';
 
-// compile the given less file
-async function compile(jsFile, content)
-{
-    const typeFile = FileParser.parse(content);
-    
-    const baseFilename = path.parse(jsFile).name;
-    const typeFilePath = `${vscode.workspace.rootPath}\\${DEFAULT_DIR}\\${baseFilename}${DEFAULT_EXT}`;
+// compile the given file
+async function compile(jsFile, content) {
+  const fileParser = FileParser.create();
 
-    await writeFileContents(typeFilePath, typeFile);
-    return;
+  let typeFile = null;
+  try {
+    typeFile = fileParser.parse(content);
+  }
+  finally {
+    await lgd.logger.write();
+  }
 
-}
+  if(fileParser.errorOccured) {
+    return false;
+  }
 
-function intepolatePath(path)
-{
-    return (path).replace(/\$\{workspaceRoot\}/g, vscode.workspace.rootPath);
-}
+  const parsedPath = path.parse(jsFile);
 
-// writes a file's contents in a path where directories may or may not yet exist
-function writeFileContents(filepath, content)
-{
-    return new Promise((resolve, reject) =>
-    {
-        mkpath(path.dirname(filepath), err =>
-        {
-            if (err)
-            {
-                return reject(err);
-            }
+  let dirInRoot = '';
+  if(lgd.configuration.options.maintainHierarchy) {
+    dirInRoot = parsedPath.dir.replace(vscode.workspace.rootPath, '');
+  }
 
-            fs.writeFile(filepath, content, err =>
-            {
-                if (err)
-                {
-                    reject(err)
-                }
-                else
-                {
-                    resolve()
-                }
-            });
-        });
-    });
-}
+  const baseFilename = parsedPath.name;
+  const typeFilePath = `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${dirInRoot}\\${baseFilename}${DEFAULT_EXT}`;
 
-function readFilePromise(filename, encoding)
-{
-    return new Promise((resolve, reject) =>
-    {
-        fs.readFile(filename, encoding, (err, data) =>
-        {
-            if (err) 
-            {
-                reject(err)
-            }
-            else
-            {
-                resolve(data);
-            }
-        });
-    });
-}
+  await FileIO.writeFileContents(typeFilePath, typeFile);
 
-function chooseExtension(options)
-{
-    if (options && options.outExt)
-    {
-        if (options.outExt === "")
-        {
-            // special case for no extension (no idea if anyone would really want this?)
-            return "";
-        }
-
-        return ensureDotPrefixed(options.outExt) || DEFAULT_EXT;
-    }
-
-    return DEFAULT_EXT;
-}
-
-function ensureDotPrefixed(extension)
-{
-    if (extension.startsWith("."))
-    {
-        return extension;
-    }
-
-    return extension ? `.${extension}` : "";
+  return true;
 }
 
 module.exports = {
-    compile
+  compile
 }

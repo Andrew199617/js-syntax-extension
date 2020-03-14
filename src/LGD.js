@@ -1,96 +1,128 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-const  vscode = require('vscode');
+const vscode = require('vscode');
 const GenerateTypings = require('./GenerateTypings');
-const Configuration = require('./Configuration');
+const Configuration = require('./Core/Configuration');
+
+const fs = require('fs');
+const Logger = require('./Logging/Logger');
+
+const Document = require('./Core/Document');
 
 const JS_EXT = ".js";
 const COMPILE_COMMAND = "lgd.generateTypings";
+const COMPILE_ALL_COMMAND = "lgd.generateTypingsForAll";
 
-global.lgd = {
-    configuration: Configuration.create()
-}
+lgd = require('./Core/Globals');
 
-let lgdDiagnosticCollection;
+function activate(context) {
 
-function activate(context)
-{
-    if(!lgd.configuration.options.generateTypings) {
-        return;
+  lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
+  lgd.configuration = Configuration.create();
+  lgd.logger = Logger.create('LGD.FileParser');
+
+  const compileCommand = vscode.commands.registerCommand(COMPILE_COMMAND, async () => {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+      const document = activeEditor.document;
+
+      if (document.fileName.endsWith(JS_EXT)) {
+        lgd.logger.log = [];
+        await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
+        lgd.logger.notifyUser();
+      }
+      else {
+        vscode.window.showWarningMessage("This command only works for .js files.");
+      }
+    }
+    else {
+      vscode.window.showInformationMessage("This command is only available when a .js editor is open.");
+    }
+  });
+
+  const compileAllCommand = vscode.commands.registerCommand(COMPILE_ALL_COMMAND, async () => {
+    const uris = await vscode.workspace.findFiles('**/*.js', '**/node_modules/**')
+
+    let completed = 0;
+    for(let i = 0; i < uris.length; ++i) {
+      const fileName = uris[i].fsPath;
+
+      lgd.logger.log = [];
+
+      fs.readFile(uris[i].fsPath, 'utf8', async (err, text) => {
+        if(err) {
+          throw err;
+        }
+
+        await GenerateTypings.create(Document.create(fileName, text, uris[i]), lgd.lgdDiagnosticCollection).execute();
+
+        completed++;
+        if(completed === uris.length) {
+          lgd.logger.notifyUser();
+        }
+      });
+    }
+  });
+
+  // compile on save when file is dirty
+  const didSaveEvent = vscode.workspace.onDidSaveTextDocument(async document => {
+    if (!lgd.configuration.options.generateTypings) {
+      return;
     }
 
-    lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
+    if (document.fileName.endsWith(JS_EXT)) {
+      lgd.logger.log = [];
+      await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
+      lgd.logger.notifyUser();
+    }
+  });
 
-    const compileLessSub = vscode.commands.registerCommand(COMPILE_COMMAND, () =>
-    {
-        const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor)
-        {
-            const document = activeEditor.document;
+  // compile file when we change the document
+  const didChangeEvent = vscode.workspace.onDidChangeTextDocument(async (TextChangedEvent) => {
+    if (!lgd.configuration.options.generateTypingsOnChange) {
+      return;
+    }
 
-            if (document.fileName.endsWith(JS_EXT))
-            {
-                document.save();
-            }
-            else
-            {
-                vscode.window.showWarningMessage("This command only works for .js files.");
-            }
-        }
-        else
-        {
-            vscode.window.showInformationMessage("This command is only available when a .js editor is open.");
-        }
-    });
+    const document = TextChangedEvent.document;
+    if (document.fileName.endsWith(JS_EXT)) {
+      lgd.logger.log = [];
+      await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
+      lgd.logger.notifyUser();
+    }
+  })
 
-    // compile less on save when file is dirty
-    const didSaveEvent = vscode.workspace.onDidSaveTextDocument(document =>
-    {
-        if (document.fileName.endsWith(JS_EXT))
-        {
-            GenerateTypings.create(document, lgdDiagnosticCollection).execute()
-        }
-    });
+  // dismiss errors on file close
+  const didCloseEvent = vscode.workspace.onDidCloseTextDocument((doc) => {
+    if (doc.fileName.endsWith(JS_EXT)) {
+      lgd.lgdDiagnosticCollection.delete(doc.uri);
+    }
+  })
 
-    // compile less on save when file is clean (clean saves don't trigger onDidSaveTextDocument, so use this as fallback)
-    const willSaveEvent = vscode.workspace.onWillSaveTextDocument(e =>
-    {
-        if (e.document.fileName.endsWith(JS_EXT) && !e.document.isDirty)
-        {
-            GenerateTypings.create(e.document, lgdDiagnosticCollection).execute()
-        }
-    });
+  const configurationChanged = vscode.workspace.onDidChangeConfiguration(() => {
+    lgd.configuration = Configuration.create();
+  });
 
-    // dismiss less errors on file close
-    const didCloseEvent = vscode.workspace.onDidCloseTextDocument((doc) =>
-    {
-        if (doc.fileName.endsWith(JS_EXT))
-        {
-            lgdDiagnosticCollection.delete(doc.uri);
-        }
-    })
-
-    context.subscriptions.push(compileLessSub);
-    context.subscriptions.push(willSaveEvent);
-    context.subscriptions.push(didSaveEvent);
-    context.subscriptions.push(didCloseEvent);
+  context.subscriptions.push(compileCommand);
+  context.subscriptions.push(compileAllCommand);
+  context.subscriptions.push(didSaveEvent);
+  context.subscriptions.push(didChangeEvent);
+  context.subscriptions.push(didCloseEvent);
+  context.subscriptions.push(configurationChanged);
 }
 
 // this method is called when your extension is deactivated
-function deactivate()
-{
-    if (lgdDiagnosticCollection)
-    {
-        lgdDiagnosticCollection.dispose();
-    }
+function deactivate() {
+  if (lgd.lgdDiagnosticCollection) {
+    lgd.lgdDiagnosticCollection.dispose();
+  }
 
-    if(lgd) {
-        delete lgd;
-    }
+  if (lgd) {
+    delete lgd;
+  }
 }
 
 
 module.exports = {
-    activate,
-    deactivate
+  activate,
+  deactivate
 }
