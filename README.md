@@ -118,14 +118,13 @@ The .ts file will be placed into the typings folder in your root directory. This
 }
 ```
 
-# Goals for 2019
+# Goals for 2020
 
-~~Auto Compile whole project into typings folder.~~
-
-~~Auto Compile React Class.~~
+- ~~Auto Compile whole project into typings folder.~~
+- ~~Auto Compile React Class.~~
 - AutoComplete for React Proptypes.
 - Classes with Type at the end need to show as error.
-- Save Enum as ts enum.
+- ~~Save Enum as ts enum.~~
 - File rename updates typings file.
 - Parse return for methods.
 - Make it so Static Variables only show as an option when you are calling them without using the 'this' keyword. Using class keyword in ts file gets us half the way there.
