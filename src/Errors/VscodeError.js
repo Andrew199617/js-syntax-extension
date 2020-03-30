@@ -37,7 +37,7 @@ const VscodeError = {
     vscodeError.startLine = startLine;
     vscodeError.startCharacter = startCharacter || 0;
     vscodeError.endLine = endLine;
-    vscodeError.endCharacter = endCharacter || 0;
+    vscodeError.endCharacter = vscodeError.startCharacter + (endCharacter || 0);
 
     vscodeError.severity = severity;
 

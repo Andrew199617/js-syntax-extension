@@ -307,7 +307,7 @@ const FileParser = {
    * @returns {string}
    */
   getClassInCreate(insideFunction) {
-    const classNameRegex = /(?<varType>const|let|var) (?<name>\w+?)\s*=\s*Object\.(?<creationWay>create|assign)\s*?\(/ms;
+    const classNameRegex = /(?<varType>const|let|var) (?<name>\w+?)\s*=\s*(?<object>Object|Oloo)\.(?<creationWay>create|assign)\s*?\(/ms;
     const className = classNameRegex.exec(insideFunction);
 
     if(!className || !className.groups.name) {
@@ -445,7 +445,7 @@ const FileParser = {
     const functionEnd = `(},|}|$)${varEndLookAhead}`;
 
     const invalidKeyword = '(?<invalid>(async\\s+(get|set)\\s+|))';
-    const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s*|)(?<getter>get\\s*|)(?<setter>get\\s*|)`;
+    const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s+|)(?<getter>get\\s+|)(?<setter>get\\s+|)`;
 
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
     const tabRegex = `^(?<tabs>${tab})`;
@@ -564,7 +564,7 @@ const FileParser = {
 
   /**
    * @description Update our position in the document to be able to log to the user where an error occurs.
-   * @param {string} str the string that was parsed.
+   * @param {string} str the string that was parsed. The string we are exec on.
    * @param {RegExpExecArray} regExpExecArray the object that was produced from exec.
    * @param {string} group the group that we are updating to.
    * @param {number} lastBegin The last begin line we were parsing.
@@ -624,7 +624,8 @@ const FileParser = {
       this.updatePosition(content, object, 'object');
 
       if(this.enumParser.isEnum(object.groups.comment)) {
-        lgd.logger.logWarning('Saving enum as interface for now! Fix coming soon.');
+        typeFile += this.enumParser.parse(content, object)
+        continue;
       }
 
       typeFile += `\n`;
