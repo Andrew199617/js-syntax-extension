@@ -28,7 +28,7 @@
 			}
 		},
 		"builtins": {
-			"match": "(propTypes|defaultProps)|(getInitialProps)",
+			"match": "(propTypes|defaultProps)|(getInitialProps|getStaticProps|getStaticPaths|getServerSideProps)",
 			"captures": {
 				"1": {
 					"name": "variable.react.builtins"
