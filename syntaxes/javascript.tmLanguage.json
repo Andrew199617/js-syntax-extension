@@ -10,7 +10,7 @@
 	],
 	"repository": {
 		"reactBuiltin": {
-			"match": "(?<!\\s)([A-Z]+\\w+)(\\.)(propTypes|defaultProps|getInitialProps)",
+			"match": "(?<!\\s)([A-Z]+\\w+)(\\.)(propTypes|defaultProps|getInitialProps|getStaticProps|getStaticPaths|getServerSideProps)",
 			"captures": {
 				"1": {
 					"name": "support.class.proptypes"
