@@ -2,7 +2,12 @@
 
 All notable changes to the "js-syntax-extension" extension will be documented in this file.
 
-## V2
+# Version 2
+
+## 2.3.0+
+
+- Added First Quick Fix, more to come.
+- Fixed Getters and Setters. readonly will only show if not setter is paired with getter. setter will show up even without getter.
 
 ### 2.2.6 - 2.2.7
 
@@ -16,7 +21,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Auto Compile React Class.
 - Nested Objects. Very useful for Creating the state object in React.
 
-### 2.2.0 - 2.2.2
+## 2.2.0 - 2.2.2
 
 - Added the ability to compile on change.
 - Improved Error reporting. Specify exact line error and warnings occur on for you to easily fix.
@@ -27,7 +32,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Added maintainHierarchy to settings.
 - Improved parsing of create method.
 
-### 2.1.0
+## 2.1.0
 
 - Compile to js to ts now working with inline array.
 - Add static keyword.
@@ -50,7 +55,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
   - This will allow you to have intellisense throughout the whole project.
   - Activate auto compile with settings.
 
-## V1
+# Version 1
 
 ### 1.1.3 - 1.1.5
 
@@ -61,7 +66,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 - Fixed bug where create whould highlight in object literal comments.
 
-### 1.1.0
+## 1.1.0
 
 - Added assign highlighting like create
 - Treating Capital Object Literals like a class.

@@ -26,7 +26,7 @@ const FileParser = {
 
     /**
      * @description the variables that the class contains.
-     * @type {string[]}
+     * @type {{ [variableName: string]: boolean}}
      */
     fileParser.variables = null;
 
@@ -252,7 +252,7 @@ const FileParser = {
   },
 
   parseComment(comment, options) {
-    const jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}(?!\s*})|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
+    const jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}(?!.*})|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
 
     let doc;
     let numReturns = 0;
@@ -364,16 +364,17 @@ const FileParser = {
       VscodeError.create(`LGD: Already defined ${variableName} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
         .notifyUser(this);
     }
-    else if(this.variables.includes(variableName)) {
+    else if(typeof this.variables[variableName] !== 'undefined') {
       if(strict) {
         VscodeError.create(`LGD: Defined ${variableName} as property already.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
           .notifyUser(this);
       }
 
-      return;
+      return false;
     }
 
-    this.variables.push(variableName);
+    this.variables[variableName] = true;
+    return true;
   },
 
   /**
@@ -385,7 +386,6 @@ const FileParser = {
    */
   parseCreate(insideFunction) {
     this.tabSize += this.defaultTabSize;
-    this.variables = [];
     const className = this.getClassInCreate(insideFunction);
 
     if(!className) {
@@ -472,14 +472,14 @@ const FileParser = {
     const functionEnd = `(},|}|$)${varEndLookAhead}`;
 
     const invalidKeyword = '(?<invalid>(async\\s+(get|set)\\s+|))';
-    const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s+|)(?<getter>get\\s+|)(?<setter>get\\s+|)`;
+    const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s+|)(?<getter>get\\s+|)(?<setter>set\\s+|)`;
 
     const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
     const tabRegex = `^(?<tabs>${tab})`;
     const varaibleNameRegex = `(?<name>${varName})`;
     const functionRegex = `(?<params>\\(.*?\\))\\s*?{(?<function>.*?)${functionEnd}`;
     const arrayRegex = `\\[(?<array>.*?)${valueEnd}`;
-    const valueRegex = `|${varDeliminator}(${arrayRegex}|(?<value>.*?)${valueEnd})`;
+    const valueRegex = `${varDeliminator}(${arrayRegex}|(?<value>.*?)${valueEnd})`;
 
     const propertiesRegex = new RegExp(
       [
@@ -487,10 +487,7 @@ const FileParser = {
         tabRegex,
         keywordsRegex,
         varaibleNameRegex,
-        '(',
-        functionRegex,
-        valueRegex,
-        ')'
+        `(${functionRegex}|${valueRegex})`
       ].join(''),
       'gms'
     );
@@ -511,12 +508,20 @@ const FileParser = {
         KeywordOrderCheck.execute.bind(this)(properties[0]);
       }
 
-      const isAsync = properties.groups.keyword && properties.groups.keyword.includes('async');
-      const isGetter = !!properties.groups.getter && properties.groups.getter.includes('get');
-      const isSetter = !!properties.groups.setter && properties.groups.setter.includes('set');
+      const isAsync = typeof properties.groups.keyword === 'string'  && properties.groups.keyword.includes('async');
+      const isGetter = typeof properties.groups.getter === 'string' && properties.groups.getter.includes('get');
+      const isSetter = typeof properties.groups.setter === 'string' && properties.groups.setter.includes('set');
 
-      if(isSetter) {
-        continue;
+      if(isSetter || isGetter) {
+        // TODO Getter and Setter as Static if no this in function.
+        const varExisted = !this.addVariable(properties.groups.name, false);
+        if(varExisted && isSetter) {
+          property = property.replace(`readonly ${properties.groups.name}`, properties.groups.name);
+          continue;
+        }
+        else if(varExisted) {
+          continue;
+        }
       }
 
       if(properties.groups.name === ConstructorMethodName) {
@@ -527,7 +532,7 @@ const FileParser = {
       const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
       property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
       property += this.parseComment(properties.groups.comment, options, isAsync);
-      let functionParamaters = '';
+      let functionParameters = '';
       if(properties.groups.params) {
         // Already updated.
         if(properties.groups.name !== ConstructorMethodName) {
@@ -536,12 +541,12 @@ const FileParser = {
 
         if(isGetter) {
           keywords = 'readonly ';
-          this.addVariable(properties.groups.name, true);
         }
-        else {
-          functionParamaters = this.functionParser.parseFunctionParams(properties.groups.params, options.params);
+        else if(!isSetter) {
+          functionParameters = this.functionParser.parseFunctionParams(properties.groups.params, options.params);
         }
 
+        // Check for errors in Function.
         this.functionParser.checkFunction(properties.groups.function, this);
       }
       else {
@@ -550,9 +555,11 @@ const FileParser = {
 
       if(!options.type) {
         options.type = 'any';
-        if(properties.groups.function) {
+        // Setter has no return.
+        if(properties.groups.function && !isSetter) {
           options.type = this.functionParser.parseFunctionReturn(properties.groups.function);
           if(isGetter && options.type === 'void') {
+            // Getter needs to have a return.
             options.type = 'any';
           }
         }
@@ -581,7 +588,7 @@ const FileParser = {
         this.staticVariables.push(properties.groups.name);
       }
 
-      property += `${keywords}${properties.groups.name}${functionParamaters}: ${type};`;
+      property += `${keywords}${properties.groups.name}${functionParameters}: ${type};`;
       property += `\n`;
     }
 
@@ -703,6 +710,7 @@ const FileParser = {
     const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(?<var>const|let|var) (?<name>\w+?) = (?<react>(createReactClass\(|)){(?<object>.*?)^}/gms;
     let object;
     while((object = objectLiterals.exec(content)) !== null) {
+      this.variables = {};
       this.staticVariables = [];
       this.updatePosition(content, object, 'object');
 

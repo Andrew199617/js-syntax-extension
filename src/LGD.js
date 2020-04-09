@@ -42,6 +42,9 @@ function activate(context) {
             if(fix) {
               actions.push(fix);
             }
+            else if(element.codeAction.command) {
+              actions.push(element.codeAction);
+            }
           }
         });
 
