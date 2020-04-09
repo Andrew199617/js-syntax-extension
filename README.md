@@ -1,14 +1,23 @@
 # Learn Game Development JS to TS Compiler and JS Syntax Highlighter.
 
-#### Have you ever felt like Visual Studio Code intellisense is lacking for JavaScript? If so, then this extension is for you. You will be able to leverage the typings folder and be able to more easily access types from other classes. This extension is a huge productivity boost i hope you enjoy :)
+[![Marketplace Version](https://vsmarketplacebadge.apphb.com/version-short/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Installs](https://vsmarketplacebadge.apphb.com/installs/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Downloads](https://vsmarketplacebadge.apphb.com/downloads/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+
+### Use Cases:
+
+- Improved intellisense for JavaScript? You will be able to leverage the typings folder and be able to more easily access types from other classes. This is a huge productivity boost!
+- Create Types folder for a NPM module in seconds.
+- Maintain OLOO pattern.
 
 ### Have Issues?
-- If it looks like a file is being generated incorrectly check the log file and file an issue on Github.
+- If it looks like a file is being generated incorrectly check the log file and file an issue on Github. This has high priority for me since i use it for my website.
 
 ### Compilation
 - There is many ways to create a class in JavaScript, there is no such thing as a 'class' only objects.
 - We like to use Object literals and take advantage of the builtin Object.create and Object.assign functions to create classes from the Object literals.
 - You can also use class for support with React.
+- Provides Quick Fix and Code Actions for fixing JS for TS export.
 
 ### Syntax
 - Provide syntax highlighting for scenarios we encounter a lot in our codebase.
@@ -32,10 +41,10 @@ The .ts file will be placed into the typings folder in your root directory. This
 - We will generate a interface like {classname}Type. Add @type {{classname}Type} to the object literal.
 
 ### Auto Compile
-![Auto compile JS](./images/autocompile.gif)
+<img src="./images/autocompile.gif" width="50%" />
 
 ### Maintain Hierarchy
-![Auto compile JS](./images/maintainhierarchy.gif)
+<img src="./images/maintainhierarchy.gif" width="50%" />
 
 ### Highlight Foo.create() like new Foo().
 
@@ -44,10 +53,6 @@ The .ts file will be placed into the typings folder in your root directory. This
 ### Code highlighting for comments with issues in them. A comment with an issue contains a #[0-9]
 
 ![TODO && Issues](./images/comments.png)
-
-### Highlighting our way of creating classes.
-
-![Foo.create Highlighting](./images/classcreation.png)
 
 ### React & Next
 
@@ -122,7 +127,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 - ~~Auto Compile whole project into typings folder.~~
 - ~~Auto Compile React Class.~~
-- AutoComplete for React Proptypes.
+- ~~AutoComplete for React Proptypes.~~ https://www.learngamedevelopment.net/blog/reactpropsintellisense-autocomplete
 - Classes with Type at the end need to show as error.
 - ~~Save Enum as ts enum.~~
 - File rename updates typings file.
@@ -135,7 +140,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 ~~We need to add option to keep directory structure in typings folder.~~
 
-Function is not created correctly when initilized inside of create and constructor.
+Function is not created correctly when initialized inside of create and constructor.
 
 Array of Array does not generate type properly defaults to any[].
 
@@ -144,6 +149,10 @@ Manual Adding of Class type.
 # Release Notes
 
 ## V2
+
+## 2.3.0
+
+- Added First Quick Fix, more to come.
 
 ### 2.2.6 - 2.2.7
 

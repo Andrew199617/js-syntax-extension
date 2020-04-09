@@ -17,7 +17,7 @@ const GenerateTypings = {
 
     /**
      * @description The document that was saved.
-     * @type {DocumentType}
+     * @type {vscode.TextDocument}
      */
     generateTypings.document = document;
 
@@ -38,7 +38,7 @@ const GenerateTypings = {
       // Reset diagnostics every time with parse a file.
       VscodeError.diagnostics = [];
       VscodeError.currentDocument = this.document;
-      lgd.logger.opendedNewDocument(this.document);
+      lgd.logger.openedNewDocument(this.document);
 
       const compiled = await JsCompiler.compile(this.document.fileName, this.document.getText());
 

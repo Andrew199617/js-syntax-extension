@@ -16,6 +16,7 @@ const VscodeError = {
 
   /**
    * @description the current document we are parsing.
+   * @type {vscode.TextDocument}
    */
   currentDocument: null,
 
@@ -41,10 +42,25 @@ const VscodeError = {
 
     vscodeError.severity = severity;
 
+    /**
+     * @description The code action that can be preformed to fix this Error.
+     */
+    vscodeError.codeAction = null;
+
     Error.call(vscodeError);
     Error.captureStackTrace(vscodeError, { message });
 
     return vscodeError;
+  },
+
+  /**
+   * @description Pass Code Action for diagnostic.
+   * @param {vscode.CodeAction} codeAction
+   * @returns {VscodeErrorType} chain notifyUser.
+   */
+  provideCodeAction(codeAction) {
+    this.codeAction = codeAction;
+    return this;
   },
 
   /**
@@ -66,6 +82,10 @@ const VscodeError = {
       SeverityConverter.getDiagnosticSeverity(this.severity)
     );
     VscodeError.diagnostics.push(diagnosis);
+
+    if(this.codeAction) {
+      diagnosis.codeAction = this.codeAction;
+    }
 
     lgd.lgdDiagnosticCollection.set(document.uri, VscodeError.diagnostics);
 

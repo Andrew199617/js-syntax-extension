@@ -14,7 +14,7 @@ const Configuration = {
 
     /**
      * @description the options for our extenstion.
-     * @type {VSCODE.Options}
+     * @type {vscode.Options}
      */
     configuration.options = vscode.workspace.getConfiguration('lgd', null).get('options');
 

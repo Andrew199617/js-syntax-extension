@@ -224,8 +224,35 @@ const FileParser = {
     return Types.ANY;
   },
 
+  /**
+   * @description Parse the comment of the class to get Template and extends.
+   * @param {string} comment The class comment.
+   * @returns { { extends: string[], template: string[] } }
+   */
+  parseClassComment(comment) {
+    const jsdocRegex = /@(?<jsdoc>(template|extends))(?!$)(\s*{(?<type>.*?)}|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
+
+    const docs = { extends: [], template: [] };
+    while((doc = jsdocRegex.exec(comment)) !== null) {
+      const jsdoc = doc.groups.jsdoc;
+      if(jsdoc === 'template') {
+
+        if(typeof doc.groups.type !== 'undefined') {
+          lgd.logger.logWarning("Don't add type for Template");
+        }
+
+        docs.template.push(doc.groups.name);
+      }
+      else if(jsdoc === 'extends') {
+        docs.extends.push(doc.groups.type);
+      }
+    }
+
+    return docs;
+  },
+
   parseComment(comment, options) {
-    const jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
+    const jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}(?!\s*})|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
 
     let doc;
     let numReturns = 0;
@@ -307,11 +334,11 @@ const FileParser = {
    * @returns {string}
    */
   getClassInCreate(insideFunction) {
-    const classNameRegex = /(?<varType>const|let|var) (?<name>\w+?)\s*=\s*(?<object>Object|Oloo)\.(?<creationWay>create|assign)\s*?\(/ms;
+    const classNameRegex = /(?<varType>const|let|var) (?<name>\w+?)\s*=\s*(?<object>Object|Oloo)\.(?<creationWay>create|assign|assignSlow|createSlow)\s*?\(/ms;
     const className = classNameRegex.exec(insideFunction);
 
     if(!className || !className.groups.name) {
-      VscodeError.create('LGD: Could not find class instance in create method. Are you creating the instance using Object.create or Object.assign.', this.beginLine, 0, this.endLine, 0, ErrorTypes.ERROR)
+      VscodeError.create('LGD: Could not find class instance in create method. Are you creating the instance properly.', this.beginLine, 0, this.endLine, 0, ErrorTypes.ERROR)
         .notifyUser(this);
     }
 
@@ -563,6 +590,59 @@ const FileParser = {
   },
 
   /**
+   * Update Position to a specific string.
+   * @param {string} str the string that was parsed. The string we are exec on.
+   * @param {string} string the string to update to.
+   * @param {number} lastBegin The last begin line we were parsing.
+   */
+  updatePositionToString(content, string, lastBegin = 0) {
+    const lines = content.split(/\r\n|\r|\n/);
+    const stringLines = string.split(/\r\n|\r|\n/);
+    const linesNoGroup = content.replace(string, '').split(/\r\n|\r|\n/);
+    let localBeginLine = 0;
+    let localEndLine = 0;
+
+    for(let i = 0; i < lines.length; ++i) {
+      if(lines[i] !== linesNoGroup[i]) {
+        this.beginCharacter = lines[i].replace(new RegExp(`${stringLines[0]}.*`, 's'), '').length;
+        this.endCharacter = stringLines[stringLines.length - 1].length;
+        this.beginLine = lastBegin + i;
+        localBeginLine = i;
+        break;
+      }
+    }
+
+    if(linesNoGroup.length === lines.length) {
+      this.endLine = this.beginLine;
+      return;
+    }
+
+    if(linesNoGroup.length === localBeginLine + 1) {
+      this.endLine = lastBegin + lines.length - 1;
+      return;
+    }
+
+    let numMatched = 0;
+    for(let i = localBeginLine; i < lines.length; ++i) {
+      if(lines[i] !== linesNoGroup[localBeginLine + numMatched + 1]) {
+        numMatched = 0;
+      }
+      else if(numMatched < 2) {
+        localEndLine = lastBegin + i;
+        numMatched++;
+      }
+      else {
+        this.endLine = lastBegin + i - numMatched;
+        return;
+      }
+    }
+
+    if(numMatched > 0) {
+      this.endLine = localEndLine;
+    }
+  },
+
+  /**
    * @description Update our position in the document to be able to log to the user where an error occurs.
    * @param {string} str the string that was parsed. The string we are exec on.
    * @param {RegExpExecArray} regExpExecArray the object that was produced from exec.
@@ -615,9 +695,12 @@ const FileParser = {
    */
   parse(content) {
     let typeFile = '';
-    typeFile = this.classParser.parse(content, typeFile);
 
-    const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(?<var>const|let|var) (?<name>\w+?) = {(?<object>.*?)^}/gms;
+    const parse = this.classParser.parse(content, typeFile);
+    content = parse.content;
+    typeFile = parse.typeFile;
+
+    const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(?<var>const|let|var) (?<name>\w+?) = (?<react>(createReactClass\(|)){(?<object>.*?)^}/gms;
     let object;
     while((object = objectLiterals.exec(content)) !== null) {
       this.staticVariables = [];
@@ -631,9 +714,24 @@ const FileParser = {
       typeFile += `\n`;
       typeFile += object.groups.comment;
 
+      const docs = this.parseClassComment(object.groups.comment);
+
+      if(object.groups.react !== '') {
+        this.updatePositionToString(content, 'createReactClass');
+        VscodeError.create(`LGD: Move createReactClass to the export statement -> export default createReactClass(${object.groups.name});`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
+          .provideCodeAction(lgd.codeActions.moveCreateReactClass)
+          .notifyUser(this);
+      }
+
       this.className = object.groups.name;
 
-      typeFile += `declare interface ${object.groups.name}Type {`;
+      typeFile += `declare interface ${object.groups.name}Type${
+        docs.template.length > 0
+        ? `<${docs.template.join(',')}>`
+        : ''} ${
+        docs.extends.length > 0
+        ? `extends ${docs.extends.join(',')} `
+        : '' }{`;
       typeFile += this.parseClass(object.groups.object);
       typeFile += `}\n`;
     }

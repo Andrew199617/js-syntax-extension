@@ -43,7 +43,7 @@ const Logger = {
    * @description Whenever we open a new docuemnt we need to specify in logger.
    * @param {DocumentType} document
    */
-  opendedNewDocument(document) {
+  openedNewDocument(document) {
     this._loggedHeading = false;
     this.document = document;
   },

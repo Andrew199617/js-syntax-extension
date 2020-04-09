@@ -239,9 +239,15 @@ const ClassParser = {
     return property;
   },
 
+  /**
+   * @description
+   * @param {string} content
+   * @param {string} typeFile
+   * @returns {{ typeFile: string, content: string }}
+   */
   parse(content, typeFile) {
     if(!this.checkForClassKeyword(content)) {
-      return typeFile;
+      return { typeFile, content };
     }
 
     const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(?<var>class) (?<name>\w+?) extends React.Component {(?<object>.*?)^}/gms;
@@ -260,7 +266,8 @@ const ClassParser = {
       typeFile += `}\n`;
     }
 
-    return typeFile;
+    content = content.replace(objectLiterals, '');
+    return { typeFile, content };
   }
 };
 

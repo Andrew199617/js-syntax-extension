@@ -6,6 +6,7 @@ const Configuration = require('./Core/Configuration');
 
 const fs = require('fs');
 const Logger = require('./Logging/Logger');
+const CodeActions = require('./CodeActions/CodeActions');
 
 const Document = require('./Core/Document');
 
@@ -15,11 +16,40 @@ const COMPILE_ALL_COMMAND = "lgd.generateTypingsForAll";
 
 lgd = require('./Core/Globals');
 
-function activate(context) {
+let actionProvider = null;
 
+function activate(context) {
+  const documentSelector = { schema: 'file', language: 'javascript' };
+
+  lgd.codeActions = CodeActions.create();
   lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
   lgd.configuration = Configuration.create();
   lgd.logger = Logger.create('LGD.FileParser');
+
+  actionProvider = vscode.languages.registerCodeActionsProvider(
+    documentSelector,
+    {
+      provideCodeActions(document, range, context, token) {
+        lgd.codeActions.document = document;
+        lgd.codeActions.range = range;
+        lgd.codeActions.token = token;
+        lgd.codeActions.context = context;
+
+        const actions = [];
+        context.diagnostics.forEach(element => {
+          if(element.codeAction) {
+            const fix = element.codeAction.createFix();
+            if(fix) {
+              actions.push(fix);
+            }
+          }
+        });
+
+        return actions;
+      }
+    },
+    [ vscode.CodeActionKind.QuickFix ]
+  );
 
   const compileCommand = vscode.commands.registerCommand(COMPILE_COMMAND, async () => {
     const activeEditor = vscode.window.activeTextEditor;
@@ -108,12 +138,19 @@ function activate(context) {
   context.subscriptions.push(didChangeEvent);
   context.subscriptions.push(didCloseEvent);
   context.subscriptions.push(configurationChanged);
+  context.subscriptions.push(actionProvider);
+
+  lgd.codeActions.registerCommands(context.subscriptions);
 }
 
 // this method is called when your extension is deactivated
 function deactivate() {
   if (lgd.lgdDiagnosticCollection) {
     lgd.lgdDiagnosticCollection.dispose();
+  }
+
+  if(actionProvider) {
+    actionProvider.dispose();
   }
 
   if (lgd) {

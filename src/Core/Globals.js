@@ -6,7 +6,10 @@ const lgd = {
   /** @type {ConfigurationType} */
   configuration: null,
 
-  /** @type {LoggerType} */
+  /** @type {CodeActionsType} */
+  codeActions: null,
+
+  /** @type {vscode.DiagnosticCollection} */
   lgdDiagnosticCollection: null,
 
   /** @type {LoggerType} */
