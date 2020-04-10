@@ -1,6 +1,7 @@
 /**
 * @description Types that typescrept uses.
 * @type {TypesType}
+* @enum
 */
 const Types = {
   /** @description */

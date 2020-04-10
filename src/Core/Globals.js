@@ -9,6 +9,9 @@ const lgd = {
   /** @type {CodeActionsType} */
   codeActions: null,
 
+  /** @type {DefinitionProviderType} */
+  definitionProvider: null,
+
   /** @type {vscode.DiagnosticCollection} */
   lgdDiagnosticCollection: null,
 

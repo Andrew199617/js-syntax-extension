@@ -23,6 +23,40 @@ const CodeActions = {
     return codeActions;
   },
 
+  /**
+   * @description Called by vscode to provide code Actions.
+   * @param {vscode.TextDocument} document
+   * @param {vscode.Range} range
+   * @param {vscode.CodeActionContext} context
+   * @param {vscode.CancellationToken} token
+   * @returns
+   */
+  provideCodeActions(document, range, context, token) {
+    this.document = document;
+    this.range = range;
+    this.token = token;
+    this.context = context;
+
+    const actions = [];
+    context.diagnostics.forEach(element => {
+      if(element.codeAction) {
+        const fix = element.codeAction.createFix();
+        if(fix) {
+          actions.push(fix);
+        }
+        else if(element.codeAction.command) {
+          actions.push(element.codeAction);
+        }
+      }
+    });
+
+    return actions;
+  },
+
+  /**
+   * @description Register commands with vscode.
+   * @param subscriptions the vscode subscription to push to.
+   */
   registerCommands(subscriptions) {
     subscriptions.push(this.moveCreateReactClass.createCommand('lgd.moveToExport', 'Move Create React Class to Export.'));
   }

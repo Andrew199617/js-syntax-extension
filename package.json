@@ -8,7 +8,7 @@
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS files. Compile JS files to TS files. Support React + Next.js.",
-    "version": "2.3.2",
+    "version": "2.3.3",
     "engines": {
         "vscode": "^1.1.0"
     },
@@ -75,6 +75,11 @@
                         "createDebugLog": {
                             "type": "boolean",
                             "description": "Whether we should create a log file to help debug errors and anomalies happening with this plugin. Log file is located in typings folder.",
+                            "default": true
+                        },
+                        "extractPropsAndState": {
+                            "type": "boolean",
+                            "description": "Whether we should create interfaces for State and Props.",
                             "default": true
                         }
                     }

@@ -34,24 +34,32 @@ const FunctionParser = {
    * @returns {string} the type that was parsed.
    */
   parseFunctionReturn(insideFunction) {
+    // TODO check we are not inside of a function.
     const returnRegex = /return(\s+(?<return>.*?);|)/gm;
 
-    let type = 'void';
     let returns;
 
+    let types = new Map();
     while((returns = returnRegex.exec(insideFunction)) !== null) {
       if(typeof returns.groups.return === 'undefined') {
-        type = 'any';
+        types.set('null', 'null');
         continue;
       }
 
       const parsedType = this.parseValue(returns.groups.return);
-      if(parsedType !== 'any' || type === 'void') {
-        type = parsedType;
+      if(parsedType === 'any') {
+        return 'any';
       }
+
+      types.set(parsedType, parsedType);
     }
 
-    return type;
+    let returnType = '';
+    types.forEach(type => {
+      returnType += returnType.length === 0 ? type : ` | ${type}`;
+    });
+
+    return returnType || 'void';
   },
 
   /**

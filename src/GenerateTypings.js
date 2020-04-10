@@ -1,5 +1,10 @@
 const StatusBarMessage = require('./Logging/StatusBarMessage');
-const JsCompiler = require('./JsCompiler');
+
+const path = require('path');
+const FileParser = require('./Parsers/FileParser');
+const ClassParser = require('./Parsers/ClassParser');
+const FileIO = require('./Logging/FileIO');
+
 const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 const vscode = require('vscode');
 
@@ -8,10 +13,20 @@ const VscodeError = require('./Errors/VscodeError');
 
 const SeverityConverter = require('./Core/ServerityConverter');
 
+const DEFAULT_EXT = '.d.ts';
+const DEFAULT_DIR = 'typings';
+
 /**
+ * @description Generate .d.ts files for a .js file.
  * @type {GenerateTypingsType}
  */
 const GenerateTypings = {
+  /**
+   * @description Initialize an Instance of GenerateTypings
+   * @param {DocumentType} document
+   * @param {vscode.DiagnosticCollection} lgdDiagnosticCollection
+   * @returns {GenerateTypingsType}
+   */
   create(document, lgdDiagnosticCollection) {
     const generateTypings = Object.assign({}, GenerateTypings);
 
@@ -40,7 +55,7 @@ const GenerateTypings = {
       VscodeError.currentDocument = this.document;
       lgd.logger.openedNewDocument(this.document);
 
-      const compiled = await JsCompiler.compile(this.document.fileName, this.document.getText());
+      const compiled = await this.compile(this.document.fileName, this.document.getText());
 
       if(compiled) {
         const elapsedTime = Date.now() - startTime;
@@ -59,6 +74,7 @@ const GenerateTypings = {
           SeverityConverter.getStatusBarMessage(ErrorTypes.ERROR),
           StatusBarMessageTypes.ERROR
         );
+
       }
     }
     catch(error) {
@@ -94,6 +110,58 @@ const GenerateTypings = {
         SeverityConverter.getMessageType(severity)
       );
     }
+  },
+
+  /**
+   * @description Parse Class, Objects, Enums from a JsFile into a TSFile.
+   * @param {string} content the content of the file.
+   * @returns {string | null} The generate type file.
+   */
+  async parseFile(content) {
+    const fileParser = FileParser.create();
+    const classParser = ClassParser.create();
+
+    let typeFile = '';
+    try {
+      const parseResult = classParser.parse(content, typeFile);
+      typeFile = fileParser.parse(parseResult.typeFile, parseResult.content);
+    }
+    finally {
+      await lgd.logger.write();
+    }
+
+    if(fileParser.errorOccurred || classParser.errorOccurred || !typeFile) {
+      return false;
+    }
+
+    return typeFile;
+  },
+
+  /**
+   * @description Compile a jsFile into a typeFile.
+   * @param {string} jsFile the js file path.
+   * @param {string} content the contents of the js file.
+   * @returns {boolean} did error occur parsing file.
+   */
+  async compile(jsFile, content) {
+    const typeFile = await this.parseFile(content);
+    if(!typeFile) {
+      return false;
+    }
+
+    const parsedPath = path.parse(jsFile);
+
+    let dirInRoot = '';
+    if(lgd.configuration.options.maintainHierarchy) {
+      dirInRoot = parsedPath.dir.replace(vscode.workspace.rootPath, '');
+    }
+
+    const baseFilename = parsedPath.name;
+    const typeFilePath = `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${dirInRoot}\\${baseFilename}${DEFAULT_EXT}`;
+
+    await FileIO.writeFileContents(typeFilePath, typeFile);
+
+    return true;
   }
 };
 

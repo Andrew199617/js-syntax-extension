@@ -3,14 +3,15 @@ const vscode = require('vscode');
 const StatusBarMessage = require('../Logging/StatusBarMessage');
 const SeverityConverter = require('../Core/ServerityConverter');
 const ErrorTypes = require('./ErrorTypes');
+const { Oloo } = require('@learngamedevelopment/oloo');
 
 /**
-* @description An error occured that should be logged to the user and we can specify the line in the document that error occured.
+* @description An error occurred that should be logged to the user and we can specify the line in the document that error occurred.
 * @type {VscodeErrorType}
 */
 const VscodeError = {
   /**
-   * @description all the errors that have occured for current document.
+   * @description all the errors that have occurred for current document.
    */
   diagnostics: [],
 
@@ -21,7 +22,7 @@ const VscodeError = {
   currentDocument: null,
 
   /**
-  * @description Initialize an instace of VscodeError.
+  * @description Initialize an instance of VscodeError.
   * @param {string} message The message to tell the user.
   * @param {number} startLine Where the error began.
   * @param {number} startCharacter The Character it began at.
@@ -31,7 +32,7 @@ const VscodeError = {
   * @returns {VscodeErrorType}
   */
   create(message, startLine, startCharacter, endLine, endCharacter, severity) {
-    const vscodeError = Object.assign({}, VscodeError);
+    const vscodeError = Oloo.assign(new Error(), VscodeError);
     vscodeError.name = 'VscodeError';
     vscodeError.message = message;
 
@@ -47,9 +48,6 @@ const VscodeError = {
      */
     vscodeError.codeAction = null;
 
-    Error.call(vscodeError);
-    Error.captureStackTrace(vscodeError, { message });
-
     return vscodeError;
   },
 
@@ -64,7 +62,7 @@ const VscodeError = {
   },
 
   /**
-   * @description Don't throw the error and stop compiling.
+   * @description Don't throw the error but fail compilation.
    */
   notifyUser(fileParser) {
     const document = VscodeError.currentDocument;
@@ -95,7 +93,7 @@ const VscodeError = {
     );
 
     if(this.severity === ErrorTypes.ERROR) {
-      fileParser.errorOccured = true;
+      fileParser.errorOccurred = true;
     }
   }
 };

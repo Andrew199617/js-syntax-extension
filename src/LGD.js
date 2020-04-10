@@ -7,6 +7,7 @@ const Configuration = require('./Core/Configuration');
 const fs = require('fs');
 const Logger = require('./Logging/Logger');
 const CodeActions = require('./CodeActions/CodeActions');
+const DefinitionProvider = require('./DefinitionProvider/DefinitionProvider');
 
 const Document = require('./Core/Document');
 
@@ -14,43 +15,39 @@ const JS_EXT = ".js";
 const COMPILE_COMMAND = "lgd.generateTypings";
 const COMPILE_ALL_COMMAND = "lgd.generateTypingsForAll";
 
-lgd = require('./Core/Globals');
-
 let actionProvider = null;
+let definitionProvider = null;
+
+async function executeGenerateTypings(document) {
+  if (document.fileName.endsWith(JS_EXT)) {
+    lgd.logger.log = [];
+    await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
+    lgd.logger.notifyUser();
+
+    if(lgd.lgdDiagnosticCollection.get(document.uri).length > 0) {
+      vscode.window.showErrorMessage(`Error occurred parsing JavaScript File into TypeScript Definition File.`);
+    }
+  }
+}
 
 function activate(context) {
   const documentSelector = { schema: 'file', language: 'javascript' };
 
+  lgd = {};
+  lgd.definitionProvider = DefinitionProvider.create();
   lgd.codeActions = CodeActions.create();
   lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
   lgd.configuration = Configuration.create();
   lgd.logger = Logger.create('LGD.FileParser');
 
+  definitionProvider = vscode.languages.registerDefinitionProvider(
+    documentSelector,
+    lgd.definitionProvider
+  )
+
   actionProvider = vscode.languages.registerCodeActionsProvider(
     documentSelector,
-    {
-      provideCodeActions(document, range, context, token) {
-        lgd.codeActions.document = document;
-        lgd.codeActions.range = range;
-        lgd.codeActions.token = token;
-        lgd.codeActions.context = context;
-
-        const actions = [];
-        context.diagnostics.forEach(element => {
-          if(element.codeAction) {
-            const fix = element.codeAction.createFix();
-            if(fix) {
-              actions.push(fix);
-            }
-            else if(element.codeAction.command) {
-              actions.push(element.codeAction);
-            }
-          }
-        });
-
-        return actions;
-      }
-    },
+    lgd.codeActions,
     [ vscode.CodeActionKind.QuickFix ]
   );
 
@@ -58,14 +55,10 @@ function activate(context) {
     const activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
       const document = activeEditor.document;
+      await executeGenerateTypings(document);
 
-      if (document.fileName.endsWith(JS_EXT)) {
-        lgd.logger.log = [];
-        await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
-        lgd.logger.notifyUser();
-      }
-      else {
-        vscode.window.showWarningMessage("This command only works for .js files.");
+      if (!document.fileName.endsWith(JS_EXT)) {
+        vscode.window.showWarningMessage("Can only compile .js file into .d.ts file.");
       }
     }
     else {
@@ -82,7 +75,7 @@ function activate(context) {
 
       lgd.logger.log = [];
 
-      fs.readFile(uris[i].fsPath, 'utf8', async (err, text) => {
+      fs.readFile(fileName, 'utf8', async (err, text) => {
         if(err) {
           throw err;
         }
@@ -103,11 +96,7 @@ function activate(context) {
       return;
     }
 
-    if (document.fileName.endsWith(JS_EXT)) {
-      lgd.logger.log = [];
-      await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
-      lgd.logger.notifyUser();
-    }
+    await executeGenerateTypings(document);
   });
 
   // compile file when we change the document
@@ -117,11 +106,7 @@ function activate(context) {
     }
 
     const document = TextChangedEvent.document;
-    if (document.fileName.endsWith(JS_EXT)) {
-      lgd.logger.log = [];
-      await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
-      lgd.logger.notifyUser();
-    }
+    await executeGenerateTypings(document);
   })
 
   // dismiss errors on file close
@@ -142,6 +127,7 @@ function activate(context) {
   context.subscriptions.push(didCloseEvent);
   context.subscriptions.push(configurationChanged);
   context.subscriptions.push(actionProvider);
+  context.subscriptions.push(definitionProvider);
 
   lgd.codeActions.registerCommands(context.subscriptions);
 }
@@ -154,6 +140,10 @@ function deactivate() {
 
   if(actionProvider) {
     actionProvider.dispose();
+  }
+
+  if(definitionProvider) {
+    definitionProvider.dispose();
   }
 
   if (lgd) {

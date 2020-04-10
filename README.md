@@ -105,6 +105,9 @@ The .ts file will be placed into the typings folder in your root directory. This
 
 ``` json
 {
+  // new in vscode, this will overwrite the syntax highlighting of this extension.
+  "editor.semanticHighlighting.enabled": false,
+
   "lgd.options": {
 
     // Generate typescript file whenever you save a JS f=File.
@@ -118,7 +121,12 @@ The .ts file will be placed into the typings folder in your root directory. This
 
     // Whether to write debug info to file in Typings folder.
     // Also determines if you are notified about debug log.
-    "createDebugLog": true
+    "createDebugLog": true,
+
+    // If we extract props and state you will be able to use it later if you want to use it as a Template
+    // Can also be used for inheriting a class.
+    // Extracted interface will be ClassNameProps & ClassNameState.
+    "extractPropsAndState": true
   }
 }
 ```
@@ -131,7 +139,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 - Classes with Type at the end need to show as error.
 - ~~Save Enum as ts enum.~~
 - File rename updates typings file.
-- Parse return for methods.
+- ~~Parse return for methods.~~
 - Make it so Static Variables only show as an option when you are calling them without using the 'this' keyword. Using class keyword in ts file gets us half the way there.
 
 # Known Issues
@@ -145,6 +153,8 @@ Function is not created correctly when initialized inside of create and construc
 Array of Array does not generate type properly defaults to any[].
 
 Manual Adding of Class type.
+
+- Extension samples for adding to this extension. https://github.com/microsoft/vscode-extension-samples/tree/86df3b9422c7fb0987f2f7bc05235875b981b000
 
 # Release Notes
 

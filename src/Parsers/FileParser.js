@@ -6,7 +6,6 @@ const Types = require('./Types');
 
 const EnumParser = require('./EnumParser');
 const FunctionParser = require('./FunctionParser');
-const ClassParser = require('./ClassParser');
 
 const CheckForThisInConstructor = require('../Checks/CheckForThisInConstructor');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
@@ -22,7 +21,7 @@ const FileParser = {
    * @returns {FileParserType}
    */
   create() {
-    const fileParser = Object.assign({}, FileParser);
+    const fileParser = Object.create(FileParser);
 
     /**
      * @description the variables that the class contains.
@@ -68,17 +67,26 @@ const FileParser = {
     /** @type {FunctionParserType} */
     fileParser.functionParser = FunctionParser.create(this.parseValue.bind(fileParser));
 
-    /** @type {ClassParserType} */
-    fileParser.classParser = ClassParser.create(fileParser);
-
     /** @description Compilation was not a success don't reset problems. */
-    fileParser.errorOccured = false;
+    fileParser.errorOccurred = false;
 
     /** @type {number} */
     fileParser.defaultTabSize = lgd.configuration.options.tabSize;
 
     /** @type {number} */
     fileParser.tabSize = 0;
+
+    /**
+     * @description Interface for parsed props.
+     * @type {string}
+     */
+    fileParser.propsInterface = null;
+
+    /**
+     * @description Interface for parsed state.
+     * @type {string}
+     */
+    fileParser.stateInterface = null;
 
     return fileParser;
   },
@@ -203,7 +211,7 @@ const FileParser = {
         return this.fixType(valType);
       }
       catch(err) {
-        lgd.logger.logError(`Error occured parsing value using "any": ${err}`);
+        lgd.logger.logError(`Error occurred parsing value using "any": ${err}`);
       }
 
       return Types.ANY;
@@ -378,8 +386,8 @@ const FileParser = {
   },
 
   /**
-   * @description parse the create funciton for variables.
-   * These varaibles are treated like normal variables
+   * @description parse the create function for variables.
+   * These variables are treated like normal variables
    * variables on the object literal are treated like static.
    * @param {string} insideFunction
    * @returns {string}
@@ -399,7 +407,8 @@ const FileParser = {
 
     const varName = '\\w+?';
     const varDeliminator = '\\s*?=\\s*';
-    const varEnd = `(;|$)(?=\\s*(^${tab}\\/|^${tab}${varName}|^${previousTab}}))`;
+    // $(?!.) = Match until end of insideFunction.
+    const varEnd = `(;|$)(?=\\s*(^${previousTab}}|^${tab}(\\/|\\w)|$(?!.)))`;
     const arrayRegex = `\\[(?<array>.*?)${varEnd}`;
 
     const commentRegex = '(?<comment>(\\/\\*\\*.*?\\*\\/.*?|))';
@@ -443,6 +452,15 @@ const FileParser = {
 
       this.addVariable(variable.groups.name);
 
+      if(variable.groups.name === 'state' && lgd.configuration.options.extractPropsAndState) {
+        const stateType = type.replace(
+          new RegExp(`^\\t`, 'gm'),
+          ''
+        );
+        this.stateInterface = `\n${comment}declare interface ${this.className}State ${stateType};\n`;
+        continue;
+      }
+
       variables += `\n\t`;
       variables += comment;
       variables += `${variable.groups.name}: ${type};`;
@@ -467,7 +485,7 @@ const FileParser = {
 
     const varName = '\\w+?';
     const varDeliminator = '\\s*?:\\s*';
-    const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.{1})))`;
+    const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.)))`;
     const valueEnd = `(,|$)${varEndLookAhead}`;
     const functionEnd = `(},|}|$)${varEndLookAhead}`;
 
@@ -558,10 +576,11 @@ const FileParser = {
         // Setter has no return.
         if(properties.groups.function && !isSetter) {
           options.type = this.functionParser.parseFunctionReturn(properties.groups.function);
-          if(isGetter && options.type === 'void') {
-            // Getter needs to have a return.
-            options.type = 'any';
-          }
+        }
+
+        if(isGetter && options.type === 'void') {
+          // Getter needs to have a return.
+          options.type = 'null';
         }
       }
       else {
@@ -697,17 +716,13 @@ const FileParser = {
 
   /**
    * @description Parse a js file into a ts file.
+   * @param {string} typeFile the type file to append.
    * @param {string} content contains js file.
    * @returns {string} the the type file to write to disk.
    */
-  parse(content) {
-    let typeFile = '';
-
-    const parse = this.classParser.parse(content, typeFile);
-    content = parse.content;
-    typeFile = parse.typeFile;
-
+  parse(typeFile, content) {
     const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(?<var>const|let|var) (?<name>\w+?) = (?<react>(createReactClass\(|)){(?<object>.*?)^}/gms;
+
     let object;
     while((object = objectLiterals.exec(content)) !== null) {
       this.variables = {};
@@ -719,11 +734,6 @@ const FileParser = {
         continue;
       }
 
-      typeFile += `\n`;
-      typeFile += object.groups.comment;
-
-      const docs = this.parseClassComment(object.groups.comment);
-
       if(object.groups.react !== '') {
         this.updatePositionToString(content, 'createReactClass');
         VscodeError.create(`LGD: Move createReactClass to the export statement -> export default createReactClass(${object.groups.name});`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
@@ -731,8 +741,15 @@ const FileParser = {
           .notifyUser(this);
       }
 
+      const docs = this.parseClassComment(object.groups.comment);
       this.className = object.groups.name;
+      const parsedClass = this.parseClass(object.groups.object);
 
+      typeFile += this.propsInterface || '';
+      typeFile += this.stateInterface || '';
+
+      typeFile += `\n`;
+      typeFile += object.groups.comment;
       typeFile += `declare interface ${object.groups.name}Type${
         docs.template.length > 0
         ? `<${docs.template.join(',')}>`
@@ -740,7 +757,7 @@ const FileParser = {
         docs.extends.length > 0
         ? `extends ${docs.extends.join(',')} `
         : '' }{`;
-      typeFile += this.parseClass(object.groups.object);
+      typeFile += parsedClass;
       typeFile += `}\n`;
     }
 
