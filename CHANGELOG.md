@@ -7,6 +7,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 ## 2.3.0+
 
 - Added First Quick Fix, more to come.
+- Added First AutoComplete for Documentation.
 - Fixed Getters and Setters. readonly will only show if not setter is paired with getter. setter will show up even without getter.
 
 ### 2.2.6 - 2.2.7

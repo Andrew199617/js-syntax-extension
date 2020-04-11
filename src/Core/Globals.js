@@ -12,6 +12,9 @@ const lgd = {
   /** @type {DefinitionProviderType} */
   definitionProvider: null,
 
+  /** @type {CompletionItemProviderType} */
+  completionItemProvider: null,
+
   /** @type {vscode.DiagnosticCollection} */
   lgdDiagnosticCollection: null,
 

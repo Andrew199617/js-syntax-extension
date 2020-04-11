@@ -10,7 +10,10 @@ const Options = {
   maintainHierarchy: null,
   createDebugLog: null,
   tabSize: null,
-  extractPropsAndState: null
+  extractPropsAndState: null,
+  autoComplete: {
+    enabled: null
+  }
 };
 
 /**
@@ -23,7 +26,7 @@ const Configuration = {
    * @returns {ConfigurationType}
    */
   create() {
-    const configuration = Object.assign({}, Configuration);
+    const configuration = Object.create(Configuration);
 
     /**
      * @description the options for our extension.
@@ -41,6 +44,12 @@ const Configuration = {
 
     if(typeof configuration.options.extractPropsAndState === 'undefined') {
       configuration.options.extractPropsAndState = true;
+    }
+
+    if(typeof configuration.options.autoComplete === 'undefined') {
+      configuration.options.autoComplete = {
+        enabled: true
+      };
     }
 
     configuration.options.tabSize = vscode.workspace.getConfiguration('editor', null).get('tabSize');

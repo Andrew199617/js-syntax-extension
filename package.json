@@ -1,14 +1,14 @@
 {
     "name": "js-syntax-extension",
-    "displayName": "JS -> TS Compiler & Syntax Highlighter",
+    "displayName": "JavaScript to Typescript Converter & Syntax Highlighter",
     "publisher": "learn-game-development",
     "icon": "LGDLogo.png",
     "repository": {
         "type": "git",
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
-    "description": "Extra Syntax highlighting for JS files. Compile JS files to TS files. Support React + Next.js.",
-    "version": "2.3.3",
+    "description": "Extra Syntax highlighting for JS/React/Next.js files. Compile/Convert JS files to TS files. Generate Typings for JavaScript project in seconds. Support React + Next.js.",
+    "version": "2.3.4",
     "engines": {
         "vscode": "^1.1.0"
     },
@@ -57,6 +57,17 @@
                     "type": "object",
                     "description": "Configuration options for LGD JS Syntax extension.",
                     "properties": {
+                        "autoComplete": {
+                            "type": "object",
+                            "description": "Configuration options for LGD JS Syntax extension.",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean",
+                                    "description": "Should we provide snippets when the opportunity arises. Example: Documentation snippet shows with /**",
+                                    "default": true
+                                }
+                            }
+                        },
                         "generateTypings": {
                             "type": "boolean",
                             "description": "Whether we should automatically compile js files into ts files when you save the document.",

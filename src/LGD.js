@@ -8,6 +8,7 @@ const fs = require('fs');
 const Logger = require('./Logging/Logger');
 const CodeActions = require('./CodeActions/CodeActions');
 const DefinitionProvider = require('./DefinitionProvider/DefinitionProvider');
+const CompletionItemProvider = require('./CompletionItems/CompletionItemProvider');
 
 const Document = require('./Core/Document');
 
@@ -17,6 +18,7 @@ const COMPILE_ALL_COMMAND = "lgd.generateTypingsForAll";
 
 let actionProvider = null;
 let definitionProvider = null;
+let completionItemProvider = null;
 
 async function executeGenerateTypings(document) {
   if (document.fileName.endsWith(JS_EXT)) {
@@ -34,16 +36,29 @@ function activate(context) {
   const documentSelector = { schema: 'file', language: 'javascript' };
 
   lgd = {};
-  lgd.definitionProvider = DefinitionProvider.create();
+  // lgd.definitionProvider = DefinitionProvider.create();
   lgd.codeActions = CodeActions.create();
   lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
   lgd.configuration = Configuration.create();
   lgd.logger = Logger.create('LGD.FileParser');
 
-  definitionProvider = vscode.languages.registerDefinitionProvider(
-    documentSelector,
-    lgd.definitionProvider
-  )
+  // definitionProvider = vscode.languages.registerDefinitionProvider(
+  //   documentSelector,
+  //   lgd.definitionProvider
+  // )
+
+  if(lgd.configuration.options.autoComplete.enabled) {
+    lgd.completionItemProvider = CompletionItemProvider.create();
+
+    completionItemProvider = vscode.languages.registerCompletionItemProvider(
+      documentSelector,
+      lgd.completionItemProvider,
+      '/', '*'
+    )
+
+    context.subscriptions.push(completionItemProvider);
+    // lgd.completionItemProvider.registerCommands(context.subscriptions);
+  }
 
   actionProvider = vscode.languages.registerCodeActionsProvider(
     documentSelector,
@@ -127,9 +142,10 @@ function activate(context) {
   context.subscriptions.push(didCloseEvent);
   context.subscriptions.push(configurationChanged);
   context.subscriptions.push(actionProvider);
-  context.subscriptions.push(definitionProvider);
+  // context.subscriptions.push(definitionProvider);
 
   lgd.codeActions.registerCommands(context.subscriptions);
+  // lgd.definitionProvider.registerCommands(context.subscriptions);
 }
 
 // this method is called when your extension is deactivated
@@ -144,6 +160,10 @@ function deactivate() {
 
   if(definitionProvider) {
     definitionProvider.dispose();
+  }
+
+  if(completionItemProvider) {
+    completionItemProvider.dispose();
   }
 
   if (lgd) {

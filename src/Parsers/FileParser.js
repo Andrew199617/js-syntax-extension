@@ -260,7 +260,7 @@ const FileParser = {
   },
 
   parseComment(comment, options) {
-    const jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}(?!.*})|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
+    const jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}(?![^\n]*}))\s*(?<name>\w*)(?<description>.*?)(?=(@|\*\/))/gms;
 
     let doc;
     let numReturns = 0;

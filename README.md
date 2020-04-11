@@ -6,7 +6,7 @@
 
 ### Use Cases:
 
-- Improved intellisense for JavaScript? You will be able to leverage the typings folder and be able to more easily access types from other classes. This is a huge productivity boost!
+- Need improved intellisense for JavaScript? You will be able to leverage the typings folder and be able to more easily access types from other classes. This is a huge productivity boost!
 - Create Types folder for a NPM module in seconds.
 - Maintain OLOO pattern.
 
@@ -109,6 +109,13 @@ The .ts file will be placed into the typings folder in your root directory. This
   "editor.semanticHighlighting.enabled": false,
 
   "lgd.options": {
+
+    // This extension will provide autocomplete/snippets when
+    // you start typing certain words.
+    "autoComplete" : {
+      // Should we autocomplete.
+      "enabled" : true
+    }
 
     // Generate typescript file whenever you save a JS f=File.
     "generateTypings": true,
