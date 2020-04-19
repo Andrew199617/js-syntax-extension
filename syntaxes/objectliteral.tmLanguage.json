@@ -5,13 +5,60 @@
 	"injectionSelector": "L:meta.objectliteral.js",
 	"patterns": [
 		{
-			"include": "#createConstructor"
+			"include": "#object-member"
 		}
 	],
 	"repository": {
     "createConstructor": {
-			"name": "keyword.create",
-			"match": "(?<!^|\\/)(create)(?=\\s*\\([\\s\\S]*\\))"
-    }
+			"match": "(create|constructor)",
+			"name": "keyword.create"
+		},
+		"reactBuiltin": {
+			"match": "(propTypes|defaultProps|contextType|displayName|statics)",
+			"name": "variable.react.builtins"
+		},
+		"reactStatics": {
+			"match": "(getDerivedStateFromProps|getDerivedStateFromError)",
+			"name": "variable.react.builtins"
+		},
+		"nextStatics": {
+			"match": "(getInitialProps)",
+			"name": "variable.next.builtins"
+		},
+		"object-member": {
+			"patterns": [
+				{
+					"match": "(?<=^\\s{2}|^\\s{4})(create|constructor|getDerivedStateFromProps|getDerivedStateFromError|getInitialProps)(?=\\s*\\([\\s\\S]*\\))",
+					"captures": {
+						"0": {
+							"patterns": [
+								{
+									"include": "#reactStatics"
+								},
+								{
+									"include": "#nextStatics"
+								},
+								{
+									"include": "#createConstructor"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "meta.object.member.js",
+					"match": "(propTypes|defaultProps|contextType|displayName|statics)\\s*(?=(\\/\\*([^\\*]|(\\*[^\\/]))*\\*\\/\\s*)*:)",
+					"captures": {
+						"0": {
+							"patterns": [
+								{
+									"include": "#reactBuiltin"
+								}
+							]
+						}
+					}
+				}
+			]
+		}
 	}
 }

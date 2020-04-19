@@ -170,6 +170,7 @@ Manual Adding of Class type.
 ## 2.3.0
 
 - Added First Quick Fix, more to come.
+- see changelog.
 
 ### 2.2.6 - 2.2.7
 

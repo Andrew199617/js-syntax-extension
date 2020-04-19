@@ -8,6 +8,12 @@
 			"include": "#objectAssign"
 		},
 		{
+			"include": "#oloo"
+		},
+		{
+			"include": "#olooFunctions"
+		},
+		{
 			"include": "#objectCreate"
 		},
 		{
@@ -16,16 +22,24 @@
 	],
 	"repository": {
     "class": {
-      "match": "\\w+(?=\\.create\\()",
+      "match": "[A-Z].+(?=\\.create\\()",
       "name": "support.class.create"
     },
 		"objectCreate": {
-			"match": "(?<=\\.)create(?=\\()",
+			"match": "(?<=\\.)(create)(?=\\()",
 			"name": "keyword.create"
 		},
 		"objectAssign": {
-			"match": "(?<=Object\\.)assign(?=\\()",
+			"match": "(?<=Object\\.)(assign)(?=\\()",
 			"name": "keyword.create"
+		},
+		"oloo": {
+			"match": "(?<=Oloo\\.)(base|createSlow|assign|assignSlow)(?=\\()",
+			"name": "keyword.create"
+		},
+		"olooFunctions": {
+			"match": "Oloo(?=\\..+\\()",
+      "name": "support.class.create"
 		}
 	}
 }

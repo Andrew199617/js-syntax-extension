@@ -5,12 +5,32 @@
 	"injectionSelector": "L:source.js",
 	"patterns": [
 		{
+			"include": "#nextExports"
+		},
+		{
 			"include": "#reactBuiltin"
 		}
 	],
 	"repository": {
+		"nextExports": {
+			"match": "(export)\\s*(async|)\\s*(function)\\s(getServerSideProps|getStaticProps|getStaticPaths)\\(",
+			"captures": {
+				"1": {
+					"name": "meta.function.js keyword.control.export.js"
+				},
+				"2": {
+					"name": "meta.function.js storage.modifier.async.js"
+				},
+				"3": {
+					"name": "meta.function.js storage.type.function.js"
+				},
+				"4": {
+					"name": "variable.next.builtins"
+				}
+			}
+		},
 		"reactBuiltin": {
-			"match": "(?<!\\s)([A-Z]+\\w+)(\\.)(propTypes|defaultProps|getInitialProps|getStaticProps|getStaticPaths|getServerSideProps)",
+			"match": "(?<!\\s)([A-Z]+\\w+)(\\.)(propTypes|defaultProps|contextType|getInitialProps)",
 			"captures": {
 				"1": {
 					"name": "support.class.proptypes"
@@ -28,7 +48,7 @@
 			}
 		},
 		"builtins": {
-			"match": "(propTypes|defaultProps)|(getInitialProps|getStaticProps|getStaticPaths|getServerSideProps)",
+			"match": "(propTypes|defaultProps|contextType)|(getInitialProps)",
 			"captures": {
 				"1": {
 					"name": "variable.react.builtins"

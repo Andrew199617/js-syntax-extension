@@ -6,6 +6,8 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ## 2.3.0+
 
+- Added Syntax Highlighting for React Properties and statics in Objects.
+- Added Syntax Highlighting for next.js exports.
 - Added First Quick Fix, more to come.
 - Added First AutoComplete for Documentation.
 - Fixed Getters and Setters. readonly will only show if not setter is paired with getter. setter will show up even without getter.
@@ -22,7 +24,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Auto Compile React Class.
 - Nested Objects. Very useful for Creating the state object in React.
 
-## 2.2.0 - 2.2.2
+## 2.2.0+
 
 - Added the ability to compile on change.
 - Improved Error reporting. Specify exact line error and warnings occur on for you to easily fix.
