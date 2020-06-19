@@ -12,6 +12,9 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Added First AutoComplete for Documentation.
 - Fixed Getters and Setters. readonly will only show if not setter is paired with getter. setter will show up even without getter.
 
+### bug fix
+- Hints should not bring up prompt saying error occurred.
+
 ### 2.2.6 - 2.2.7
 
 - Added notification to check log. Disabled if createDebugLog is false.

@@ -10,6 +10,9 @@ const CodeActions = require('./CodeActions/CodeActions');
 const DefinitionProvider = require('./DefinitionProvider/DefinitionProvider');
 const CompletionItemProvider = require('./CompletionItems/CompletionItemProvider');
 
+const ErrorTypes = require('./Errors/ErrorTypes');
+const SeverityConverter = require('./Core/ServerityConverter');
+
 const Document = require('./Core/Document');
 
 const JS_EXT = ".js";
@@ -19,6 +22,7 @@ const COMPILE_ALL_COMMAND = "lgd.generateTypingsForAll";
 let actionProvider = null;
 let definitionProvider = null;
 let completionItemProvider = null;
+const errorSeverity = SeverityConverter.getDiagnosticSeverity(ErrorTypes.ERROR);
 
 async function executeGenerateTypings(document) {
   if (document.fileName.endsWith(JS_EXT)) {
@@ -26,7 +30,17 @@ async function executeGenerateTypings(document) {
     await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
     lgd.logger.notifyUser();
 
-    if(lgd.lgdDiagnosticCollection.get(document.uri).length > 0) {
+    const diagnostics = lgd.lgdDiagnosticCollection.get(document.uri);
+
+    let anySevere = false;
+    for(let i = 0; i < diagnostics.length; ++i) {
+      if(diagnostics[i].severity === errorSeverity) {
+        anySevere = true;
+        break;
+      }
+    }
+
+    if(anySevere) {
       vscode.window.showErrorMessage(`Error occurred parsing JavaScript File into TypeScript Definition File.`);
     }
   }
