@@ -15,6 +15,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 ### bug fix
 - Hints should not bring up prompt saying error occurred.
+- When parsing props we need to prefer comments since we currently don't parse propTypes object.
 
 ### 2.2.6 - 2.2.7
 

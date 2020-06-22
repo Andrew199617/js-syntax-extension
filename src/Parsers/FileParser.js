@@ -404,7 +404,7 @@ const FileParser = {
           break;
         }
 
-        const propsType = this.parseClass(object.groups.object);
+        const propsType = this.parseClass(object.groups.object, { preferComments: true });
         this.propsInterface = `\n${object.groups.comment}declare interface ${objectName}Props {${propsType}};\n`;
         propsExisted = true;
       }
@@ -500,9 +500,10 @@ const FileParser = {
   /**
    * Parse an object literal into properties for a ts file.
    * @param {string} object
+   * @param {{ preferComments: boolean }} parsingOptions
    * @returns {string} parsed object.
    */
-  parseClass(object) {
+  parseClass(object, parsingOptions = { preferComments: false }) {
     this.tabSize += this.defaultTabSize;
     const lastBeginLine = this.beginLine;
 
@@ -618,6 +619,12 @@ const FileParser = {
       let type = this.parseValue(properties.groups.value)
         || this.parseArray(properties.groups.array)
         || options.type;
+
+      if(parsingOptions.preferComments) {
+        type = options.type
+          || this.parseValue(properties.groups.value)
+          || this.parseArray(properties.groups.array);
+      }
 
       if(this.staticVariables.includes(properties.groups.name)) {
         VscodeError.create(`LGD: Already defined ${properties.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
