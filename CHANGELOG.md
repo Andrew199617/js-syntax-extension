@@ -11,6 +11,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Added First Quick Fix, more to come.
 - Added First AutoComplete for Documentation.
 - Fixed Getters and Setters. readonly will only show if not setter is paired with getter. setter will show up even without getter.
+- Added Props parsing. Now will parse propTypes and add it to the typings file with Props appended to end of the name of the object.
 
 ### bug fix
 - Hints should not bring up prompt saying error occurred.

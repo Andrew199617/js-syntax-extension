@@ -386,6 +386,32 @@ const FileParser = {
   },
 
   /**
+  * @description Parse the props of a file.
+  */
+  parseProps(objectName, content) {
+    if(lgd.configuration.options.extractPropsAndState) {
+      const commentRegex = `(?<comment>(\\/\\*\\*.*?\\*\\/(?=\\s*${objectName})|))`;
+      const objectLiterals = `^${objectName}.propTypes\\s*=\\s*{(?<object>.*?)^}`;
+
+      const regex = new RegExp([ commentRegex, objectLiterals ].join(''), 'gms');
+
+      let object;
+      let propsExisted = false;
+      while((object = regex.exec(content)) !== null) {
+        if(propsExisted) {
+          VscodeError.create(`LGD: ${objectName} already has propTypes defined;`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.HINT)
+            .notifyUser(this);
+          break;
+        }
+
+        const propsType = this.parseClass(object.groups.object);
+        this.propsInterface = `\n${object.groups.comment}declare interface ${objectName}Props {${propsType}};\n`;
+        propsExisted = true;
+      }
+    }
+  },
+
+  /**
    * @description parse the create function for variables.
    * These variables are treated like normal variables
    * variables on the object literal are treated like static.
@@ -733,6 +759,8 @@ const FileParser = {
         typeFile += this.enumParser.parse(content, object)
         continue;
       }
+
+      this.parseProps(object.groups.name, content);
 
       if(object.groups.react !== '') {
         this.updatePositionToString(content, 'createReactClass');
