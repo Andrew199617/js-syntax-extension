@@ -404,7 +404,7 @@ const FileParser = {
           break;
         }
 
-        const propsType = this.parseClass(object.groups.object, { preferComments: true });
+        const propsType = this.parseClass(object.groups.object, { preferComments: true, ignoreDuplicate: true });
         this.propsInterface = `\n${object.groups.comment}declare interface ${objectName}Props {${propsType}};\n`;
         propsExisted = true;
       }
@@ -500,10 +500,10 @@ const FileParser = {
   /**
    * Parse an object literal into properties for a ts file.
    * @param {string} object
-   * @param {{ preferComments: boolean }} parsingOptions
+   * @param {{ preferComments: boolean, ignoreDuplicate: boolean }} parsingOptions
    * @returns {string} parsed object.
    */
-  parseClass(object, parsingOptions = { preferComments: false }) {
+  parseClass(object, parsingOptions = { preferComments: false, ignoreDuplicate: false }) {
     this.tabSize += this.defaultTabSize;
     const lastBeginLine = this.beginLine;
 
@@ -636,7 +636,7 @@ const FileParser = {
         type = options.type;
       }
 
-      if(!properties.groups.function) {
+      if(!properties.groups.function && !parsingOptions.ignoreDuplicate) {
         this.staticVariables.push(properties.groups.name);
       }
 
