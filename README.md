@@ -167,6 +167,11 @@ Manual Adding of Class type.
 
 ## V2
 
+## 2.4.0
+
+- Parsing propTypes for React Components and React objects not using ES6.
+- see changelog.
+
 ## 2.3.0
 
 - Added First Quick Fix, more to come.

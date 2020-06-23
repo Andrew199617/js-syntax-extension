@@ -165,7 +165,7 @@ const FileParser = {
       const tabs = new Array(tabSize / this.defaultTabSize)
         .fill('\t')
         .join('');
-      return `{${tempParser.parseClass(value)}${tabs}}`;
+      return `{${tempParser.parseObject(value)}${tabs}}`;
     }
 
     if((/function\s*?\(|=>/m).test(value)) {
@@ -404,7 +404,7 @@ const FileParser = {
           break;
         }
 
-        const propsType = this.parseClass(object.groups.object, { preferComments: true, ignoreDuplicate: true });
+        const propsType = this.parseObject(object.groups.object, { preferComments: true, ignoreDuplicate: true });
         this.propsInterface = `\n${object.groups.comment}declare interface ${objectName}Props {${propsType}};\n`;
         propsExisted = true;
       }
@@ -503,7 +503,7 @@ const FileParser = {
    * @param {{ preferComments: boolean, ignoreDuplicate: boolean }} parsingOptions
    * @returns {string} parsed object.
    */
-  parseClass(object, parsingOptions = { preferComments: false, ignoreDuplicate: false }) {
+  parseObject(object, parsingOptions = { preferComments: false, ignoreDuplicate: false }) {
     this.tabSize += this.defaultTabSize;
     const lastBeginLine = this.beginLine;
 
@@ -778,7 +778,7 @@ const FileParser = {
 
       const docs = this.parseClassComment(object.groups.comment);
       this.className = object.groups.name;
-      const parsedClass = this.parseClass(object.groups.object);
+      const parsedClass = this.parseObject(object.groups.object);
 
       typeFile += this.propsInterface || '';
       typeFile += this.stateInterface || '';

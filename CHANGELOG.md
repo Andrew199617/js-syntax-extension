@@ -4,6 +4,10 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+## 2.4.0+
+
+- Parsing propTypes for React Components and React objects not using ES6.
+
 ## 2.3.0+
 
 - Added Syntax Highlighting for React Properties and statics in Objects.

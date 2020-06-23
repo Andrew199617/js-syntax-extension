@@ -213,6 +213,8 @@ const ClassParser = {
       this.staticVariables = [];
       this.updatePosition(content, object, 'object');
 
+      this.parseProps(object.groups.name, content);
+
       this.className = object.groups.name;
       const parsedClass = this.parseClass(object.groups.object);
 
