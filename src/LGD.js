@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
+const path = require('path');
 const GenerateTypings = require('./GenerateTypings');
 const Configuration = require('./Core/Configuration');
 
@@ -12,6 +13,8 @@ const CompletionItemProvider = require('./CompletionItems/CompletionItemProvider
 
 const ErrorTypes = require('./Errors/ErrorTypes');
 const SeverityConverter = require('./Core/ServerityConverter');
+const StatusBarMessage = require('./Logging/StatusBarMessage');
+const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 
 const Document = require('./Core/Document');
 
@@ -149,11 +152,63 @@ function activate(context) {
     lgd.configuration = Configuration.create();
   });
 
+  const onDidRenameFiles = vscode.workspace.onDidRenameFiles(fileRenameEvent => {
+    const DEFAULT_DIR = 'typings';
+    const DEFAULT_EXT = '.d.ts';
+
+    for(let i = 0; i < fileRenameEvent.files.length; ++i) {
+      const oldFileUri = fileRenameEvent.files[i].oldUri;
+      const newFileUri = fileRenameEvent.files[i].newUri;
+
+      const oldParsedPath = path.parse(oldFileUri.fsPath)
+      const oldFileName = oldParsedPath.name;
+
+      const newParsedPath = path.parse(newFileUri.fsPath)
+      const newFileName = newParsedPath.name;
+
+      const oldMaintainedRoot = oldParsedPath.dir.replace(vscode.workspace.rootPath, '');
+      const newMaintainedRoot = newParsedPath.dir.replace(vscode.workspace.rootPath, '');
+
+      const typeFilePaths = [
+        {
+          oldPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}\\${oldFileName}${DEFAULT_EXT}`,
+          newPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}\\${newFileName}${DEFAULT_EXT}`
+        },
+        {
+          oldPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${oldMaintainedRoot}\\${oldFileName}${DEFAULT_EXT}`,
+          newPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${newMaintainedRoot}\\${newFileName}${DEFAULT_EXT}`
+        }
+      ];
+
+      for(let k = 0; k < typeFilePaths.length; ++k) {
+        const potentialPath = typeFilePaths[k];
+        fs.exists(potentialPath.newPath, exists => {
+          if(exists) {
+            vscode.window.showErrorMessage(`LGD: Renamed to existing file. ${oldFileName} ->  ${newFileName}`);
+            return;
+          }
+
+          fs.exists(potentialPath.oldPath, exists => {
+            if(exists) {
+              fs.rename(potentialPath.oldPath, potentialPath.newPath, () => {
+                StatusBarMessage.show('LGD: Renamed successful.', StatusBarMessageTypes.SUCCESS)
+              });
+            }
+            else {
+              console.warn('LGD: File did not already exist.');
+            }
+          });
+        })
+      }
+    }
+  });
+
   context.subscriptions.push(compileCommand);
   context.subscriptions.push(compileAllCommand);
   context.subscriptions.push(didSaveEvent);
   context.subscriptions.push(didChangeEvent);
   context.subscriptions.push(didCloseEvent);
+  context.subscriptions.push(onDidRenameFiles);
   context.subscriptions.push(configurationChanged);
   context.subscriptions.push(actionProvider);
   // context.subscriptions.push(definitionProvider);

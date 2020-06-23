@@ -1,11 +1,11 @@
 const StatusBarMessage = require('./Logging/StatusBarMessage');
+const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 
 const path = require('path');
 const FileParser = require('./Parsers/FileParser');
 const ClassParser = require('./Parsers/ClassParser');
 const FileIO = require('./Logging/FileIO');
 
-const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 const vscode = require('vscode');
 
 const ErrorTypes = require('./Errors/ErrorTypes');

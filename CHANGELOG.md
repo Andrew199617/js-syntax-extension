@@ -4,11 +4,13 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
-## 2.4.0+
+# 2.4.0+
 
 - Parsing propTypes for React Components and React objects not using ES6.
+- Handling Renaming of Files. Renaming a js file will update the file path and name of the ts file.
+- Fixed StatusBarMessage clear timeout. Change colors of status bar.
 
-## 2.3.0+
+# 2.3.0+
 
 - Added Syntax Highlighting for React Properties and statics in Objects.
 - Added Syntax Highlighting for next.js exports.
@@ -17,53 +19,38 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Fixed Getters and Setters. readonly will only show if not setter is paired with getter. setter will show up even without getter.
 - Added Props parsing. Now will parse propTypes and add it to the typings file with Props appended to end of the name of the object.
 
-### bug fix
+## bug fix
 - Hints should not bring up prompt saying error occurred.
 - When parsing props we need to prefer comments since we currently don't parse propTypes object.
 - Prop variables sharing name with function would throw error.
 
-### 2.2.6 - 2.2.7
+# 2.2.0+
 
 - Added notification to check log. Disabled if createDebugLog is false.
 - Added support for getter and setters in Object Literal.
-
-### 2.2.3 - 2.2.5
-
 - Added ability to compile every js file in your project.
 - Improved Error Reporting and logging.
 - Auto Compile React Class.
 - Nested Objects. Very useful for Creating the state object in React.
-
-## 2.2.0+
-
 - Added the ability to compile on change.
 - Improved Error reporting. Specify exact line error and warnings occur on for you to easily fix.
 - Logging Errors that occure that aren't breaking to a log file in typings folder.
 
-### 2.1.1 - 2.1.5
+# 2.1.0+
 
 - Added maintainHierarchy to settings.
 - Improved parsing of create method.
-
-## 2.1.0
-
 - Compile to js to ts now working with inline array.
 - Add static keyword.
 - Problems being shown for you to fix.
 - Create method being parsed for non static variables.
 
-### 2.0.5 - 2.0.7
+# 2.0.0+
 
 - Command works now even if you dont have generateTypings set.
 - Fixed typed file. interface needs to have a different name than the object for vscode to pick up.
-
-### 2.0.3 - 2.0.4
-
 - Add async and prevent breaking on nested functions
 - Add ability to parse defaultValue in function paramaters.
-
-### 2.0.0 - 2.0.2
-
 - Compile a js file into a .d.ts file.
   - This will allow you to have intellisense throughout the whole project.
   - Activate auto compile with settings.

@@ -40,7 +40,7 @@ const ServerityConverter = {
         return '$(alert) Hint can be found in Problems window ctrl+shift+M';
 
       case ErrorTypes.WARNING:
-        return '$(alert) Warning occured compiling JS to TS (more detail in Problems window ctrl+shift+M)';
+        return '$(alert) Warning occurred compiling JS to TS (more detail in Problems window ctrl+shift+M)';
 
       case ErrorTypes.ERROR:
         return '$(error) Error compiling JS to TS (more detail in Problems window ctrl+shift+M)';
