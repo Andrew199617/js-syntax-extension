@@ -147,6 +147,8 @@ The .ts file will be placed into the typings folder in your root directory. This
 - ~~Save Enum as ts enum.~~
 - ~~File rename updates typings file.~~
 - ~~Parse return for methods.~~
+- Allow the compilation of the whole project into actual TS files not just interfaces.
+  - This will allow a user to migrate their entire JS project to TS if they desire.
 - Make it so Static Variables only show as an option when you are calling them without using the 'this' keyword. Using class keyword in ts file gets us half the way there.
 
 # Known Issues
