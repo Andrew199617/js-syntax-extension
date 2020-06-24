@@ -9,6 +9,12 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Parsing propTypes for React Components and React objects not using ES6.
 - Handling Renaming of Files. Renaming a js file will update the file path and name of the ts file.
 - Fixed StatusBarMessage clear timeout. Change colors of status bar.
+- Allow use of this inside of create function if you are creating a ReactComponent.
+  - This is determined by checking with regex createReact(Component|)(ObjectName
+
+## bug fixes
+- Renaming File would not rename if dir did not exist.
+  - Cleaning up empty directories when renaming.
 
 # 2.3.0+
 
@@ -19,7 +25,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Fixed Getters and Setters. readonly will only show if not setter is paired with getter. setter will show up even without getter.
 - Added Props parsing. Now will parse propTypes and add it to the typings file with Props appended to end of the name of the object.
 
-## bug fix
+## bug fixes
 - Hints should not bring up prompt saying error occurred.
 - When parsing props we need to prefer comments since we currently don't parse propTypes object.
 - Prop variables sharing name with function would throw error.

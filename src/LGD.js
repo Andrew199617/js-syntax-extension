@@ -16,6 +16,7 @@ const SeverityConverter = require('./Core/ServerityConverter');
 const StatusBarMessage = require('./Logging/StatusBarMessage');
 const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 
+const FileIO = require('./Logging/FileIO');
 const Document = require('./Core/Document');
 
 const JS_EXT = ".js";
@@ -172,31 +173,37 @@ function activate(context) {
       const typeFilePaths = [
         {
           oldPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}\\${oldFileName}${DEFAULT_EXT}`,
-          newPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}\\${newFileName}${DEFAULT_EXT}`
+          newPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}\\${newFileName}${DEFAULT_EXT}`,
+          isMaintained: false
         },
         {
           oldPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${oldMaintainedRoot}\\${oldFileName}${DEFAULT_EXT}`,
-          newPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${newMaintainedRoot}\\${newFileName}${DEFAULT_EXT}`
+          newPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${newMaintainedRoot}\\${newFileName}${DEFAULT_EXT}`,
+          isMaintained: true
         }
       ];
 
       for(let k = 0; k < typeFilePaths.length; ++k) {
         const potentialPath = typeFilePaths[k];
-        fs.exists(potentialPath.newPath, exists => {
-          if(exists) {
-            vscode.window.showErrorMessage(`LGD: Renamed to existing file. ${oldFileName} ->  ${newFileName}`);
+        fs.exists(potentialPath.oldPath, exists => {
+
+          if(!exists) {
+            console.warn('LGD: File did not already exist.');
             return;
           }
 
-          fs.exists(potentialPath.oldPath, exists => {
+          fs.exists(potentialPath.newPath, exists => {
             if(exists) {
-              fs.rename(potentialPath.oldPath, potentialPath.newPath, () => {
-                StatusBarMessage.show('LGD: Renamed successful.', StatusBarMessageTypes.SUCCESS)
-              });
+              if(oldMaintainedRoot === newMaintainedRoot) {
+                vscode.window.showErrorMessage(`LGD: Renamed to existing file. ${oldFileName} ->  ${newFileName}`);
+              }
+
+              return;
             }
-            else {
-              console.warn('LGD: File did not already exist.');
-            }
+
+            FileIO.rename(potentialPath.oldPath, potentialPath.newPath, () => {
+              StatusBarMessage.show('LGD: Renamed successful.', StatusBarMessageTypes.SUCCESS)
+            });
           });
         })
       }

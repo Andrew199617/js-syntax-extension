@@ -26,7 +26,7 @@ const FileIO = {
       };
 
       const dir = path.dirname(filepath);
-      fs.existsSync(dir) ? write(null) : this.mkdirRecursive(dir, write);
+      fs.existsSync(dir) ? write(null) : FileIO.mkdirRecursive(dir, write);
     });
   },
 
@@ -49,6 +49,44 @@ const FileIO = {
     }
 
     callback();
+  },
+
+  /**
+  * @description Make sure the new path dir exists and then rename.
+  * Cleans up old dir if it has no files.
+  */
+  async rename(oldPath, newPath, callback) {
+    const dir = path.dirname(newPath);
+    const oldDir = path.dirname(oldPath);
+
+    const renamed = () => {
+      fs.readdir(oldDir, function(err, files) {
+          if (err) {
+            // some sort of error
+            console.error(err);
+          }
+          else {
+            if (!files.length) {
+              fs.rmdir(oldDir, () => {
+                console.log(`LGD: Removed Old Dir ${oldDir}`);
+              });
+            }
+          }
+      });
+
+      callback();
+    }
+
+    fs.exists(dir, exists => {
+      if(!exists) {
+        FileIO.mkdirRecursive(dir, () => {
+          fs.rename(oldPath, newPath, renamed);
+        })
+      }
+      else {
+        fs.rename(oldPath, newPath, renamed);
+      }
+    })
   }
 };
 

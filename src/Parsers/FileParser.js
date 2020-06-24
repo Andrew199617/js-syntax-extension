@@ -88,6 +88,11 @@ const FileParser = {
      */
     fileParser.stateInterface = null;
 
+    /**
+     * @description Whether the current object we are parsing is a React Object.
+     */
+    fileParser.isReactComponent = false;
+
     return fileParser;
   },
 
@@ -345,7 +350,7 @@ const FileParser = {
     const classNameRegex = /(?<varType>const|let|var) (?<name>\w+?)\s*=\s*(?<object>Object|Oloo)\.(?<creationWay>create|assign|assignSlow|createSlow)\s*?\(/ms;
     const className = classNameRegex.exec(insideFunction);
 
-    if(!className || !className.groups.name) {
+    if((!className || !className.groups.name) && !this.isReactComponent) {
       VscodeError.create('LGD: Could not find class instance in create method. Are you creating the instance properly.', this.beginLine, 0, this.endLine, 0, ErrorTypes.ERROR)
         .notifyUser(this);
     }
@@ -420,13 +425,21 @@ const FileParser = {
    */
   parseCreate(insideFunction) {
     this.tabSize += this.defaultTabSize;
-    const className = this.getClassInCreate(insideFunction);
+    let className = this.getClassInCreate(insideFunction);
 
     if(!className) {
-      return;
+      if(!this.isReactComponent) {
+        return;
+      }
+
+      // TODO check for use of both this and className.
+      // Don't be greedy.
+      className = 'this';
     }
 
-    this.checkForThisInCreate(insideFunction);
+    if(!this.isReactComponent) {
+      this.checkForThisInCreate(insideFunction);
+    }
 
     const tab = `\\s{${this.tabSize}}`;
     const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
@@ -762,22 +775,26 @@ const FileParser = {
       this.staticVariables = [];
       this.updatePosition(content, object, 'object');
 
+      this.className = object.groups.name;
+
+      const isReactRegex = new RegExp(`createReact(Component|Pure)\\(${this.className}`, '');
+      this.isReactComponent = isReactRegex.test(content);
+
       if(this.enumParser.isEnum(object.groups.comment)) {
         typeFile += this.enumParser.parse(content, object)
         continue;
       }
 
-      this.parseProps(object.groups.name, content);
+      this.parseProps(this.className, content);
 
       if(object.groups.react !== '') {
         this.updatePositionToString(content, 'createReactClass');
-        VscodeError.create(`LGD: Move createReactClass to the export statement -> export default createReactClass(${object.groups.name});`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
+        VscodeError.create(`LGD: Move createReactClass to the export statement -> export default createReactClass(${this.className});`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
           .provideCodeAction(lgd.codeActions.moveCreateReactClass)
           .notifyUser(this);
       }
 
       const docs = this.parseClassComment(object.groups.comment);
-      this.className = object.groups.name;
       const parsedClass = this.parseObject(object.groups.object);
 
       typeFile += this.propsInterface || '';
