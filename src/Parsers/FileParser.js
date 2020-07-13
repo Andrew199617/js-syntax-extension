@@ -97,6 +97,22 @@ const FileParser = {
   },
 
   /**
+  * @description Create an error / Problem for the user to fix.
+  * Will prevent page from being compiled.
+  * @param {string} message
+  * @param {CodeActionsType} codeAction Provide a fix for the error.
+  */
+  createError(message, codeAction = null) {
+    const vscodeError = VscodeError.create(message, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR);
+
+    if(codeAction) {
+      vscodeError.provideCodeAction(codeAction)
+    }
+
+    vscodeError.notifyUser(this);
+  },
+
+  /**
    * @description Parses any property values.
    * @param {string} valuesStr the value of the property.
    * @returns {any} the type.
@@ -367,7 +383,7 @@ const FileParser = {
   },
 
   /**
-   * @description Add varaible to local variables of class.
+   * @description Add variable to local variables of class.
    * Do checks before adding.
    * @param {string} variableName
    * @param {boolean} strict whether another variable of same name can exist.
@@ -388,6 +404,31 @@ const FileParser = {
 
     this.variables[variableName] = true;
     return true;
+  },
+
+  /**
+   * @description print the text for extends.
+   * @param {string[]} extendsDoc The array of extends found in jsx comment.
+   * @param {string} content the context for finding where errors occurred in the file.
+   * @returns {string}
+   */
+  printExtends(extendsDoc, content) {
+    if(this.isReactComponent) {
+      const defaultReactExtends = `React.Component<${this.className}Props, ${this.className}State>`;
+      if(extendsDoc.includes(defaultReactExtends)) {
+        this.updatePositionToString(content, defaultReactExtends);
+        this.createError(
+          `Using ${defaultReactExtends} without templates is unnecessary.`,
+          lgd.codeActions.removeDefaultReactExtends);
+      }
+      else {
+        extendsDoc.push(defaultReactExtends);
+      }
+    }
+
+    return extendsDoc.length > 0
+      ? `extends ${extendsDoc.join(', ')} `
+      : '';
   },
 
   /**
@@ -805,10 +846,7 @@ const FileParser = {
       typeFile += `declare interface ${object.groups.name}Type${
         docs.template.length > 0
         ? `<${docs.template.join(',')}>`
-        : ''} ${
-        docs.extends.length > 0
-        ? `extends ${docs.extends.join(',')} `
-        : '' }{`;
+        : ''} ${this.printExtends(docs.extends, content)}{`;
       typeFile += parsedClass;
       typeFile += `}\n`;
     }

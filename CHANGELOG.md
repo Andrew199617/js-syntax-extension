@@ -6,7 +6,9 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # 2.4.0+
 
+- Adding extends React.Component by default if the object is a react component.
 - Parsing propTypes for React Components and React objects not using ES6.
+  - Parsing propTypes for Functional Components as well.
 - Handling Renaming of Files. Renaming a js file will update the file path and name of the ts file.
 - Fixed StatusBarMessage clear timeout. Change colors of status bar.
 - Allow use of this inside of create function if you are creating a ReactComponent.

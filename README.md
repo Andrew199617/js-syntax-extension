@@ -6,6 +6,7 @@
 
 ### Use Cases:
 
+- Use typescript checking without needing to convert js files.
 - Need improved intellisense for JavaScript? You will be able to leverage the typings folder and be able to more easily access types from other classes. This is a huge productivity boost!
 - Create Types folder for a NPM module in seconds.
 - Maintain OLOO pattern.
@@ -35,13 +36,51 @@ Search for commands under LGD ctrl+shift+P. You can call the command "Compile js
 
 The .ts file will be placed into the typings folder in your root directory. This is here vscode looks for typings.
 - You need to have a jsconfig or tsconfig for vscode to pick up your typings automatically.
-- The autocompile is sensitive to tab size. It picks up your tab size from editor.tabSize. It is highly recommended that you use ESLINT with indent set to error.
+- The auto-compile is sensitive to tab size. It picks up your tab size from editor.tabSize. It is highly recommended that you use ESLINT with indent set to error.
 - You have to use Stroustrup or Allman style brackets.
-### Make sure you set your @type tag corrrectly.
+### Make sure you set your @type tag correctly.
 - We will generate a interface like {classname}Type. Add @type {{classname}Type} to the object literal.
 
 ### Auto Compile
 <img src="./images/autocompile.gif" width="50%" />
+
+### Compile propTypes for Functional Components into an interface.
+``` js
+import React from 'react';
+import Proptypes from 'prop-types';
+
+/**
+* @description
+* @param {TestProps} props The props passed in by Parent.
+*/
+function Test(props) {
+  return (
+    <h1>
+      Functional component. Well generate an interface for you props.
+    </h1>
+  );
+}
+
+// This will be compiled into an interface called TestProps.
+Test.propTypes = {
+  /**
+   * @description leave a description here.
+   * @type {string}
+   */
+  test: Proptypes.string
+};
+
+export default Test;
+
+///
+/// File in typings/**/Test.d.ts
+///
+
+declare interface TestProps {
+	static test: string;
+};
+
+```
 
 ### Maintain Hierarchy
 <img src="./images/maintainhierarchy.gif" width="50%" />
@@ -115,7 +154,7 @@ The .ts file will be placed into the typings folder in your root directory. This
     "autoComplete" : {
       // Should we autocomplete.
       "enabled" : true
-    }
+    },
 
     // Generate typescript file whenever you save a JS f=File.
     "generateTypings": true,
@@ -150,6 +189,7 @@ The .ts file will be placed into the typings folder in your root directory. This
 - Allow the compilation of the whole project into actual TS files not just interfaces.
   - This will allow a user to migrate their entire JS project to TS if they desire.
 - Make it so Static Variables only show as an option when you are calling them without using the 'this' keyword. Using class keyword in ts file gets us half the way there.
+- checkJs should not cause any issues on our end.
 
 # Known Issues
 

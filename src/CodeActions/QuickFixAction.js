@@ -10,7 +10,7 @@ const QuickFixAction = {
   * @description Initialize an instance of QuickFixAction.
   * @returns {QuickFixActionType & vscode.CodeAction}
   */
-  create(title) {
+  create(title = 'Quick Fix') {
     const quickFixAction = Oloo.assign(new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix), QuickFixAction);
 
     /** @type {vscode.WorkspaceEdit} */
@@ -91,6 +91,7 @@ const QuickFixAction = {
    * @description Clears Diagnostic by default.
    */
   executeCommand() {
+    // if not already removed.
     if(!lgd.configuration.options.generateTypingsOnChange) {
       let diagnostics = lgd.lgdDiagnosticCollection.get(this.document.uri);
       this.context.diagnostics.forEach(element => {

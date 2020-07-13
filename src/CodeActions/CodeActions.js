@@ -1,4 +1,5 @@
 const MoveCreateReactClass = require('./MoveCreateReactClass');
+const RemoveDefaultReactExtends = require('./RemoveDefaultReactExtends');
 
 /**
 * @description The code actions for this extension.
@@ -17,8 +18,11 @@ const CodeActions = {
     codeActions.token = null;
     codeActions.context = null;
 
-    /** @type {MoveCreateReactClassType & QuickFixActionType} */
-    codeActions.moveCreateReactClass = MoveCreateReactClass.create('Move to export');
+    /** @type {MoveCreateReactClassType} */
+    codeActions.moveCreateReactClass = MoveCreateReactClass.create();
+
+    /** @type {RemoveDefaultReactExtendsType} */
+    codeActions.removeDefaultReactExtends = RemoveDefaultReactExtends.create();
 
     return codeActions;
   },
@@ -59,6 +63,7 @@ const CodeActions = {
    */
   registerCommands(subscriptions) {
     subscriptions.push(this.moveCreateReactClass.createCommand('lgd.moveToExport', 'Move Create React Class to Export.'));
+    subscriptions.push(this.removeDefaultReactExtends.createCommand('lgd.clearDiagnostic', 'Clear Diagnostic after remove.'));
   }
 };
 

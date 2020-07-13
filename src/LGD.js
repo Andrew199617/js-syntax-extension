@@ -186,7 +186,6 @@ function activate(context) {
       for(let k = 0; k < typeFilePaths.length; ++k) {
         const potentialPath = typeFilePaths[k];
         fs.exists(potentialPath.oldPath, exists => {
-
           if(!exists) {
             console.warn('LGD: File did not already exist.');
             return;

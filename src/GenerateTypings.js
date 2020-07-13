@@ -3,6 +3,7 @@ const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 
 const path = require('path');
 const FileParser = require('./Parsers/FileParser');
+const FunctionComponentParser = require('./Parsers/FunctionComponentParser');
 const ClassParser = require('./Parsers/ClassParser');
 const FileIO = require('./Logging/FileIO');
 
@@ -120,10 +121,12 @@ const GenerateTypings = {
   async parseFile(content) {
     const fileParser = FileParser.create();
     const classParser = ClassParser.create();
+    const functionComponentParser = FunctionComponentParser.create();
 
     let typeFile = '';
     try {
-      const parseResult = classParser.parse(content, typeFile);
+      let parseResult = classParser.parse(content, typeFile);
+      parseResult = functionComponentParser.parse(parseResult.content, parseResult.typeFile);
       typeFile = fileParser.parse(parseResult.typeFile, parseResult.content);
     }
     finally {
