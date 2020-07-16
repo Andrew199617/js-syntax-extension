@@ -1,6 +1,7 @@
 # Logs
 logs
 *.log
+**.debug.d.ts
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -59,5 +60,3 @@ typings/
 
 # next.js build output
 .next
-
-tests/
