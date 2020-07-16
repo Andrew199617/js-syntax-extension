@@ -4,6 +4,9 @@
 [![Installs](https://vsmarketplacebadge.apphb.com/installs/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
 [![Downloads](https://vsmarketplacebadge.apphb.com/downloads/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
 
+
+![Tests](https://github.com/Andrew199617/js-syntax-extension/workflows/Tests/badge.svg?branch=master)
+
 ### Use Cases:
 
 - Use typescript checking without needing to convert js files.

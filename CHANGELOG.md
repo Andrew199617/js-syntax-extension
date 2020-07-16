@@ -4,6 +4,13 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.5.0+
+
+- Added Tests to Project, this will make sure no regression happen when features are added in future.
+- Improvements to Class Parser.
+  - You can extend classes besides React.Component now.
+  - Adding props and state to React.Component<> by default.
+
 # 2.4.0+
 
 - Adding extends React.Component by default if the object is a react component.
