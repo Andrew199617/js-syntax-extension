@@ -414,6 +414,7 @@ const FileParser = {
    */
   printExtends(extendsDoc, content) {
     if(this.isReactComponent) {
+      // TODO check that React.Component is used.
       const defaultReactExtends = `React.Component<${this.className}Props, ${this.className}State>`;
       if(extendsDoc.includes(defaultReactExtends)) {
         this.updatePositionToString(content, defaultReactExtends);

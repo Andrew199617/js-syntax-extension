@@ -72,9 +72,9 @@ const ClassParser = {
    */
   checkForClassKeyword(content) {
     const classKeywordRegex = /(?<class>^class.*?$)/gms;
-    let object;
-    if((object = classKeywordRegex.exec(content)) !== null) {
-      this.updatePosition(content, object, 'class');
+    let classObj;
+    if((classObj = classKeywordRegex.exec(content)) !== null) {
+      this.updatePosition(content, classObj, 'class');
       return true;
     }
 
@@ -82,11 +82,11 @@ const ClassParser = {
   },
 
   /**
-   * Parse an object literal into properties for a ts file.
-   * @param {string} object
-   * @returns {string} parsed object.
+   * Parse an class into properties for a ts file.
+   * @param {string} classObj
+   * @returns {string} parsed classObj.
    */
-  parseClass(object) {
+  parseClass(classObj) {
     this.tabSize += this.defaultTabSize;
     const lastBeginLine = this.beginLine;
 
@@ -126,7 +126,7 @@ const ClassParser = {
     let properties;
     let property = '';
 
-    while((properties = propertiesRegex.exec(object)) !== null) {
+    while((properties = propertiesRegex.exec(classObj)) !== null) {
       let keywords = '';
       const options = {
         type: undefined,
@@ -135,7 +135,7 @@ const ClassParser = {
       };
 
       if(properties.groups.invalid) {
-        this.updatePosition(object, properties, 'name', lastBeginLine);
+        this.updatePosition(classObj, properties, 'name', lastBeginLine);
         KeywordOrderCheck.execute.bind(this)(properties[0]);
       }
 
@@ -143,7 +143,7 @@ const ClassParser = {
       const isStatic = !!properties.groups.static && properties.groups.static.includes('static');
 
       if(properties.groups.name === ConstructorMethodName) {
-        this.updatePosition(object, properties, 'function', lastBeginLine);
+        this.updatePosition(classObj, properties, 'function', lastBeginLine);
         property += this.parseCreate(properties.groups.function);
       }
 
@@ -154,7 +154,7 @@ const ClassParser = {
       if(properties.groups.params) {
         // Already updated.
         if(properties.groups.name !== ConstructorMethodName) {
-          this.updatePosition(object, properties, 'function', lastBeginLine);
+          this.updatePosition(classObj, properties, 'function', lastBeginLine);
         }
 
         functionParamaters = this.functionParser.parseFunctionParams(properties.groups.params, options.params);
@@ -206,29 +206,37 @@ const ClassParser = {
       return { typeFile, content };
     }
 
-    const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(?<var>class) (?<name>\w+?) extends React.Component {(?<object>.*?)^}/gms;
-    let object;
-    while((object = objectLiterals.exec(content)) !== null) {
+    const classObjRegex = /(?<comment>\/\*\*.*?\*\/\s*?|)(?<var>class) (?<name>\w+?) extends (?<extends>[\w\.]+) {(?<classObj>.*?)^}/gms;
+    let classObj;
+    while((classObj = classObjRegex.exec(content)) !== null) {
       this.variables = {};
       this.staticVariables = [];
-      this.updatePosition(content, object, 'object');
+      this.updatePosition(content, classObj, 'classObj');
 
-      this.parseProps(object.groups.name, content);
+      this.isReactComponent = classObj.groups.extends.includes('React.Component');
 
-      this.className = object.groups.name;
-      const parsedClass = this.parseClass(object.groups.object);
+      this.parseProps(classObj.groups.name, content);
+
+      const docs = this.parseClassComment(classObj.groups.comment);
+
+      this.className = classObj.groups.name;
+      const parsedClass = this.parseClass(classObj.groups.classObj);
 
       typeFile += this.propsInterface || '';
       typeFile += this.stateInterface || '';
 
       typeFile += `\n`;
-      typeFile += object.groups.comment;
-      typeFile += `declare interface ${object.groups.name}Type extends React.Component {`;
+      typeFile += classObj.groups.comment;
+
+      const extendsStr = this.printExtends(docs.extends, content);
+      const template = `${docs.template.length > 0 ? `<${docs.template.join(',')}>` : ''}`
+      typeFile += `declare interface ${classObj.groups.name}Type${template} ${extendsStr} {`;
+
       typeFile += parsedClass;
       typeFile += `}\n`;
     }
 
-    content = content.replace(objectLiterals, '');
+    content = content.replace(classObjRegex, '');
     return { typeFile, content };
   }
 };

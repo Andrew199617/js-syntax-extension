@@ -3,6 +3,9 @@
     "displayName": "JavaScript to Typescript Converter & Syntax Highlighter",
     "publisher": "learn-game-development",
     "icon": "LGDLogo.png",
+    "scripts": {
+        "test": "jest --config ./tests/jest.config.js"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/Andrew199617/js-syntax-extension"
@@ -10,6 +13,7 @@
     "description": "Extra Syntax highlighting for JS/React/Next.js files. Compile/Convert JS files to TS files. Generate Typings for JavaScript project in seconds. Support React + Next.js.",
     "version": "2.4.3",
     "engines": {
+        "node": "10.xx",
         "vscode": "^1.1.0"
     },
     "keywords": [
@@ -140,8 +144,10 @@
         "@types/vscode": "^1.44.0"
     },
     "devDependencies": {
+        "@types/jest": "^26.0.4",
         "babel-eslint": "^10.0.3",
         "eslint": "^6.2.2",
+        "jest": "^25.2.2",
         "vscode": "^1.1.0"
     }
 }
