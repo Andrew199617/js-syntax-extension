@@ -10,6 +10,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Improvements to Class Parser.
   - You can extend classes besides React.Component now.
   - Adding props and state to React.Component<> by default.
+- export const obj = {}; is now being parsed.
 
 # 2.4.0+
 

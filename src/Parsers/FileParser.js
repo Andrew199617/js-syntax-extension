@@ -809,7 +809,7 @@ const FileParser = {
    * @returns {string} the the type file to write to disk.
    */
   parse(typeFile, content) {
-    const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(?<var>const|let|var) (?<name>\w+?) = (?<react>(createReactClass\(|)){(?<object>.*?)^}/gms;
+    const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(export |)(?<var>const|let|var) (?<name>\w+?) = (?<react>(createReactClass\(|)){(?<object>.*?)^}/gms;
 
     let object;
     while((object = objectLiterals.exec(content)) !== null) {

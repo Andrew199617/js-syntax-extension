@@ -55,4 +55,8 @@ describe('Class Parser.', () => {
   test('Props are being parsed for React Class.', () => {
     CheckFile('ReactPropsExample');
   });
+
+  test('Obj is being parsed when export is at front of obj.', () => {
+    CheckFile('ReactPropsExample');
+  });
 });

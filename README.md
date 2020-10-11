@@ -54,12 +54,12 @@ import Proptypes from 'prop-types';
 
 /**
 * @description
-* @param {TestProps} props The props passed in by Parent.
+* @param {TestProps} props
 */
 function Test(props) {
   return (
     <h1>
-      Functional component. Well generate an interface for you props.
+      Functional component. We'll generate an interface for your props.
     </h1>
   );
 }
