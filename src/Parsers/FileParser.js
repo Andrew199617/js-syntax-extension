@@ -259,7 +259,7 @@ const FileParser = {
    * @returns { { extends: string[], template: string[] } }
    */
   parseClassComment(comment) {
-    const jsdocRegex = /@(?<jsdoc>(template|extends))(?!$)(\s*{(?<type>.*?)}|)\s*(?<name>\w*)(?<description>.*?( |\*)(?=@|\*\/)|.*?$)/gms;
+    const jsdocRegex = /@(?<jsdoc>(template|extends))(?!$)(\s*{(?<type>.*?)}|\s*(?<name>[\w, ]*))/gms;
 
     const docs = { extends: [], template: [] };
     while((doc = jsdocRegex.exec(comment)) !== null) {

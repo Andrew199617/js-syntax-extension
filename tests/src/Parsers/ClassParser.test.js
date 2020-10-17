@@ -44,19 +44,11 @@ function CheckFile(filePath) {
 }
 
 describe('Class Parser.', () => {
-  test('Parsing Class without extends React.Component', () => {
-    CheckFile('Recommendation');
-  });
-
   test('State is being parsed for React Class.', () => {
     CheckFile('ReactStateExample');
   });
 
   test('Props are being parsed for React Class.', () => {
-    CheckFile('ReactPropsExample');
-  });
-
-  test('Obj is being parsed when export is at front of obj.', () => {
     CheckFile('ReactPropsExample');
   });
 });
