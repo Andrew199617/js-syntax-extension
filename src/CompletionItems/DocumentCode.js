@@ -1,5 +1,5 @@
 const BaseCompletionItem = require('./BaseCompletionItem');
-const { Oloo } = require('@learngamedevelopment/oloo');
+const { Oloo } = require('@mavega/oloo');
 const FunctionParser = require('../Parsers/FunctionParser');
 const vscode = require('vscode');
 

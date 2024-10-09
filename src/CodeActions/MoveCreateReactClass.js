@@ -1,6 +1,6 @@
 const QuickFixAction = require('./QuickFixAction');
 const vscode = require('vscode');
-const { Oloo } = require('@learngamedevelopment/oloo');
+const { Oloo } = require('@mavega/oloo');
 
 /**
 * @description

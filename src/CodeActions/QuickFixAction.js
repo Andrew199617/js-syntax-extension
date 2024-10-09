@@ -1,4 +1,4 @@
-const { Oloo } = require('@learngamedevelopment/oloo');
+const { Oloo } = require('@mavega/oloo');
 const vscode = require('vscode');
 
 /**

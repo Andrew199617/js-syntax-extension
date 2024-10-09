@@ -3,7 +3,7 @@ const vscode = require('vscode');
 const StatusBarMessage = require('../Logging/StatusBarMessage');
 const SeverityConverter = require('../Core/ServerityConverter');
 const ErrorTypes = require('./ErrorTypes');
-const { Oloo } = require('@learngamedevelopment/oloo');
+const { Oloo } = require('@mavega/oloo');
 
 /**
 * @description An error occurred that should be logged to the user and we can specify the line in the document that error occurred.

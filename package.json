@@ -140,7 +140,7 @@
         ]
     },
     "dependencies": {
-        "@learngamedevelopment/oloo": "^2.1.0",
+        "@mavega/oloo": "^2.3.0",
         "@types/vscode": "^1.44.0"
     },
     "devDependencies": {

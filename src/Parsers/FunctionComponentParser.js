@@ -7,7 +7,7 @@ const ErrorTypes = require('../Errors/ErrorTypes');
 const StaticAccessorCheck = require('../Checks/StaticAccessorCheck');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
 
-const { Oloo } = require('@learngamedevelopment/oloo');
+const { Oloo } = require('@mavega/oloo');
 
 const Types = require('./Types');
 
