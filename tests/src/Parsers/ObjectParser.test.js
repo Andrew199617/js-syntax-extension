@@ -56,7 +56,7 @@ async function CheckFile(filePath) {
   }
 }
 
-describe('Class Parser.', () => {
+describe('Object Linked to Other Objects Parser.', () => {
 
   test('Obj is being parsed when export is at front of obj.', () => {
     CheckFile('ExportConst');

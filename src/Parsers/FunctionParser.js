@@ -6,7 +6,7 @@ const StaticAccessorCheck = require('../Checks/StaticAccessorCheck');
 */
 const FunctionParser = {
   /**
-  * @description Initialize an instace of FunctionParser.
+  * @description Initialize an instance of FunctionParser.
   * @param {Function} parseValue
   * @returns {FunctionParserType}
   */
