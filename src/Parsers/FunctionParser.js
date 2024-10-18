@@ -63,6 +63,17 @@ const FunctionParser = {
   },
 
   /**
+   * @description Split the function parameters into an array.
+   * @param {string} params the parameters of a function.
+   * @returns {string[]} the split parameters.
+   */
+  splitFunctionParams(params) {
+    // Regex to split object, parsingOptions = { preferComments: false, ignoreDuplicate: false } into an array of two items. ['object', 'parsingOptions = { preferComments: false, ignoreDuplicate: false }'].
+    const regex = /\w+\s*=\s*[a-zA-Z0-9]+(,|)|\w+\s*=\s*\{[^}]+\}|\w+/g;
+    return params.match(regex) || [];
+  },
+
+  /**
    * Parse the function paramaters.
    * @param {string} params
    */
@@ -74,22 +85,27 @@ const FunctionParser = {
     let functionCall = '(';
 
     let variables = params.replace('(', '').replace(')', '');
-    variables = variables.split(',').map(val => val.trim());
+    variables = this.splitFunctionParams(variables);
 
     for(let i = 0; i < variables.length; ++i) {
       if(!variables[i]) {
         continue;
       }
 
-      const type = commentParams[variables[i]];
+      let type = commentParams[variables[i]];
 
       // The type gotten from the default value.
       let parsedType = null;
       if(variables[i].includes('=')) {
         const expr = variables[i].split('=').map(val => val.trim());
+
         variables[i] = expr[0];
-        const defaultValue = expr[1];
-        parsedType = await this.parseValue(defaultValue);
+        type = commentParams[variables[i]];
+
+        if(!type) {
+          const defaultValue = expr[1];
+          parsedType = await this.parseValue(defaultValue);
+        }
       }
 
       functionCall += `${variables[i]}: ${type || parsedType || 'any'}${i < variables.length - 1 ? ', ' : ''}`;

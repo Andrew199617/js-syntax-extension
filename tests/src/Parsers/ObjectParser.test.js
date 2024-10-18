@@ -69,4 +69,8 @@ describe('Object Linked to Other Objects Parser.', () => {
   test('Don\'t need to add template args when using my own class or some other class.', () => {
     CheckFile('DontRequireTemplates');
   });
+
+  test('default params generate properly.', () => {
+    CheckFile('/ObjectTests/TestFileParser');
+  });
 });
