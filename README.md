@@ -5,14 +5,14 @@
 [![Downloads](https://vsmarketplacebadges.dev/downloads/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
 
 
-![Tests](https://github.com/Andrew199617/js-syntax-extension/workflows/Tests/badge.svg?branch=master)
+[![Tests](https://github.com/Andrew199617/js-syntax-extension/actions/workflows/tests.yml/badge.svg)](https://github.com/Andrew199617/js-syntax-extension/actions/workflows/tests.yml)
 
 ### Use Cases:
 
 - Use typescript checking without needing to convert js files. We don't currently allow you to switch to TS using the extension. This extension is for better autocomplete, type checking, and more using JSDocs.
 - Need improved intellisense for JavaScript? You will be able to leverage the typings folder and be able to more easily access types from other classes. This is a huge productivity boost!
 - Create Types folder for a NPM module in seconds.
-- Maintain OLOO pattern.
+- Maintain OLOO pattern. Using Oloo is optional, you can use functions, classes, or Objects linked to other objects.
 - This extension is for someone who prefers using vanilla Javascript with jsdoc over TypeScript.
 
 ### Have Issues?
