@@ -13,7 +13,7 @@
     "description": "Extra Syntax highlighting for JS/React/Next.js files. This extension is for someone who prefers using vanilla Javascript with jsdoc over TypeScript. Generate Typings for JavaScript project in seconds. Supports React, Next.js, and vanilla JS.",
     "version": "2.6.0",
     "engines": {
-        "node": "10.xx",
+        "node": "20.18.0",
         "vscode": "^1.1.0"
     },
     "keywords": [

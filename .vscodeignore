@@ -5,3 +5,5 @@ vsc-extension-quickstart.md
 
 typings/
 tests/
+coverage/
+.github/
