@@ -148,7 +148,7 @@ const GenerateTypings = {
     let typeFile = '';
     try {
       let parseResult = await classParser.parse(content, typeFile);
-      parseResult = functionComponentParser.parse(parseResult.content, parseResult.typeFile);
+      parseResult = await functionComponentParser.parse(parseResult.content, parseResult.typeFile);
       typeFile = await fileParser.parse(parseResult.typeFile, parseResult.content);
     }
     finally {
