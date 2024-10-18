@@ -372,17 +372,17 @@ const FileParser = {
       return type;
     }
 
-    const typeRegex = /.*?Type/ms;
-    if(type && typeRegex.test(type)) {
-      const document = await FindFile.generateDocumentFromType(type);
-      if(document) {
-        const tempParser = FileParser.create();
-        type = tempParser.parseTypeWithTemplates(document.getText());
-      }
-      else {
-        lgd.logger.logWarning(`Could not find file for ${type}.`);
-      }
-    }
+    // const typeRegex = /.*?Type/ms;
+    // if(type && typeRegex.test(type)) {
+    //   const document = await FindFile.generateDocumentFromType(type);
+    //   if(document) {
+    //     const tempParser = FileParser.create();
+    //     type = tempParser.parseTypeWithTemplates(document.getText());
+    //   }
+    //   else {
+    //     lgd.logger.logWarning(`Could not find file for ${type}.`);
+    //   }
+    // }
 
     return type;
   },

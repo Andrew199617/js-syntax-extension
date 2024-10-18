@@ -1,4 +1,4 @@
-# Learn Game Development JS to TS Compiler and JS Syntax Highlighter.
+# Learn Game Development JS to TS typings Compiler and JS Syntax Highlighter.
 
 [![Marketplace Version](https://vsmarketplacebadge.apphb.com/version-short/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
 [![Installs](https://vsmarketplacebadge.apphb.com/installs/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
@@ -9,10 +9,11 @@
 
 ### Use Cases:
 
-- Use typescript checking without needing to convert js files.
+- Use typescript checking without needing to convert js files. We don't currently allow you to switch to TS using the extension. This extension is for better autocomplete, type checking, and more using JSDocs.
 - Need improved intellisense for JavaScript? You will be able to leverage the typings folder and be able to more easily access types from other classes. This is a huge productivity boost!
 - Create Types folder for a NPM module in seconds.
 - Maintain OLOO pattern.
+- This extension is for someone who prefers using vanilla Javascript with jsdoc over TypeScript.
 
 ### Have Issues?
 - If it looks like a file is being generated incorrectly check the log file and file an issue on Github. This has high priority for me since i use it for my website.

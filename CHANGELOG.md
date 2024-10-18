@@ -4,6 +4,13 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.6.0+
+
+- Add way to get templates for a give classNameType. Convert classNameType to classNameType<T>.
+  - You no longer need to provide templates when using the class you are in as a return value.
+- Improved regex parsing of function parameters.
+- Add test for function components.
+
 # 2.5.0+
 
 - Added Tests to Project, this will make sure no regression happen when features are added in future.

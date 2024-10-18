@@ -10,8 +10,8 @@
         "type": "git",
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
-    "description": "Extra Syntax highlighting for JS/React/Next.js files. Compile/Convert JS files to TS files. Generate Typings for JavaScript project in seconds. Support React + Next.js.",
-    "version": "2.5.2",
+    "description": "Extra Syntax highlighting for JS/React/Next.js files. This extension is for someone who prefers using vanilla Javascript with jsdoc over TypeScript. Generate Typings for JavaScript project in seconds. Supports React, Next.js, and vanilla JS.",
+    "version": "2.6.0",
     "engines": {
         "node": "10.xx",
         "vscode": "^1.1.0"
