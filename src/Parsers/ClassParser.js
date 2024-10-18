@@ -15,6 +15,7 @@ const ConstructorMethodName = 'constructor';
 
 /**
 * @description Parse a class from a JS File into a TS Interface.
+* parses a ES6 class into a typescript interface.
 * @type {ClassParserType}
 * @extends {FileParserType}
 */
@@ -32,7 +33,7 @@ const ClassParser = {
 
   },
 
-  parseType(options, properties) {
+  async parseType(options, properties) {
     if(options && !options.type) {
 
       if(!properties.groups.function) {
@@ -47,7 +48,7 @@ const ClassParser = {
         options.type = `${this.className}Type`;
       }
       else if(properties.groups.function.includes('return')) {
-        options.type = this.functionParser.parseFunctionReturn(properties.groups.function);
+        options.type = await this.functionParser.parseFunctionReturn(properties.groups.function);
       }
       else {
         options.type = Types.VOID;
@@ -86,7 +87,7 @@ const ClassParser = {
    * @param {string} classObj
    * @returns {string} parsed classObj.
    */
-  parseClass(classObj) {
+  async parseClass(classObj) {
     this.tabSize += this.defaultTabSize;
     const lastBeginLine = this.beginLine;
 
@@ -144,11 +145,11 @@ const ClassParser = {
 
       if(properties.groups.name === ConstructorMethodName) {
         this.updatePosition(classObj, properties, 'function', lastBeginLine);
-        property += this.parseCreate(properties.groups.function);
+        property += await this.parseCreate(properties.groups.function);
       }
 
       property += `\n\t`;
-      property += this.parseComment(properties.groups.comment, options, isAsync);
+      property += await this.parseComment(properties.groups.comment, options, isAsync);
 
       let functionParamaters = '';
       if(properties.groups.params) {
@@ -157,7 +158,7 @@ const ClassParser = {
           this.updatePosition(classObj, properties, 'function', lastBeginLine);
         }
 
-        functionParamaters = this.functionParser.parseFunctionParams(properties.groups.params, options.params);
+        functionParamaters = await this.functionParser.parseFunctionParams(properties.groups.params, options.params);
         StaticAccessorCheck.execute.bind(this)(properties.groups.function);
       }
 
@@ -165,12 +166,12 @@ const ClassParser = {
         keywords = 'static ';
       }
 
-      this.parseType(options, properties);
+      await this.parseType(options, properties);
 
       options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
 
-      let type = this.parseValue(properties.groups.value)
-        || this.parseArray(properties.groups.array)
+      let type = await this.parseValue(properties.groups.value)
+        || await this.parseArray(properties.groups.array)
         || options.type;
 
       if(this.staticVariables.includes(properties.groups.name)) {
@@ -201,11 +202,12 @@ const ClassParser = {
    * @param {string} typeFile
    * @returns {{ typeFile: string, content: string }}
    */
-  parse(content, typeFile) {
+  async parse(content, typeFile) {
     if(!this.checkForClassKeyword(content)) {
       return { typeFile, content };
     }
 
+    this.content = content;
     const classObjRegex = /(?<comment>\/\*\*.*?\*\/\s*?|)(?<var>class) (?<name>\w+?) extends (?<extends>[\w\.]+) {(?<classObj>.*?)^}/gms;
     let classObj;
     while((classObj = classObjRegex.exec(content)) !== null) {
@@ -215,12 +217,12 @@ const ClassParser = {
 
       this.isReactComponent = classObj.groups.extends.includes('React.Component');
 
-      this.parseProps(classObj.groups.name, content);
+      await this.parseProps(classObj.groups.name, content);
 
       const docs = this.parseClassComment(classObj.groups.comment);
 
       this.className = classObj.groups.name;
-      const parsedClass = this.parseClass(classObj.groups.classObj);
+      const parsedClass = await this.parseClass(classObj.groups.classObj);
 
       typeFile += this.propsInterface || '';
       typeFile += this.stateInterface || '';

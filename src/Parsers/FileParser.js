@@ -9,6 +9,7 @@ const FunctionParser = require('./FunctionParser');
 
 const CheckForThisInConstructor = require('../Checks/CheckForThisInConstructor');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
+const FindFile = require('../FileSystem/FindFile');
 
 const ConstructorMethodName = 'create';
 
@@ -47,7 +48,7 @@ const FileParser = {
     fileParser.beginLine = 0;
 
     /**
-     * @description The character that is the beinning of the current parse. "This line is being parsed" <- T in "This" is the endCharacter.
+     * @description The character that is the beginning of the current parse. "This line is being parsed" <- T in "This" is the beginCharacter.
      */
     fileParser.beginCharacter = 0;
 
@@ -93,6 +94,11 @@ const FileParser = {
      */
     fileParser.isReactComponent = false;
 
+    /**
+     * @description The content of the file.
+     */
+    fileParser.content = null;
+
     return fileParser;
   },
 
@@ -117,7 +123,7 @@ const FileParser = {
    * @param {string} valuesStr the value of the property.
    * @returns {any} the type.
    */
-  parseArray(valuesStr) {
+  async parseArray(valuesStr) {
     if(typeof valuesStr === 'undefined') {
       return null;
     }
@@ -134,7 +140,7 @@ const FileParser = {
     };
 
     for(let i = 0; i < values.length; ++i) {
-      const type = this.parseValue(values[i]);
+      const type = await this.parseValue(values[i]);
       if(!type) {
         return 'any[]';
       }
@@ -171,7 +177,7 @@ const FileParser = {
    * @param {string} value the value of the property.
    * @returns {string | null} the type.
    */
-  parseValue(value) {
+  async parseValue(value) {
     if(typeof value === 'undefined') {
       return null;
     }
@@ -186,7 +192,7 @@ const FileParser = {
       const tabs = new Array(tabSize / this.defaultTabSize)
         .fill('\t')
         .join('');
-      return `{${tempParser.parseObject(value)}${tabs}}`;
+      return `{${await tempParser.parseObject(value)}${tabs}}`;
     }
 
     if((/function\s*?\(|=>/m).test(value)) {
@@ -220,7 +226,7 @@ const FileParser = {
       .map(op => `\\${op}`)
       .join('|');
 
-    const operationRegex = new RegExp(`(${ops})`,'m');
+    const operationRegex = new RegExp(`(${ops})`, 'm');
     if(operationRegex.test(value)) {
       try {
         const val = eval(value);
@@ -280,7 +286,13 @@ const FileParser = {
     return docs;
   },
 
-  parseComment(comment, options) {
+  /**
+   * @description Parse a comment.
+   * @param {string} comment The comment to parse.
+   * @param {Object} options
+   * @returns {string} The parsed comment.
+   */
+  async parseComment(comment, options) {
     const jsdocRegex = /@(?<jsdoc>(type|returns|param))(?!$)(\s*{(?<type>.*?)}(?![^\n]*}))\s*(?<name>\w*)(?<description>.*?)(?=(@|\*\/))/gms;
 
     let doc;
@@ -311,8 +323,14 @@ const FileParser = {
           continue;
         }
 
+        doc.groups.type = await this.getTypeWithTemplates(doc.groups.type);
+
+        if(!doc.groups.type) {
+          doc.groups.type = 'any';
+        }
+
         numReturns++;
-        options.type = doc.groups.type || 'any';
+        options.type = doc.groups.type;
       }
       else if(jsdoc === 'param') {
         if(typeof doc.groups.name === 'undefined') {
@@ -340,6 +358,33 @@ const FileParser = {
     }
 
     return comment;
+  },
+
+  /**
+   * @description given a type add templates if any. ex: MyClassType -> MyClassType<T>
+   * @param {string} type ex: MyClassType
+   * @returns {string} the type with templates if any.
+   */
+  async getTypeWithTemplates(type) {
+    // Append templates to my own classType.
+    if(this.className === type || `${this.className}Type` === type) {
+      type = this.parseTypeWithTemplates(this.content);
+      return type;
+    }
+
+    const typeRegex = /.*?Type/ms;
+    if(type && typeRegex.test(type)) {
+      const document = await FindFile.generateDocumentFromType(type);
+      if(document) {
+        const tempParser = FileParser.create();
+        type = tempParser.parseTypeWithTemplates(document.getText());
+      }
+      else {
+        lgd.logger.logWarning(`Could not find file for ${type}.`);
+      }
+    }
+
+    return type;
   },
 
   /**
@@ -435,26 +480,28 @@ const FileParser = {
   /**
   * @description Parse the props of a file.
   */
-  parseProps(objectName, content) {
-    if(lgd.configuration.options.extractPropsAndState) {
-      const commentRegex = `(?<comment>(\\/\\*\\*.*?\\*\\/(?=\\s*${objectName})|))`;
-      const objectLiterals = `^${objectName}.propTypes\\s*=\\s*{(?<object>.*?)^}`;
+  async parseProps(objectName, content) {
+    if(!lgd.configuration.options.extractPropsAndState) {
+      return;
+    }
 
-      const regex = new RegExp([ commentRegex, objectLiterals ].join(''), 'gms');
+    const commentRegex = `(?<comment>(\\/\\*\\*.*?\\*\\/(?=\\s*${objectName})|))`;
+    const objectLiterals = `^${objectName}.propTypes\\s*=\\s*{(?<object>.*?)^}`;
 
-      let object;
-      let propsExisted = false;
-      while((object = regex.exec(content)) !== null) {
-        if(propsExisted) {
-          VscodeError.create(`LGD: ${objectName} already has propTypes defined;`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.HINT)
-            .notifyUser(this);
-          break;
-        }
+    const regex = new RegExp([commentRegex, objectLiterals].join(''), 'gms');
 
-        const propsType = this.parseObject(object.groups.object, { preferComments: true, ignoreDuplicate: true });
-        this.propsInterface = `\n${object.groups.comment}declare interface ${objectName}Props {${propsType}};\n`;
-        propsExisted = true;
+    let object;
+    let propsExisted = false;
+    while((object = regex.exec(content)) !== null) {
+      if(propsExisted) {
+        VscodeError.create(`LGD: ${objectName} already has propTypes defined;`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.HINT)
+          .notifyUser(this);
+        break;
       }
+
+      const propsType = await this.parseObject(object.groups.object, { preferComments: true, ignoreDuplicate: true });
+      this.propsInterface = `\n${object.groups.comment}declare interface ${objectName}Props {${propsType}};\n`;
+      propsExisted = true;
     }
   },
 
@@ -465,7 +512,7 @@ const FileParser = {
    * @param {string} insideFunction
    * @returns {string}
    */
-  parseCreate(insideFunction) {
+  async parseCreate(insideFunction) {
     this.tabSize += this.defaultTabSize;
     let className = this.getClassInCreate(insideFunction);
 
@@ -514,30 +561,28 @@ const FileParser = {
         type: undefined
       };
 
-      const comment = this.parseComment(variable.groups.comment, options, false);
+      const comment = await this.parseComment(variable.groups.comment, options, false);
 
       if(options.type) {
         options.type = this.fixType(options.type);
       }
 
       const type = options.type
-        || this.parseValue(variable.groups.value)
-        || this.parseArray(variable.groups.array);
+        || await this.parseValue(variable.groups.value)
+        || await this.parseArray(variable.groups.array);
 
 
       // Must be a es6 function.
       if(typeof type === 'undefined') {
         VscodeError.create(`LGD: Could not parse ${variable.groups.name} in create function. No functions declarations in create()`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
           .notifyUser(this);
+        continue;
       }
 
       this.addVariable(variable.groups.name);
 
       if(variable.groups.name === 'state' && lgd.configuration.options.extractPropsAndState) {
-        const stateType = type.replace(
-          new RegExp(`^\\t`, 'gm'),
-          ''
-        );
+        const stateType = type.replace(new RegExp(`^\\t`, 'gm'), '');
         this.stateInterface = `\n${comment}declare interface ${this.className}State ${stateType};\n`;
         continue;
       }
@@ -558,7 +603,7 @@ const FileParser = {
    * @param {{ preferComments: boolean, ignoreDuplicate: boolean }} parsingOptions
    * @returns {string} parsed object.
    */
-  parseObject(object, parsingOptions = { preferComments: false, ignoreDuplicate: false }) {
+  async parseObject(object, parsingOptions = { preferComments: false, ignoreDuplicate: false }) {
     this.tabSize += this.defaultTabSize;
     const lastBeginLine = this.beginLine;
 
@@ -608,7 +653,7 @@ const FileParser = {
         KeywordOrderCheck.execute.bind(this)(properties[0]);
       }
 
-      const isAsync = typeof properties.groups.keyword === 'string'  && properties.groups.keyword.includes('async');
+      const isAsync = typeof properties.groups.keyword === 'string' && properties.groups.keyword.includes('async');
       const isGetter = typeof properties.groups.getter === 'string' && properties.groups.getter.includes('get');
       const isSetter = typeof properties.groups.setter === 'string' && properties.groups.setter.includes('set');
 
@@ -626,12 +671,12 @@ const FileParser = {
 
       if(properties.groups.name === ConstructorMethodName) {
         this.updatePosition(object, properties, 'function', lastBeginLine);
-        property += this.parseCreate(properties.groups.function);
+        property += await this.parseCreate(properties.groups.function);
       }
 
       const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
       property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
-      property += this.parseComment(properties.groups.comment, options, isAsync);
+      property += await this.parseComment(properties.groups.comment, options, isAsync);
       let functionParameters = '';
       if(properties.groups.params) {
         // Already updated.
@@ -643,7 +688,7 @@ const FileParser = {
           keywords = 'readonly ';
         }
         else if(!isSetter) {
-          functionParameters = this.functionParser.parseFunctionParams(properties.groups.params, options.params);
+          functionParameters = await this.functionParser.parseFunctionParams(properties.groups.params, options.params);
         }
 
         // Check for errors in Function.
@@ -657,7 +702,7 @@ const FileParser = {
         options.type = 'any';
         // Setter has no return.
         if(properties.groups.function && !isSetter) {
-          options.type = this.functionParser.parseFunctionReturn(properties.groups.function);
+          options.type = await this.functionParser.parseFunctionReturn(properties.groups.function);
         }
 
         if(isGetter && options.type === 'void') {
@@ -671,14 +716,17 @@ const FileParser = {
 
       options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
 
-      let type = this.parseValue(properties.groups.value)
-        || this.parseArray(properties.groups.array)
-        || options.type;
+      let type = null;
 
       if(parsingOptions.preferComments) {
         type = options.type
-          || this.parseValue(properties.groups.value)
-          || this.parseArray(properties.groups.array);
+          || await this.parseValue(properties.groups.value)
+          || await this.parseArray(properties.groups.array);
+      }
+      else {
+        type = await this.parseValue(properties.groups.value)
+          || await this.parseArray(properties.groups.array)
+          || options.type;
       }
 
       if(this.staticVariables.includes(properties.groups.name)) {
@@ -803,12 +851,32 @@ const FileParser = {
   },
 
   /**
+  * @description Get the class type with template args. Given Tester with template arg Props return TesterType<Props>.
+  * @param {string} content the content of the file.
+  * @returns {string} the class type.
+  */
+  parseTypeWithTemplates(content) {
+    const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(export |)(?<var>const|let|var) (?<name>\w+?) = (?<react>(createReactClass\(|)){(?<object>.*?)^}/gms;
+    let object;
+    while((object = objectLiterals.exec(content)) !== null) {
+      const docs = this.parseClassComment(object.groups.comment);
+
+      if(docs.template.length === 0) {
+        return `${object.groups.name}Type`;
+      }
+
+      return `${object.groups.name}Type<${docs.template.join(',')}>`;
+    }
+  },
+
+  /**
    * @description Parse a js file into a ts file.
    * @param {string} typeFile the type file to append.
    * @param {string} content contains js file.
    * @returns {string} the the type file to write to disk.
    */
-  parse(typeFile, content) {
+  async parse(typeFile, content) {
+    this.content = content;
     const objectLiterals = /(?<comment>\/\*\*.*?\*\/.*?|)(export |)(?<var>const|let|var) (?<name>\w+?) = (?<react>(createReactClass\(|)){(?<object>.*?)^}/gms;
 
     let object;
@@ -827,7 +895,7 @@ const FileParser = {
         continue;
       }
 
-      this.parseProps(this.className, content);
+      await this.parseProps(this.className, content);
 
       if(object.groups.react !== '') {
         this.updatePositionToString(content, 'createReactClass');
@@ -837,15 +905,14 @@ const FileParser = {
       }
 
       const docs = this.parseClassComment(object.groups.comment);
-      const parsedClass = this.parseObject(object.groups.object);
+      const parsedClass = await this.parseObject(object.groups.object);
 
       typeFile += this.propsInterface || '';
       typeFile += this.stateInterface || '';
 
       typeFile += `\n`;
       typeFile += object.groups.comment;
-      typeFile += `declare interface ${object.groups.name}Type${
-        docs.template.length > 0
+      typeFile += `declare interface ${object.groups.name}Type${docs.template.length > 0
         ? `<${docs.template.join(',')}>`
         : ''} ${this.printExtends(docs.extends, content)}{`;
       typeFile += parsedClass;

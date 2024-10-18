@@ -1,11 +1,24 @@
 const fs = require('fs');
 
 const FileParser = require('../../../src/Parsers/FileParser');
+const Logger = require('../../../src/Logging/Logger');
 
 lgd = {};
 // lgd.codeActions = CodeActions.create();
 // lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
-// lgd.logger = Logger.create('LGD.FileParser');
+Logger.logInfo = (info) => {
+  console.log(info);
+};
+
+Logger.logWarning = (info) => {
+  console.warn(info);
+};
+
+Logger.logWarning = (info) => {
+  throw new Error(info);
+};
+lgd.logger = Logger.create();
+
 lgd.configuration = {
   options: {
     createDebugLog: false,
@@ -23,15 +36,15 @@ function fixString(str) {
   return str.trim();
 }
 
-function CheckFile(filePath) {
+async function CheckFile(filePath) {
   const originalFile = fs.readFileSync(`./tests/mocks/${filePath}.js`, 'utf8');
 
   const fileParser = FileParser.create();
-  let parseResult = fileParser.parse('', originalFile);
+  let parseResult = await fileParser.parse('', originalFile);
+
+  // fs.writeFileSync(`./tests/debug/${filePath}.debug.d.ts`, parseResult);
 
   const compiledFile = fs.readFileSync(`./tests/mocks/${filePath}.d.ts`, 'binary').toString();
-
-  // fs.writeFileSync(`./tests/debug/${filePath}.debug.d.ts`, parseResult.typeFile);
 
   const typeFileAry = parseResult.split('\n');
   const compileAry = compiledFile.split('\n');
@@ -51,5 +64,9 @@ describe('Class Parser.', () => {
 
   test('Template comments are parsed properly.', () => {
     CheckFile('BaseCardView');
+  });
+
+  test('Don\'t need to add template args when using my own class or some other class.', () => {
+    CheckFile('DontRequireTemplates');
   });
 });

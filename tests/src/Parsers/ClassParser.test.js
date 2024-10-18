@@ -23,15 +23,15 @@ function fixString(str) {
   return str.trim();
 }
 
-function CheckFile(filePath) {
+async function CheckFile(filePath) {
   const originalFile = fs.readFileSync(`./tests/mocks/${filePath}.js`, 'utf8');
 
   const classParser = ClassParser.create();
-  let parseResult = classParser.parse(originalFile, '');
-
-  const compiledFile = fs.readFileSync(`./tests/mocks/${filePath}.d.ts`, 'binary').toString();
+  let parseResult = await classParser.parse(originalFile, '');
 
   // fs.writeFileSync(`./tests/debug/${filePath}.debug.d.ts`, parseResult.typeFile);
+
+  const compiledFile = fs.readFileSync(`./tests/mocks/${filePath}.d.ts`, 'binary').toString();
 
   const typeFileAry = parseResult.typeFile.split('\n');
   const compileAry = compiledFile.split('\n');

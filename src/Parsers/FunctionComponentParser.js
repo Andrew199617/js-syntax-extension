@@ -14,7 +14,8 @@ const Types = require('./Types');
 const ConstructorMethodName = 'constructor';
 
 /**
-* @description Parse a class from a JS File into a TS Interface.
+* @description Parse a function from a JS File into a TS Interface.
+* parses a React function into a typescript interface.
 * @type {FunctionComponentParserType}
 * @extends {FileParserType}
 */
@@ -28,7 +29,7 @@ const FunctionComponentParser = {
     return functionComponentParser;
   },
 
-  parseType(options, properties) {
+  async parseType(options, properties) {
     if(options && !options.type) {
 
       if(!properties.groups.function) {
@@ -43,7 +44,7 @@ const FunctionComponentParser = {
         options.type = `${this.className}Type`;
       }
       else if(properties.groups.function.includes('return')) {
-        options.type = this.functionParser.parseFunctionReturn(properties.groups.function);
+        options.type = await this.functionParser.parseFunctionReturn(properties.groups.function);
       }
       else {
         options.type = Types.VOID;
@@ -82,7 +83,7 @@ const FunctionComponentParser = {
    * @param {string} object
    * @returns {string} parsed object.
    */
-  parseClass(object) {
+  async parseClass(object) {
     this.tabSize += this.defaultTabSize;
     const lastBeginLine = this.beginLine;
 
@@ -140,11 +141,11 @@ const FunctionComponentParser = {
 
       if(properties.groups.name === ConstructorMethodName) {
         this.updatePosition(object, properties, 'function', lastBeginLine);
-        property += this.parseCreate(properties.groups.function);
+        property += await this.parseCreate(properties.groups.function);
       }
 
       property += `\n\t`;
-      property += this.parseComment(properties.groups.comment, options, isAsync);
+      property += await this.parseComment(properties.groups.comment, options, isAsync);
 
       let functionParamaters = '';
       if(properties.groups.params) {
@@ -153,7 +154,7 @@ const FunctionComponentParser = {
           this.updatePosition(object, properties, 'function', lastBeginLine);
         }
 
-        functionParamaters = this.functionParser.parseFunctionParams(properties.groups.params, options.params);
+        functionParamaters = await this.functionParser.parseFunctionParams(properties.groups.params, options.params);
         StaticAccessorCheck.execute.bind(this)(properties.groups.function);
       }
 
@@ -161,12 +162,12 @@ const FunctionComponentParser = {
         keywords = 'static ';
       }
 
-      this.parseType(options, properties);
+      await this.parseType(options, properties);
 
       options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
 
-      let type = this.parseValue(properties.groups.value)
-        || this.parseArray(properties.groups.array)
+      let type = await this.parseValue(properties.groups.value)
+        || await this.parseArray(properties.groups.array)
         || options.type;
 
       if(this.staticVariables.includes(properties.groups.name)) {
@@ -197,7 +198,7 @@ const FunctionComponentParser = {
    * @param {string} typeFile
    * @returns {{ typeFile: string, content: string }}
    */
-  parse(content, typeFile) {
+  async parse(content, typeFile) {
     const funcComponent = /(?<comment>\/\*\*.*?\*\/.*?|)function (?<name>\w+?)\(props\) {(?<func>.*?)^}/gms;
     let func;
     while((func = funcComponent.exec(content)) !== null) {
@@ -205,7 +206,7 @@ const FunctionComponentParser = {
       this.staticVariables = [];
       this.updatePosition(content, func, 'func');
 
-      this.parseProps(func.groups.name, content);
+      await this.parseProps(func.groups.name, content);
 
       typeFile += this.propsInterface || '';
     }

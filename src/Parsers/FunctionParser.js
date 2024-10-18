@@ -7,11 +7,11 @@ const StaticAccessorCheck = require('../Checks/StaticAccessorCheck');
 const FunctionParser = {
   /**
   * @description Initialize an instace of FunctionParser.
-  * @param {Funciton} parseValue
+  * @param {Function} parseValue
   * @returns {FunctionParserType}
   */
   create(parseValue) {
-    const functionParser = Object.assign({}, FunctionParser);
+    const functionParser = Object.create(FunctionParser);
 
     /** @type {Function} */
     functionParser.parseValue = parseValue;
@@ -33,7 +33,7 @@ const FunctionParser = {
    * @param {string} insideFunction the entire inside of a function.
    * @returns {string} the type that was parsed.
    */
-  parseFunctionReturn(insideFunction) {
+  async parseFunctionReturn(insideFunction) {
     // TODO check we are not inside of a function.
     const returnRegex = /return(\s+(?<return>.*?);|)/gm;
 
@@ -46,7 +46,7 @@ const FunctionParser = {
         continue;
       }
 
-      const parsedType = this.parseValue(returns.groups.return);
+      const parsedType = await this.parseValue(returns.groups.return);
       if(parsedType === 'any') {
         return 'any';
       }
@@ -66,7 +66,7 @@ const FunctionParser = {
    * Parse the function paramaters.
    * @param {string} params
    */
-  parseFunctionParams(params, commentParams) {
+  async parseFunctionParams(params, commentParams) {
     if(typeof params === 'undefined') {
       return '';
     }
@@ -89,7 +89,7 @@ const FunctionParser = {
         const expr = variables[i].split('=').map(val => val.trim());
         variables[i] = expr[0];
         const defaultValue = expr[1];
-        parsedType = this.parseValue(defaultValue);
+        parsedType = await this.parseValue(defaultValue);
       }
 
       functionCall += `${variables[i]}: ${type || parsedType || 'any'}${i < variables.length - 1 ? ', ' : ''}`;
