@@ -52,13 +52,40 @@ const Configuration = {
       };
     }
 
-    configuration.options.tabSize = vscode.workspace.getConfiguration('editor', null).get('tabSize');
+    configuration.tabSize = configuration.getTabSize();
 
     return configuration;
   },
 
-  get tabSize() {
-    return this.options.tabSize || vscode.workspace.getConfiguration('editor', null).get('tabSize');
+  /**
+ * @description Get the tab size of the currently opened file in VS Code.
+ * @returns {number} The tab size.
+ */
+  getTabSize() {
+    // Use the tabSize from options if available
+    if(this.options.tabSize) {
+      return this.options.tabSize;
+    }
+
+    // Get the active text editor
+    const editor = vscode.window.activeTextEditor;
+
+    if(editor) {
+      // Retrieve tabSize from the active editor's options
+      const editorTabSize = editor.options.tabSize;
+      if(editorTabSize) {
+        return editorTabSize;
+      }
+
+      // Alternatively, get language-specific tabSize settings
+      const languageTabSize = vscode.workspace.getConfiguration('editor', editor.document.uri).get('tabSize');
+      if(languageTabSize) {
+        return languageTabSize;
+      }
+    }
+
+    // Fallback to the general editor tabSize configuration
+    return vscode.workspace.getConfiguration('editor').get('tabSize') || 2; // Default to 2 if not set
   },
 
   get autoComplete() {
