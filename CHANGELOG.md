@@ -10,6 +10,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
   - You no longer need to provide templates when using the class you are in as a return value.
 - Improved regex parsing of function parameters.
 - Add test for function components.
+- Fix configuration file to work by default.
 
 # 2.5.0+
 
