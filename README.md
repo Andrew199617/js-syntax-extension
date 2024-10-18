@@ -1,8 +1,8 @@
 # Learn Game Development JS to TS typings Compiler and JS Syntax Highlighter.
 
-[![Marketplace Version](https://vsmarketplacebadge.apphb.com/version-short/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
-[![Installs](https://vsmarketplacebadge.apphb.com/installs/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
-[![Downloads](https://vsmarketplacebadge.apphb.com/downloads/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Marketplace Version](https://vsmarketplacebadges.dev/version-short/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Installs](https://vsmarketplacebadges.dev/installs/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Downloads](https://vsmarketplacebadges.dev/downloads/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
 
 
 ![Tests](https://github.com/Andrew199617/js-syntax-extension/workflows/Tests/badge.svg?branch=master)
