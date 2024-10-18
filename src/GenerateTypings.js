@@ -46,6 +46,28 @@ const GenerateTypings = {
     return generateTypings;
   },
 
+  async executeGenerateTypings() {
+    if(this.document.fileName.endsWith(JS_EXT)) {
+      lgd.logger.log = [];
+      await execute()
+      lgd.logger.notifyUser();
+
+      const diagnostics = lgd.lgdDiagnosticCollection.get(this.document.uri);
+
+      let anySevere = false;
+      for(let i = 0; i < diagnostics.length; ++i) {
+        if(diagnostics[i].severity === errorSeverity) {
+          anySevere = true;
+          break;
+        }
+      }
+
+      if(anySevere) {
+        vscode.window.showErrorMessage(`Error occurred parsing JavaScript File into TypeScript Definition File.`);
+      }
+    }
+  },
+
   async execute() {
     const compilingMessage = StatusBarMessage.show('$(zap) Compiling .js --> .d.ts', StatusBarMessageTypes.INDEFINITE);
     const startTime = Date.now();
@@ -94,11 +116,11 @@ const GenerateTypings = {
         switch(fileSystemError.code) {
           case 'EACCES':
           case 'ENOENT':
-          {
-            message = `Cannot open file '${fileSystemError.path}'`;
-            const firstLine = this.document.lineAt(0);
-            range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
-          }
+            {
+              message = `Cannot open file '${fileSystemError.path}'`;
+              const firstLine = this.document.lineAt(0);
+              range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
+            }
         }
       }
 
@@ -125,9 +147,9 @@ const GenerateTypings = {
 
     let typeFile = '';
     try {
-      let parseResult = classParser.parse(content, typeFile);
+      let parseResult = await classParser.parse(content, typeFile);
       parseResult = functionComponentParser.parse(parseResult.content, parseResult.typeFile);
-      typeFile = fileParser.parse(parseResult.typeFile, parseResult.content);
+      typeFile = await fileParser.parse(parseResult.typeFile, parseResult.content);
     }
     finally {
       await lgd.logger.write();

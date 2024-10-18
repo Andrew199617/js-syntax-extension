@@ -28,28 +28,6 @@ let definitionProvider = null;
 let completionItemProvider = null;
 const errorSeverity = SeverityConverter.getDiagnosticSeverity(ErrorTypes.ERROR);
 
-async function executeGenerateTypings(document) {
-  if (document.fileName.endsWith(JS_EXT)) {
-    lgd.logger.log = [];
-    await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute()
-    lgd.logger.notifyUser();
-
-    const diagnostics = lgd.lgdDiagnosticCollection.get(document.uri);
-
-    let anySevere = false;
-    for(let i = 0; i < diagnostics.length; ++i) {
-      if(diagnostics[i].severity === errorSeverity) {
-        anySevere = true;
-        break;
-      }
-    }
-
-    if(anySevere) {
-      vscode.window.showErrorMessage(`Error occurred parsing JavaScript File into TypeScript Definition File.`);
-    }
-  }
-}
-
 function activate(context) {
   const documentSelector = { schema: 'file', language: 'javascript' };
 
@@ -88,7 +66,7 @@ function activate(context) {
     const activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
       const document = activeEditor.document;
-      await executeGenerateTypings(document);
+      await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
 
       if (!document.fileName.endsWith(JS_EXT)) {
         vscode.window.showWarningMessage("Can only compile .js file into .d.ts file.");

@@ -11,7 +11,7 @@ const Document = {
   * @returns {DocumentType}
   */
   create(fileName, text, uri) {
-    const document = Object.assign({}, Document);
+    const document = Object.create(Document);
 
     document.fileName = fileName;
     document._text = text;

@@ -10,8 +10,10 @@
     "editor.wordWrap": "on",
     "editor.fontSize": 16,
     "editor.tabSize": 2,
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
 
     "files.trimTrailingWhitespace": true,
+    "javascript.format.insertSpaceAfterKeywordsInControlFlowStatements": false,
 
     "lgd.options": {
         "generateTypings": true,
@@ -63,6 +65,11 @@
     },
     "cSpell.words": [
         "ANYARRAY",
-        "JSXELEMENT"
+        "Dont",
+        "JSXELEMENT",
+        "Oloo"
     ],
+    "[javascript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
 }
