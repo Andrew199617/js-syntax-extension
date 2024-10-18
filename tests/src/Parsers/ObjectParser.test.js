@@ -20,11 +20,9 @@ Logger.logWarning = (info) => {
 lgd.logger = Logger.create();
 
 lgd.configuration = {
-  options: {
-    createDebugLog: false,
-    tabSize: 2,
-    extractPropsAndState: true
-  }
+  createDebugLog: false,
+  tabSize: 2,
+  extractPropsAndState: true
 };
 
 

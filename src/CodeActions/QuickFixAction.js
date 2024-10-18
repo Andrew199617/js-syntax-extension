@@ -92,7 +92,7 @@ const QuickFixAction = {
    */
   executeCommand() {
     // if not already removed.
-    if(!lgd.configuration.options.generateTypingsOnChange) {
+    if(!lgd.configuration.generateTypingsOnChange) {
       let diagnostics = lgd.lgdDiagnosticCollection.get(this.document.uri);
       this.context.diagnostics.forEach(element => {
         diagnostics = diagnostics.filter(val => val !== element);

@@ -43,7 +43,7 @@ function activate(context) {
   //   lgd.definitionProvider
   // )
 
-  if(lgd.configuration.options.autoComplete.enabled) {
+  if(lgd.configuration.autoComplete.enabled) {
     lgd.completionItemProvider = CompletionItemProvider.create();
 
     completionItemProvider = vscode.languages.registerCompletionItemProvider(
@@ -66,7 +66,7 @@ function activate(context) {
     const activeEditor = vscode.window.activeTextEditor;
     if (activeEditor) {
       const document = activeEditor.document;
-      await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
+      await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();
 
       if (!document.fileName.endsWith(JS_EXT)) {
         vscode.window.showWarningMessage("Can only compile .js file into .d.ts file.");
@@ -88,6 +88,7 @@ function activate(context) {
 
       fs.readFile(fileName, 'utf8', async (err, text) => {
         if(err) {
+          lgd.logger.notifyUser();
           throw err;
         }
 
@@ -103,21 +104,21 @@ function activate(context) {
 
   // compile on save when file is dirty
   const didSaveEvent = vscode.workspace.onDidSaveTextDocument(async document => {
-    if (!lgd.configuration.options.generateTypings) {
+    if (!lgd.configuration.generateTypings) {
       return;
     }
 
-    await executeGenerateTypings(document);
+    await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();
   });
 
   // compile file when we change the document
   const didChangeEvent = vscode.workspace.onDidChangeTextDocument(async (TextChangedEvent) => {
-    if (!lgd.configuration.options.generateTypingsOnChange) {
+    if (!lgd.configuration.generateTypingsOnChange) {
       return;
     }
 
     const document = TextChangedEvent.document;
-    await executeGenerateTypings(document);
+    await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();
   })
 
   // dismiss errors on file close

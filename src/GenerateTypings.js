@@ -16,6 +16,8 @@ const SeverityConverter = require('./Core/ServerityConverter');
 
 const DEFAULT_EXT = '.d.ts';
 const DEFAULT_DIR = 'typings';
+const JS_EXT = ".js";
+const errorSeverity = SeverityConverter.getDiagnosticSeverity(ErrorTypes.ERROR);
 
 /**
  * @description Generate .d.ts files for a .js file.
@@ -49,7 +51,7 @@ const GenerateTypings = {
   async executeGenerateTypings() {
     if(this.document.fileName.endsWith(JS_EXT)) {
       lgd.logger.log = [];
-      await execute()
+      await this.execute()
       lgd.logger.notifyUser();
 
       const diagnostics = lgd.lgdDiagnosticCollection.get(this.document.uri);
@@ -177,7 +179,7 @@ const GenerateTypings = {
     const parsedPath = path.parse(jsFile);
 
     let dirInRoot = '';
-    if(lgd.configuration.options.maintainHierarchy) {
+    if(lgd.configuration.maintainHierarchy) {
       dirInRoot = parsedPath.dir.replace(vscode.workspace.rootPath, '');
     }
 

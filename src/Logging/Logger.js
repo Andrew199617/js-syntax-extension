@@ -87,7 +87,7 @@ const Logger = {
    * @description write the file to disk.
    */
   async write() {
-    if(!lgd.configuration.options.createDebugLog) {
+    if(!lgd.configuration.createDebugLog) {
       return;
     }
 
@@ -100,7 +100,7 @@ const Logger = {
    * @description notify user if log has any value to check.
    */
   notifyUser() {
-    if(!lgd.configuration.options.createDebugLog) {
+    if(!lgd.configuration.createDebugLog) {
       return;
     }
 

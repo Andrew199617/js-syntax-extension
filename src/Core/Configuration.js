@@ -32,7 +32,7 @@ const Configuration = {
      * @description the options for our extension.
      * @type {OptionsType}
      */
-    configuration.options = vscode.workspace.getConfiguration('lgd', null).get('options');
+    configuration.options = vscode.workspace.getConfiguration('lgd', null).get('options') || {};
 
     if(typeof configuration.options.maintainHierarchy === 'undefined') {
       configuration.options.maintainHierarchy = true;
@@ -55,6 +55,36 @@ const Configuration = {
     configuration.options.tabSize = vscode.workspace.getConfiguration('editor', null).get('tabSize');
 
     return configuration;
+  },
+
+  get tabSize() {
+    return this.options.tabSize || vscode.workspace.getConfiguration('editor', null).get('tabSize');
+  },
+
+  get autoComplete() {
+    return this.options.autoComplete || {
+      enabled: true
+    };
+  },
+
+  get maintainHierarchy() {
+    return this.options.maintainHierarchy || true;
+  },
+
+  get createDebugLog() {
+    return this.options.createDebugLog || true;
+  },
+
+  get extractPropsAndState() {
+    return this.options.extractPropsAndState || true;
+  },
+
+  get generateTypings() {
+    return this.options.generateTypings || true;
+  },
+
+  get generateTypingsOnChange() {
+    return this.options.generateTypingsOnChange || true;
   }
 };
 

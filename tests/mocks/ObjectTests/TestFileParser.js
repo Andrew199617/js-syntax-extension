@@ -72,7 +72,7 @@ const TestFileParser = {
     testFileParser.errorOccurred = false;
 
     /** @type {number} */
-    testFileParser.defaultTabSize = lgd.configuration.options.tabSize;
+    testFileParser.defaultTabSize = lgd.configuration.tabSize;
 
     /** @type {number} */
     testFileParser.tabSize = 0;
@@ -481,7 +481,7 @@ const TestFileParser = {
   * @description Parse the props of a file.
   */
   async parseProps(objectName, content) {
-    if(!lgd.configuration.options.extractPropsAndState) {
+    if(!lgd.configuration.extractPropsAndState) {
       return;
     }
 
@@ -581,7 +581,7 @@ const TestFileParser = {
 
       this.addVariable(variable.groups.name);
 
-      if(variable.groups.name === 'state' && lgd.configuration.options.extractPropsAndState) {
+      if(variable.groups.name === 'state' && lgd.configuration.extractPropsAndState) {
         const stateType = type.replace(new RegExp(`^\\t`, 'gm'), '');
         this.stateInterface = `\n${comment}declare interface ${this.className}State ${stateType};\n`;
         continue;

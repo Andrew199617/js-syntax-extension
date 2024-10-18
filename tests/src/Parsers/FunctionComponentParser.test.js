@@ -7,11 +7,9 @@ lgd = {};
 // lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
 // lgd.logger = Logger.create('LGD.FileParser');
 lgd.configuration = {
-  options: {
-    createDebugLog: false,
-    tabSize: 2,
-    extractPropsAndState: true
-  }
+  createDebugLog: false,
+  tabSize: 2,
+  extractPropsAndState: true
 };
 
 
@@ -49,7 +47,7 @@ describe('Function Component Parser.', () => {
   });
 
   test('Props are not created when extractPropsAndState set to false.', async () => {
-    lgd.configuration.options.extractPropsAndState = false;
+    lgd.configuration.extractPropsAndState = false;
 
     const originalFile = fs.readFileSync(`./tests/mocks/FunctionTests/CollapsablePanel.js`, 'utf8');
 

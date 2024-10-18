@@ -75,6 +75,7 @@
                         "generateTypings": {
                             "type": "boolean",
                             "description": "Whether we should automatically compile js files into ts files when you save the document.",
+                            "title": "Generate Typings on Save",
                             "default": true
                         },
                         "generateTypingsOnChange": {

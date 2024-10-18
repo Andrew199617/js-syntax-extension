@@ -32,7 +32,7 @@ const EnumParser = {
     enumParser.staticVariables = null;
 
     /** @type {number} */
-    enumParser.defaultTabSize = lgd.configuration.options.tabSize;
+    enumParser.defaultTabSize = lgd.configuration.tabSize;
 
     /** @type {number} */
     enumParser.tabSize = 0;

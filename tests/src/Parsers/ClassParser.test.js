@@ -7,11 +7,9 @@ lgd = {};
 // lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
 // lgd.logger = Logger.create('LGD.FileParser');
 lgd.configuration = {
-  options: {
-    createDebugLog: false,
-    tabSize: 2,
-    extractPropsAndState: true
-  }
+  createDebugLog: false,
+  tabSize: 2,
+  extractPropsAndState: true
 };
 
 
