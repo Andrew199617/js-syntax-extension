@@ -11,6 +11,13 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Improved regex parsing of function parameters.
 - Add test for function components.
 - Fix configuration file to work by default.
+- Add functionality to parse ['']
+  - Will now parse -> this.state['valueName'] = 'value';
+  - valueName will be added to state interface.
+- Added functionality to have infinite . while setting object.
+  - this.state.parent.parent2.valueName = 'value';
+  - Does not setup up object right now that will be in another version. For now it no longer will cause an issue.
+
 
 # 2.5.0+
 
