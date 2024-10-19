@@ -1,0 +1,92 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+	// Quickly document code.
+	"docthis.includeMemberOfOnClassMembers": false,
+	"docthis.includeDescriptionTag": true,
+	"docthis.includeMemberOfOnInterfaceMembers": false,
+	// Editor settings.
+	"editor.snippetSuggestions": "inline",
+	"editor.wordWrap": "on",
+	"editor.fontSize": 16,
+	"editor.tabSize": 2,
+	"editor.defaultFormatter": "dbaeumer.vscode-eslint",
+	"files.trimTrailingWhitespace": true,
+	"javascript.format.insertSpaceAfterKeywordsInControlFlowStatements": false,
+	"lgd.options": {
+		"generateTypings": true,
+		"maintainHierarchy": true,
+		"createDebugLog": true
+	},
+	"eslint.options": {
+		"configFile": "D:\\React\\js-syntax-extension\\.eslintrc.json"
+	},
+	"editor.semanticHighlighting.enabled": false,
+	"terminal.integrated.shell.windows": "C:\\Windows\\Sysnative\\cmd.exe",
+	"editor.tokenColorCustomizations": {
+		"textMateRules": [
+			{
+				"scope": "log.date",
+				"settings": {
+					"foreground": "#59e259",
+					"fontStyle": ""
+				}
+			},
+			{
+				"scope": "comment.todo",
+				"settings": {
+					"foreground": "#EE82EE"
+				}
+			},
+			{
+				"scope": "comment.issue",
+				"settings": {
+					"foreground": "#5555EE"
+				}
+			},
+			{
+				"scope": "variable.react",
+				"settings": {
+					"foreground": "#9370DB"
+				}
+			},
+			{
+				"scope": "variable.next",
+				"settings": {
+					"foreground": "#9370DB"
+				}
+			}
+		]
+	},
+	"cSpell.words": [
+		"ANYARRAY",
+		"Dont",
+		"JSXELEMENT",
+		"mavega",
+		"Oloo"
+	],
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"reactTsScss.autoComplete": true,
+		"reactTsScss.definition": true,
+		"reactTsScss.peekProperties": true,
+		"reactTsScss.cssAutoComplete": true,
+		"reactTsScss.cssDefinitions": true,
+		"reactTsScss.diagnostics": true,
+		"reactTsScss.baseDir": "src",
+		"reactTsScss.cssSyntaxColor": true,
+		"reactTsScss.tsCleanUpDefs": true,
+		"reactTsScss.cleanUpDefs": [
+			"*.module.css",
+			"*.module.scss",
+			"*.module.sass",
+			"*.module.less",
+			"*.module.styl"
+		],
+		"reactTsScss.references": true,
+		"reactTsScss.codelens": false
+	}
+}

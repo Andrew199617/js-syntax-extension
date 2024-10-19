@@ -7,7 +7,7 @@ const Types = require('./Types');
 const EnumParser = require('./EnumParser');
 const FunctionParser = require('./FunctionParser');
 
-const CheckForThisInConstructor = require('../Checks/CheckForThisInConstructor');
+const checkForThisInConstructor = require('../Checks/CheckForThisInConstructor');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
 const FindFile = require('../FileSystem/FindFile');
 
@@ -195,6 +195,10 @@ const FileParser = {
       return `{${await tempParser.parseObject(value)}${tabs}}`;
     }
 
+    if(value.includes('.bind(this)')) {
+      return Types.FUNCTION;
+    }
+
     if((/function\s*?\(|=>/m).test(value)) {
       return Types.FUNCTION;
     }
@@ -238,7 +242,7 @@ const FileParser = {
         return this.fixType(valType);
       }
       catch(err) {
-        lgd.logger.logError(`Error occurred parsing value using "any": ${err}`);
+        lgd.logger.logError(`Error occurred parsing value using "any" instead. err: ${err}`);
       }
 
       return Types.ANY;
@@ -424,7 +428,7 @@ const FileParser = {
    * @param {string} insideFunction the inside of the create() funciton.
    */
   checkForThisInCreate(insideFunction) {
-    CheckForThisInConstructor.execute.bind(this)(insideFunction);
+    checkForThisInConstructor.bind(this)(insideFunction);
   },
 
   /**
@@ -533,7 +537,7 @@ const FileParser = {
     const tab = `\\s{${this.tabSize}}`;
     const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
 
-    const varName = '\\w+?';
+    const varName = '(?<name>\\w+?)';
     const varDeliminator = '\\s*?=\\s*';
     // $(?!.) = Match until end of insideFunction.
     const varEnd = `(;|$)(?=\\s*(^${previousTab}}|^${tab}(\\/|\\w)|$(?!.)))`;
@@ -541,14 +545,22 @@ const FileParser = {
 
     const commentRegex = '(?<comment>(\\/\\*\\*.*?\\*\\/.*?|))';
     const tabRegex = `^(?<tabs>${tab})`;
-    const varaibleName = `${className}\\.(?<name>${varName})${varDeliminator}`;
+    const firstAccess = `(\\.|\\[')`;
+    const objectAccessorEnd = `(\\[|\\['|\\.)`;
+    const infiniteDots = `\\w[\\w+\\.]+`;
+    const infiniteSquares = `\\w+\\[[\\w\\]'\`\\$\\{\\}\\[]+`;
+    // access is example.value or example['value'] or example['value']['value'] or example.value['value']
+    const objectAccessor = `${firstAccess}(?<objectAccessors>(${infiniteSquares}${objectAccessorEnd}|${infiniteDots}${objectAccessorEnd}|))`;
+    // regex that will get every ['var'] from this string "example['var']['var']"
+    const varAccessor = `\\['(?<access>.*?)'\\]`;
+    const variableName = `${className}${objectAccessor}${varName}(\\]|'\\]|)${varDeliminator}`;
     const valueRegex = `(${arrayRegex}|(?<value>.*?)${varEnd})`;
 
     const variablesRegex = new RegExp(
       [
         commentRegex,
         tabRegex,
-        varaibleName,
+        variableName,
         valueRegex
       ].join(''),
       'gms'
@@ -560,6 +572,17 @@ const FileParser = {
       const options = {
         type: undefined
       };
+
+      const settingValueUsingVariable = variable.groups.objectAccessors.endsWith('[');
+      if(settingValueUsingVariable) {
+        lgd.logger.logWarning(`Ignoring because you are using a variable to set object. See -> ${variable.groups.objectAccessors}${variable.groups.name}].`);
+        continue;
+      }
+
+      if(variable.groups.value.includes(`this.${variable.groups.name}.bind(this)`)) {
+        console.log(`ignoring this.${variable.groups.name}.bind(this);`);
+        continue;
+      }
 
       const comment = await this.parseComment(variable.groups.comment, options, false);
 
@@ -581,6 +604,16 @@ const FileParser = {
 
       this.addVariable(variable.groups.name);
 
+      let definedOnState = /state(\.|\[)/.test(variable.groups.objectAccessors);
+      if(definedOnState) {
+        if(!this.stateInterface) {
+          this.stateInterface = `\ndeclare interface ${this.className}State {`;
+        }
+
+        this.stateInterface += `\n\t${comment}${variable.groups.name}: ${type};\n`;
+        continue;
+      }
+
       if(variable.groups.name === 'state' && lgd.configuration.extractPropsAndState) {
         const stateType = type.replace(new RegExp(`^\\t`, 'gm'), '');
         this.stateInterface = `\n${comment}declare interface ${this.className}State ${stateType};\n`;
@@ -591,6 +624,10 @@ const FileParser = {
       variables += comment;
       variables += `${variable.groups.name}: ${type};`;
       variables += `\n`;
+    }
+
+    if(this.stateInterface?.endsWith('};\n') === false) {
+      this.stateInterface += '};\n';
     }
 
     this.tabSize -= this.defaultTabSize;

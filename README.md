@@ -1,4 +1,4 @@
-# Learn Game Development JS to TS typings Compiler and JS Syntax Highlighter.
+# JS to TS typings Compiler and JS Syntax Highlighter.
 
 [![Marketplace Version](https://vsmarketplacebadges.dev/version-short/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
 [![Installs](https://vsmarketplacebadges.dev/installs/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)

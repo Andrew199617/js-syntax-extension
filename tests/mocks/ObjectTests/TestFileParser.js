@@ -7,7 +7,7 @@ const Types = require('./Types');
 const EnumParser = require('./EnumParser');
 const FunctionParser = require('./FunctionParser');
 
-const CheckForThisInConstructor = require('../Checks/CheckForThisInConstructor');
+const checkForThisInConstructor = require('../Checks/CheckForThisInConstructor');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
 const FindFile = require('../FileSystem/FindFile');
 
@@ -424,7 +424,7 @@ const TestFileParser = {
    * @param {string} insideFunction the inside of the create() funciton.
    */
   checkForThisInCreate(insideFunction) {
-    CheckForThisInConstructor.execute.bind(this)(insideFunction);
+    checkForThisInConstructor.bind(this)(insideFunction);
   },
 
   /**
