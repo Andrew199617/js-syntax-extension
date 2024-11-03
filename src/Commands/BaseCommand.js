@@ -1,3 +1,5 @@
+const vscode = require('vscode');
+
 /**
 * @description Helps Create an Object that can generate a Command for vscode.
 * @type {BaseCommandType}
@@ -33,7 +35,7 @@ const BaseCommand = {
    * @returns {vscode.Disposable}
    */
   createCommand() {
-    return vscode.commands.registerCommand(this.commandName, this.executeCommand.bind(this))
+    return vscode.commands.registerCommand(this.commandName, this.executeCommand)
   },
 
   /**
