@@ -35,30 +35,38 @@ const InvertIf = {
     const ifRegex = /if\s*\(((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*)\)\s*{/;
     const match = ifRegex.exec(lineText);
 
-    if (match) {
-      const condition = match[1].trim();
-      let body = '';
-      let openBraces = 1;
-      let line = selection.start.line + 1;
+    if (!(match)) {
+      return false;
+    }
 
-      // Collect the body of the if statement
-      while (openBraces > 0 && line < document.lineCount) {
-        const currentLineText = document.lineAt(line).text;
+    const condition = match[1].trim();
+    let body = '';
+    let openBraces = 1;
+    let line = selection.start.line + 1;
+    const indent = lineText.substring(0, lineText.indexOf('if'));
 
-        // Count the braces to find the end of the if statement
-        for (const char of currentLineText) {
-          if (char === '{') openBraces++;
-          if (char === '}') openBraces--;
-        }
+    // Collect the body of the if statement
+    while (openBraces > 0 && line < document.lineCount) {
+      const currentLineText = document.lineAt(line).text;
 
-        if (openBraces > 0) {
-          body += currentLineText + '\n';
-        } else {
-          body += currentLineText.substring(0, currentLineText.indexOf('}')) + '\n';
-        }
-
-        line++;
+      // Count the braces to find the end of the if statement
+      for (const char of currentLineText) {
+        if (char === '{') openBraces++;
+        if (char === '}') openBraces--;
       }
+
+      if (openBraces > 0) {
+        body += currentLineText + '\n';
+      }
+      else if (!currentLineText.startsWith(`${indent}}`)) {
+        return false;
+      }
+      else {
+        body += currentLineText.substring(0, currentLineText.indexOf('}')) + '\n';
+      }
+
+      line++;
+    }
 
       // Invert the condition
       let invertedCondition = `!(${condition})`;
@@ -74,7 +82,6 @@ const InvertIf = {
       // Create the new if statement
       let newIfStatement = `if (${invertedCondition}) {\n  return;\n}`;
       // modify newIfStatement to keep old indentation
-      const indent = lineText.substring(0, lineText.indexOf('if'));
       const lines = newIfStatement.split('\n');
       const indentedLines = lines.map((line) => indent + line);
       newIfStatement = indentedLines.join('\n');
@@ -93,9 +100,6 @@ const InvertIf = {
       this.isPreferred = true;
 
       return true;
-    }
-
-    return false;
   },
 
   register(context) {
