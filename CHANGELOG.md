@@ -4,6 +4,10 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.0+
+
+- Added invert if quick action refactor.
+
 # 2.6.0+
 
 - Add way to get templates for a give classNameType. Convert classNameType to classNameType<T>.

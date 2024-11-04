@@ -24,6 +24,10 @@
 - You can also use class for support with React.
 - Provides Quick Fix and Code Actions for fixing JS for TS export.
 
+# Quick Fixes
+- Invert If statement to reduce Christmas tree code.
+- Move createReactClass to export at end of file.
+
 ### Syntax
 - Provide syntax highlighting for scenarios we encounter a lot in our codebase.
 - This allows us to easily know what is going on in a file and avoid errors with naming.
@@ -181,7 +185,7 @@ declare interface TestProps {
 }
 ```
 
-# Goals for 2020
+# Goals for 2024
 
 - ~~Auto Compile whole project into typings folder.~~
 - ~~Auto Compile React Class.~~
@@ -212,6 +216,8 @@ Manual Adding of Class type.
 # Release Notes
 
 ## V2
+
+See changelogs for more info.
 
 ## 2.4.0
 
