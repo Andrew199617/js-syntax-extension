@@ -1,8 +1,8 @@
 # JS to TS typings Compiler and JS Syntax Highlighter.
 
-[![Marketplace Version](https://vsmarketplacebadges.dev/version-short/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
-[![Installs](https://vsmarketplacebadges.dev/installs/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
-[![Downloads](https://vsmarketplacebadges.dev/downloads/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Marketplace Version](https://vsmarketplacebadges.dev/version-short/learn-game-development.js-syntax-extension.png)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Installs](https://vsmarketplacebadges.dev/installs/learn-game-development.js-syntax-extension.png)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Downloads](https://vsmarketplacebadges.dev/downloads/learn-game-development.js-syntax-extension.png)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
 
 
 [![Tests](https://github.com/Andrew199617/js-syntax-extension/actions/workflows/tests.yml/badge.svg)](https://github.com/Andrew199617/js-syntax-extension/actions/workflows/tests.yml)
