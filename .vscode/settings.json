@@ -69,5 +69,6 @@
         "JSXELEMENT",
         "mavega",
         "Oloo"
-    ]
+    ],
+    "workbench.startupEditor": "readme"
 }
