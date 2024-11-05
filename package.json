@@ -11,7 +11,7 @@
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS/React/Next.js files. This extension is for someone who prefers using vanilla Javascript with jsdoc over TypeScript. Generate Typings for JavaScript project in seconds. Supports React, Next.js, and vanilla JS.",
-    "version": "2.6.2",
+    "version": "2.7.1",
     "engines": {
         "node": "20.18.0",
         "vscode": "^1.1.0"
@@ -35,9 +35,7 @@
         "Programming Languages"
     ],
     "activationEvents": [
-        "onLanguage:javascript",
-        "onCommand:lgd.generateTypings",
-        "onCommand:lgd.generateTypingsForAll"
+        "onLanguage:javascript"
     ],
     "main": "./src/LGD",
     "contributes": {
@@ -50,6 +48,11 @@
             {
                 "command": "lgd.generateTypingsForAll",
                 "title": "Compile all js files in project to ts files.",
+                "category": "LGD"
+            },
+            {
+                "command": "lgd.invertIf",
+                "title": "Invert if statement to reduce christmas tree code.",
                 "category": "LGD"
             }
         ],

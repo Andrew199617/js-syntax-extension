@@ -50,6 +50,10 @@ const DocumentCode = {
     return this;
   },
 
+  /**
+   * @description Inserts a documentation snippet at the current position in the document.
+   * @returns {vscode.SnippetString} The snippet string containing the documentation template.
+   */
   insertDocumentation() {
     const snippetString = new vscode.SnippetString();
 

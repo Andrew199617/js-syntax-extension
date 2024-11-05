@@ -21,9 +21,8 @@
         "createDebugLog": true
     },
 
-    "eslint.options": {
-      "configFile": "D:\\React\\js-syntax-extension\\.eslintrc.json"
-    },
+    "eslint.enable": true,
+    "eslint.run": "onSave",
 
     "editor.semanticHighlighting.enabled": false,
 

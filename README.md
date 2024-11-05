@@ -1,8 +1,8 @@
 # JS to TS typings Compiler and JS Syntax Highlighter.
 
-[![Marketplace Version](https://vsmarketplacebadges.dev/version-short/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
-[![Installs](https://vsmarketplacebadges.dev/installs/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
-[![Downloads](https://vsmarketplacebadges.dev/downloads/learn-game-development.js-syntax-extension.svg)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Marketplace Version](https://vsmarketplacebadges.dev/version-short/learn-game-development.js-syntax-extension.png)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Installs](https://vsmarketplacebadges.dev/installs/learn-game-development.js-syntax-extension.png)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
+[![Downloads](https://vsmarketplacebadges.dev/downloads/learn-game-development.js-syntax-extension.png)](https://marketplace.visualstudio.com/items?itemName=learn-game-development.js-syntax-extension)
 
 
 [![Tests](https://github.com/Andrew199617/js-syntax-extension/actions/workflows/tests.yml/badge.svg)](https://github.com/Andrew199617/js-syntax-extension/actions/workflows/tests.yml)
@@ -23,6 +23,10 @@
 - We like to use Object literals and take advantage of the builtin Object.create and Object.assign functions to create classes from the Object literals.
 - You can also use class for support with React.
 - Provides Quick Fix and Code Actions for fixing JS for TS export.
+
+# Quick Fixes
+- Invert If statement to reduce Christmas tree code.
+- Move createReactClass to export at end of file.
 
 ### Syntax
 - Provide syntax highlighting for scenarios we encounter a lot in our codebase.
@@ -181,7 +185,7 @@ declare interface TestProps {
 }
 ```
 
-# Goals for 2020
+# Goals for 2024
 
 - ~~Auto Compile whole project into typings folder.~~
 - ~~Auto Compile React Class.~~
@@ -212,6 +216,8 @@ Manual Adding of Class type.
 # Release Notes
 
 ## V2
+
+See changelogs for more info.
 
 ## 2.4.0
 

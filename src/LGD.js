@@ -18,6 +18,8 @@ const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 
 const FileIO = require('./Logging/FileIO');
 const Document = require('./Core/Document');
+const RefactorProvider = require('./Refactor/RefactorProvider');
+const InvertIf = require('./Refactor/InvertIf');
 
 const JS_EXT = ".js";
 const COMPILE_COMMAND = "lgd.generateTypings";
@@ -42,6 +44,9 @@ function activate(context) {
   //   documentSelector,
   //   lgd.definitionProvider
   // )
+
+  const refactorProvider = RefactorProvider.create(context);
+  InvertIf.create().register(context);
 
   if(lgd.configuration.autoComplete.enabled) {
     lgd.completionItemProvider = CompletionItemProvider.create();
