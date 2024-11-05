@@ -46,7 +46,7 @@ const InvertIf = {
     const indent = lineText.substring(0, lineText.indexOf('if'));
 
     // Collect the body of the if statement
-    while (openBraces > 0 && line < document.lineCount) {
+    while (openBraces > 0 && line < document.lineCount - 1) {
       const currentLineText = document.lineAt(line).text;
 
       // Count the braces to find the end of the if statement
