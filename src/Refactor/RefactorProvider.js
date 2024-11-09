@@ -1,10 +1,12 @@
 const vscode = require('vscode');
 const InvertIf = require('./InvertIf');
 const { Oloo } = require('@mavega/oloo');
+const ExtractFunction = require('./ExtractFunction');
 
 /**
  * @description Provides refactoring actions for inverting if statements.
  * @type {RefactorProviderType}
+ * @extends {vscode.CodeActionProvider}
  */
 const RefactorProvider = {
   /**
@@ -15,6 +17,9 @@ const RefactorProvider = {
     const refactorProvider = Oloo.create(RefactorProvider);
     refactorProvider.context = context;
     refactorProvider.register();
+
+    refactorProvider.extractFunction = ExtractFunction.create();
+    refactorProvider.extractFunction.register(context);
     return refactorProvider;
   },
 
@@ -23,7 +28,7 @@ const RefactorProvider = {
    */
   register() {
     const provider = vscode.languages.registerCodeActionsProvider(
-      ['javascript', 'typescript'],
+      [ 'javascript', 'typescript' ],
       this,
       {
         providedCodeActionKinds: this.providedCodeActionKinds
@@ -48,14 +53,20 @@ const RefactorProvider = {
    * @returns {vscode.CodeAction[]}
    */
   provideCodeActions(document, range, context) {
+    const codeActions = [];
+
+    if(this.extractFunction.shouldProvideRefactor(document, range, context)) {
+      codeActions.push(this.extractFunction.createCodeAction(document, range, context));
+    }
+
     const lineText = document.lineAt(range.start.line).text;
 
     // Find the if statement on the current line
     const ifRegex = /if\s*\(((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*)\)\s*{/;
     const match = ifRegex.exec(lineText);
 
-    if (!match) {
-      return [];
+    if(!match) {
+      return codeActions;
     }
 
     const invertIfAction = new vscode.CodeAction(
@@ -65,9 +76,10 @@ const RefactorProvider = {
     invertIfAction.command = {
       command: 'lgd.invertIf',
       title: 'Invert If Statement',
-      arguments: [document, range]
+      arguments: [ document, range ]
     };
-    return [invertIfAction];
+    codeActions.push(invertIfAction);
+    return codeActions;
   }
 };
 

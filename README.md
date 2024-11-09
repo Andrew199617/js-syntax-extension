@@ -26,6 +26,7 @@
 
 # Quick Fixes
 - Invert If statement to reduce Christmas tree code.
+- Basic Extract Function.
 - Move createReactClass to export at end of file.
 
 ### Syntax
