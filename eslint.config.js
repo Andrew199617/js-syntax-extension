@@ -1,21 +1,20 @@
-import react from 'eslint-plugin-react';
-import globals from 'globals';
-import babelParser from '@babel/eslint-parser';
-import jest from 'eslint-plugin-jest';
+const globals = require('globals');
+const jest = require('eslint-plugin-jest');
+const babelParser = require('@babel/eslint-parser');
+
+console.log('Loaded eslint.config.js');
 
 //
 // I'm open to changes to any of these settings.
 // Let's talk about it first.
 //
-export default[
+module.exports = [
   {
     plugins: {
-      react
     },
 
     languageOptions: {
       globals: {
-        ...globals.browser,
         ...globals.node,
         ...globals.commonjs,
 
@@ -29,13 +28,6 @@ export default[
         admin: 'readonly',
 
         Oloo: 'readonly',
-        UserRole: 'readonly',
-
-        // We always have access to Phaser.
-        Phaser: 'readonly',
-
-        // One Game Instance per web page.
-        gameInstance: 'writable',
 
         // Use Async.
         Promise: 'readonly',
@@ -43,9 +35,6 @@ export default[
         // Don't keep debugger in the code.
         debugger: 'off',
 
-        paypal: 'readonly',
-        document: 'readonly',
-        window: 'readonly',
         global: 'readonly',
         globalThis: 'readonly'
       },
@@ -65,18 +54,6 @@ export default[
           defaultParams: true
         }
       }
-    },
-
-    settings: {
-      react: {
-        pragma: 'React',
-        version: 'detect'
-      },
-
-      linkComponents: [{
-        name: 'Link',
-        linkAttribute: 'route'
-      }]
     },
 
     rules: {
@@ -708,232 +685,7 @@ export default[
       'template-curly-spacing': [ 'error', 'never' ],
 
       // Consistent spacing.
-      'yield-star-spacing': [ 'error', { before: false, after: true } ],
-
-      //
-      //
-      // React Rules https://github.com/yannickcr/eslint-plugin-react
-      //
-      //
-
-      // Booleans should follow proper naming.
-      // "react/boolean-prop-naming": ["error", {
-      //   "propTypeNames": ["bool", "mutuallyExclusiveTrueProps"],
-      //   "rule": "^(is|has|show)[A-Z]([A-Za-z0-9]?)+",
-      //   "message":  "Change boolean PropName {{ propName }} to is|has|show(PropName)"
-      // }],
-
-      // default props should not be provided for required propTypes.
-      'react/default-props-match-prop-types': 'error',
-
-      // Use arrow function to get last state.
-      'react/no-access-state-in-setstate': 'error',
-
-      // Don't pass children as a prop. Set it properly.
-      'react/no-children-prop': 'error',
-
-      // We are removing prop-types in production.
-      // "react/forbid-foreign-prop-types": "error",
-
-      // The key is used by React to identify which items have changed, are added, or are removed and should be stable.
-      'react/no-array-index-key': 'error',
-
-      // Should be sanitized first.
-      'react/no-danger': 'error',
-      'react/no-danger-with-children': 'error',
-
-      // Read the new info on React Components to find out what to do.
-      'react/no-deprecated': 'error',
-
-      // NEVER mutate this.state directly, as calling setState() afterwards may replace the mutation you made.
-      // Treat this.state as if it were immutable.
-      'react/no-direct-mutation-state': 'error',
-
-      // I might consider ignoreStateless.
-      // Each class should have its own file for readability.
-      // "react/no-multi-comp": "error",
-
-      // Don't use pure component and check for update.
-      'react/no-redundant-should-component-update': 'error',
-
-      // Helps.
-      'react/no-typos': 'warn',
-
-      // Use {"I'm"} instead of I'm it will prevent errors inside of tags.
-      'react/no-unescaped-entities': 'error',
-
-      // Use React.createRef()
-      'react/no-string-refs': [ 'error', { noTemplateLiterals: true } ],
-
-      // Attempting to access properties on this can be a potential error if someone is unaware of the differences
-      // when writing a SFC or missed when converting a class component to a SFC.
-      'react/no-this-in-sfc': 'error',
-
-      // class vs className help remember react style.
-      'react/no-unknown-property': 'error',
-
-      // These are getting deprecated. Let's replace with the correct way.
-      'react/no-unsafe': ['warn'],
-
-      // Although we transpile it out it makes sense for autocomplete to only have useful proptypes.
-      'react/no-unused-prop-types': 'error',
-
-      // Let's use the memory we need to.
-      'react/no-unused-state': 'error',
-
-      // proptypes will be used to autocomplete and see options for rendering class.
-      'react/prop-types': 'error',
-
-      // When using JSX, <a /> expands to React.createElement("a"). Therefore the React variable must be in scope.
-      // Webpack now includes React so no need to include.
-      // "react/react-in-jsx-scope": "error",
-
-      // Default Props are nice.
-      'react/require-default-props': [ 'error', { forbidDefaultForRequired: true } ],
-
-      // Obvious mistake why not.
-      'react/require-render-return': 'error',
-
-      // It looks better.
-      'react/self-closing-comp': 'error',
-
-      // Having it in a certain order makes it easier to find methods later.
-      'react/sort-comp': [ 'error', {
-        order: [
-          'constructor',
-          'static-variables',
-          'static-methods',
-          'getters|setters',
-          'lifecycle',
-          '/(^(_|)get.+$)|(^(_|)set.+$)/',
-          '/^(_|)on.+$/',
-          'submit',
-          'everything-else',
-          '/^(_|)render.+$/',
-          'render'
-        ],
-        groups: {
-          submit: [
-            'submit',
-            '/^(_|)submit.+$/'
-          ]
-        }
-      } ],
-
-      // This is just convention to be consistent.
-      'react/state-in-constructor': [ 'error', 'always' ],
-
-      // proptypes and default props at bottom of file.
-      'react/static-property-placement': [ 'error', 'static public field', {
-        defaultProps: 'property assignment',
-        propTypes: 'property assignment'
-      } ],
-
-      // Consistency
-      'react/style-prop-object': 'error',
-
-      // Should really not have children. (e.g. img, br, hr)
-      'react/void-dom-elements-no-children': 'error',
-
-      //
-      //
-      // JSX Rules https://github.com/yannickcr/eslint-plugin-react
-      //
-      //
-
-      // It looks nicer.
-      'react/jsx-boolean-value': [ 'error', 'always' ],
-
-      // Consistency
-      'react/jsx-closing-bracket-location': [ 'error', 'after-props' ],
-
-      // "react/jsx-closing-tag-location": "error",
-      'react/jsx-curly-newline': [ 'error', { multiline: 'consistent', singleline: 'consistent' } ],
-      'react/jsx-equals-spacing': [ 'error', 'never' ],
-      'react/jsx-max-props-per-line': [ 'error', { maximum: 1, when: 'multiline' } ],
-
-      'react/jsx-tag-spacing': [ 'error', {
-        closingSlash: 'never',
-        beforeSelfClosing: 'always',
-        afterOpening: 'never',
-        beforeClosing: 'allow'
-      } ],
-
-      // We always use .js
-      'react/jsx-filename-extension': [ 1, { extensions: ['.js'] } ],
-
-      // Prevents no-unused for JSX.
-      'react/jsx-uses-vars': 'error',
-      'react/jsx-uses-react': 'error',
-
-      // Might comeback to this,
-      // "react/jsx-first-prop-new-line": "error",
-
-      // Warn for potential jsx key
-      'react/jsx-key': 'warn',
-
-      // Time to make a new function.
-      'react/jsx-max-depth': [ 'error', { max: 5 } ],
-
-      // Keep indent style for jsx as well.
-      'react/jsx-indent': [ 'error', 2, { indentLogicalExpressions: true } ],
-      'react/jsx-indent-props': [ 'error', 2 ],
-
-      // Might be usefull to also specify  "eventHandlerPrefix": <eventHandlerPrefix>,
-      // "react/jsx-handler-names": ["error", {
-      //   "eventHandlerPrefix": "on",
-      //   "eventHandlerPropPrefix": "on"
-      // }],
-
-      // Place bind in constructor.
-      'react/jsx-no-bind': 'error',
-
-      // Should put it in brackets { /* hello */ }
-      'react/jsx-no-comment-textnodes': 'error',
-
-      // Mistake also should not be possible to have same variable with different casing.
-      'react/jsx-no-duplicate-props': 'error',
-
-      // Security
-      'react/jsx-no-target-blank': 'warn',
-
-      // Most likely a mistake we should import components from somewhere.
-      'react/jsx-no-undef': 'error',
-
-      'react/jsx-curly-brace-presence': [ 'error', { props: 'never', children: 'ignore' } ],
-
-      // Pascal case for components.
-      'react/jsx-pascal-case': 'error',
-
-      // No multi spaces..
-      'react/jsx-props-no-multi-spaces': 'error',
-
-      // Be Explicit.
-      'react/jsx-props-no-spreading': 'error',
-
-      'react/jsx-wrap-multilines': [ 'error', {
-        declaration: 'parens-new-line',
-        assignment: 'parens-new-line',
-        return: 'parens-new-line',
-        arrow: 'parens-new-line',
-        condition: 'parens-new-line',
-        logical: 'parens-new-line',
-        prop: 'parens-new-line'
-      } ]
-
-      // Ones we should think about.
-      // "react/prefer-es6-class": "0",
-      // "react/jsx-sort-default-props": "error"
-      // "react/sort-prop-types": "error"
-      // "react/jsx-no-literals": "error" Could be usefull for translations.
-      // "react/jsx-fragments": "error" Might be more efficient.
-      // "react/jsx-one-expression-per-line": [ "error", { "allow": "single-child" } ],
-      // "react/jsx-curly-spacing": [2, {
-      //   "when": "always",
-      //   "allowMultiline": true,
-      //   "spacing": { "objectLiterals": "never" }
-      //   }
-      // ],
+      'yield-star-spacing': [ 'error', { before: false, after: true } ]
     }
   },
   {
@@ -957,7 +709,6 @@ export default[
         patterns: [
           'APPROOT',
           'SRC',
-          'CAREERSRC',
           'PAGES',
           '../',
           '../../',

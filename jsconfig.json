@@ -1,7 +1,12 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "checkJs": false
+    "target": "ES2023",
+    "checkJs": false,
+    "paths": {
+      "TESTS/*": ["./tests"],
+      "SRC": ["./src"]
+    }
   },
   "exclude": [
     "node_modules"
