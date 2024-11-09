@@ -16,7 +16,7 @@ const SeverityConverter = require('./Core/ServerityConverter');
 
 const DEFAULT_EXT = '.d.ts';
 const DEFAULT_DIR = 'typings';
-const JS_EXT = ".js";
+const JS_EXT = '.js';
 const errorSeverity = SeverityConverter.getDiagnosticSeverity(ErrorTypes.ERROR);
 
 /**
@@ -51,7 +51,7 @@ const GenerateTypings = {
   async executeGenerateTypings() {
     if(this.document.fileName.endsWith(JS_EXT)) {
       lgd.logger.log = [];
-      await this.execute()
+      await this.execute();
       lgd.logger.notifyUser();
 
       const diagnostics = lgd.lgdDiagnosticCollection.get(this.document.uri);
@@ -99,7 +99,6 @@ const GenerateTypings = {
           SeverityConverter.getStatusBarMessage(ErrorTypes.ERROR),
           StatusBarMessageTypes.ERROR
         );
-
       }
     }
     catch(error) {
@@ -118,11 +117,11 @@ const GenerateTypings = {
         switch(fileSystemError.code) {
           case 'EACCES':
           case 'ENOENT':
-            {
-              message = `Cannot open file '${fileSystemError.path}'`;
-              const firstLine = this.document.lineAt(0);
-              range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
-            }
+          {
+            message = `Cannot open file '${fileSystemError.path}'`;
+            const firstLine = this.document.lineAt(0);
+            range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
+          }
         }
       }
 

@@ -55,7 +55,7 @@ const EnumParser = {
   writeInterfaceVar(name, keywords) {
     let property = '';
 
-    let type = `${this.className}Enum.${name}`;
+    const type = `${this.className}Enum.${name}`;
     property += `${keywords}${name}: ${type};`;
     property += `\n`;
 
@@ -112,7 +112,7 @@ const EnumParser = {
     let property = '';
 
     while((properties = propertiesRegex.exec(object)) !== null) {
-      let keywords = 'static ';
+      const keywords = 'static ';
 
       if(properties.groups.invalid) {
         this.updatePosition(object, properties, 'name', lastBeginLine);
@@ -146,12 +146,14 @@ const EnumParser = {
       this.staticVariables.push(properties.groups.name);
 
       const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
-      property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
+      property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t')
+        .join('')}`;
       property += properties.groups.comment;
 
       if(properties.groups.comment.length > 0) {
         const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
-        property += `${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
+        property += `${new Array(tabSize / this.defaultTabSize).fill('\t')
+          .join('')}`;
       }
 
       property += writeOut(properties.groups.name, keywords, properties.groups.value);
@@ -162,7 +164,7 @@ const EnumParser = {
   },
 
   updatePositionToString(content, string, lastBegin = 0) {
-    this.fileParser.updatePositionToString.bind(this)(content, string, lastBegin)
+    this.fileParser.updatePositionToString.bind(this)(content, string, lastBegin);
   },
 
   /**
@@ -177,12 +179,14 @@ const EnumParser = {
 
     if(this.className.includes('Enum')) {
       VscodeError
-        .create(`LGD: ${this.className} should not have Enum in Name.`,
+        .create(
+          `LGD: ${this.className} should not have Enum in Name.`,
           this.beginLine,
           object.groups.var.length + 1,
           this.beginLine,
           this.className.length,
-          ErrorTypes.ERROR)
+          ErrorTypes.ERROR
+        )
         .notifyUser(this.fileParser);
     }
 

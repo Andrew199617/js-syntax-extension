@@ -23,7 +23,7 @@ const InvertIf = {
    */
   executeCommand() {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) {
+    if(!editor) {
       return false;
     }
 
@@ -35,7 +35,7 @@ const InvertIf = {
     const ifRegex = /if\s*\(((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*)\)\s*{/;
     const match = ifRegex.exec(lineText);
 
-    if (!(match)) {
+    if(!match) {
       return false;
     }
 
@@ -46,67 +46,75 @@ const InvertIf = {
     const indent = lineText.substring(0, lineText.indexOf('if'));
 
     // Collect the body of the if statement
-    while (openBraces > 0 && line < document.lineCount - 1) {
+    while(openBraces > 0 && line < document.lineCount - 1) {
       const currentLineText = document.lineAt(line).text;
 
       // Count the braces to find the end of the if statement
-      for (const char of currentLineText) {
-        if (char === '{') openBraces++;
-        if (char === '}') openBraces--;
+      for(const char of currentLineText) {
+        if(char === '{') {
+          openBraces++;
+        }
+
+        if(char === '}') {
+          openBraces--;
+        }
       }
 
-      if (openBraces > 0) {
-        body += currentLineText + '\n';
+      if(openBraces > 0) {
+        body += `${currentLineText}\n`;
       }
-      else if (!currentLineText.startsWith(`${indent}}`)) {
+      else if(!currentLineText.startsWith(`${indent}}`)) {
         return false;
       }
       else {
-        body += currentLineText.substring(0, currentLineText.indexOf('}')) + '\n';
+        body += `${currentLineText.substring(0, currentLineText.indexOf('}'))}\n`;
       }
 
       line++;
     }
 
-      // Invert the condition
-      let invertedCondition = `!(${condition})`;
+    // Invert the condition
+    let invertedCondition = `!(${condition})`;
 
-      // if condition is already inverted remove the !() from condition
-      if (condition.startsWith('!')) {
-        // remove the characters '!' and '('
-        invertedCondition = condition.substring(2);
-        // remove the last character which is ')'
-        invertedCondition = invertedCondition.trim().substring(0, invertedCondition.length - 1);
+    // if condition is already inverted remove the !() from condition
+    if(condition.startsWith('!')) {
+      // remove the characters '!' and '('
+      invertedCondition = condition.substring(2);
+
+      // remove the last character which is ')'
+      invertedCondition = invertedCondition.trim().substring(0, invertedCondition.length - 1);
+    }
+
+    // Create the new if statement
+    let newIfStatement = `if (${invertedCondition}) {\n  return;\n}`;
+
+    // modify newIfStatement to keep old indentation
+    const lines = newIfStatement.split('\n');
+    const indentedLines = lines.map(line => indent + line);
+    newIfStatement = indentedLines.join('\n');
+    const backTabbedBody = body.split('\n').map(line => {
+      if(line.startsWith('  ')) {
+        return line.substring(2);
       }
+    })
+      .join('\n');
+    newIfStatement += `\n${backTabbedBody}`;
 
-      // Create the new if statement
-      let newIfStatement = `if (${invertedCondition}) {\n  return;\n}`;
-      // modify newIfStatement to keep old indentation
-      const lines = newIfStatement.split('\n');
-      const indentedLines = lines.map((line) => indent + line);
-      newIfStatement = indentedLines.join('\n');
-      const backTabbedBody = body.split('\n').map((line) => {
-        if(line.startsWith('  ')) {
-          return line.substring(2);
-        }
-      }).join('\n');
-      newIfStatement += "\n" + backTabbedBody;
+    const startPosition = new vscode.Position(selection.start.line, 0);
+    const endPosition = new vscode.Position(line, 0);
+    editor.edit(editBuilder => {
+      editBuilder.replace(new vscode.Range(startPosition, endPosition), newIfStatement);
+    });
+    this.isPreferred = true;
 
-      const startPosition = new vscode.Position(selection.start.line, 0);
-      const endPosition = new vscode.Position(line, 0);
-      editor.edit(editBuilder => {
-        editBuilder.replace(new vscode.Range(startPosition, endPosition), newIfStatement);
-      });
-      this.isPreferred = true;
-
-      return true;
+    return true;
   },
 
   register(context) {
     const command = vscode.commands.registerCommand('lgd.invertIf', async (document, range) => {
       const success = await this.executeCommand();
 
-      if (!success) {
+      if(!success) {
         StatusBarMessage.show('No valid if statement found to invert.', StatusBarMessageTypes.WARNING);
       }
     });

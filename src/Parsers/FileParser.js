@@ -737,6 +737,7 @@ const FileParser = {
 
       if(!options.type) {
         options.type = 'any';
+
         // Setter has no return.
         if(properties.groups.function && !isSetter) {
           options.type = await this.functionParser.parseFunctionReturn(properties.groups.function);
@@ -928,7 +929,7 @@ const FileParser = {
       this.isReactComponent = isReactRegex.test(content);
 
       if(this.enumParser.isEnum(object.groups.comment)) {
-        typeFile += this.enumParser.parse(content, object)
+        typeFile += this.enumParser.parse(content, object);
         continue;
       }
 
