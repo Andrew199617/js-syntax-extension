@@ -2,7 +2,7 @@ const path = require('path');
 
 /** @type {import('webpack').Configuration}*/
 const config = {
-  target: 'webworker',
+  target: 'node',
   optimization: {
     minimize: true
   },

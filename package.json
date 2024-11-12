@@ -13,7 +13,7 @@
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS/React/Next.js files. This extension is for someone who prefers using vanilla Javascript with jsdoc over TypeScript. Generate Typings for JavaScript project in seconds. Supports React, Next.js, and vanilla JS.",
-    "version": "2.7.7",
+    "version": "2.7.8",
     "engines": {
         "node": "20.18.0",
         "vscode": "^1.44.0"

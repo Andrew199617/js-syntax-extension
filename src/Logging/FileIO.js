@@ -1,7 +1,6 @@
 const path = require('path');
 const vscode = require('vscode');
-
-const fs = vscode.workspace.fs;
+const fs = require('fs');
 
 /**
 * @description
