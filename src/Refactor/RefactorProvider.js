@@ -60,9 +60,7 @@ const RefactorProvider = {
     }
 
     const lineText = document.lineAt(range.start.line).text;
-
-    // Find the if statement on the current line
-    const ifRegex = /if\s*\(((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*)\)\s*{/;
+    const ifRegex = /if\s*\(/;
     const match = ifRegex.exec(lineText);
 
     if(!match) {
