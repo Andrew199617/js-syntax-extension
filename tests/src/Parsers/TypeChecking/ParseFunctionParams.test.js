@@ -1,12 +1,6 @@
 const ParseFunctionParams = require('../../../../src/Parsers/TypeChecking/ParseFunctionParams');
 
 describe('ParseFunctionParams', () => {
-  let parseFunctionParams;
-
-  beforeEach(() => {
-    parseFunctionParams = ParseFunctionParams.create();
-  });
-
   test('should return undefined variables correctly', () => {
     const code = `
       const a = 1;
@@ -14,7 +8,7 @@ describe('ParseFunctionParams', () => {
       console.log(a + b);
       console.log(c);
     `;
-    const undefinedVars = parseFunctionParams.getUndefinedVariables(code);
+    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
     expect(undefinedVars).toContain('c');
     expect(undefinedVars).not.toContain('a');
     expect(undefinedVars).not.toContain('b');
@@ -27,7 +21,7 @@ describe('ParseFunctionParams', () => {
       const b = 2;
       console.log(a + b);
     `;
-    const undefinedVars = parseFunctionParams.getUndefinedVariables(code);
+    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
     expect(undefinedVars).toEqual([]);
   });
 
@@ -37,7 +31,7 @@ describe('ParseFunctionParams', () => {
         console.log(d + e);
       }
     `;
-    const undefinedVars = parseFunctionParams.getUndefinedVariables(code);
+    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
     expect(undefinedVars).toContain('e');
     expect(undefinedVars).not.toContain('d');
     expect(undefinedVars).toHaveLength(1);
@@ -63,7 +57,7 @@ describe('ParseFunctionParams', () => {
       }
       level1(a);
     `;
-    const undefinedVars = parseFunctionParams.getUndefinedVariables(code);
+    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
     expect(undefinedVars).toContain('v');
     expect(undefinedVars).toContain('a');
     expect(undefinedVars).not.toContain('x');
@@ -80,7 +74,7 @@ describe('ParseFunctionParams', () => {
         console.log(items[i] + j);
       }
     `;
-    const undefinedVars = parseFunctionParams.getUndefinedVariables(code);
+    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
     expect(undefinedVars).toContain('j');
     expect(undefinedVars).not.toContain('items');
     expect(undefinedVars).not.toContain('i');
@@ -95,7 +89,7 @@ describe('ParseFunctionParams', () => {
         count--;
       }
     `;
-    const undefinedVars = parseFunctionParams.getUndefinedVariables(code);
+    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
     expect(undefinedVars).toContain('k');
     expect(undefinedVars).not.toContain('count');
   });
@@ -118,7 +112,7 @@ describe('ParseFunctionParams', () => {
       }
       outer(arr);
     `;
-    const undefinedVars = parseFunctionParams.getUndefinedVariables(code);
+    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
     expect(undefinedVars).toContain('m');
     expect(undefinedVars).toContain('n');
     expect(undefinedVars).toContain('arr');
