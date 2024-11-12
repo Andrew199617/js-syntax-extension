@@ -5,7 +5,6 @@ const path = require('path');
 const GenerateTypings = require('./GenerateTypings');
 const Configuration = require('./Core/Configuration');
 
-const fs = require('fs');
 const Logger = require('./Logging/Logger');
 const CodeActions = require('./CodeActions/CodeActions');
 const DefinitionProvider = require('./DefinitionProvider/DefinitionProvider');
@@ -21,6 +20,7 @@ const Document = require('./Core/Document');
 const RefactorProvider = require('./Refactor/RefactorProvider');
 const InvertIf = require('./Refactor/InvertIf');
 
+const fs = vscode.workspace.fs;
 const JS_EXT = ".js";
 const COMPILE_COMMAND = "lgd.generateTypings";
 const COMPILE_ALL_COMMAND = "lgd.generateTypingsForAll";

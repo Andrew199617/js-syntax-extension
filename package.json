@@ -4,17 +4,19 @@
     "publisher": "learn-game-development",
     "icon": "LGDLogo.png",
     "scripts": {
-        "test": "jest --config ./tests/jest.config.js"
+        "test": "jest --config ./tests/jest.config.js",
+        "vscode:prepublish": "npm run package",
+        "package": "webpack --mode production --devtool hidden-source-map"
     },
     "repository": {
         "type": "git",
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS/React/Next.js files. This extension is for someone who prefers using vanilla Javascript with jsdoc over TypeScript. Generate Typings for JavaScript project in seconds. Supports React, Next.js, and vanilla JS.",
-    "version": "2.7.6",
+    "version": "2.7.7",
     "engines": {
         "node": "20.18.0",
-        "vscode": "^1.1.0"
+        "vscode": "^1.44.0"
     },
     "keywords": [
         "js-syntax",
@@ -37,7 +39,7 @@
     "activationEvents": [
         "onLanguage:javascript"
     ],
-    "main": "./src/LGD",
+    "main": "./dist/extension.js",
     "contributes": {
         "commands": [
             {
@@ -147,18 +149,21 @@
         "@babel/parser": "^7.26.2",
         "@babel/traverse": "^7.25.9",
         "@mavega/oloo": "^2.3.0",
-        "globals": "^15.12.0"
+        "globals": "^15.12.0",
+        "path-browserify": "^1.0.1"
     },
     "devDependencies": {
         "@babel/eslint-parser": "^7.25.9",
-        "@types/vscode": "^1.44.0",
         "@types/jest": "^26.0.4",
+        "@types/vscode": "^1.44.0",
         "babel-eslint": "^10.0.3",
         "babel-plugin-module-resolver": "^5.0.2",
         "eslint": "9.14.0",
         "eslint-plugin-jest": "^28.9.0",
         "jest": "^25.2.2",
-        "vscode": "^1.1.0"
+        "vscode": "^1.1.0",
+        "webpack": "^5.96.1",
+        "webpack-cli": "^5.1.4"
     },
     "imports": {
         "#SRC/*": "./src/*"

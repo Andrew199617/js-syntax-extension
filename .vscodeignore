@@ -7,3 +7,9 @@ typings/
 tests/
 coverage/
 .github/
+src/
+node_modules/
+
+webpack.config.js
+eslint.config.js
+jsconfig.json
