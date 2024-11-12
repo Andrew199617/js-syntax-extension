@@ -15,19 +15,10 @@ const environmentGlobals = {
 const globalsSet = new Set(Object.keys(environmentGlobals));
 
 /**
- * @description
+ * @description Parse function parameters and extract undefined variables.
  * @type {ParseFunctionParamsType}
  */
 const ParseFunctionParams = {
-  /**
-   * @description Initialize an instance of ParseFunctionParams.
-   * @returns {ParseFunctionParamsType}
-   */
-  create() {
-    const parseFunctionParams = Object.create(ParseFunctionParams);
-    return parseFunctionParams;
-  },
-
   /**
    * Extract undefined variables in a function.
    * @param {string} code - The source code to analyze.
