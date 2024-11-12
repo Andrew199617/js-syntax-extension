@@ -1,6 +1,9 @@
 const vscode = require('vscode');
 const StatusBarMessage = require('../Logging/StatusBarMessage');
 const StatusBarMessageTypes = require('../Logging/StatusBarMessageTypes');
+const ParseFunctionParams = require('../Parsers/TypeChecking/ParseFunctionParams');
+const parser = require('@babel/parser');
+const traverse = require('@babel/traverse').default;
 
 /**
  * @description Extract a function from selected code.
@@ -40,6 +43,9 @@ const ExtractFunction = {
       return false;
     }
 
+    const isInsideClass = this.checkIfInsideClass(document, selection);
+    this.needsFunctionString = this.needsFunctionString && !isInsideClass;
+
     let indent = lgd.configuration.tabSize;
     const functionName = 'extractedFunction';
 
@@ -48,16 +54,61 @@ const ExtractFunction = {
     const selectedTextArray = selectedText.split('\n');
     selectedTextArray[0] = indent + indent + selectedTextArray[0].trim();
     const functionString = this.needsFunctionString ? 'function ' : '';
-    const functionEnding = this.needsFunctionString ? '' : ',';
-    const newFunction = `\n${indent}${functionString}${functionName}() {\n${selectedTextArray.join('\n')}\n${indent}}${functionEnding}\n`;
+    const functionEnding = this.needsFunctionString || isInsideClass ? '' : ',';
+
+    const importedVars = this.getImportedVariables(document);
+    const functionParams = this.parseFunctionParams(selectedText, importedVars);
+
+    const newFunction = `\n${indent}${functionString}${functionName}(${functionParams}) {\n${selectedTextArray.join('\n')}\n${indent}}${functionEnding}\n`;
 
     editor.edit(editBuilder => {
       editBuilder.insert(insertPosition, newFunction);
-      editBuilder.replace(selection, `${functionName}();`);
+      editBuilder.replace(selection, `${functionName}(${functionParams});`);
     });
 
     this.isPreferred = true;
     return true;
+  },
+
+  checkIfInsideClass(document, selection) {
+    let line = selection.start.line;
+    while(line > 0) {
+      const lineText = document.lineAt(line).text;
+      if(lineText.includes('class')) {
+        return true;
+      }
+
+      line--;
+    }
+
+    return false;
+  },
+
+  /**
+   * @description Extracts imported variable names from the entire document.
+   * @param {vscode.TextDocument} document
+   * @returns {string[]} - An array of imported variable names.
+   */
+  getImportedVariables(document) {
+    const code = document.getText();
+    const ast = parser.parse(code, {
+      sourceType: 'module',
+      plugins: [ 'jsx', 'typescript' ]
+    });
+
+    const importedVars = [];
+
+    traverse(ast, {
+      ImportDeclaration(path) {
+        path.node.specifiers.forEach(specifier => {
+          if(specifier.type === 'ImportSpecifier' || specifier.type === 'ImportDefaultSpecifier' || specifier.type === 'ImportNamespaceSpecifier') {
+            importedVars.push(specifier.local.name);
+          }
+        });
+      }
+    });
+
+    return importedVars;
   },
 
   /**
@@ -66,20 +117,12 @@ const ExtractFunction = {
   * If there are no variables, it returns an empty string.
   * Checks the rest of the document to see if there are any variables not defined in the selected text.
   * If there are variables that are used but not defined in the selected text, it returns those variables.
-  * @param {string[]} selectedTextArray
+  * @param {string} selectedText
+  * @param {string[]} additionalDeclaredVars
   */
-  parseFunctionParams(selectedTextArray) {
-    const variables = [];
-    const variableRegex = /(?:let|const|var)\s+([a-zA-Z_$][0-9a-zA-Z_$]*)\s*=\s*(.*);/;
-    let match;
-    for(let i = 0; i < selectedTextArray.length; i++) {
-      match = variableRegex.exec(selectedTextArray[i]);
-      if(match) {
-        variables.push(match[1]);
-      }
-    }
-
-    return variables.join(', ');
+  parseFunctionParams(selectedText, additionalDeclaredVars = []) {
+    const undefinedVars = ParseFunctionParams.getUndefinedVariables(selectedText, additionalDeclaredVars);
+    return undefinedVars.join(', ');
   },
 
   /**
@@ -91,13 +134,21 @@ const ExtractFunction = {
   findInsertPosition(document, selection) {
     let line = selection.start.line;
     while(line > 0) {
-      this._findInsertPosition(line, document);
+      const insertPosition = this._findInsertPosition(line, document);
+      if(insertPosition) {
+        return insertPosition;
+      }
+
       line--;
     }
 
     line = selection.end.line;
     while(line < document.lineCount) {
-      this._findInsertPosition(line, document);
+      const insertPosition = this._findInsertPosition(line, document);
+      if(insertPosition) {
+        return insertPosition;
+      }
+
       line++;
     }
 
@@ -113,6 +164,8 @@ const ExtractFunction = {
       this.needsFunctionString = false;
       return new vscode.Position(line + 1, 0);
     }
+
+    return null;
   },
 
   /**
