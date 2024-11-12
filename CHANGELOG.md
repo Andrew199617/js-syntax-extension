@@ -10,6 +10,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
   - Only invert if the last curly brace is properly formatted. The tabs of if must match tabs for }
 - Fix bug with enums not generating correctly.
 - Add extract function code action.
+  - Parsing function to get arguments that need to be extracted.
 
 # 2.6.0+
 
