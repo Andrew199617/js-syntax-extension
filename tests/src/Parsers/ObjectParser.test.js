@@ -4,19 +4,22 @@ const FileParser = require('../../../src/Parsers/FileParser');
 const Logger = require('../../../src/Logging/Logger');
 
 lgd = {};
+
 // lgd.codeActions = CodeActions.create();
 // lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
-Logger.logInfo = (info) => {
+
+Logger.logInfo = info => {
   console.log(info);
 };
 
-Logger.logWarning = (info) => {
+Logger.logWarning = info => {
   console.warn(info);
 };
 
-Logger.logWarning = (info) => {
+Logger.logWarning = info => {
   throw new Error(info);
 };
+
 lgd.logger = Logger.create();
 
 lgd.configuration = {
@@ -24,7 +27,6 @@ lgd.configuration = {
   tabSize: 2,
   extractPropsAndState: true
 };
-
 
 /**
  * @description We shouldn't be trimming but there is a bug in jest that doesn't allow this check to work without trimming.
@@ -34,11 +36,11 @@ function fixString(str) {
   return str.trim();
 }
 
-async function CheckFile(filePath) {
+async function checkFile(filePath) {
   const originalFile = fs.readFileSync(`./tests/mocks/${filePath}.js`, 'utf8');
 
   const fileParser = FileParser.create();
-  let parseResult = await fileParser.parse('', originalFile);
+  const parseResult = await fileParser.parse('', originalFile);
 
   // fs.writeFileSync(`./tests/debug/${filePath}.debug.d.ts`, parseResult);
 
@@ -55,20 +57,23 @@ async function CheckFile(filePath) {
 }
 
 describe('Object Linked to Other Objects Parser.', () => {
-
   test('Obj is being parsed when export is at front of obj.', () => {
-    CheckFile('ExportConst');
+    checkFile('ExportConst');
   });
 
   test('Template comments are parsed properly.', () => {
-    CheckFile('BaseCardView');
+    checkFile('BaseCardView');
   });
 
   test('Don\'t need to add template args when using my own class or some other class.', () => {
-    CheckFile('DontRequireTemplates');
+    checkFile('DontRequireTemplates');
   });
 
   test('default params generate properly.', () => {
-    CheckFile('/ObjectTests/TestFileParser');
+    checkFile('/ObjectTests/TestFileParser');
+  });
+
+  test('Real example works.', () => {
+    checkFile('/ObjectTests/CopilotAdapter');
   });
 });

@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function */
 const VscodeError = require('../Errors/VscodeError');
 
 const ErrorTypes = require('../Errors/ErrorTypes');
@@ -112,7 +111,7 @@ const FileParser = {
     const vscodeError = VscodeError.create(message, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR);
 
     if(codeAction) {
-      vscodeError.provideCodeAction(codeAction)
+      vscodeError.provideCodeAction(codeAction);
     }
 
     vscodeError.notifyUser(this);
@@ -182,8 +181,40 @@ const FileParser = {
       return null;
     }
 
+    const normalizedValue = value.trim();
+
+    if((/^process\.env\.[A-Z0-9_]+$/i).test(normalizedValue)) {
+      return Types.STRING;
+    }
+
+    if(normalizedValue.includes('.bind(this)')) {
+      return Types.FUNCTION;
+    }
+
+    if((/function\s*?\(|=>/m).test(normalizedValue)) {
+      return Types.FUNCTION;
+    }
+
+    let className = (/new\s+(?<className>\w+)\(/m).exec(normalizedValue);
+    if(className !== null && className.groups.className) {
+      return className.groups.className;
+    }
+
+    className = (/(?<className>\w+)\.create\s*\(/m).exec(normalizedValue);
+    if(className !== null && className.groups.className) {
+      return `${className.groups.className}Type`;
+    }
+
+    if((/^[A-Z][A-Z0-9_]*$/).test(normalizedValue)) {
+      const constantRegex = new RegExp(`(?:const|let|var)\\s+${normalizedValue}\\s*=\\s*(?<assignedValue>.*?)(;|$)`, 'm');
+      const constantMatch = constantRegex.exec(this.content || '');
+      if(constantMatch?.groups?.assignedValue && constantMatch.groups.assignedValue !== normalizedValue) {
+        return await this.parseValue(constantMatch.groups.assignedValue);
+      }
+    }
+
     // Parse recursive object.
-    if(value.includes('{') && value.includes(':')) {
+    if(normalizedValue.includes('{') && normalizedValue.includes(':')) {
       const tempParser = FileParser.create();
       tempParser.staticVariables = [];
       tempParser.tabSize = this.tabSize;
@@ -192,48 +223,26 @@ const FileParser = {
       const tabs = new Array(tabSize / this.defaultTabSize)
         .fill('\t')
         .join('');
-      return `{${await tempParser.parseObject(value)}${tabs}}`;
-    }
-
-    if(value.includes('.bind(this)')) {
-      return Types.FUNCTION;
-    }
-
-    if((/function\s*?\(|=>/m).test(value)) {
-      return Types.FUNCTION;
-    }
-
-    let className = (/new\s+(?<className>\w+)\(/m).exec(value);
-    if(className !== null && className.groups.className) {
-      return className.groups.className;
+      return `{${await tempParser.parseObject(normalizedValue)}${tabs}}`;
     }
 
     const stringRegex = /^("|').*?("|')\s*?(;$|$)/m;
-    if(stringRegex.test(value)) {
+    if(stringRegex.test(normalizedValue)) {
       return Types.STRING;
     }
 
-    if(value === 'null' || value === 'undefined') {
-      return Types.ANY;
-    }
-
-    if(value.includes('[') && value.includes(']')) {
+    if(normalizedValue.includes('[') && normalizedValue.includes(']')) {
       return Types.ANYARRAY;
     }
 
-    className = (/(?<className>\w+)\.create\s*\(/m).exec(value);
-    if(className !== null && className.groups.className) {
-      return `${className.groups.className}Type`;
-    }
-
-    const ops = ['+', '-\\s+', '*', '/', '=', '<', '>', '<=', '>=', '&', '|', '^']
-      .map(op => `\\${op}`)
+    const ops = [ '+', '-\\s+', '*', '/', '=', '<', '>', '<=', '>=', '&', '|', '^' ]
+      .map(operation => `\\${operation}`)
       .join('|');
 
     const operationRegex = new RegExp(`(${ops})`, 'm');
-    if(operationRegex.test(value)) {
+    if(operationRegex.test(normalizedValue)) {
       try {
-        const val = eval(value);
+        const val = eval(normalizedValue);
         let valType = typeof val;
         if(valType === 'object' && val === null) {
           valType = Types.ANY;
@@ -248,16 +257,20 @@ const FileParser = {
       return Types.ANY;
     }
 
-    if(value === 'true' || value === 'false' || value.includes('!!')) {
+    if(normalizedValue === 'true' || normalizedValue === 'false' || normalizedValue.includes('!!')) {
       return Types.BOOLEAN;
     }
 
-    if(!isNaN(parseInt(value))) {
+    if(!isNaN(parseInt(normalizedValue))) {
       return Types.NUMBER;
     }
 
-    if(value.includes('{') && value.includes('}')) {
+    if(normalizedValue.includes('{') && normalizedValue.includes('}')) {
       return Types.OBJECT;
+    }
+
+    if(normalizedValue === 'null' || normalizedValue === 'undefined') {
+      return Types.ANY;
     }
 
     return Types.ANY;
@@ -272,10 +285,10 @@ const FileParser = {
     const jsdocRegex = /@(?<jsdoc>(template|extends))(?!$)(\s*{(?<type>.*?)}|\s*(?<name>[\w, ]*))/gms;
 
     const docs = { extends: [], template: [] };
+    let doc = null;
     while((doc = jsdocRegex.exec(comment)) !== null) {
       const jsdoc = doc.groups.jsdoc;
       if(jsdoc === 'template') {
-
         if(typeof doc.groups.type !== 'undefined') {
           lgd.logger.logWarning("Don't add type for Template");
         }
@@ -469,7 +482,8 @@ const FileParser = {
         this.updatePositionToString(content, defaultReactExtends);
         this.createError(
           `Using ${defaultReactExtends} without templates is unnecessary.`,
-          lgd.codeActions.removeDefaultReactExtends);
+          lgd.codeActions.removeDefaultReactExtends
+        );
       }
       else {
         extendsDoc.push(defaultReactExtends);
@@ -492,7 +506,7 @@ const FileParser = {
     const commentRegex = `(?<comment>(\\/\\*\\*.*?\\*\\/(?=\\s*${objectName})|))`;
     const objectLiterals = `^${objectName}.propTypes\\s*=\\s*{(?<object>.*?)^}`;
 
-    const regex = new RegExp([commentRegex, objectLiterals].join(''), 'gms');
+    const regex = new RegExp([ commentRegex, objectLiterals ].join(''), 'gms');
 
     let object;
     let propsExisted = false;
@@ -539,20 +553,21 @@ const FileParser = {
 
     const varName = '(?<name>\\w+?)';
     const varDeliminator = '\\s*?=\\s*';
+
     // $(?!.) = Match until end of insideFunction.
-    const varEnd = `(;|$)(?=\\s*(^${previousTab}}|^${tab}(\\/|\\w)|$(?!.)))`;
+    const varEnd = `(;|$)(?=\\s*(^${tab}}|^${previousTab}}|^${tab}(\\/|\\w)|$(?!.)))`;
     const arrayRegex = `\\[(?<array>.*?)${varEnd}`;
 
     const commentRegex = '(?<comment>(\\/\\*\\*.*?\\*\\/.*?|))';
-    const tabRegex = `^(?<tabs>${tab})`;
+    const tabRegex = `^(?<tabs>[ \t]{${this.tabSize},})`;
     const firstAccess = `(\\.|\\[')`;
     const objectAccessorEnd = `(\\[|\\['|\\.)`;
     const infiniteDots = `\\w[\\w+\\.]+`;
     const infiniteSquares = `\\w+\\[[\\w\\]'\`\\$\\{\\}\\[]+`;
+
     // access is example.value or example['value'] or example['value']['value'] or example.value['value']
     const objectAccessor = `${firstAccess}(?<objectAccessors>(${infiniteSquares}${objectAccessorEnd}|${infiniteDots}${objectAccessorEnd}|))`;
-    // regex that will get every ['var'] from this string "example['var']['var']"
-    const varAccessor = `\\['(?<access>.*?)'\\]`;
+
     const variableName = `${className}${objectAccessor}${varName}(\\]|'\\]|)${varDeliminator}`;
     const valueRegex = `(${arrayRegex}|(?<value>.*?)${varEnd})`;
 
@@ -567,11 +582,12 @@ const FileParser = {
     );
 
     let variable;
-    let variables = '';
+    const parsedVariables = new Map();
     while((variable = variablesRegex.exec(insideFunction)) !== null) {
       const options = {
         type: undefined
       };
+      const assignmentValue = variable.groups.value;
 
       const settingValueUsingVariable = variable.groups.objectAccessors.endsWith('[');
       if(settingValueUsingVariable) {
@@ -579,7 +595,7 @@ const FileParser = {
         continue;
       }
 
-      if(variable.groups.value.includes(`this.${variable.groups.name}.bind(this)`)) {
+      if(assignmentValue.includes(`this.${variable.groups.name}.bind(this)`)) {
         console.log(`ignoring this.${variable.groups.name}.bind(this);`);
         continue;
       }
@@ -591,7 +607,7 @@ const FileParser = {
       }
 
       const type = options.type
-        || await this.parseValue(variable.groups.value)
+        || await this.parseValue(assignmentValue)
         || await this.parseArray(variable.groups.array);
 
 
@@ -604,7 +620,7 @@ const FileParser = {
 
       this.addVariable(variable.groups.name);
 
-      let definedOnState = /state(\.|\[)/.test(variable.groups.objectAccessors);
+      const definedOnState = (/state(\.|\[)/).test(variable.groups.objectAccessors);
       if(definedOnState) {
         if(!this.stateInterface) {
           this.stateInterface = `\ndeclare interface ${this.className}State {`;
@@ -620,9 +636,51 @@ const FileParser = {
         continue;
       }
 
+      const parsedVariable = parsedVariables.get(variable.groups.name) || {
+        comment: '',
+        conditional: false,
+        count: 0,
+        types: []
+      };
+
+      if(!parsedVariable.comment && comment) {
+        parsedVariable.comment = comment;
+      }
+
+      parsedVariable.conditional = parsedVariable.conditional || variable.groups.tabs.length > this.tabSize;
+      parsedVariable.count++;
+      parsedVariable.types.push(type);
+      parsedVariables.set(variable.groups.name, parsedVariable);
+    }
+
+    let variables = '';
+    for(const [ name, parsedVariable ] of parsedVariables.entries()) {
+      const uniqueTypes = [];
+
+      for(const parsedType of parsedVariable.types) {
+        const fixedType = this.fixType(parsedType);
+        if(fixedType === Types.ANY) {
+          continue;
+        }
+
+        if(!uniqueTypes.includes(fixedType)) {
+          uniqueTypes.push(fixedType);
+        }
+      }
+
+      if(uniqueTypes.length === 0) {
+        uniqueTypes.push(Types.ANY);
+      }
+
+      let parsedType = uniqueTypes.join('|');
+
+      if(parsedVariable.conditional && parsedVariable.count === 1 && !parsedType.includes('undefined')) {
+        parsedType += '|undefined';
+      }
+
       variables += `\n\t`;
-      variables += comment;
-      variables += `${variable.groups.name}: ${type};`;
+      variables += parsedVariable.comment || '';
+      variables += `${name}: ${parsedType};`;
       variables += `\n`;
     }
 
@@ -712,6 +770,8 @@ const FileParser = {
       }
 
       const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
+
+      // eslint-disable-next-line newline-per-chained-call
       property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
       property += await this.parseComment(properties.groups.comment, options, isAsync);
       let functionParameters = '';
