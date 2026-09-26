@@ -6,11 +6,11 @@ const FileParser = require('./Parsers/FileParser');
 const FunctionComponentParser = require('./Parsers/FunctionComponentParser');
 const ClassParser = require('./Parsers/ClassParser');
 const FileIO = require('./Logging/FileIO');
+const Logger = require('./Logging/Logger');
 
 const vscode = require('vscode');
 
 const ErrorTypes = require('./Errors/ErrorTypes');
-const VscodeError = require('./Errors/VscodeError');
 
 const SeverityConverter = require('./Core/ServerityConverter');
 
@@ -52,6 +52,18 @@ const GenerateTypings = {
          * @type {vscode.DiagnosticCollection}
          */
         generateTypings.lgdDiagnosticCollection = lgdDiagnosticCollection;
+        generateTypings.loggerSink = lgd.logger;
+        const logger = Logger.create(lgd.logger._fileName);
+        generateTypings.compilationContext = {
+            document: document,
+            diagnostics: [],
+            diagnosticCollection: lgdDiagnosticCollection,
+            logger: logger,
+            statusBar: StatusBarMessage.create(),
+            errorOccurred: false
+        };
+        logger.compilationContext = generateTypings.compilationContext;
+        logger.openedNewDocument(document);
 
         return generateTypings;
     },
@@ -64,7 +76,7 @@ const GenerateTypings = {
             await this.execute();
             lgd.logger.notifyUser();
 
-            const diagnostics = lgd.lgdDiagnosticCollection.get(this.document.uri);
+            const diagnostics = this.lgdDiagnosticCollection.get(this.document.uri) || [];
 
             let anySevere = false;
             for(let i = 0; i < diagnostics.length; ++i)
@@ -85,16 +97,12 @@ const GenerateTypings = {
 
     async execute()
     {
-        const compilingMessage = StatusBarMessage.show('$(zap) Compiling .js --> .d.ts', StatusBarMessageTypes.INDEFINITE);
+        const statusBar = this.compilationContext.statusBar;
+        const compilingMessage = statusBar.show('$(zap) Compiling .js --> .d.ts', StatusBarMessageTypes.INDEFINITE);
         const startTime = Date.now();
 
         try
         {
-            // Reset diagnostics every time with parse a file.
-            VscodeError.diagnostics = [];
-            VscodeError.currentDocument = this.document;
-            lgd.logger.openedNewDocument(this.document);
-
             const compiled = await this.compile(this.document.fileName, this.document.getText());
 
             if(compiled)
@@ -103,7 +111,7 @@ const GenerateTypings = {
                 compilingMessage.dispose();
                 this.lgdDiagnosticCollection.set(this.document.uri, []);
 
-                StatusBarMessage.show(
+                statusBar.show(
                     `$(check) LGD compiled in ${elapsedTime}ms`,
                     StatusBarMessageTypes.SUCCESS
                 );
@@ -112,7 +120,7 @@ const GenerateTypings = {
             {
                 compilingMessage.dispose();
 
-                StatusBarMessage.show(
+                statusBar.show(
                     SeverityConverter.getStatusBarMessage(ErrorTypes.ERROR),
                     StatusBarMessageTypes.ERROR
                 );
@@ -147,9 +155,10 @@ const GenerateTypings = {
 
             compilingMessage.dispose();
             const diagnosis = new vscode.Diagnostic(range, message, SeverityConverter.getDiagnosticSeverity(severity));
-            this.lgdDiagnosticCollection.set(this.document.uri, [diagnosis]);
+            this.compilationContext.diagnostics.push(diagnosis);
+            this.lgdDiagnosticCollection.set(this.document.uri, this.compilationContext.diagnostics);
 
-            StatusBarMessage.show(
+            statusBar.show(
                 SeverityConverter.getStatusBarMessage(severity),
                 SeverityConverter.getMessageType(severity)
             );
@@ -163,9 +172,9 @@ const GenerateTypings = {
      */
     async parseFile(content)
     {
-        const fileParser = FileParser.create();
-        const classParser = ClassParser.create();
-        const functionComponentParser = FunctionComponentParser.create();
+        const fileParser = FileParser.create(this.compilationContext);
+        const classParser = ClassParser.create(this.compilationContext);
+        const functionComponentParser = FunctionComponentParser.create(this.compilationContext);
 
         let typeFile = '';
         try
@@ -176,10 +185,11 @@ const GenerateTypings = {
         }
         finally
         {
-            await lgd.logger.write();
+            this.loggerSink.append(this.compilationContext.logger);
+            await this.loggerSink.write();
         }
 
-        if(fileParser.errorOccurred || classParser.errorOccurred || !typeFile)
+        if(this.compilationContext.errorOccurred || fileParser.errorOccurred || classParser.errorOccurred || !typeFile)
         {
             return false;
         }

@@ -175,6 +175,8 @@
     },
     "devDependencies": {
         "@babel/eslint-parser": "^7.25.9",
+        "@babel/plugin-transform-modules-commonjs": "^7.29.7",
+        "@babel/register": "^7.29.7",
         "@types/jest": "^26.0.4",
         "@types/vscode": "^1.44.0",
         "@vscode/vsce": "3.6.2",

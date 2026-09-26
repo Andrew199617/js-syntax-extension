@@ -31,6 +31,9 @@ const Logger = {
 
         /** @type {DocumentType} */
         logger.document = null;
+        logger.compilationContext = null;
+        logger.pendingLoggers = [];
+        logger.writeCompleted = Promise.resolve();
 
         return logger;
     },
@@ -85,7 +88,17 @@ const Logger = {
         return str;
     },
 
-    /** @description write the file to disk. */
+    /** @description Adds a completed document's log to the shared output. */
+    append(logger)
+    {
+        this.log.push(...logger.log);
+        if(logger.log.length > 0)
+        {
+            this.pendingLoggers.push(logger);
+        }
+    },
+
+    /** @description Serializes writes to the shared log without serializing compilation. */
     async write()
     {
         if(!lgd.configuration.createDebugLog)
@@ -93,22 +106,43 @@ const Logger = {
             return;
         }
 
-        const logFile = this._toString();
-        const filePath = `${this._logFolder()}\\${this._fileName}.log`;
-        await FileIO.writeFileContents(filePath, logFile);
+        const previousWrite = this.writeCompleted;
+        let completeWrite;
+        this.writeCompleted = new Promise(resolve =>
+        {
+            completeWrite = resolve;
+        });
+
+        try
+        {
+            await previousWrite;
+            const logFile = this._toString();
+            const filePath = `${this._logFolder()}\\${this._fileName}.log`;
+            await FileIO.writeFileContents(filePath, logFile);
+        }
+        finally
+        {
+            completeWrite();
+        }
     },
 
     /** @description notify user if log has any value to check. */
     notifyUser()
     {
+        const pendingLoggers = this.pendingLoggers.splice(0);
+        for(const logger of pendingLoggers)
+        {
+            logger.notifyUser();
+        }
+
         if(!lgd.configuration.createDebugLog)
         {
             return;
         }
 
-        if(this.log.length > 0)
+        if(this.log.length > 0 && this.compilationContext)
         {
-            VscodeError.create('LGD: Check log!', 0, 0, 0, 0, ErrorTypes.HINT).notifyUser(null);
+            VscodeError.create('LGD: Check log!', 0, 0, 0, 0, ErrorTypes.HINT).notifyUser(this);
         }
     },
 

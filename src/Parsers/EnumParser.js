@@ -16,6 +16,7 @@ const EnumParser = {
     create(fileParser)
     {
         const enumParser = Object.create(EnumParser);
+        enumParser.compilationContext = fileParser.compilationContext;
 
         /** @type {FileParserType} */
         enumParser.fileParser = fileParser;
