@@ -67,6 +67,7 @@ function createEditor(source, selectedText)
             return Promise.resolve(true);
         }
     };
+
     return {
         editor: editor,
         edits: edits,

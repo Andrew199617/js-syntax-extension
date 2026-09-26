@@ -1,5 +1,5 @@
 const assert = require('assert').strict;
-const { spawn } = require('child_process')
+const { spawn } = require('child_process');
 const fs = require('fs').promises;
 const operatingSystem = require('os');
 const path = require('path');

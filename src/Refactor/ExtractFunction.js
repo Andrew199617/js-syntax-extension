@@ -1,5 +1,7 @@
 const vscode = require('vscode');
 const StatusBarMessage = require('../Logging/StatusBarMessage');
+
+// Supported categories for status bar notifications.
 const StatusBarMessageTypes = require('../Logging/StatusBarMessageTypes');
 const ParseFunctionParams = require('../Parsers/TypeChecking/ParseFunctionParams');
 const parser = require('@babel/parser');

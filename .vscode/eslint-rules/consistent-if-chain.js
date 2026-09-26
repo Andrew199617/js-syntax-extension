@@ -63,7 +63,16 @@ function hasUnsafeDeclaration(body)
         return hasUnsafeDeclaration(body.consequent) || Boolean(body.alternate && hasUnsafeDeclaration(body.alternate));
     }
 
-    if(body.type === 'LabeledStatement' || body.type === 'WithStatement' || body.type === 'WhileStatement' || body.type === 'DoWhileStatement' || body.type === 'ForStatement' || body.type === 'ForInStatement' || body.type === 'ForOfStatement')
+    const wrappedStatements = [
+        'LabeledStatement',
+        'WithStatement',
+        'WhileStatement',
+        'DoWhileStatement',
+        'ForStatement',
+        'ForInStatement',
+        'ForOfStatement'
+    ];
+    if(wrappedStatements.includes(body.type))
     {
         return hasUnsafeDeclaration(body.body);
     }
@@ -78,7 +87,8 @@ function hasUnsafeDeclaration(body)
  */
 function requiresExpansion(body)
 {
-    return body.type === 'BlockStatement' || body.type === 'ReturnStatement' || body.type === 'BreakStatement' || body.type === 'ContinueStatement' || body.type === 'ThrowStatement';
+    const expandedStatements = [ 'BlockStatement', 'ReturnStatement', 'BreakStatement', 'ContinueStatement', 'ThrowStatement' ];
+    return expandedStatements.includes(body.type);
 }
 
 /**

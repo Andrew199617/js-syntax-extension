@@ -43,16 +43,18 @@ export function create(context)
 
                 const range = [ comment.range[0] - indentation.length, comment.range[1] ];
                 const original = source.text.slice(range[0], range[1]);
-                const replacement = original.split('\n').map(lineText =>
-                {
-                    if(lineText.startsWith(indentation))
+                const replacement = original.split('\n')
+                    .map(lineText =>
                     {
-                        return expected + lineText.slice(indentation.length);
-                    }
+                        if(lineText.startsWith(indentation))
+                        {
+                            return expected + lineText.slice(indentation.length);
+                        }
 
-                    return lineText;
-                })
+                        return lineText;
+                    })
                     .join('\n');
+
                 context.report({ node: comment, messageId: 'alignment', fix: fixer => fixer.replaceTextRange(range, replacement) });
             }
         }

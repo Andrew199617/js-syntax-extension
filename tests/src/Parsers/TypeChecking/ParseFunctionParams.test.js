@@ -1,44 +1,49 @@
 const ParseFunctionParams = require('../../../../src/Parsers/TypeChecking/ParseFunctionParams');
 
-describe('ParseFunctionParams', () => {
-  test('should return undefined variables correctly', () => {
-    const code = `
+describe('ParseFunctionParams', () =>
+{
+    test('should return undefined variables correctly', () =>
+    {
+        const code = `
       const a = 1;
       const b = 2;
       console.log(a + b);
       console.log(c);
     `;
-    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
-    expect(undefinedVars).toContain('c');
-    expect(undefinedVars).not.toContain('a');
-    expect(undefinedVars).not.toContain('b');
-    expect(undefinedVars).toHaveLength(1);
-  });
+        const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
+        expect(undefinedVars).toContain('c');
+        expect(undefinedVars).not.toContain('a');
+        expect(undefinedVars).not.toContain('b');
+        expect(undefinedVars).toHaveLength(1);
+    });
 
-  test('should return an empty array when no undefined variables', () => {
-    const code = `
+    test('should return an empty array when no undefined variables', () =>
+    {
+        const code = `
       const a = 1;
       const b = 2;
       console.log(a + b);
     `;
-    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
-    expect(undefinedVars).toEqual([]);
-  });
+        const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
+        expect(undefinedVars).toEqual([]);
+    });
 
-  test('should handle functions with parameters', () => {
-    const code = `
+    test('should handle functions with parameters', () =>
+    {
+        const code = `
       function test(d) {
         console.log(d + e);
       }
     `;
-    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
-    expect(undefinedVars).toContain('e');
-    expect(undefinedVars).not.toContain('d');
-    expect(undefinedVars).toHaveLength(1);
-  });
+        const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
+        expect(undefinedVars).toContain('e');
+        expect(undefinedVars).not.toContain('d');
+        expect(undefinedVars).toHaveLength(1);
+    });
 
-  test('should handle deeply nested functions up to four levels', () => {
-    const code = `
+    test('should handle deeply nested functions up to four levels', () =>
+    {
+        const code = `
       function level1(x) {
         function level2(y) {
           if (y > 0) {
@@ -57,45 +62,48 @@ describe('ParseFunctionParams', () => {
       }
       level1(a);
     `;
-    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
-    expect(undefinedVars).toContain('v');
-    expect(undefinedVars).toContain('a');
-    expect(undefinedVars).not.toContain('x');
-    expect(undefinedVars).not.toContain('y');
-    expect(undefinedVars).not.toContain('z');
-    expect(undefinedVars).not.toContain('w');
-    expect(undefinedVars).toHaveLength(2);
-  });
+        const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
+        expect(undefinedVars).toContain('v');
+        expect(undefinedVars).toContain('a');
+        expect(undefinedVars).not.toContain('x');
+        expect(undefinedVars).not.toContain('y');
+        expect(undefinedVars).not.toContain('z');
+        expect(undefinedVars).not.toContain('w');
+        expect(undefinedVars).toHaveLength(2);
+    });
 
-  test('should handle for loops with declared variables', () => {
-    const code = `
+    test('should handle for loops with declared variables', () =>
+    {
+        const code = `
       const items = [1, 2, 3];
       for (let i = 0; i < items.length; i++) {
         console.log(items[i] + j);
       }
     `;
-    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
-    expect(undefinedVars).toContain('j');
-    expect(undefinedVars).not.toContain('items');
-    expect(undefinedVars).not.toContain('i');
-    expect(undefinedVars).toHaveLength(1);
-  });
+        const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
+        expect(undefinedVars).toContain('j');
+        expect(undefinedVars).not.toContain('items');
+        expect(undefinedVars).not.toContain('i');
+        expect(undefinedVars).toHaveLength(1);
+    });
 
-  test('should handle while loops with declared variables', () => {
-    const code = `
+    test('should handle while loops with declared variables', () =>
+    {
+        const code = `
       let count = 10;
       while (count > 0) {
         console.log(count + k);
         count--;
       }
     `;
-    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
-    expect(undefinedVars).toContain('k');
-    expect(undefinedVars).not.toContain('count');
-  });
+        const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
+        expect(undefinedVars).toContain('k');
+        expect(undefinedVars).not.toContain('count');
+    });
 
-  test('should handle combined nested structures with loops', () => {
-    const code = `
+    test('should handle combined nested structures with loops', () =>
+    {
+        const code = `
       function outer(a) {
         for (let i = 0; i < a.length; i++) {
           function inner(b) {
@@ -112,13 +120,13 @@ describe('ParseFunctionParams', () => {
       }
       outer(arr);
     `;
-    const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
-    expect(undefinedVars).toContain('m');
-    expect(undefinedVars).toContain('n');
-    expect(undefinedVars).toContain('arr');
-    expect(undefinedVars).not.toContain('a');
-    expect(undefinedVars).not.toContain('i');
-    expect(undefinedVars).not.toContain('b');
-    expect(undefinedVars).toHaveLength(3);
-  });
+        const undefinedVars = ParseFunctionParams.getUndefinedVariables(code);
+        expect(undefinedVars).toContain('m');
+        expect(undefinedVars).toContain('n');
+        expect(undefinedVars).toContain('arr');
+        expect(undefinedVars).not.toContain('a');
+        expect(undefinedVars).not.toContain('i');
+        expect(undefinedVars).not.toContain('b');
+        expect(undefinedVars).toHaveLength([ 'm', 'n', 'arr' ].length);
+    });
 });

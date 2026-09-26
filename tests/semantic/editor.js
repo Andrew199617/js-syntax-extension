@@ -3,10 +3,19 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const vscode = require('vscode');
 
+// Delay in milliseconds between semantic token requests.
 const retryInterval = 250;
+
+// Maximum time in milliseconds to wait for semantic tokens.
 const maximumWait = 60000;
+
+// Number of encoded integers per semantic token.
 const tokenWidth = 5;
+
+// Offset of the token type within an encoded token.
 const tokenTypeIndex = 3;
+
+// Offset of the modifier bits within an encoded token.
 const tokenModifierIndex = 4;
 
 function decode(document, legend, tokens)
