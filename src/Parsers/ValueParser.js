@@ -1,12 +1,56 @@
 const Types = require('./Types');
 const inferExpressionType = require('./ExpressionType');
-const { parseExpression } = require('@babel/parser');
+const { parse, parseExpression } = require('@babel/parser');
 
 /** @description Value and array inference shared by file parser instances. */
 const ValueParser = {
+    /** @description Read file-level initializers from syntax, excluding comments, literals, and unrelated local scopes. */
+    parseConstants(content)
+    {
+        const values = new Map();
+        let parsedFile;
+        try
+        {
+            parsedFile = parse(content, { sourceType: 'unambiguous', plugins: ['jsx'] });
+        }
+        catch
+        {
+            return values;
+        }
+
+        for(const statement of parsedFile.program.body)
+        {
+            const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+            if(declaration?.type !== 'VariableDeclaration')
+            {
+                continue;
+            }
+
+            for(const variable of declaration.declarations)
+            {
+                if(variable.id.type === 'Identifier' && variable.init)
+                {
+                    values.set(variable.id.name, content.slice(variable.init.start, variable.init.end));
+                }
+            }
+        }
+
+        return values;
+    },
+
     /** @description Resolves constant aliases without recursing or following a cycle. */
     resolveConstant(value, content)
     {
+        if(!(/^[A-Z][A-Z0-9_]*$/).test(value))
+        {
+            return value;
+        }
+
+        if(this.constantCache?.source !== content)
+        {
+            this.constantCache = { source: content, values: ValueParser.parseConstants(content) };
+        }
+
         const visited = new Set();
         while((/^[A-Z][A-Z0-9_]*$/).test(value))
         {
@@ -16,14 +60,13 @@ const ValueParser = {
             }
 
             visited.add(value);
-            const constantRegex = new RegExp(`(?:const|let|var)\\s+${value}\\s*=\\s*(?<assignedValue>.*?)(?:;|$)`, 'm');
-            const constantMatch = constantRegex.exec(content);
-            if(!constantMatch?.groups?.assignedValue)
+            const assignedValue = this.constantCache.values.get(value);
+            if(!assignedValue)
             {
                 break;
             }
 
-            value = constantMatch.groups.assignedValue.trim();
+            value = assignedValue.trim();
         }
 
         return value;
@@ -113,7 +156,7 @@ const ValueParser = {
             return null;
         }
 
-        const normalizedValue = ValueParser.resolveConstant(value.trim(), this.content || '');
+        const normalizedValue = ValueParser.resolveConstant.call(this, value.trim(), this.content || '');
         if(normalizedValue === null)
         {
             return Types.ANY;

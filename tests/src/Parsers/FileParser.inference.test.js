@@ -131,6 +131,36 @@ test.each([ '(value = 2 + 3)', 'value = 2 + 3' ])('accepts parameter lists with 
     expect(await parser.functionParser.parseFunctionParams(parameters, {})).toBe('(value: number)');
 });
 
+test.each([
+    [ undefined, 'any[]' ],
+    [ 'number', 'number[]' ],
+    [ 'number[]', 'number[]' ],
+    [ 'Array<number>', 'Array<number>' ],
+    [ 'ReadonlyArray<number>', 'ReadonlyArray<number>' ],
+    [ '[number, string]', '[number, string]' ],
+    [ 'readonly number[]', 'readonly number[]' ],
+    [ 'keyof number[]', '(keyof number[])[]' ],
+    [ '() => void', '(() => void)[]' ],
+    [ 'number | string', '(number | string)[]' ],
+    [ 'number | string[]', '(number | string[])[]' ],
+    [ 'number[] | string[]', 'number[] | string[]' ],
+    [ '...number', 'number[]' ]
+])('emits a valid rest parameter using its JSDoc name and type: %s', async (annotation, expected) =>
+{
+    const commentParams = { values: annotation };
+    expect(await parser.functionParser.parseFunctionParams('prefix = "x", ...values', commentParams)).toBe(`(prefix: string, ...values: ${expected})`);
+});
+
+test.each([ 'number', 'number[]' ])('preserves documented rest parameters in generated declarations: %s', async annotation =>
+{
+    const source = `const Example = {
+  /** @param {${annotation}} values */
+  result(...values) {
+  }
+};`;
+    expect(await parser.parse('', source)).toContain('result(...values: number[]): void;');
+});
+
 describe.each([
     [ '[1, 2]', 'number[]' ],
     [ '[1, 2]  ', 'number[]' ],

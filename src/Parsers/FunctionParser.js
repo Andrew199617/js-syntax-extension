@@ -91,6 +91,56 @@ const FunctionParser = {
         }
     },
 
+    /** @description Recognizes array-shaped TypeScript annotations without changing their element types. */
+    isArrayType(annotation)
+    {
+        switch(annotation.type)
+        {
+            case 'TSArrayType':
+            case 'TSTupleType':
+                return true;
+            case 'TSTypeReference':
+                return [ 'Array', 'ReadonlyArray' ].includes(annotation.typeName.name);
+            case 'TSParenthesizedType':
+                return this.isArrayType(annotation.typeAnnotation);
+            case 'TSTypeOperator':
+                return annotation.operator === 'readonly' && this.isArrayType(annotation.typeAnnotation);
+            case 'TSUnionType':
+                return annotation.types.every(type => this.isArrayType(type));
+            case 'TSIntersectionType':
+                return annotation.types.some(type => this.isArrayType(type));
+            default:
+                return false;
+        }
+    },
+
+    /** @description Rest parameters need an array or tuple, including when JSDoc specifies an element type. */
+    getRestParameterType(type)
+    {
+        type = type.trim().replace(/^\.\.\./, '').trim();
+        let annotation;
+        try
+        {
+            annotation = parseExpression(`value as ${type}`, { plugins: ['typescript'] }).typeAnnotation;
+        }
+        catch
+        {
+            return 'any[]';
+        }
+
+        if(this.isArrayType(annotation))
+        {
+            return type;
+        }
+
+        if([ 'TSUnionType', 'TSIntersectionType', 'TSFunctionType', 'TSConstructorType', 'TSConditionalType', 'TSTypeOperator' ].includes(annotation.type))
+        {
+            return `(${type})[]`;
+        }
+
+        return `${type}[]`;
+    },
+
     /**
      * Parse the function paramaters.
      * @param {string} params
@@ -119,16 +169,23 @@ const FunctionParser = {
                 continue;
             }
 
-            let type = commentParams[variables[i]];
+            let parameter = variables[i];
+            const isRest = parameter.startsWith('...');
+            if(isRest)
+            {
+                parameter = parameter.slice('...'.length).trim();
+            }
+
+            let type = commentParams[parameter];
 
             // The type gotten from the default value.
             let parsedType = null;
-            const assignmentIndex = variables[i].indexOf('=');
+            const assignmentIndex = parameter.indexOf('=');
             if(assignmentIndex !== -1)
             {
-                const defaultValue = variables[i].slice(assignmentIndex + 1).trim();
-                variables[i] = variables[i].slice(0, assignmentIndex).trim();
-                type = commentParams[variables[i]];
+                const defaultValue = parameter.slice(assignmentIndex + 1).trim();
+                parameter = parameter.slice(0, assignmentIndex).trim();
+                type = commentParams[parameter];
 
                 if(!type)
                 {
@@ -136,7 +193,14 @@ const FunctionParser = {
                 }
             }
 
-            functionCall += `${variables[i]}: ${type || parsedType || 'any'}${i < variables.length - 1 ? ', ' : ''}`;
+            let parameterType = type || parsedType || 'any';
+            if(isRest)
+            {
+                parameter = `...${parameter}`;
+                parameterType = this.getRestParameterType(parameterType);
+            }
+
+            functionCall += `${parameter}: ${parameterType}${i < variables.length - 1 ? ', ' : ''}`;
         }
 
         functionCall += ')';

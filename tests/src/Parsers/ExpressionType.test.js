@@ -126,6 +126,35 @@ test('constant resolution keeps independent and repeated aliases usable', async 
     expect(await Promise.all([ parser.parseValue('A'), parser.parseValue('B'), parser.parseValue('A') ])).toEqual([ 'number', 'number', 'number' ]);
 });
 
+test.each([
+    [ '// const A = "text";\nconst A = 1;', 'number' ],
+    [ '/* const A = "text"; */\nconst A = 1;', 'number' ],
+    [ 'const text = "const A = false;"; const A = 1;', 'number' ],
+    [ 'const text = `const A = false;`; const A = 1;', 'number' ],
+    [ 'const text = /const A = false;/; const A = 1;', 'number' ],
+    [ 'const A = "text; with semicolon";', 'string' ],
+    [ 'const A =\n  Math.PI * 2;', 'number' ],
+    [ 'export const A = B, B = 1;', 'number' ],
+    [ 'const markup = <span>const A = false;</span>; const A = 1;', 'number' ],
+    [ 'function inner() { const A = "text"; } const A = 1;', 'number' ],
+    [ '/* const A = 1; */', 'any' ],
+    [ 'const text = "const A = 1;";', 'any' ],
+    [ 'const A = 1; function unfinished(', 'any' ]
+])('constant lookup uses source declarations rather than text: %s', async (source, expected) =>
+{
+    parser.content = source;
+    expect(await parser.parseValue('A')).toBe(expected);
+});
+
+test('constant declarations refresh when the parser receives different source', async () =>
+{
+    const currentParser = parser;
+    currentParser.content = 'const A = 1;';
+    expect(await currentParser.parseValue('A')).toBe('number');
+    currentParser.content = 'const A = "text";';
+    expect(await currentParser.parseValue('A')).toBe('string');
+});
+
 test('propagates inferred values to array elements and function return declarations', async () =>
 {
     expect(await parser.parseArray('null + 1, true + 1')).toBe('number[]');
