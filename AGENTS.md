@@ -5,6 +5,12 @@
 - `README.md` is displayed to users of the VS Code extension. Keep it focused on extension features and usage; do not add developer setup, linting, testing, build instructions, or internal implementation details.
 - Put developer and agent guidance in `AGENTS.md` or separate developer documentation.
 
+## Parser regression fixtures
+
+- Preserve `tests/mocks/`, including expected `.d.ts` outputs, during linting and formatting cleanup. Edit or regenerate fixtures only when intentionally changing the tested behavior.
+- Do not change parser acceptance, generated output, or parser-test `tabSize` to accommodate linting or formatting changes.
+- Keep `tests/mocks/`, `tests/__mocks__/`, and generated `.d.ts` files excluded from ESLint and autofix.
+
 ## File encoding and line endings
 
 - Save new text files with CRLF line endings and UTF-8 encoding without a BOM. Preserve an existing file's encoding and BOM when editing it.
