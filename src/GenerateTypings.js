@@ -51,6 +51,7 @@ const GenerateTypings = {
         const logger = Logger.create(lgd.logger._fileName);
         generateTypings.compilationContext = {
             document: document,
+            source: null,
             diagnostics: [],
             diagnosticCollection: lgdDiagnosticCollection,
             logger: logger,
@@ -109,6 +110,7 @@ const GenerateTypings = {
      */
     async parseFile(content)
     {
+        this.compilationContext.source = content;
         const fileParser = FileParser.create(this.compilationContext);
         const classParser = ClassParser.create(this.compilationContext);
         const functionComponentParser = FunctionComponentParser.create(this.compilationContext);
