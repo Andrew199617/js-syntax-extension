@@ -8,6 +8,8 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 - Fix generated array types when elements contain commas inside strings, template literals, function parameters, or calls.
 - Handle trailing commas and repeated element types correctly, and use `any[]` for incomplete array syntax or unresolved spreads.
+- Generate valid array types for rest parameters and preserve their JSDoc annotations.
+- Ignore declarations inside comments and strings when inferring types from constants.
 
 # 2.7.10
 
