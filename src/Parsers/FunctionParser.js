@@ -1,4 +1,5 @@
 const StaticAccessorCheck = require('../Checks/StaticAccessorCheck');
+const { parseExpression } = require('@babel/parser');
 
 /**
  * @description Class that handles parsing a Function.
@@ -76,9 +77,18 @@ const FunctionParser = {
      */
     splitFunctionParams(params)
     {
-    // Split parameters while keeping object defaults together.
-        const regex = /\w+\s*=\s*[a-zA-Z0-9]+(?:,|)|\w+\s*=\s*\{[^}]+\}|\w+/g;
-        return params.match(regex) || [];
+        const source = `(${params}) => {}`;
+        try
+        {
+            const parsedFunction = parseExpression(source);
+            return parsedFunction.params.map(parameter => source.slice(parameter.start, parameter.end));
+        }
+        catch
+        {
+            // Preserve the existing recovery behavior for incomplete parameter lists.
+            const regex = /\w+\s*=\s*[a-zA-Z0-9]+(?:,|)|\w+\s*=\s*\{[^}]+\}|\w+/g;
+            return params.match(regex) || [];
+        }
     },
 
     /**
@@ -94,8 +104,13 @@ const FunctionParser = {
 
         let functionCall = '(';
 
-        let variables = params.replace('(', '').replace(')', '');
-        variables = this.splitFunctionParams(variables);
+        let parameterList = params.trim();
+        if(parameterList.startsWith('(') && parameterList.endsWith(')'))
+        {
+            parameterList = parameterList.slice(1, -1);
+        }
+
+        const variables = this.splitFunctionParams(parameterList);
 
         for(let i = 0; i < variables.length; ++i)
         {
@@ -108,16 +123,15 @@ const FunctionParser = {
 
             // The type gotten from the default value.
             let parsedType = null;
-            if(variables[i].includes('='))
+            const assignmentIndex = variables[i].indexOf('=');
+            if(assignmentIndex !== -1)
             {
-                const expr = variables[i].split('=').map(val => val.trim());
-
-                variables[i] = expr[0];
+                const defaultValue = variables[i].slice(assignmentIndex + 1).trim();
+                variables[i] = variables[i].slice(0, assignmentIndex).trim();
                 type = commentParams[variables[i]];
 
                 if(!type)
                 {
-                    const defaultValue = expr[1];
                     parsedType = await this.parseValue(defaultValue);
                 }
             }
