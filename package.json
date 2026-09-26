@@ -5,6 +5,7 @@
     "icon": "LGDLogo.png",
     "scripts": {
         "test": "jest --config ./tests/jest.config.js",
+        "build": "webpack --mode development --devtool source-map",
         "vscode:prepublish": "npm run package",
         "package": "webpack --mode production --devtool hidden-source-map"
     },

@@ -7,10 +7,24 @@
     "configurations": [
 
         {
-            "name": "Extension",
+            "name": "Extension (Debug)",
             "type": "extensionHost",
             "request": "launch",
-            "preLaunchTask": "Build extension",
+            "preLaunchTask": "Build extension (Debug)",
+            "runtimeExecutable": "${execPath}",
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/dist/**/*.js"
+            ],
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/dist"
+            ]
+        },
+        {
+            "name": "Extension (Production)",
+            "type": "extensionHost",
+            "request": "launch",
+            "preLaunchTask": "Build extension (Production)",
             "runtimeExecutable": "${execPath}",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}/dist"

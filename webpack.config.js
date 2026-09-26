@@ -93,9 +93,6 @@ const extensionOutput = {
 /** @type {Configuration} */
 const config = {
     target: 'node',
-    optimization: {
-        minimize: true
-    },
     entry: './src/LGD.js',
     output: {
         path: path.resolve(__dirname, path.dirname(extensionManifest.main)),
