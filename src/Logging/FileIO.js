@@ -1,93 +1,60 @@
 const path = require('path');
-const vscode = require('vscode');
-const fs = require('fs');
+const fs = require('fs').promises;
 
-/**
-* @description
-* @type {FileIOType}
-* @static
-*/
+/** @description File operations used when writing and moving generated declarations. */
 const FileIO = {
-  writeFileContents(filepath, content) {
-    return new Promise((resolve, reject) => {
-      const write = err => {
-        if(err) {
-          return reject(err);
+    async writeFileContents(filepath, content)
+    {
+        await fs.mkdir(path.dirname(filepath), { recursive: true });
+        await fs.writeFile(filepath, content);
+    },
+
+    async mkdirRecursive(fullDir, callback)
+    {
+        try
+        {
+            await fs.mkdir(fullDir, { recursive: true });
+        }
+        catch(error)
+        {
+            callback(error);
+            return;
         }
 
-        fs.writeFile(filepath, content, err => {
-          if(err) {
-            reject(err);
-          }
-          else {
-            resolve();
-          }
-        });
-      };
+        callback();
+    },
 
-      const dir = path.dirname(filepath);
-      fs.existsSync(dir) ? write(null) : FileIO.mkdirRecursive(dir, write);
-    });
-  },
-
-  async mkdirRecursive(fullDir, callback) {
-    let dirs = fullDir.replace(`${vscode.workspace.rootPath}\\`, '');
-    dirs = dirs.split(/\\/)
-      .map((dir, index, array) => {
-        let subDir = '';
-        for(let i = 0; i < index; ++i) {
-          subDir += `${array[i]}\\`;
+    /** @description Moves a declaration and removes its old directory if it is empty. */
+    async rename(oldPath, newPath, callback)
+    {
+        try
+        {
+            await fs.mkdir(path.dirname(newPath), { recursive: true });
+            await fs.rename(oldPath, newPath);
+        }
+        catch(error)
+        {
+            callback(error);
+            return;
         }
 
-        return `${vscode.workspace.rootPath}\\${subDir}${dir}`;
-      });
+        const oldDir = path.dirname(oldPath);
+        try
+        {
+            const files = await fs.readdir(oldDir);
+            if(!files.length)
+            {
+                await fs.rmdir(oldDir);
+                console.log(`LGD: Removed Old Dir ${oldDir}`);
+            }
+        }
+        catch(error)
+        {
+            console.error(error);
+        }
 
-    for(let currentDir = 0; currentDir < dirs.length; currentDir++) {
-      if(!fs.existsSync(dirs[currentDir])) {
-        await fs.mkdir(dirs[currentDir], { recursive: true }, err => {
-          throw err;
-        });
-      }
+        callback();
     }
-
-    callback();
-  },
-
-  /**
-  * @description Make sure the new path dir exists and then rename.
-  * Cleans up old dir if it has no files.
-  */
-  async rename(oldPath, newPath, callback) {
-    const dir = path.dirname(newPath);
-    const oldDir = path.dirname(oldPath);
-
-    const renamed = () => {
-      fs.readdir(oldDir, (err, files) => {
-        if(err) {
-          // some sort of error
-          console.error(err);
-        }
-        else if(!files.length) {
-          fs.rmdir(oldDir, () => {
-            console.log(`LGD: Removed Old Dir ${oldDir}`);
-          });
-        }
-      });
-
-      callback();
-    };
-
-    fs.exists(dir, exists => {
-      if(!exists) {
-        FileIO.mkdirRecursive(dir, () => {
-          fs.rename(oldPath, newPath, renamed);
-        });
-      }
-      else {
-        fs.rename(oldPath, newPath, renamed);
-      }
-    });
-  }
 };
 
 module.exports = FileIO;
