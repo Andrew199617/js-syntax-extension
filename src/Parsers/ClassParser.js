@@ -31,7 +31,8 @@ const ClassParser = {
         return classParser;
     },
 
-    checkForThisInCreate()
+    /** @description Class constructors allow this, so no diagnostic is needed. */
+    reportInvalidThisUsageInCreate()
     {
 
     },

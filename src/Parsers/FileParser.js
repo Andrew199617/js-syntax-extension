@@ -7,8 +7,9 @@ const Types = require('./Types');
 
 const EnumParser = require('./EnumParser');
 const FunctionParser = require('./FunctionParser');
+const hasDirectInstanceReturn = require('./HasDirectInstanceReturn');
 
-const checkForThisInConstructor = require('../Checks/CheckForThisInConstructor');
+const reportInvalidThisUsageInCreate = require('../Checks/ReportInvalidThisUsageInCreate');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
 
 // Method that initializes instances in this parser.
@@ -284,16 +285,16 @@ const FileParser = {
     },
 
     /**
-     * @description returns the class name.
+     * @description Returns the instance variable name, or null for a directly returned instance.
      * @param {string} insideFunction
-     * @returns {string}
+     * @returns {string | null}
      */
     getClassInCreate(insideFunction)
     {
-        const classNameRegex = /(?<varType>const|let|var) (?<name>\w+?)\s*=\s*(?<object>Object|Oloo)\.(?<creationWay>create|assign|assignSlow|createSlow)\s*?\(/ms;
+        const classNameRegex = /(?<varType>const|let|var) (?<name>\w+?)\s*=\s*(?<object>Object|Oloo)\.(?<creationWay>create|assign|assignSlow|createSlow)\s*?\(/;
         const className = classNameRegex.exec(insideFunction);
 
-        if((!className || !className.groups.name) && !this.isReactComponent)
+        if(!className && !this.isReactComponent && !hasDirectInstanceReturn(insideFunction))
         {
             VscodeError.create('LGD: Could not find class instance in create method. Are you creating the instance properly.', this.beginLine, 0, this.endLine, 0, ErrorTypes.ERROR)
                 .notifyUser(this);
@@ -303,12 +304,12 @@ const FileParser = {
     },
 
     /**
-     * @description notify the user if they use Create incorrectly.
-     * @param {string} insideFunction the inside of the create() funciton.
+     * @description Report invalid use of this in the create method.
+     * @param {string} insideFunction The body of the create method.
      */
-    checkForThisInCreate(insideFunction)
+    reportInvalidThisUsageInCreate(insideFunction)
     {
-        checkForThisInConstructor.bind(this)(insideFunction);
+        reportInvalidThisUsageInCreate.bind(this)(insideFunction);
     },
 
     /**
@@ -412,21 +413,21 @@ const FileParser = {
         this.tabSize += this.defaultTabSize;
         let className = this.getClassInCreate(insideFunction);
 
+        if(!this.isReactComponent)
+        {
+            this.reportInvalidThisUsageInCreate(insideFunction);
+        }
+
         if(!className)
         {
             if(!this.isReactComponent)
             {
-                return;
+                this.tabSize -= this.defaultTabSize;
+                return '';
             }
 
-            // This check does not distinguish mixed use of this and className.
-            // Don't be greedy.
+            // React components can initialize properties directly on this.
             className = 'this';
-        }
-
-        if(!this.isReactComponent)
-        {
-            this.checkForThisInCreate(insideFunction);
         }
 
         const tab = `\\s{${this.tabSize}}`;

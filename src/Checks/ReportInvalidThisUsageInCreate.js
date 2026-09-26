@@ -2,11 +2,11 @@ const VscodeError = require('../Errors/VscodeError');
 const ErrorTypes = require('../Errors/ErrorTypes');
 
 /**
- * @description Check the create method for use of this since that is incorrect way to initialize object literal.
+ * @description Report invalid use of this in an object-literal create method.
  * @this {FileParserType}
- * @param {string} insideFunction inside the constructor function. contents of create() or constructor().
+ * @param {string} insideFunction The body of the create method.
  */
-function checkForThisInConstructor(insideFunction)
+function reportInvalidThisUsageInCreate(insideFunction)
 {
     const thisKeywordRegex = new RegExp(`(?<this>^\\s{${this.tabSize}}this\\.\\w+)`, 'gm');
     let test;
@@ -31,4 +31,4 @@ function checkForThisInConstructor(insideFunction)
     this.endLine = oldEndLine;
 }
 
-module.exports = checkForThisInConstructor;
+module.exports = reportInvalidThisUsageInCreate;

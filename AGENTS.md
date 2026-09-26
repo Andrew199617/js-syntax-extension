@@ -23,6 +23,7 @@
 - Use ordinary conditionals instead of nested ternaries. Keep distinct operations on separate lines and use explicit object properties when mapping a small, fixed set of settings.
 - Do not address a readability complaint by only wrapping the same dense expression across more lines. Simplify the structure.
 - Use named regex captures and `match.groups`; use `(?:...)` for non-capturing groups.
+- Preserve descriptive named captures when they improve regex readability, even if their values are not used. Do not replace them with non-capturing groups solely because they are unused.
 
 Also follow the established project conventions in `.github/instructions/default.instructions.md`.
 # JSDoc formatting
