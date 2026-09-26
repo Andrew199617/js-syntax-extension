@@ -1,6 +1,15 @@
 const { parse } = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 
+/** @description Limit retained method bodies across files and successive edits. */
+const MAX_CACHE_ENTRIES = 100;
+
+/** @description Avoid retaining unusually large method bodies in the shared cache. */
+const MAX_CACHED_BODY_LENGTH = 100000;
+
+/** @description Cache boolean results by exact method text; syntax trees are not retained. */
+const instanceReturnCache = new Map();
+
 /** @description Recognizes calls to the instance creation methods supported by the object parser. */
 function isInstanceCreation(expression)
 {
@@ -30,7 +39,7 @@ function isInstanceCreation(expression)
  * @param {string} insideFunction The body of the create method.
  * @returns {boolean} Whether the method directly returns an instance creation call.
  */
-function hasDirectInstanceReturn(insideFunction)
+function parseDirectInstanceReturn(insideFunction)
 {
     const parseOptions = {
         allowReturnOutsideFunction: true,
@@ -64,6 +73,30 @@ function hasDirectInstanceReturn(insideFunction)
         }
     };
     traverse(parsedBody, returnVisitor);
+    return foundInstanceReturn;
+}
+
+/** @description Reuse results for unchanged method bodies, evicting the oldest entry when the cache is full. */
+function hasDirectInstanceReturn(insideFunction)
+{
+    if(instanceReturnCache.has(insideFunction))
+    {
+        return instanceReturnCache.get(insideFunction);
+    }
+
+    const foundInstanceReturn = parseDirectInstanceReturn(insideFunction);
+    if(insideFunction.length > MAX_CACHED_BODY_LENGTH)
+    {
+        return foundInstanceReturn;
+    }
+
+    if(instanceReturnCache.size >= MAX_CACHE_ENTRIES)
+    {
+        const oldestBody = instanceReturnCache.keys().next().value;
+        instanceReturnCache.delete(oldestBody);
+    }
+
+    instanceReturnCache.set(insideFunction, foundInstanceReturn);
     return foundInstanceReturn;
 }
 

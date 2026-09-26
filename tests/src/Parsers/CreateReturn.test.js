@@ -1,5 +1,13 @@
 const FileParser = require('../../../src/Parsers/FileParser');
 const VscodeError = require('../../../src/Errors/VscodeError');
+const hasDirectInstanceReturn = require('../../../src/Parsers/HasDirectInstanceReturn');
+const babelParser = require('@babel/parser');
+
+jest.mock('@babel/parser', () =>
+{
+    const actualParser = jest.requireActual('@babel/parser');
+    return { ...actualParser, parse: jest.fn(actualParser.parse) };
+});
 
 beforeEach(() =>
 {
@@ -131,5 +139,56 @@ const AnotherCommand = {
         expect(VscodeError.create).toHaveBeenCalledTimes(1);
         expect(VscodeError.create.mock.calls[0][0]).toContain("Don't use 'this' in create method");
         expect(fileParser.errorOccurred).toBe(true);
+    });
+});
+
+describe('Direct instance return cache', () =>
+{
+    test.each([
+        [ 'return Object.create(CachedCommand);', true ],
+        [ 'return CachedCommand;', false ],
+        [ 'return Object.create(CachedCommand', false ]
+    ])('parses unchanged text only once: %s', (body, expected) =>
+    {
+        expect(hasDirectInstanceReturn(body)).toBe(expected);
+        expect(hasDirectInstanceReturn(body)).toBe(expected);
+        expect(babelParser.parse).toHaveBeenCalledTimes(1);
+    });
+
+    test('reparses edited text without reusing its previous result', () =>
+    {
+        const originalBody = 'return Object.create(EditedCommand);';
+        const editedBody = 'return\nObject.create(EditedCommand);';
+
+        expect(hasDirectInstanceReturn(originalBody)).toBe(true);
+        expect(hasDirectInstanceReturn(editedBody)).toBe(false);
+        expect(hasDirectInstanceReturn(originalBody)).toBe(true);
+        expect(babelParser.parse).toHaveBeenCalledTimes(2);
+    });
+
+    test('evicts old results after many distinct edits', () =>
+    {
+        const originalBody = 'return Object.create(EvictedCommand);';
+        const editCount = 1000;
+        expect(hasDirectInstanceReturn(originalBody)).toBe(true);
+
+        for(let index = 0; index < editCount; index++)
+        {
+            hasDirectInstanceReturn(`return Object.create(Command${index});`);
+        }
+
+        expect(hasDirectInstanceReturn(originalBody)).toBe(true);
+        const originalParses = babelParser.parse.mock.calls.filter(([source]) => source === originalBody);
+        expect(originalParses).toHaveLength(2);
+    });
+
+    test('parses very large bodies without retaining them', () =>
+    {
+        const commentLength = 1000000;
+        const body = `/* ${'x'.repeat(commentLength)} */ return Object.create(LargeCommand);`;
+
+        expect(hasDirectInstanceReturn(body)).toBe(true);
+        expect(hasDirectInstanceReturn(body)).toBe(true);
+        expect(babelParser.parse).toHaveBeenCalledTimes(2);
     });
 });
