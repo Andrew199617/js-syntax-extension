@@ -139,8 +139,7 @@ function init(modules)
             proxy.getEncodedSemanticClassifications = (...args) =>
             {
                 const result = service.getEncodedSemanticClassifications(...args);
-                if(args[2] !== typescript.SemanticClassificationFormat.TwentyTwenty || args[2] !== '2020')
-                {
+                if(args[2] !== typescript.SemanticClassificationFormat.TwentyTwenty && args[2] !== '2020')
                     return result;
                 }
 
