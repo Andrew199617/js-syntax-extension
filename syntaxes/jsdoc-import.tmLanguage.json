@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "JSDoc import declarations",
+  "scopeName": "source.lgd.jsdoc-import",
+  "injectionSelector": "L:source.js comment.block.documentation, L:source.js.jsx comment.block.documentation",
+  "patterns": [
+    {
+      "name": "meta.import.jsdoc",
+      "begin": "((@)import)\\b",
+      "beginCaptures": {
+        "1": { "name": "storage.type.class.jsdoc" },
+        "2": { "name": "punctuation.definition.block.tag.jsdoc" }
+      },
+      "end": "(?=\\*/|@[[:alpha:]])|(?<=[\"'])|;",
+      "endCaptures": {
+        "0": { "name": "punctuation.terminator.statement.js" }
+      },
+      "patterns": [
+        {
+          "match": "^[ \\t]*\\*(?!/)",
+          "name": "punctuation.definition.comment.js"
+        },
+        {
+          "begin": "'",
+          "end": "'|(?=\\*/|$)",
+          "name": "string.quoted.single.js",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.js" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.js" } },
+          "patterns": [{ "match": "\\\\(?!\\*/).", "name": "constant.character.escape.js" }]
+        },
+        {
+          "begin": "\"",
+          "end": "\"|(?=\\*/|$)",
+          "name": "string.quoted.double.js",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.js" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.js" } },
+          "patterns": [{ "match": "\\\\(?!\\*/).", "name": "constant.character.escape.js" }]
+        },
+        { "match": "\\bfrom\\b", "name": "keyword.control.from.js" },
+        { "match": "\\bas\\b", "name": "keyword.control.as.js" },
+        { "match": "\\bdefault\\b", "name": "keyword.control.default.js" },
+        { "match": "[{}]", "name": "punctuation.definition.block.js" },
+        { "match": ",", "name": "punctuation.separator.comma.js" },
+        { "match": "\\*(?!/)", "name": "constant.language.import-export-all.js" },
+        { "match": "[_$[:alpha:]][_$[:alnum:]]*", "name": "variable.other.readwrite.alias.js" }
+      ]
+    }
+  ]
+}

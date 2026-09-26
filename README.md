@@ -39,6 +39,18 @@
 
 # Features
 
+## JSDoc import highlighting
+
+JSDoc imports such as `/** @import { Node as AstNode } from 'estree' */` now highlight imported names, aliases, `as`/`from`, and module strings using normal import theme scopes. Supports JavaScript and JSX, including multiline, default and namespace imports. Reload VS Code after installing the updated VSIX. Colors follow your theme; no settings changes are needed for this syntax rule.
+
+## Callback parameter semantic highlighting
+
+If a function-valued `@param` has the wrong color, add `parameter:javascript` to your existing `editor.semanticTokenColorCustomizations.rules`, using your preferred parameter color:
+
+```jsonc
+"parameter:javascript": "#9CDCFE"
+```
+
 ## Compile .js file into .ts file automagically. Read below to use!
 
 Search for commands under LGD ctrl+shift+P. You can call the command "Compile js file into ts file" or turn generateTypings setting to true.
@@ -153,8 +165,8 @@ declare interface TestProps {
 
 ``` json
 {
-  // new in vscode, this will overwrite the syntax highlighting of this extension.
-  "editor.semanticHighlighting.enabled": false,
+  // Required for callback parameter semantic highlighting.
+  "editor.semanticHighlighting.enabled": true,
 
   "lgd.options": {
 

@@ -1,6 +1,7 @@
 .vscode/**
 .vscode-test/**
 .gitignore
+AGENTS.md
 vsc-extension-quickstart.md
 
 typings/
@@ -8,7 +9,13 @@ tests/
 coverage/
 .github/
 src/
-node_modules/
+node_modules/**
+!node_modules/lgd-callback-parameter-highlighting/index.js
+!node_modules/lgd-callback-parameter-highlighting/package.json
+**/*.vsix
+**/*.map
+artifacts/**
+**/*.log
 
 webpack.config.js
 eslint.config.js

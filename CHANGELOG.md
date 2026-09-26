@@ -4,6 +4,12 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.10
+
+- Highlight JSDoc `@import` names, aliases, keywords and module paths in JavaScript and JSX.
+
+- Correct JavaScript and JSX callback parameter semantic highlighting through a bundled TypeScript language-service plugin. Preserve function/method highlighting and keep semantic highlighting enabled.
+
 # 2.7.0+
 
 - Added invert if quick action refactor.

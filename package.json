@@ -13,7 +13,7 @@
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS/React/Next.js files. This extension is for someone who prefers using vanilla Javascript with jsdoc over TypeScript. Generate Typings for JavaScript project in seconds. Supports React, Next.js, and vanilla JS.",
-    "version": "2.7.9",
+    "version": "2.7.10",
     "engines": {
         "node": "20.18.0",
         "vscode": "^1.44.0"
@@ -41,6 +41,16 @@
     ],
     "main": "./dist/extension.js",
     "contributes": {
+        "typescriptServerPlugins": [
+            {
+                "name": "lgd-callback-parameter-highlighting",
+                "enableForWorkspaceTypeScriptVersions": true,
+                "languages": [
+                    "javascript",
+                    "javascriptreact"
+                ]
+            }
+        ],
         "commands": [
             {
                 "command": "lgd.generateTypings",
@@ -109,6 +119,14 @@
         },
         "grammars": [
             {
+                "scopeName": "source.lgd.jsdoc-import",
+                "injectTo": [
+                    "source.js",
+                    "source.js.jsx"
+                ],
+                "path": "./syntaxes/jsdoc-import.tmLanguage.json"
+            },
+            {
                 "scopeName": "source.lgd.js",
                 "injectTo": [
                     "source.js"
@@ -156,12 +174,23 @@
         "@babel/eslint-parser": "^7.25.9",
         "@types/jest": "^26.0.4",
         "@types/vscode": "^1.44.0",
+        "@vscode/vsce": "3.6.2",
         "babel-eslint": "^10.0.3",
         "babel-plugin-module-resolver": "^5.0.2",
-        "eslint": "9.14.0",
+        "eslint": "8.57.1",
+        "eslint-plugin-html": "8.2.1",
         "eslint-plugin-jest": "^28.9.0",
+        "eslint-plugin-jsdoc": "50.8.0",
+        "eslint-plugin-promise": "7.3.0",
+        "eslint-plugin-react": "7.37.5",
+        "espree": "10.4.0",
         "jest": "^25.2.2",
+        "typescript-test-5-0": "npm:typescript@5.0.4",
+        "typescript-test-5-9": "npm:typescript@5.9.3",
+        "typescript-test-6-0": "npm:typescript@6.0.3",
         "vscode": "^1.1.0",
+        "vscode-oniguruma": "2.0.1",
+        "vscode-textmate": "9.3.2",
         "webpack": "^5.96.1",
         "webpack-cli": "^5.1.4"
     },

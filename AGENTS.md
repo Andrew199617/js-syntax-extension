@@ -1,0 +1,29 @@
+# Code readability
+
+## File encoding and line endings
+
+- Save new text files with CRLF line endings and UTF-8 encoding without a BOM. Preserve an existing file's encoding and BOM when editing it.
+- Keep edited text files in CRLF; do not leave LF-only or mixed line endings after applying patches. Check the final bytes before finishing so saving in the editor does not rewrite the entire file.
+
+## General guidelines
+- Prefer straightforward code that can be read once over compact code that saves lines.
+- For small, fixed sets of commands or actions, prefer explicit registration calls over building arrays of command/callback tuples and immediately iterating over them.
+- Extract repeated error handling and disposal into a named helper. Give substantial callbacks and configuration objects meaningful names before passing them to another function.
+- Use ordinary conditionals instead of nested ternaries. Keep distinct operations on separate lines and use explicit object properties when mapping a small, fixed set of settings.
+- Do not address a readability complaint by only wrapping the same dense expression across more lines. Simplify the structure.
+- Use named regex captures and `match.groups`; use `(?:...)` for non-capturing groups.
+
+Also follow the established project conventions in `.github/instructions/default.instructions.md`.
+# JSDoc formatting
+
+- Use top-level JSDoc `@import` declarations for types from other modules; do not use inline `import()` types or imported `@typedef` aliases.
+
+- Keep short JSDoc with at most one `@` tag on one line, including typedef aliases. With multiple tags, put `/**`, each tag, and `*/` on separate lines, with no blank lines between tags.
+
+## ESLint verification after edits
+
+- After creating or editing any JavaScript file, run ESLint on that file. Repeat the check after subsequent edits and autofixes; the final saved version must be checked before reporting completion.
+- Use the project's full ESLint configuration in `.vscode/.eslintrc.json`, the custom rules in `.vscode/eslint-rules`, and the `espree` parser with `ecmaVersion: "latest"` as configured in `.vscode/settings.json`. Resolve configuration and rule paths in the workspace being edited, including isolated feature workspaces.
+- Review both errors and warnings. Fix violations introduced by your changes, including restricted identifiers such as `data` and `foo` (`id-blacklist`); choose descriptive names and update their references without changing external API field names.
+- Do not disable rules or add suppression comments to avoid fixing violations. Report any remaining pre-existing diagnostics or blocked checks explicitly; do not claim ESLint passed when it did not.
+- Editor format-on-save and passing tests do not replace an explicit ESLint check. In the final response, state which edited files were checked and whether any diagnostics remain.
