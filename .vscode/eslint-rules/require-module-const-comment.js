@@ -1,12 +1,35 @@
 /** @import { Rule } from 'eslint' */
+/** @import { VariableDeclarator } from 'estree' */
 
 /** @description Metadata for the module-level constant documentation rule. */
 export const meta = {
     type: 'suggestion',
-    docs: { description: 'Require a comment immediately above every module-level const declaration.' },
+    docs: { description: 'Require a comment immediately above module-level const declarations, except require imports.' },
     schema: [],
     messages: { missing: 'Add a descriptive comment above this module-level const declaration.' }
 };
+
+/**
+ * @description Recognizes require imports, including destructuring and property access.
+ * @param {VariableDeclarator} declaration Constant binding to inspect.
+ * @returns {boolean} Whether the initializer imports a module or one of its properties.
+ */
+function isRequireImport(declaration)
+{
+    let initializer = declaration.init;
+    while(initializer && initializer.type === 'MemberExpression')
+    {
+        initializer = initializer.object;
+    }
+
+    if(!initializer || initializer.type !== 'CallExpression')
+    {
+        return false;
+    }
+
+    const callee = initializer.callee;
+    return callee.type === 'Identifier' && callee.name === 'require' && initializer.arguments.length === 1;
+}
 
 /**
  * @description Checks documentation on module-level constants, including exported declarations.
@@ -31,6 +54,11 @@ export function create(context)
             }
 
             if(declaration.parent.type !== 'Program')
+            {
+                return;
+            }
+
+            if(node.declarations.every(isRequireImport))
             {
                 return;
             }

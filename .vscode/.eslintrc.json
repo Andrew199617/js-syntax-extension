@@ -291,6 +291,7 @@
         { "blankLine": "any", "prev": "block-like", "next": "break" },
         { "blankLine": "always", "prev": "class", "next": "*" },
         { "blankLine": "always", "prev": "block-like", "next": "return" },
+        { "blankLine": "always", "prev": "multiline-const", "next": "return" },
         // proptypes - defaultprops.
         { "blankLine": "always", "prev": "multiline-expression", "next": "multiline-expression" },
         { "blankLine": "always", "prev": "*", "next": "export" },

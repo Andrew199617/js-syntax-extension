@@ -15,6 +15,25 @@ async function writeManifest(fileName, manifest)
     await fs.writeFile(fileName, contents);
 }
 
+async function copyAsset(source, destination)
+{
+    const sourceStats = await fs.stat(source);
+    if(sourceStats.isDirectory())
+    {
+        // Create fresh directories without copying Windows read-only attributes.
+        await fs.mkdir(destination, { recursive: true });
+        for(const entry of await fs.readdir(source))
+        {
+            await copyAsset(path.join(source, entry), path.join(destination, entry));
+        }
+
+        return;
+    }
+
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.copyFile(source, destination);
+}
+
 async function prepareExtensionOutput(compilation)
 {
     const output = compilation.outputOptions.path;
@@ -59,8 +78,7 @@ async function prepareExtensionOutput(compilation)
     for(const asset of assets)
     {
         const destination = path.join(output, asset);
-        await fs.mkdir(path.dirname(destination), { recursive: true });
-        await fs.cp(path.join(__dirname, asset), destination, { recursive: true });
+        await copyAsset(path.join(__dirname, asset), destination);
     }
 }
 
