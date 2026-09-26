@@ -4,6 +4,11 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.11
+
+- Fix generated array types when elements contain commas inside strings, template literals, function parameters, or calls.
+- Handle trailing commas and repeated element types correctly, and use `any[]` for incomplete array syntax or unresolved spreads.
+
 # 2.7.10
 
 - Highlight JSDoc `@import` names, aliases, keywords and module paths in JavaScript and JSX.

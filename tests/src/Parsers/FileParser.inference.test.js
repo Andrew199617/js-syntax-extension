@@ -136,6 +136,11 @@ describe.each([
     [ '[1, 2]  ', 'number[]' ],
     [ '[]', 'any[]' ],
     [ '["first", "second"]', 'string[]' ],
+    [ '["first,second", "third"]', 'string[]' ],
+    [ '[`first,second`, `third`]', 'string[]' ],
+    [ '[new Example(1, 2), new Example(3, 4)]', 'Example[]' ],
+    [ '[fn(1, 2), fn(3, 4)]', 'any[]' ],
+    [ '["first", "second",]', 'string[]' ],
     [ '[true, false]', 'boolean[]' ],
     [ '[1, "second"]', '(number | string)[]' ],
     [ '[1n + 2n, 3n]', 'bigint[]' ]
@@ -174,4 +179,22 @@ describe.each([
 };`;
         expect(await parser.parse('', source)).toContain(`values: ${expected};`);
     });
+});
+
+test.each([
+    [ '"a\\",b", "c"', 'string[]' ],
+    [ '"[first]", "second"', 'string[]' ],
+    [ '(left, right) => left, (left, right) => right', 'Function[]' ],
+    [ '1, /* comma, in comment */ 2', 'number[]' ],
+    [ '"unfinished', 'any[]' ],
+    [ '1, , 2', '(number | any)[]' ],
+    [ '1, "second", 2, "third"', '(number | string)[]' ],
+    [ 'new constructor(1, 2), new constructor(3, 4)', 'constructor[]' ],
+    [ 'new length(1, 2)', 'length[]' ],
+    [ '...new Example(1, 2)', 'any[]' ],
+    [ '1], [2', 'any[]' ],
+    [ '[1, 2], [3, 4]', '(any | any[])[]' ]
+])('array splitting preserves complete expressions: %s', async (elements, expected) =>
+{
+    expect(await parser.parseArray(elements)).toBe(expected);
 });
