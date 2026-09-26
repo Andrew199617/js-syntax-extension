@@ -1,5 +1,6 @@
 const Types = require('./Types');
 const inferExpressionType = require('./ExpressionType');
+const { parseExpression } = require('@babel/parser');
 
 /** @description Value and array inference shared by file parser instances. */
 const ValueParser = {
@@ -29,9 +30,9 @@ const ValueParser = {
     },
 
     /**
-     * @description Parses any property values.
-     * @param {string} valuesStr the value of the property.
-     * @returns {any} the type.
+     * @description Infers an array type from complete element expressions without executing them.
+     * @param {string} valuesStr the source between the array brackets.
+     * @returns {Promise<string | null>} the inferred array type.
      */
     async parseArray(valuesStr)
     {
@@ -40,55 +41,64 @@ const ValueParser = {
             return null;
         }
 
-        if(valuesStr.includes('[') && valuesStr.includes(']'))
+        const source = `[${valuesStr}]`;
+        let array;
+        try
         {
-            this.logger.logInfo(`${valuesStr} | No array of array implemented yet.`);
-            return '(any | any[])[]';
+            array = parseExpression(source);
+        }
+        catch
+        {
+            return Types.ANYARRAY;
         }
 
-        const values = valuesStr.split(',').map(val => val.trim());
-
-        const types = {
-            length: 0
-        };
-
-        for(let i = 0; i < values.length; ++i)
+        if(array.type !== 'ArrayExpression')
         {
-            const type = await this.parseValue(values[i]);
+            return Types.ANYARRAY;
+        }
+
+        const types = new Set();
+        for(const element of array.elements)
+        {
+            if(!element)
+            {
+                types.add(Types.ANY);
+                continue;
+            }
+
+            if(element.type === 'SpreadElement')
+            {
+                return Types.ANYARRAY;
+            }
+
+            if(element.type === 'ArrayExpression')
+            {
+                this.logger.logInfo(`${valuesStr} | No array of array implemented yet.`);
+                return '(any | any[])[]';
+            }
+
+            const value = source.slice(element.start, element.end);
+            const type = await this.parseValue(value);
             if(!type)
             {
-                return 'any[]';
+                return Types.ANYARRAY;
             }
 
-            if(!types[type])
-            {
-                types[type] = 1;
-                types.length++;
-            }
+            types.add(type);
         }
 
-        if(types.length === 1)
+        const elementTypes = Array.from(types);
+        if(elementTypes.length === 0)
         {
-            delete types.length;
-            const typeKeys = Object.keys(types);
-            return `${typeKeys[0]}[]`;
+            return Types.ANYARRAY;
         }
-        else if(types.length > 1)
+
+        if(elementTypes.length === 1)
         {
-            delete types.length;
-            const typeKeys = Object.keys(types);
-            let typeStr = '(';
-            for(let i = 0; i < typeKeys.length; ++i)
-            {
-                typeStr += typeKeys[i];
-                typeStr += i < typeKeys.length - 1 ? ' | ' : '';
-            }
-
-            typeStr += ')[]';
-            return typeStr;
+            return `${elementTypes[0]}[]`;
         }
 
-        return 'any[]';
+        return `(${elementTypes.join(' | ')})[]`;
     },
 
     /**
