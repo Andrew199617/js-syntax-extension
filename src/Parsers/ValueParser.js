@@ -46,9 +46,10 @@ const ValueParser = {
             return value;
         }
 
-        if(this.constantCache?.source !== content)
+        if(this.constantSourceCache !== content)
         {
-            this.constantCache = { source: content, values: ValueParser.parseConstants(content) };
+            this.constantSourceCache = content;
+            this.constantValuesCache = ValueParser.parseConstants(content);
         }
 
         const visited = new Set();
@@ -60,7 +61,7 @@ const ValueParser = {
             }
 
             visited.add(value);
-            const assignedValue = this.constantCache.values.get(value);
+            const assignedValue = this.constantValuesCache.get(value);
             if(!assignedValue)
             {
                 break;
