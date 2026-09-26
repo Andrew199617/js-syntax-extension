@@ -23,21 +23,46 @@ const spanSize = 3;
 // Mark source positions that should be classified as parameters.
 const marker = '/*parameter*/';
 
+// Share parsed libraries within each TypeScript version while isolating sample files.
+const testEnvironments = new Map();
+
 function tokenType(classification)
 {
     return (classification >> typeShift) - 1;
 }
 
+function getTestEnvironment(typescript)
+{
+    let environment = testEnvironments.get(typescript);
+    if(!environment)
+    {
+        environment = {
+            registry: typescript.createDocumentRegistry(typescript.sys.useCaseSensitiveFileNames, __dirname),
+            comparisons: new Map(),
+            nextFileId: 0
+        };
+        testEnvironments.set(typescript, environment);
+    }
+
+    return environment;
+}
+
 function createService(typescript, initialSource, extension = '.js')
 {
-    const fileName = path.resolve(__dirname, `sample${extension}`).replaceAll('\\', '/');
+    const environment = getTestEnvironment(typescript);
+    environment.nextFileId++;
+    const fileName = path.resolve(__dirname, `sample-${environment.nextFileId}${extension}`).replaceAll('\\', '/');
     let source = initialSource;
     let version = 0;
+    const dependencySnapshots = new Map();
 
     const options = { allowJs: true, checkJs: true, types: [], target: typescript.ScriptTarget.ESNext };
     const host = {
         getScriptFileNames: () => [fileName],
-        getScriptVersion: () => String(version),
+        getScriptVersion(name)
+        {
+            return name === fileName ? String(version) : '0';
+        },
         getScriptSnapshot(name)
         {
             if(name === fileName)
@@ -45,8 +70,18 @@ function createService(typescript, initialSource, extension = '.js')
                 return typescript.ScriptSnapshot.fromString(source);
             }
 
-            const contents = typescript.sys.readFile(name);
-            return contents === undefined ? undefined : typescript.ScriptSnapshot.fromString(contents);
+            if(!dependencySnapshots.has(name))
+            {
+                const contents = typescript.sys.readFile(name);
+                if(contents === undefined)
+                {
+                    return undefined;
+                }
+
+                dependencySnapshots.set(name, typescript.ScriptSnapshot.fromString(contents));
+            }
+
+            return dependencySnapshots.get(name);
         },
         getCurrentDirectory: () => __dirname,
         getCompilationSettings: () => options,
@@ -56,7 +91,7 @@ function createService(typescript, initialSource, extension = '.js')
         readDirectory: typescript.sys.readDirectory
     };
 
-    const service = typescript.createLanguageService(host);
+    const service = typescript.createLanguageService(host, environment.registry);
     const info = {
         languageService: service,
         project: { projectService: { logger: { info: () => undefined } } }
@@ -76,7 +111,19 @@ function createService(typescript, initialSource, extension = '.js')
 
 function compare(typescript, source, extension = '.js', range)
 {
-    const context = createService(typescript, source, extension);
+    const comparisons = getTestEnvironment(typescript).comparisons;
+    let context = comparisons.get(extension);
+    if(!context)
+    {
+        context = createService(typescript, source, extension);
+        comparisons.set(extension, context);
+    }
+    else
+    {
+        context.update(source);
+    }
+
+    const classify = context.service.getEncodedSemanticClassifications;
     const span = range || { start: 0, length: source.length };
     try
     {
@@ -143,8 +190,22 @@ function compare(typescript, source, extension = '.js', range)
     }
     finally
     {
-        context.service.dispose();
+        // The next comparison must request fresh classifications for its updated source.
+        context.service.getEncodedSemanticClassifications = classify;
     }
+}
+
+function disposeComparisonServices()
+{
+    for(const environment of testEnvironments.values())
+    {
+        for(const context of environment.comparisons.values())
+        {
+            context.service.dispose();
+        }
+    }
+
+    testEnvironments.clear();
 }
 
 // Cover parameter bindings, references and unrelated functions in real source text.
@@ -250,6 +311,8 @@ if(process.env.TS_LIBRARY_PATH)
 {
     versions.push(process.env.TS_LIBRARY_PATH);
 }
+
+afterAll(disposeComparisonServices);
 
 for(const moduleName of versions)
 {
