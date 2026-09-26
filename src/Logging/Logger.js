@@ -32,7 +32,6 @@ const Logger = {
         /** @type {DocumentType} */
         logger.document = null;
         logger.compilationContext = null;
-        logger.pendingLoggers = [];
         logger.writeCompleted = Promise.resolve();
 
         return logger;
@@ -50,7 +49,7 @@ const Logger = {
 
     logHeader()
     {
-        if(!this._loggedHeading)
+        if(!this._loggedHeading && this.document)
         {
             this.log.push(`\n${this.document.fileName}: \n`);
             this._loggedHeading = true;
@@ -67,12 +66,23 @@ const Logger = {
     {
         this.logHeader();
         this.log.push(`WARNING: ${warning}`);
+        this.reportDiagnostic(warning, ErrorTypes.WARNING);
     },
 
     logError(error)
     {
         this.logHeader();
         this.log.push(`ERROR: ${error}`);
+        this.reportDiagnostic(error, ErrorTypes.ERROR);
+    },
+
+    /** @description Publish parser log issues to Problems without displaying notifications. */
+    reportDiagnostic(message, severity)
+    {
+        if(this.compilationContext)
+        {
+            VscodeError.create(message, 0, 0, 0, 0, severity).notifyUser(this);
+        }
     },
 
     /** @description Convert the log to a string to be written to a file. */
@@ -88,17 +98,7 @@ const Logger = {
         return str;
     },
 
-    /** @description Adds a completed document's log to the shared output. */
-    append(logger)
-    {
-        this.log.push(...logger.log);
-        if(logger.log.length > 0)
-        {
-            this.pendingLoggers.push(logger);
-        }
-    },
-
-    /** @description Serializes writes to the shared log without serializing compilation. */
+    /** @description Serialize completed runs' debug logs without delaying parallel parsing. */
     async write()
     {
         if(!lgd.configuration.createDebugLog)
@@ -106,6 +106,8 @@ const Logger = {
             return;
         }
 
+        const logFile = this._toString();
+        const filePath = `${this._logFolder()}\\${this._fileName}.log`;
         const previousWrite = this.writeCompleted;
         let completeWrite;
         this.writeCompleted = new Promise(resolve =>
@@ -116,33 +118,11 @@ const Logger = {
         try
         {
             await previousWrite;
-            const logFile = this._toString();
-            const filePath = `${this._logFolder()}\\${this._fileName}.log`;
             await FileIO.writeFileContents(filePath, logFile);
         }
         finally
         {
             completeWrite();
-        }
-    },
-
-    /** @description notify user if log has any value to check. */
-    notifyUser()
-    {
-        const pendingLoggers = this.pendingLoggers.splice(0);
-        for(const logger of pendingLoggers)
-        {
-            logger.notifyUser();
-        }
-
-        if(!lgd.configuration.createDebugLog)
-        {
-            return;
-        }
-
-        if(this.log.length > 0 && this.compilationContext)
-        {
-            VscodeError.create('LGD: Check log!', 0, 0, 0, 0, ErrorTypes.HINT).notifyUser(this);
         }
     },
 

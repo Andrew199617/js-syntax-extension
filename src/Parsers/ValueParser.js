@@ -1,33 +1,33 @@
 const Types = require('./Types');
 const inferExpressionType = require('./ExpressionType');
 
-/** @description Resolves constant aliases without recursing or following a cycle. */
-function resolveConstant(value, content)
-{
-    const visited = new Set();
-    while((/^[A-Z][A-Z0-9_]*$/).test(value))
-    {
-        if(visited.has(value))
-        {
-            return null;
-        }
-
-        visited.add(value);
-        const constantRegex = new RegExp(`(?:const|let|var)\\s+${value}\\s*=\\s*(?<assignedValue>.*?)(?:;|$)`, 'm');
-        const constantMatch = constantRegex.exec(content);
-        if(!constantMatch?.groups?.assignedValue)
-        {
-            break;
-        }
-
-        value = constantMatch.groups.assignedValue.trim();
-    }
-
-    return value;
-}
-
 /** @description Value and array inference shared by file parser instances. */
 const ValueParser = {
+    /** @description Resolves constant aliases without recursing or following a cycle. */
+    resolveConstant(value, content)
+    {
+        const visited = new Set();
+        while((/^[A-Z][A-Z0-9_]*$/).test(value))
+        {
+            if(visited.has(value))
+            {
+                return null;
+            }
+
+            visited.add(value);
+            const constantRegex = new RegExp(`(?:const|let|var)\\s+${value}\\s*=\\s*(?<assignedValue>.*?)(?:;|$)`, 'm');
+            const constantMatch = constantRegex.exec(content);
+            if(!constantMatch?.groups?.assignedValue)
+            {
+                break;
+            }
+
+            value = constantMatch.groups.assignedValue.trim();
+        }
+
+        return value;
+    },
+
     /**
      * @description Parses any property values.
      * @param {string} valuesStr the value of the property.
@@ -103,7 +103,7 @@ const ValueParser = {
             return null;
         }
 
-        const normalizedValue = resolveConstant(value.trim(), this.content || '');
+        const normalizedValue = ValueParser.resolveConstant(value.trim(), this.content || '');
         if(normalizedValue === null)
         {
             return Types.ANY;

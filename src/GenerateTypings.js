@@ -1,5 +1,4 @@
-const StatusBarMessage = require('./Logging/StatusBarMessage');
-const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
+const CompilationReport = require('./Logging/CompilationReport');
 
 const path = require('path');
 const FileParser = require('./Parsers/FileParser');
@@ -22,9 +21,6 @@ const DEFAULT_DIR = 'typings';
 
 // JavaScript source extension supported by the commands.
 const JS_EXT = '.js';
-
-// VS Code severity used for parser errors.
-const errorSeverity = SeverityConverter.getDiagnosticSeverity(ErrorTypes.ERROR);
 
 /**
  * @description Generate .d.ts files for a .js file.
@@ -52,15 +48,14 @@ const GenerateTypings = {
          * @type {vscode.DiagnosticCollection}
          */
         generateTypings.lgdDiagnosticCollection = lgdDiagnosticCollection;
-        generateTypings.loggerSink = lgd.logger;
         const logger = Logger.create(lgd.logger._fileName);
         generateTypings.compilationContext = {
             document: document,
             diagnostics: [],
             diagnosticCollection: lgdDiagnosticCollection,
             logger: logger,
-            statusBar: StatusBarMessage.create(),
-            errorOccurred: false
+            errorOccurred: false,
+            compiled: false
         };
         logger.compilationContext = generateTypings.compilationContext;
         logger.openedNewDocument(document);
@@ -72,97 +67,39 @@ const GenerateTypings = {
     {
         if(this.document.fileName.endsWith(JS_EXT))
         {
-            lgd.logger.log = [];
+            const report = CompilationReport.create('Compile file');
             await this.execute();
-            lgd.logger.notifyUser();
-
-            const diagnostics = this.lgdDiagnosticCollection.get(this.document.uri) || [];
-
-            let anySevere = false;
-            for(let i = 0; i < diagnostics.length; ++i)
-            {
-                if(diagnostics[i].severity === errorSeverity)
-                {
-                    anySevere = true;
-                    break;
-                }
-            }
-
-            if(anySevere)
-            {
-                vscode.window.showErrorMessage(`Error occurred parsing JavaScript File into TypeScript Definition File.`);
-            }
+            report.add(this.compilationContext);
+            await report.finish();
         }
     },
 
     async execute()
     {
-        const statusBar = this.compilationContext.statusBar;
-        const compilingMessage = statusBar.show('$(zap) Compiling .js --> .d.ts', StatusBarMessageTypes.INDEFINITE);
-        const startTime = Date.now();
-
         try
         {
             const compiled = await this.compile(this.document.fileName, this.document.getText());
-
-            if(compiled)
-            {
-                const elapsedTime = Date.now() - startTime;
-                compilingMessage.dispose();
-                this.lgdDiagnosticCollection.set(this.document.uri, []);
-
-                statusBar.show(
-                    `$(check) LGD compiled in ${elapsedTime}ms`,
-                    StatusBarMessageTypes.SUCCESS
-                );
-            }
-            else
-            {
-                compilingMessage.dispose();
-
-                statusBar.show(
-                    SeverityConverter.getStatusBarMessage(ErrorTypes.ERROR),
-                    StatusBarMessageTypes.ERROR
-                );
-            }
+            this.compilationContext.compiled = compiled;
         }
         catch(error)
         {
-            const startLine = error.startLine || 0;
-            const startCharacter = error.startCharacter || 0;
-            const endLine = error.endLine || 0;
-            const endCharacter = error.endCharacter || 0;
-
-            let message = error.message;
-            let range = new vscode.Range(startLine, startCharacter, endLine, endCharacter);
-            const severity = error.severity;
-
-            if(error.code)
-            {
-                // fs errors
-                const fileSystemError = error;
-                switch(fileSystemError.code)
-                {
-                    case 'EACCES':
-                    case 'ENOENT':
-                    {
-                        message = `Cannot open file '${fileSystemError.path}'`;
-                        const firstLine = this.document.lineAt(0);
-                        range = new vscode.Range(0, 0, 0, firstLine.range.end.character);
-                    }
-                }
-            }
-
-            compilingMessage.dispose();
-            const diagnosis = new vscode.Diagnostic(range, message, SeverityConverter.getDiagnosticSeverity(severity));
-            this.compilationContext.diagnostics.push(diagnosis);
-            this.lgdDiagnosticCollection.set(this.document.uri, this.compilationContext.diagnostics);
-
-            statusBar.show(
-                SeverityConverter.getStatusBarMessage(severity),
-                SeverityConverter.getMessageType(severity)
-            );
+            this.recordError(error);
         }
+
+        this.lgdDiagnosticCollection.set(this.document.uri, this.compilationContext.diagnostics);
+        return this.compilationContext;
+    },
+
+    /** @description Record parser or filesystem failures against this source document. */
+    recordError(error)
+    {
+        const range = new vscode.Range(error.startLine || 0, error.startCharacter || 0, error.endLine || 0, error.endCharacter || 0);
+        const severity = SeverityConverter.getDiagnosticSeverity(error.severity ?? ErrorTypes.ERROR);
+        const diagnosis = new vscode.Diagnostic(range, error.message || String(error), severity);
+        diagnosis.source = 'LGD';
+        this.compilationContext.diagnostics.push(diagnosis);
+        this.compilationContext.errorOccurred = true;
+        this.lgdDiagnosticCollection.set(this.document.uri, this.compilationContext.diagnostics);
     },
 
     /**
@@ -176,18 +113,9 @@ const GenerateTypings = {
         const classParser = ClassParser.create(this.compilationContext);
         const functionComponentParser = FunctionComponentParser.create(this.compilationContext);
 
-        let typeFile = '';
-        try
-        {
-            let parseResult = await classParser.parse(content, typeFile);
-            parseResult = await functionComponentParser.parse(parseResult.content, parseResult.typeFile);
-            typeFile = await fileParser.parse(parseResult.typeFile, parseResult.content);
-        }
-        finally
-        {
-            this.loggerSink.append(this.compilationContext.logger);
-            await this.loggerSink.write();
-        }
+        let parseResult = await classParser.parse(content, '');
+        parseResult = await functionComponentParser.parse(parseResult.content, parseResult.typeFile);
+        const typeFile = await fileParser.parse(parseResult.typeFile, parseResult.content);
 
         if(this.compilationContext.errorOccurred || fileParser.errorOccurred || classParser.errorOccurred || !typeFile)
         {

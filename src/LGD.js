@@ -7,6 +7,7 @@ const Configuration = require('./Core/Configuration');
 const fs = require('fs');
 
 const Logger = require('./Logging/Logger');
+const CompilationReport = require('./Logging/CompilationReport');
 const CodeActions = require('./CodeActions/CodeActions');
 const CompletionItemProvider = require('./CompletionItems/CompletionItemProvider');
 
@@ -27,35 +28,99 @@ const COMPILE_COMMAND = 'lgd.generateTypings';
 // Command identifier for compiling all workspace files.
 const COMPILE_ALL_COMMAND = 'lgd.generateTypingsForAll';
 
+// VS Code emits separate save events for Save All; collect neighboring events into one report.
+const SAVE_BATCH_DELAY_MS = 100;
+
+// Documents waiting for the current save burst to finish.
+const pendingSaves = new Map();
+
 let actionProvider = null;
 let completionItemProvider = null;
+let saveTimer;
 
-
-async function compileFile(uri)
+function clearPendingSaves()
 {
-    const text = await fs.promises.readFile(uri.fsPath, 'utf8');
-    const document = Document.create(uri.fsPath, text, uri);
-    await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    pendingSaves.clear();
+}
+
+async function compileSavedDocuments()
+{
+    const documents = Array.from(pendingSaves.values());
+    clearPendingSaves();
+    const batch = documents.length > 1;
+    const report = CompilationReport.create(batch ? 'Save all' : 'Save file', batch);
+    const compilations = documents.map(document => GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute());
+    const results = await Promise.allSettled(compilations);
+    for(const result of results)
+    {
+        if(result.status === 'fulfilled')
+        {
+            report.add(result.value);
+        }
+        else
+        {
+            report.reportError(result.reason);
+        }
+    }
+
+    await report.finish();
+}
+
+function queueSavedDocument(document)
+{
+    if(!document.fileName.endsWith(JS_EXT))
+    {
+        return;
+    }
+
+    const snapshot = Document.create(document.fileName, document.getText(), document.uri);
+    pendingSaves.set(document.uri.toString(), snapshot);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(compileSavedDocuments, SAVE_BATCH_DELAY_MS);
+}
+
+
+async function compileFile(uri, report)
+{
+    const document = Document.create(uri.fsPath, '', uri);
+    const compilation = GenerateTypings.create(document, lgd.lgdDiagnosticCollection);
+    try
+    {
+        document._text = await fs.promises.readFile(uri.fsPath, 'utf8');
+        await compilation.execute();
+    }
+    catch(error)
+    {
+        compilation.recordError(error);
+    }
+
+    report.add(compilation.compilationContext);
 }
 
 async function compileAllFiles()
 {
-    const uris = await vscode.workspace.findFiles('**/*.js', '**/node_modules/**');
-    lgd.logger.log = [];
+    const report = CompilationReport.create('Compile all', true);
     try
     {
-        const compilations = uris.map(compileFile);
+        const uris = await vscode.workspace.findFiles('**/*.js', '**/node_modules/**');
+        const compilations = uris.map(uri => compileFile(uri, report));
         const results = await Promise.allSettled(compilations);
-        const failure = results.find(result => result.status === 'rejected');
-        if(failure)
+        for(const result of results)
         {
-            throw failure.reason;
+            if(result.status === 'rejected')
+            {
+                report.reportError(result.reason);
+            }
         }
     }
-    finally
+    catch(error)
     {
-        lgd.logger.notifyUser();
+        report.reportError(error);
     }
+
+    await report.finish();
 }
 
 function reportRename(error)
@@ -108,6 +173,8 @@ function activate(context)
     lgd.lgdDiagnosticCollection = vscode.languages.createDiagnosticCollection();
     lgd.configuration = Configuration.create();
     lgd.logger = Logger.create('LGD.FileParser');
+    lgd.outputChannel = vscode.window.createOutputChannel('LGD');
+    context.subscriptions.push(lgd.outputChannel);
 
     // definitionProvider = vscode.languages.registerDefinitionProvider(
     //   documentSelector,
@@ -160,14 +227,14 @@ function activate(context)
     const compileAllCommand = vscode.commands.registerCommand(COMPILE_ALL_COMMAND, compileAllFiles);
 
     // compile on save when file is dirty
-    const didSaveEvent = vscode.workspace.onDidSaveTextDocument(async document =>
+    const didSaveEvent = vscode.workspace.onDidSaveTextDocument(document =>
     {
         if(!lgd.configuration.generateTypings)
         {
             return;
         }
 
-        await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();
+        queueSavedDocument(document);
     });
 
     // compile file when we change the document
@@ -260,6 +327,7 @@ function activate(context)
 // this method is called when your extension is deactivated
 function deactivate()
 {
+    clearPendingSaves();
     if(globalThis.lgd?.lgdDiagnosticCollection)
     {
         lgd.lgdDiagnosticCollection.dispose();

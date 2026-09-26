@@ -78,6 +78,7 @@ const VscodeError = {
             this.message,
             SeverityConverter.getDiagnosticSeverity(this.severity)
         );
+        diagnosis.source = 'LGD';
         const diagnostics = context?.diagnostics || VscodeError.diagnostics;
         diagnostics.push(diagnosis);
 
@@ -89,11 +90,13 @@ const VscodeError = {
         const collection = context?.diagnosticCollection || lgd.lgdDiagnosticCollection;
         collection.set(document.uri, diagnostics);
 
-        const statusBar = context?.statusBar || StatusBarMessage;
-        statusBar.show(
-            SeverityConverter.getStatusBarMessage(this.severity),
-            SeverityConverter.getMessageType(this.severity)
-        );
+        if(!context)
+        {
+            StatusBarMessage.show(
+                SeverityConverter.getStatusBarMessage(this.severity),
+                SeverityConverter.getMessageType(this.severity)
+            );
+        }
 
         if(this.severity === ErrorTypes.ERROR)
         {
