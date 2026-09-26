@@ -7,6 +7,7 @@ const Types = require('./Types');
 
 const EnumParser = require('./EnumParser');
 const FunctionParser = require('./FunctionParser');
+const hasDirectInstanceReturn = require('./HasDirectInstanceReturn');
 
 const reportInvalidThisUsageInCreate = require('../Checks/ReportInvalidThisUsageInCreate');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
@@ -292,9 +293,8 @@ const FileParser = {
     {
         const classNameRegex = /(?<varType>const|let|var) (?<name>\w+?)\s*=\s*(?<object>Object|Oloo)\.(?<creationWay>create|assign|assignSlow|createSlow)\s*?\(/;
         const className = classNameRegex.exec(insideFunction);
-        const directReturnRegex = /\breturn[^\S\r\n\u2028\u2029]+(?<object>Object|Oloo)\.(?<creationWay>create|assign|assignSlow|createSlow)\s*?\(/;
 
-        if(!className && !this.isReactComponent && !directReturnRegex.test(insideFunction))
+        if(!className && !this.isReactComponent && !hasDirectInstanceReturn(insideFunction))
         {
             VscodeError.create('LGD: Could not find class instance in create method. Are you creating the instance properly.', this.beginLine, 0, this.endLine, 0, ErrorTypes.ERROR)
                 .notifyUser(this);

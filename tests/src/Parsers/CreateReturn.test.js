@@ -53,6 +53,21 @@ const AnotherCommand = {
         expect(declaration).toBe('\ndeclare interface InvertIfType {\n\t/** @returns {InvertIfType} */\n\tcreate(): InvertIfType;\n\n\texecute(): boolean;\n}\n\ndeclare interface AnotherCommandType {\n\tisEnabled(): boolean;\n}\n');
     });
 
+    test.each([
+        'return /* factory */ Object.create(Command);',
+        'return (Object.create(Command));',
+        'if(enabled) { return Object.create(Command); } return {};',
+        'await initialize(); return Object.create(Command);'
+    ])('accepts executable instance returns in %s', async body =>
+    {
+        const fileParser = FileParser.create();
+
+        await fileParser.parseCreate(body);
+
+        expect(VscodeError.create).not.toHaveBeenCalled();
+        expect(fileParser.errorOccurred).toBe(false);
+    });
+
     test('keeps named instance properties when an earlier branch returns directly', async () =>
     {
         const source = `const Command = {
@@ -76,7 +91,17 @@ const AnotherCommand = {
         'return {};',
         'return;',
         'return Factory.create(Command);',
-        'return\nObject.create(Command);'
+        'return\nObject.create(Command);',
+        '// return Object.create(Command);\nreturn {};',
+        '/* return Object.create(Command); */ return {};',
+        'const example = "return Object.create(Command);"; return {};',
+        'const example = `return Object.create(Command);`; return {};',
+        'const example = /return Object.create(Command)/; return {};',
+        'const example = <span>return Object.create(Command);</span>; return {};',
+        'function nested() { return Object.create(Command); } return {};',
+        'const nested = () => { return Object.create(Command); }; return {};',
+        'return Object.create(Command).value;',
+        'return Object.create('
     ])('still reports a missing instance for %s', async body =>
     {
         const fileParser = FileParser.create();
