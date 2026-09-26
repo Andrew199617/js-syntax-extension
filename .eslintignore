@@ -2,3 +2,8 @@
 
 # Include the editor custom rules in project lint checks.
 !/.vscode/
+
+# Mock files and generated declarations are test inputs or build output.
+/tests/mocks/
+/tests/__mocks__/
+**/*.d.ts
