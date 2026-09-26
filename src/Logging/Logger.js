@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const path = require('path');
 const FileIO = require('./FileIO');
 
 const VscodeError = require('../Errors/VscodeError');
@@ -107,7 +108,7 @@ const Logger = {
         }
 
         const logFile = this._toString();
-        const filePath = `${this._logFolder()}\\${this._fileName}.log`;
+        const filePath = path.join(this._logFolder(), `${this._fileName}.log`);
         const previousWrite = this.writeCompleted;
         let completeWrite;
         this.writeCompleted = new Promise(resolve =>
@@ -129,7 +130,7 @@ const Logger = {
     /** @description where we save the logger. */
     _logFolder()
     {
-        return `${vscode.workspace.rootPath}\\${DEFAULT_DIR}`;
+        return path.join(vscode.workspace.rootPath, DEFAULT_DIR);
     }
 
 };

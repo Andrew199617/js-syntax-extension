@@ -10,6 +10,9 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Handle trailing commas and repeated element types correctly, and use `any[]` for incomplete array syntax or unresolved spreads.
 - Generate valid array types for rest parameters and preserve their JSDoc annotations.
 - Ignore declarations inside comments and strings when inferring types from constants.
+- Fix declaration, debug log, and rename paths on Linux and macOS while preserving Windows paths.
+- Preserve destructured function parameters when removing their default values from declarations.
+- Avoid duplicate compilation reports when saving changes a document's dirty state.
 
 # 2.7.10
 
