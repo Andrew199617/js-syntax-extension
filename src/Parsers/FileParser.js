@@ -20,9 +20,11 @@ const ConstructorMethodName = 'create';
  */
 const FileParser = {
     /** @returns {FileParserType}*/
-    create()
+    create(compilationContext = null)
     {
         const fileParser = Object.create(FileParser);
+        fileParser.compilationContext = compilationContext;
+        fileParser.logger = compilationContext?.logger || lgd.logger;
 
         /**
          * @description the variables that the class contains.
@@ -136,7 +138,7 @@ const FileParser = {
             {
                 if(typeof doc.groups.type !== 'undefined')
                 {
-                    lgd.logger.logWarning("Don't add type for Template");
+                    this.logger.logWarning("Don't add type for Template");
                 }
 
                 docs.template.push(doc.groups.name);
@@ -181,7 +183,7 @@ const FileParser = {
 
                 if(typeof doc.groups.type === 'undefined')
                 {
-                    lgd.logger.logWarning('Empty Type tag.');
+                    this.logger.logWarning('Empty Type tag.');
                 }
 
                 numTypes++;
@@ -208,14 +210,14 @@ const FileParser = {
             {
                 if(typeof doc.groups.name === 'undefined')
                 {
-                    lgd.logger.logWarning('Empty param tag.');
+                    this.logger.logWarning('Empty param tag.');
                     continue;
                 }
                 else if(typeof doc.groups.type === 'undefined')
                 {
                     params[doc.groups.name] = 'any';
                     params.length++;
-                    lgd.logger.logWarning(`Param type for ${doc.groups.name} not given, using any.`);
+                    this.logger.logWarning(`Param type for ${doc.groups.name} not given, using any.`);
                     continue;
                 }
 
@@ -258,7 +260,7 @@ const FileParser = {
         //     type = tempParser.parseTypeWithTemplates(document.getText());
         //   }
         //   else {
-        //     lgd.logger.logWarning(`Could not find file for ${type}.`);
+        //     this.logger.logWarning(`Could not find file for ${type}.`);
         //   }
         // }
 
@@ -472,7 +474,7 @@ const FileParser = {
             const settingValueUsingVariable = variable.groups.objectAccessors.endsWith('[');
             if(settingValueUsingVariable)
             {
-                lgd.logger.logWarning(`Ignoring because you are using a variable to set object. See -> ${variable.groups.objectAccessors}${variable.groups.name}].`);
+                this.logger.logWarning(`Ignoring because you are using a variable to set object. See -> ${variable.groups.objectAccessors}${variable.groups.name}].`);
                 continue;
             }
 

@@ -25,9 +25,9 @@ const ClassParser = {
      * @description Initialize an instance of ClassParser.
      * @returns {ClassParserType & FileParserType}
      */
-    create()
+    create(compilationContext = null)
     {
-        const classParser = Oloo.assignSlow(FileParser.create(), ClassParser);
+        const classParser = Oloo.assignSlow(FileParser.create(compilationContext), ClassParser);
         return classParser;
     },
 

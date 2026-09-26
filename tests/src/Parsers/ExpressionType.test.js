@@ -109,6 +109,23 @@ test('bounds expression length and recursive inference', () =>
     expect(inferExpressionType(`${'1+'.repeat(excessiveDepth)}1`)).toBe('any');
 });
 
+test.each([
+    'const A = A;',
+    'const A = A ;',
+    'const A = B; const B = A;',
+    'const A = B; const B = C; const C = A;'
+])('cyclic constants resolve to any: %s', async source =>
+{
+    parser.content = source;
+    expect(await parser.parseValue('A')).toBe('any');
+});
+
+test('constant resolution keeps independent and repeated aliases usable', async () =>
+{
+    parser.content = 'const A = B; const B = C; const C = Math.PI * 2;';
+    expect(await Promise.all([ parser.parseValue('A'), parser.parseValue('B'), parser.parseValue('A') ])).toEqual([ 'number', 'number', 'number' ]);
+});
+
 test('propagates inferred values to array elements and function return declarations', async () =>
 {
     expect(await parser.parseArray('null + 1, true + 1')).toBe('number[]');

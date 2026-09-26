@@ -1,5 +1,6 @@
 const path = require('node:path');
 const { ESLint } = require('eslint');
+const registerEslintRules = require('./register-eslint-rules');
 
 /** @description Project root anchors configuration and custom rule resolution. */
 const projectRoot = path.resolve(__dirname, '..');
@@ -7,6 +8,7 @@ const projectRoot = path.resolve(__dirname, '..');
 /** @description Checks maintained JavaScript, including the editor's custom ESLint rules. */
 async function lintProject()
 {
+    registerEslintRules();
     const options = {
         cwd: projectRoot,
         useEslintrc: false,
