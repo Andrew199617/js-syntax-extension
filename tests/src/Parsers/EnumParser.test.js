@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 
 const FileParser = require('SRC/Parsers/FileParser');
 

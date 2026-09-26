@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 
 const FunctionComponentParser = require('../../../src/Parsers/FunctionComponentParser');
 

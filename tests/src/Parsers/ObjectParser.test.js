@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 
 const FileParser = require('../../../src/Parsers/FileParser');
 const Logger = require('../../../src/Logging/Logger');

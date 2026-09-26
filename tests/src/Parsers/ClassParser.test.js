@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 
 const ClassParser = require('../../../src/Parsers/ClassParser');
 
@@ -31,7 +31,7 @@ async function checkFile(filePath)
     }
 }
 
-lgd = {}
+lgd = {};
 lgd.configuration = {
     createDebugLog: false,
     tabSize: 2,
