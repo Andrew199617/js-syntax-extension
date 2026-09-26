@@ -92,17 +92,9 @@ const FindFile = {
         }
     },
 
-    /** @description Check if the file extension is supported. */
     _checkFileExtension(fileName)
     {
-        for(let i = 0; i < FindFile.supportedFileExt.length; ++i)
-        {
-            const fileExt = FindFile.supportedFileExt[i];
-            if(!fileName.endsWith(fileExt))
-            {
-                return true;
-            }
-        }
+        return FindFile.supportedFileExt.some(fileExtension => fileName.endsWith(`.${fileExtension}`));
     }
 };
 
