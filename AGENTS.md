@@ -38,3 +38,11 @@ Also follow the established project conventions in `.github/instructions/default
 - Review both errors and warnings. Fix violations introduced by your changes, including restricted identifiers such as `data` and `foo` (`id-blacklist`); choose descriptive names and update their references without changing external API field names.
 - Do not disable rules or add suppression comments to avoid fixing violations. Report any remaining pre-existing diagnostics or blocked checks explicitly; do not claim ESLint passed when it did not.
 - Editor format-on-save and passing tests do not replace an explicit ESLint check. In the final response, state which edited files were checked and whether any diagnostics remain.
+
+## Testing
+
+- Keep testing proportional to the change. Prefer extending existing tests.
+- Add tests for meaningful behavior, important edge cases, and bug regressions.
+- Avoid redundant tests, assertions coupled to implementation details, and
+elaborate test infrastructure for small changes. run broader checks when warranted or required by the project.
+- Stop expanding coverage once the relevant behavior is sufficiently verified.

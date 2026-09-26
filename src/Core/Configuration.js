@@ -101,27 +101,27 @@ const Configuration = {
 
     get maintainHierarchy()
     {
-        return this.options.maintainHierarchy || true;
+        return this.options.maintainHierarchy ?? true;
     },
 
     get createDebugLog()
     {
-        return this.options.createDebugLog || true;
+        return this.options.createDebugLog ?? true;
     },
 
     get extractPropsAndState()
     {
-        return this.options.extractPropsAndState || true;
+        return this.options.extractPropsAndState ?? true;
     },
 
     get generateTypings()
     {
-        return this.options.generateTypings || true;
+        return this.options.generateTypings ?? true;
     },
 
     get generateTypingsOnChange()
     {
-        return this.options.generateTypingsOnChange || true;
+        return this.options.generateTypingsOnChange ?? true;
     }
 };
 

@@ -21,6 +21,27 @@ afterEach(() =>
     globalThis.lgd = previousLgd;
 });
 
+test('nested objects retain file-level constant declarations', async () =>
+{
+    parser.content = 'const COUNT = 1; const LABEL = "example";';
+    const value = `{
+  settings: {
+    count: COUNT,
+    labels: [LABEL, LABEL]
+  }
+}`;
+    const type = await parser.parseValue(value);
+    expect(type).toContain('count: number;');
+    expect(type).toContain('labels: string[];');
+});
+
+test('nested source propagation stops recursive constant-backed objects', async () =>
+{
+    parser.content = 'const NODE = {\n  child: NODE\n};';
+    const type = await parser.parseValue('NODE');
+    expect(type).toContain('child: any;');
+});
+
 test.each([ 'OtherType', 'Example', 'ExampleType' ])('preserves the Promise contract for %s', async type =>
 {
     parser.className = 'Example';

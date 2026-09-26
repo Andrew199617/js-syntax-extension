@@ -13,6 +13,8 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Fix declaration, debug log, and rename paths on Linux and macOS while preserving Windows paths.
 - Preserve destructured function parameters when removing their default values from declarations.
 - Avoid duplicate compilation reports when saving changes a document's dirty state.
+- Honor disabled generation, debug logging, hierarchy, and props/state extraction settings.
+- Preserve constant type inference inside nested objects and after parsing exported classes or components.
 
 # 2.7.10
 

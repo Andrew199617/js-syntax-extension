@@ -83,6 +83,48 @@ afterEach(() =>
     globalThis.lgd = previousLgd;
 });
 
+test.each([
+    'class Exported extends Parent {\n  value = 1;\n}',
+    'function Exported(props) {\n  return null;\n}'
+])('constant inference retains source before removing %s', async exportedDeclaration =>
+{
+    const source = `const COUNT = 1;
+${exportedDeclaration}
+export { Exported };
+const Example = {
+  count: COUNT,
+  settings: {
+    count: COUNT
+  }
+};`;
+    const document = {
+        fileName: 'Example.js',
+        uri: { fsPath: 'Example.js' },
+        getText: () => source
+    };
+    const compilation = GenerateTypings.create(document, lgd.lgdDiagnosticCollection);
+    const result = await compilation.execute();
+    expect(result.compiled).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+    const declaration = FileIO.writeFileContents.mock.calls[0][1];
+    expect(declaration.match(/count: number;/g)).toHaveLength(2);
+    expect(declaration).not.toContain('count: any;');
+});
+
+test('concurrent compilations keep original constant sources separate', async () =>
+{
+    const first = createCompilation('First');
+    const second = createCompilation('Second');
+    first.document.getText = () => 'const COUNT = 1;\nconst Example = {\n  settings: {\n    count: COUNT\n  }\n};';
+    second.document.getText = () => 'const COUNT = "text";\nconst Example = {\n  settings: {\n    count: COUNT\n  }\n};';
+    const results = await Promise.all([ first.execute(), second.execute() ]);
+    expect(results.every(result => result.compiled)).toBe(true);
+    const firstWrite = FileIO.writeFileContents.mock.calls.find(([filename]) => filename.endsWith('First.d.ts'));
+    const secondWrite = FileIO.writeFileContents.mock.calls.find(([filename]) => filename.endsWith('Second.d.ts'));
+    expect(firstWrite[1]).toContain('count: number;');
+    expect(secondWrite[1]).toContain('count: string;');
+});
+
 test('parallel compilations keep diagnostics and logs with their documents without per-file UI', async () =>
 {
     const firstGate = deferred();

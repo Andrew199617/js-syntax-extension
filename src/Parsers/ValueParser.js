@@ -157,7 +157,8 @@ const ValueParser = {
             return null;
         }
 
-        const normalizedValue = ValueParser.resolveConstant.call(this, value.trim(), this.content || '');
+        const source = this.compilationContext?.source ?? this.content ?? '';
+        const normalizedValue = ValueParser.resolveConstant.call(this, value.trim(), source);
         if(normalizedValue === null)
         {
             return Types.ANY;
@@ -199,7 +200,16 @@ const ValueParser = {
         // Parse recursive object.
         if(normalizedValue.includes('{') && normalizedValue.includes(':'))
         {
+            // Constant-backed objects can refer back to an object already being expanded.
+            if(this.objectAncestors?.has(normalizedValue))
+            {
+                return Types.ANY;
+            }
+
             const tempParser = createParser(this.compilationContext);
+            tempParser.content = source;
+            tempParser.objectAncestors = new Set(this.objectAncestors);
+            tempParser.objectAncestors.add(normalizedValue);
             tempParser.staticVariables = [];
             tempParser.tabSize = this.tabSize;
 
