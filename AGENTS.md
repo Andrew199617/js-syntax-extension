@@ -1,5 +1,10 @@
 # Code readability
 
+## README audience
+
+- `README.md` is displayed to users of the VS Code extension. Keep it focused on extension features and usage; do not add developer setup, linting, testing, build instructions, or internal implementation details.
+- Put developer and agent guidance in `AGENTS.md` or separate developer documentation.
+
 ## File encoding and line endings
 
 - Save new text files with CRLF line endings and UTF-8 encoding without a BOM. Preserve an existing file's encoding and BOM when editing it.

@@ -4,6 +4,8 @@
     "publisher": "learn-game-development",
     "icon": "LGDLogo.png",
     "scripts": {
+        "lint": "node scripts/lint.js",
+        "lint:fix": "node scripts/lint.js --fix",
         "test": "jest --config ./tests/jest.config.js",
         "build": "webpack --mode development --devtool source-map",
         "vscode:prepublish": "npm run package",

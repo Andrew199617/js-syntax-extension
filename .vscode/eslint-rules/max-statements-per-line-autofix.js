@@ -61,5 +61,6 @@ export function create(context)
     const fixingContext = Object.create(context, {
         report: { value: reportWithFix }
     });
+
     return baseRule.create(fixingContext);
 }

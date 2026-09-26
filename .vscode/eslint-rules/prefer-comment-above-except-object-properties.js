@@ -53,5 +53,6 @@ export function create(context)
     const commentContext = Object.create(context, {
         report: { value: reportComment }
     });
+
     return baseRule.create(commentContext);
 }

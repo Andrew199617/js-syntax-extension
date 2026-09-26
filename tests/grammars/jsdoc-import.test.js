@@ -4,6 +4,7 @@ const path = require('path');
 const textmate = require('vscode-textmate');
 const oniguruma = require('vscode-oniguruma');
 
+// Repository root containing the syntax grammars.
 const root = path.resolve(__dirname, '../..');
 
 // Identify the extension grammar in its manifest.

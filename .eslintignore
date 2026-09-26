@@ -1,0 +1,4 @@
+/eslint.config.js
+
+# Include the editor custom rules in project lint checks.
+!/.vscode/
