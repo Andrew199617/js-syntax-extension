@@ -28,82 +28,76 @@ const SUCCESS_COLOR_CSS = 'rgba(60,255,60,1)';
 // Success notification duration in milliseconds.
 const SUCCESS_DURATION_MS = 2500;
 
-function hideError(state)
+let statusBarItem;
+let timeoutRef;
+
+function hideError()
 {
-    if(state.timeoutRef)
+    if(timeoutRef)
     {
-        clearTimeout(state.timeoutRef);
-        state.timeoutRef = null;
+        clearTimeout(timeoutRef);
+        timeoutRef = null;
     }
 
-    if(state.statusBarItem)
+    if(statusBarItem)
     {
-        state.statusBarItem.hide();
-        state.statusBarItem = null;
+        statusBarItem.hide();
+        statusBarItem = null;
     }
 }
 
-function show(state, message, type)
+function show(message, type)
 {
-    hideError(state);
+    hideError();
 
     switch(type)
     {
         case StatusBarMessageTypes.SUCCESS:
-            state.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
-            state.statusBarItem.text = message;
-            state.statusBarItem.command = 'workbench.action.showErrorsWarnings';
-            state.statusBarItem.color = SUCCESS_COLOR_CSS;
-            state.statusBarItem.show();
-            state.timeoutRef = setTimeout(() => hideError(state), SUCCESS_DURATION_MS);
+            statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+            statusBarItem.text = message;
+            statusBarItem.command = 'workbench.action.showErrorsWarnings';
+            statusBarItem.color = SUCCESS_COLOR_CSS;
+            statusBarItem.show();
+            timeoutRef = setTimeout(hideError, SUCCESS_DURATION_MS);
 
-            return state.statusBarItem;
+            return statusBarItem;
 
         case StatusBarMessageTypes.INDEFINITE:
             return vscode.window.setStatusBarMessage(message);
 
         case StatusBarMessageTypes.HINT:
-            state.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
-            state.statusBarItem.text = message;
-            state.statusBarItem.command = 'workbench.action.showErrorsWarnings';
-            state.statusBarItem.color = HINT_COLOR_CSS;
-            state.statusBarItem.show();
-            state.timeoutRef = setTimeout(() => hideError(state), HINT_DURATION_MS);
+            statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+            statusBarItem.text = message;
+            statusBarItem.command = 'workbench.action.showErrorsWarnings';
+            statusBarItem.color = HINT_COLOR_CSS;
+            statusBarItem.show();
+            timeoutRef = setTimeout(hideError, HINT_DURATION_MS);
 
-            return state.statusBarItem;
+            return statusBarItem;
 
         case StatusBarMessageTypes.WARNING:
-            state.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
-            state.statusBarItem.text = message;
-            state.statusBarItem.command = 'workbench.action.showErrorsWarnings';
-            state.statusBarItem.color = WARNING_COLOR_CSS;
-            state.statusBarItem.show();
-            state.timeoutRef = setTimeout(() => hideError(state), WARNING_DURATION_MS);
+            statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+            statusBarItem.text = message;
+            statusBarItem.command = 'workbench.action.showErrorsWarnings';
+            statusBarItem.color = WARNING_COLOR_CSS;
+            statusBarItem.show();
+            timeoutRef = setTimeout(hideError, WARNING_DURATION_MS);
 
-            return state.statusBarItem;
+            return statusBarItem;
 
         case StatusBarMessageTypes.ERROR:
-            state.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
-            state.statusBarItem.text = message;
-            state.statusBarItem.command = 'workbench.action.showErrorsWarnings';
-            state.statusBarItem.color = ERROR_COLOR_CSS;
-            state.statusBarItem.show();
-            state.timeoutRef = setTimeout(() => hideError(state), ERROR_DURATION_MS);
+            statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+            statusBarItem.text = message;
+            statusBarItem.command = 'workbench.action.showErrorsWarnings';
+            statusBarItem.color = ERROR_COLOR_CSS;
+            statusBarItem.show();
+            timeoutRef = setTimeout(hideError, ERROR_DURATION_MS);
 
-            return state.statusBarItem;
+            return statusBarItem;
     }
 }
 
-function create()
-{
-    const state = { statusBarItem: null, timeoutRef: null };
-    return {
-        hideError: () => hideError(state),
-        show: (message, type) => show(state, message, type)
-    };
-}
-
 module.exports = {
-    ...create(),
-    create: create
+    hideError,
+    show
 };

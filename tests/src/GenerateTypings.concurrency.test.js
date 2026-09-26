@@ -8,7 +8,6 @@ const vscode = require('vscode');
 
 let previousLgd;
 let diagnostics;
-let compilations;
 
 function deferred()
 {
@@ -40,7 +39,6 @@ const ${name} = {
         getText: () => source
     };
     const compilation = GenerateTypings.create(document, lgd.lgdDiagnosticCollection);
-    compilations.push(compilation);
     return compilation;
 }
 
@@ -50,22 +48,25 @@ jest.mock('vscode', () => ({
     workspace: { rootPath: 'workspace' },
     DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2 },
     StatusBarAlignment: { Left: 1 },
-    Range: jest.fn((...coordinates) => ({ coordinates: coordinates })),
+    Range: jest.fn((line, character) => ({ start: { line: line, character: character } })),
     Diagnostic: jest.fn((range, message, severity) => ({ range: range, message: message, severity: severity })),
     window: {
         setStatusBarMessage: jest.fn(() => ({ dispose: jest.fn() })),
-        createStatusBarItem: jest.fn(() => ({ show: jest.fn(), hide: jest.fn() }))
-    }
+        createStatusBarItem: jest.fn(() => ({ show: jest.fn(), hide: jest.fn() })),
+        showErrorMessage: jest.fn(),
+        showWarningMessage: jest.fn()
+    },
+    commands: { executeCommand: jest.fn() }
 }));
 
 beforeEach(() =>
 {
     previousLgd = globalThis.lgd;
     diagnostics = new Map();
-    compilations = [];
     globalThis.lgd = {
         configuration: { tabSize: 2, createDebugLog: true },
         logger: Logger.create('parser'),
+        outputChannel: { appendLine: jest.fn(), show: jest.fn() },
         lgdDiagnosticCollection: {
             set: (uri, entries) => diagnostics.set(uri.fsPath, entries),
             get: uri => diagnostics.get(uri.fsPath)
@@ -77,17 +78,12 @@ beforeEach(() =>
 
 afterEach(() =>
 {
-    for(const compilation of compilations)
-    {
-        compilation.compilationContext.statusBar.hideError();
-    }
-
     StatusBarMessage.hideError();
     jest.restoreAllMocks();
     globalThis.lgd = previousLgd;
 });
 
-test('parallel compilations keep diagnostics, log headings and status messages with their documents', async () =>
+test('parallel compilations keep diagnostics and logs with their documents without per-file UI', async () =>
 {
     const firstGate = deferred();
     const secondGate = deferred();
@@ -108,25 +104,34 @@ test('parallel compilations keep diagnostics, log headings and status messages w
     await nextTurn();
     expect(parse).toHaveBeenCalledTimes(2);
     firstGate.resolve();
-    await first;
-    expect(diagnostics.get('First.js')).toHaveLength(1);
+    const firstResult = await first;
+    expect(diagnostics.get('First.js')).toHaveLength(2);
     expect(diagnostics.has('Second.js')).toBe(false);
     secondGate.resolve();
-    await second;
-    expect(diagnostics.get('First.js')[0].message).toContain('FirstValue');
-    expect(diagnostics.get('Second.js')[0].message).toContain('SecondValue');
+    const secondResult = await second;
+    expect(diagnostics.get('First.js')[1].message).toContain('FirstValue');
+    expect(diagnostics.get('Second.js')[1].message).toContain('SecondValue');
     expect(diagnostics.get('First.js')).not.toBe(diagnostics.get('Second.js'));
     expect(VscodeError.currentDocument).toBeNull();
-    expect(lgd.logger.log.filter(entry => entry.includes('First.js'))).toHaveLength(1);
-    expect(lgd.logger.log.filter(entry => entry.includes('Second.js'))).toHaveLength(1);
-    const displayedStatuses = vscode.window.createStatusBarItem.mock.results.map(result => result.value);
-    expect(displayedStatuses[1].hide).not.toHaveBeenCalled();
-    lgd.logger.notifyUser();
-    expect(diagnostics.get('First.js').map(entry => entry.message)).toContain('LGD: Check log!');
-    expect(diagnostics.get('Second.js').map(entry => entry.message)).toContain('LGD: Check log!');
-    const savedLog = FileIO.writeFileContents.mock.calls.pop()[1];
-    expect(savedLog).toContain('First.js');
-    expect(savedLog).toContain('Second.js');
+    expect(firstResult.logger.log.join('\n')).toContain('First.js');
+    expect(firstResult.logger.log.join('\n')).not.toContain('Second.js');
+    expect(secondResult.logger.log.join('\n')).toContain('Second.js');
+    expect(FileIO.writeFileContents).not.toHaveBeenCalled();
+    expect(vscode.window.createStatusBarItem).not.toHaveBeenCalled();
+    expect(vscode.window.setStatusBarMessage).not.toHaveBeenCalled();
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+});
+
+test('single-file compilation reports its issues once and offers the Problems window', async () =>
+{
+    vscode.window.showErrorMessage.mockResolvedValueOnce('Show Problems');
+    await createCompilation('Single').executeGenerateTypings();
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith('workbench.actions.view.problems');
+    expect(diagnostics.get('Single.js')).toHaveLength(2);
+    expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
 });
 
 test('shared log writes finish in order without losing another document', async () =>
