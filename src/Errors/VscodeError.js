@@ -62,7 +62,8 @@ const VscodeError = {
     /** @description Don't throw the error but fail compilation. */
     notifyUser(fileParser)
     {
-        const document = VscodeError.currentDocument;
+        const context = fileParser?.compilationContext;
+        const document = context?.document || VscodeError.currentDocument;
 
         if(!document)
         {
@@ -77,16 +78,19 @@ const VscodeError = {
             this.message,
             SeverityConverter.getDiagnosticSeverity(this.severity)
         );
-        VscodeError.diagnostics.push(diagnosis);
+        const diagnostics = context?.diagnostics || VscodeError.diagnostics;
+        diagnostics.push(diagnosis);
 
         if(this.codeAction)
         {
             diagnosis.codeAction = this.codeAction;
         }
 
-        lgd.lgdDiagnosticCollection.set(document.uri, VscodeError.diagnostics);
+        const collection = context?.diagnosticCollection || lgd.lgdDiagnosticCollection;
+        collection.set(document.uri, diagnostics);
 
-        StatusBarMessage.show(
+        const statusBar = context?.statusBar || StatusBarMessage;
+        statusBar.show(
             SeverityConverter.getStatusBarMessage(this.severity),
             SeverityConverter.getMessageType(this.severity)
         );
@@ -94,6 +98,10 @@ const VscodeError = {
         if(this.severity === ErrorTypes.ERROR)
         {
             fileParser.errorOccurred = true;
+            if(context)
+            {
+                context.errorOccurred = true;
+            }
         }
     }
 };

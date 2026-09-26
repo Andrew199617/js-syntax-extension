@@ -140,6 +140,7 @@ function init(modules)
             {
                 const result = service.getEncodedSemanticClassifications(...args);
                 if(args[2] !== typescript.SemanticClassificationFormat.TwentyTwenty && args[2] !== '2020')
+                {
                     return result;
                 }
 

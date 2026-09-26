@@ -25,9 +25,9 @@ const FunctionComponentParser = {
      * @description Initialize an instance of FunctionComponentParser.
      * @returns {FunctionComponentParserType & FileParserType}
      */
-    create()
+    create(compilationContext = null)
     {
-        const functionComponentParser = Oloo.assignSlow(FileParser.create(), FunctionComponentParser);
+        const functionComponentParser = Oloo.assignSlow(FileParser.create(compilationContext), FunctionComponentParser);
         return functionComponentParser;
     },
 
