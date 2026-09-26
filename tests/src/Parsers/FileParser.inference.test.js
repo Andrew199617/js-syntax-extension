@@ -1,6 +1,7 @@
 const FileParser = require('../../../src/Parsers/FileParser');
 const ClassParser = require('../../../src/Parsers/ClassParser');
 const FunctionComponentParser = require('../../../src/Parsers/FunctionComponentParser');
+const typescript = require('typescript-test-5-9');
 
 let previousLgd;
 let parser;
@@ -129,6 +130,27 @@ test('keeps parentheses, equality operators and quoted commas inside defaults', 
 test.each([ '(value = 2 + 3)', 'value = 2 + 3' ])('accepts parameter lists with or without enclosing parentheses: %s', async parameters =>
 {
     expect(await parser.functionParser.parseFunctionParams(parameters, {})).toBe('(value: number)');
+});
+
+test.each([
+    [ '{ value = 1 }', '({ value }: any)' ],
+    [ '[first = 1]', '([first]: any)' ],
+    [ '{ value = 1 } = {}', '({ value }: any)' ],
+    [ '[first = 1] = []', '([first]: any)' ],
+    [ '{ outer: { inner = 1 } = {}, ...rest }', '({ outer: { inner }, ...rest }: any)' ],
+    [ '[first = 1, , { label = "x" } = {}, ...rest]', '([first, , { label }, ...rest]: any)' ],
+    [ '[first = 1, ,]', '([first, ,]: any)' ],
+    [ '{ "a=b": value = 1 }', '({ "a=b": value }: any)' ],
+    [ '{ ["a=b"]: value = 1 }', '({ ["a=b"]: value }: any)' ],
+    [ '...[first = 1, ...rest]', '(...[first, ...rest]: any[])' ],
+    [ 'value /* = comment */ = 2', '(value: number)' ]
+])('emits valid declarations for parameter bindings: %s', async (parameters, expected) =>
+{
+    const source = `const Example = {\n  run(${parameters}) {\n  }\n};`;
+    const declaration = await parser.parse('', source);
+    expect(declaration).toContain(`run${expected}: void;`);
+    const parsedDeclaration = typescript.createSourceFile('Example.d.ts', declaration, typescript.ScriptTarget.Latest, true);
+    expect(parsedDeclaration.parseDiagnostics).toEqual([]);
 });
 
 test.each([

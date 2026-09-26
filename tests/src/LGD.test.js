@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const vscode = require('vscode');
 const GenerateTypings = require('../../src/GenerateTypings');
 const FileIO = require('../../src/Logging/FileIO');
@@ -40,17 +41,20 @@ function getOutput()
     return lgd.outputChannel.appendLine.mock.calls.map(([line]) => line).join('\n');
 }
 
-async function saveFiles(filenames)
+async function saveFiles(filenames, source = 'const Example = {\n  value: 1\n};')
 {
     const save = vscode.workspace.onDidSaveTextDocument.mock.calls[0][0];
+    const change = vscode.workspace.onDidChangeTextDocument.mock.calls[0][0];
     const schedule = jest.spyOn(global, 'setTimeout').mockReturnValue(0);
     for(const filename of filenames)
     {
-        save({
+        const document = {
             fileName: filename,
             uri: { fsPath: filename, toString: () => filename },
-            getText: () => 'const Example = {\n  value: 1\n};'
-        });
+            getText: () => source
+        };
+        await change({ document: document, contentChanges: [] });
+        save(document);
     }
 
     const [flushSaves] = schedule.mock.calls[schedule.mock.calls.length - 1];
@@ -59,8 +63,9 @@ async function saveFiles(filenames)
 }
 
 jest.unmock('../../src/Errors/VscodeError');
-jest.mock('fs', () => ({ promises: { readFile: jest.fn() } }));
-jest.mock('../../src/Logging/FileIO', () => ({ writeFileContents: jest.fn() }));
+jest.mock('fs', () => ({ exists: jest.fn(), promises: { readFile: jest.fn() } }));
+jest.mock('path', () => ({ ...jest.requireActual('path') }));
+jest.mock('../../src/Logging/FileIO', () => ({ writeFileContents: jest.fn(), rename: jest.fn() }));
 
 jest.mock('vscode', () => ({
     commands: {
@@ -95,7 +100,7 @@ jest.mock('vscode', () => ({
 }));
 
 jest.mock('../../src/Core/Configuration', () => ({
-    create: jest.fn(() => ({ autoComplete: { enabled: false }, tabSize: 2, createDebugLog: true, generateTypings: true }))
+    create: jest.fn(() => ({ autoComplete: { enabled: false }, tabSize: 2, createDebugLog: true, generateTypings: true, generateTypingsOnChange: true }))
 }));
 
 jest.mock('../../src/CodeActions/CodeActions', () => ({ create: jest.fn(() => ({ registerCommands: jest.fn() })) }));
@@ -106,7 +111,10 @@ jest.mock('../../src/Refactor/InvertIf', () => ({ create: jest.fn(() => ({ regis
 beforeEach(() =>
 {
     previousLgd = globalThis.lgd;
+    vscode.workspace.rootPath = 'workspace';
+    fs.exists.mockReset();
     fs.promises.readFile.mockReset();
+    FileIO.rename.mockReset();
     FileIO.writeFileContents.mockReset();
     FileIO.writeFileContents.mockResolvedValue();
     extension.activate({ subscriptions: [] });
@@ -260,4 +268,103 @@ test('Save All groups neighboring saves into one report while compiling both doc
     expect(getDiagnostics('second.js')).toEqual([]);
     const debugWrites = FileIO.writeFileContents.mock.calls.filter(([filename]) => filename.endsWith('.log'));
     expect(debugWrites).toHaveLength(1);
+});
+
+test('Save All with dirty-state changes produces one warning summary', async () =>
+{
+    const source = '/** @template {number} Item */\nconst Example = {\n  value: 1\n};';
+    const filenames = [ 'first.js', 'second.js' ];
+    await saveFiles(filenames, source);
+    expect(vscode.window.setStatusBarMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledTimes(1);
+    expect(getOutput()).toContain('2 compiled, 0 skipped, 0 failed; 0 errors, 2 warnings');
+    expect(getDiagnostics('first.js')).toHaveLength(1);
+    expect(getDiagnostics('second.js')).toHaveLength(1);
+    expect(FileIO.writeFileContents).toHaveBeenCalledTimes(filenames.length + 1);
+});
+
+test('actual content changes still compile with single-file feedback', async () =>
+{
+    const change = vscode.workspace.onDidChangeTextDocument.mock.calls[0][0];
+    const document = {
+        fileName: 'single.js',
+        uri: { fsPath: 'single.js' },
+        getText: () => 'const Example = {\n  value: 1\n};'
+    };
+    await change({ document: document, contentChanges: [{ text: '1' }] });
+    expect(vscode.window.setStatusBarMessage).toHaveBeenCalledTimes(1);
+    expect(getOutput()).toContain('1 compiled, 0 skipped, 0 failed; 0 errors, 0 warnings');
+    expect(FileIO.writeFileContents).toHaveBeenCalledTimes(2);
+});
+
+describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
+{
+    beforeEach(() =>
+    {
+        const platformPath = path[platform];
+        jest.spyOn(path, 'parse').mockImplementation(platformPath.parse);
+        jest.spyOn(path, 'relative').mockImplementation(platformPath.relative);
+        jest.spyOn(path, 'join').mockImplementation(platformPath.join);
+        vscode.workspace.rootPath = platform === 'win32' ? 'C:\\workspace\\project' : '/workspace/project';
+    });
+
+    test.each([
+        [ true, 'typings/src/nested/Example.d.ts' ],
+        [ false, 'typings/Example.d.ts' ]
+    ])('generates nested declarations with maintainHierarchy=%s', async (maintainHierarchy, expectedFile) =>
+    {
+        lgd.configuration.maintainHierarchy = maintainHierarchy;
+        const filename = path[platform].normalize(`${vscode.workspace.rootPath}/src/nested/Example.js`);
+        const document = {
+            fileName: filename,
+            uri: { fsPath: filename },
+            getText: () => 'const Example = {\n  value: 1\n};'
+        };
+        const result = await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
+        expect(result.compiled).toBe(true);
+        expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(
+            path[platform].normalize(`${vscode.workspace.rootPath}/${expectedFile}`),
+            expect.stringContaining('static value: number;')
+        );
+    });
+
+    test('writes root-level declarations and debug logs inside the typings directory', async () =>
+    {
+        lgd.configuration.maintainHierarchy = true;
+        const filename = path[platform].normalize(`${vscode.workspace.rootPath}/Example.js`);
+        const document = {
+            fileName: filename,
+            uri: { fsPath: filename },
+            getText: () => 'const Example = {\n  value: 1\n};'
+        };
+        await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();
+        expect(FileIO.writeFileContents).toHaveBeenCalledTimes(2);
+        expect(FileIO.writeFileContents.mock.calls.map(([file]) => file)).toEqual([
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/Example.d.ts`),
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/LGD.FileParser.log`)
+        ]);
+    });
+
+    test('renames declarations in both flattened and maintained layouts', () =>
+    {
+        fs.exists.mockImplementation((filename, callback) => callback(filename.endsWith('Old.d.ts')));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/old/Old.js`) },
+            newUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/new/New.js`) }
+        }] });
+        expect(FileIO.rename).toHaveBeenCalledTimes(2);
+        expect(FileIO.rename).toHaveBeenCalledWith(
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/Old.d.ts`),
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/New.d.ts`),
+            expect.any(Function)
+        );
+
+        expect(FileIO.rename).toHaveBeenCalledWith(
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/old/Old.d.ts`),
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/new/New.d.ts`),
+            expect.any(Function)
+        );
+    });
 });

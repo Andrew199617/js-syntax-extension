@@ -240,7 +240,7 @@ function activate(context)
     // compile file when we change the document
     const didChangeEvent = vscode.workspace.onDidChangeTextDocument(async TextChangedEvent =>
     {
-        if(!lgd.configuration.generateTypingsOnChange)
+        if(!lgd.configuration.generateTypingsOnChange || TextChangedEvent.contentChanges.length === 0)
         {
             return;
         }
@@ -279,18 +279,18 @@ function activate(context)
             const newParsedPath = path.parse(newFileUri.fsPath);
             const newFileName = newParsedPath.name;
 
-            const oldMaintainedRoot = oldParsedPath.dir.replace(vscode.workspace.rootPath, '');
-            const newMaintainedRoot = newParsedPath.dir.replace(vscode.workspace.rootPath, '');
+            const oldMaintainedRoot = path.relative(vscode.workspace.rootPath, oldParsedPath.dir);
+            const newMaintainedRoot = path.relative(vscode.workspace.rootPath, newParsedPath.dir);
 
             const typeFilePaths = [
                 {
-                    oldPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}\\${oldFileName}${DEFAULT_EXT}`,
-                    newPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}\\${newFileName}${DEFAULT_EXT}`,
+                    oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${oldFileName}${DEFAULT_EXT}`),
+                    newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${newFileName}${DEFAULT_EXT}`),
                     isMaintained: false
                 },
                 {
-                    oldPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${oldMaintainedRoot}\\${oldFileName}${DEFAULT_EXT}`,
-                    newPath: `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${newMaintainedRoot}\\${newFileName}${DEFAULT_EXT}`,
+                    oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, oldMaintainedRoot, `${oldFileName}${DEFAULT_EXT}`),
+                    newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, newMaintainedRoot, `${newFileName}${DEFAULT_EXT}`),
                     isMaintained: true
                 }
             ];

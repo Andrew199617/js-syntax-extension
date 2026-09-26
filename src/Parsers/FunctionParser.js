@@ -91,6 +91,83 @@ const FunctionParser = {
         }
     },
 
+    /** @description Preserve binding patterns while removing their nested default initializers. */
+    getParameterBinding(pattern, source)
+    {
+        if(pattern.type === 'AssignmentPattern')
+        {
+            return this.getParameterBinding(pattern.left, source);
+        }
+
+        let children = [];
+        if(pattern.type === 'ObjectPattern')
+        {
+            children = pattern.properties.map(property =>
+            {
+                if(property.type === 'RestElement')
+                {
+                    return property;
+                }
+
+                return property.value;
+            });
+        }
+        else if(pattern.type === 'ArrayPattern')
+        {
+            children = pattern.elements.filter(Boolean);
+        }
+        else if(pattern.type === 'RestElement')
+        {
+            children = [pattern.argument];
+        }
+
+        let binding = '';
+        let position = pattern.start;
+        for(const child of children)
+        {
+            binding += source.slice(position, child.start);
+            binding += this.getParameterBinding(child, source);
+            position = child.end;
+        }
+
+        return binding + source.slice(position, pattern.end);
+    },
+
+    /** @description Separate the binding, rest marker, and whole-parameter default using syntax nodes. */
+    parseParameter(parameter)
+    {
+        const source = `(${parameter}) => {}`;
+        let binding;
+        try
+        {
+            binding = parseExpression(source).params[0];
+        }
+        catch
+        {
+            return { name: parameter, isRest: false };
+        }
+
+        const isRest = binding.type === 'RestElement';
+        if(isRest)
+        {
+            binding = binding.argument;
+        }
+
+        let defaultValue;
+        if(binding.type === 'AssignmentPattern')
+        {
+            // A destructuring default does not describe every property accepted by the parameter.
+            if(binding.left.type === 'Identifier')
+            {
+                defaultValue = source.slice(binding.right.start, binding.right.end);
+            }
+
+            binding = binding.left;
+        }
+
+        return { name: this.getParameterBinding(binding, source), isRest: isRest, defaultValue: defaultValue };
+    },
+
     /** @description Recognizes array-shaped TypeScript annotations without changing their element types. */
     isArrayType(annotation)
     {
@@ -169,32 +246,19 @@ const FunctionParser = {
                 continue;
             }
 
-            let parameter = variables[i];
-            const isRest = parameter.startsWith('...');
-            if(isRest)
-            {
-                parameter = parameter.slice('...'.length).trim();
-            }
-
-            let type = commentParams[parameter];
+            const parsedParameter = this.parseParameter(variables[i]);
+            let parameter = parsedParameter.name;
+            const type = commentParams[parameter];
 
             // The type gotten from the default value.
             let parsedType = null;
-            const assignmentIndex = parameter.indexOf('=');
-            if(assignmentIndex !== -1)
+            if(!type && typeof parsedParameter.defaultValue !== 'undefined')
             {
-                const defaultValue = parameter.slice(assignmentIndex + 1).trim();
-                parameter = parameter.slice(0, assignmentIndex).trim();
-                type = commentParams[parameter];
-
-                if(!type)
-                {
-                    parsedType = await this.parseValue(defaultValue);
-                }
+                parsedType = await this.parseValue(parsedParameter.defaultValue);
             }
 
             let parameterType = type || parsedType || 'any';
-            if(isRest)
+            if(parsedParameter.isRest)
             {
                 parameter = `...${parameter}`;
                 parameterType = this.getRestParameterType(parameterType);

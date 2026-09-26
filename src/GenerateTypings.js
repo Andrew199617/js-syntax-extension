@@ -144,11 +144,11 @@ const GenerateTypings = {
         let dirInRoot = '';
         if(lgd.configuration.maintainHierarchy)
         {
-            dirInRoot = parsedPath.dir.replace(vscode.workspace.rootPath, '');
+            dirInRoot = path.relative(vscode.workspace.rootPath, parsedPath.dir);
         }
 
         const baseFilename = parsedPath.name;
-        const typeFilePath = `${vscode.workspace.rootPath}\\${DEFAULT_DIR}${dirInRoot}\\${baseFilename}${DEFAULT_EXT}`;
+        const typeFilePath = path.join(vscode.workspace.rootPath, DEFAULT_DIR, dirInRoot, `${baseFilename}${DEFAULT_EXT}`);
 
         await FileIO.writeFileContents(typeFilePath, typeFile);
 
