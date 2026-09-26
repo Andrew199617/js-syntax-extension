@@ -65,7 +65,7 @@ function hasSeparatedLinks(chain, source)
         }
         else if(current.type === 'MemberExpression')
         {
-            const operator = source.getTokenAfter(current.object, token => token.value !== ')');
+const operator = source.getTokenAfter(current.object, { filter: token => token.value !== ')' });
             const previous = source.getTokenBefore(operator);
             if(operator.loc.start.line !== previous.loc.end.line)
             {
