@@ -135,7 +135,7 @@ export function create(context)
             }
         }
 
-        if(!replacements.length)
+        if(replacements.length === 0)
         {
             return;
         }

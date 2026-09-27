@@ -18,11 +18,7 @@ const StaticAccessorCheck = {
             return;
         }
 
-        const staticVariables = this.staticVariables.reduce((accumulator, val) =>
-        {
-            const lastVal = accumulator === '' ? '' : `${accumulator}|`;
-            return lastVal + val;
-        });
+        const staticVariables = this.staticVariables.join('|');
 
         const staticCheck = new RegExp(`this\\.(?<variableName>(${staticVariables}))`, 'm');
         let object;

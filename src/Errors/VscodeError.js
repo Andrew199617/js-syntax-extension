@@ -31,7 +31,7 @@ const VscodeError = {
      */
     create(message, startLine, startCharacter, endLine, endCharacter, severity)
     {
-        const vscodeError = Oloo.assign(new Error(), VscodeError);
+        const vscodeError = Oloo.assign(new Error(message), VscodeError);
         vscodeError.name = 'VscodeError';
         vscodeError.message = message;
 

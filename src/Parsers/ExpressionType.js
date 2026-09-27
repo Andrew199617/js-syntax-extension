@@ -75,9 +75,9 @@ const ExpressionType = {
         switch(name)
         {
             case 'undefined':
-                return this.constantValue(undefined);
+                return this.constantValue();
             case 'NaN':
-                return this.constantValue(NaN);
+                return this.constantValue(Number.NaN);
             case 'Infinity':
                 return this.constantValue(Infinity);
             default:
@@ -135,7 +135,7 @@ const ExpressionType = {
 
                 return this.unknownValue(Types.STRING);
             case 'void':
-                return this.constantValue(undefined);
+                return this.constantValue();
             case '+':
                 if(argument.known)
                 {

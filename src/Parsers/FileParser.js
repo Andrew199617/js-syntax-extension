@@ -133,7 +133,7 @@ const FileParser = {
      */
     parseClassComment(comment)
     {
-        const jsdocRegex = /@(?<jsdoc>(?:template|extends))(?!$)(?:\s*{(?<type>.*?)}|\s*(?<name>[\w, ]*))/gms;
+        const jsdocRegex = /@(?<jsdoc>(?:template|extends))(?!$)(?:\s*{(?<type>.*?)}|\s*(?<name>[\w ,]*))/gms;
 
         const docs = { extends: [], template: [] };
         let doc = null;
@@ -166,7 +166,7 @@ const FileParser = {
      */
     async parseComment(comment, options)
     {
-        const jsdocRegex = /@(?<jsdoc>(?:type|returns|param))(?!$)(?:\s*{(?<type>.*?)}(?![^\n]*}))\s*(?<name>\w*)(?<description>.*?)(?=(?:@|\*\/))/gms;
+        const jsdocRegex = /@(?<jsdoc>(?:type|returns|param))(?!$)\s*{(?<type>.*?)}(?![^\n]*})\s*(?<name>\w*)(?<description>.*?)(?=(?:@|\*\/))/gms;
 
         let doc;
         let numReturns = 0;
@@ -510,7 +510,7 @@ const FileParser = {
 
             this.addVariable(variable.groups.name);
 
-            const definedOnState = (/state(?:\.|\[)/).test(variable.groups.objectAccessors);
+            const definedOnState = (/state[.[]/).test(variable.groups.objectAccessors);
             if(definedOnState)
             {
                 if(!this.stateInterface)

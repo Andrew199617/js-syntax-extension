@@ -196,7 +196,7 @@ export function create(context)
             separateToken(alternative, indentation, edits);
         }
 
-        if(!edits.length)
+        if(edits.length === 0)
         {
             return;
         }

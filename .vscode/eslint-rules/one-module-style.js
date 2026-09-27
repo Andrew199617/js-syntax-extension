@@ -114,7 +114,7 @@ export function create(context)
             collectDefinitions(statement, definitions);
         }
 
-        if(!definitions.owners.length)
+        if(definitions.owners.length === 0)
         {
             return;
         }
