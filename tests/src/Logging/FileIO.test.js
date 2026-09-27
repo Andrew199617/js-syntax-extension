@@ -119,7 +119,7 @@ test.each([
 {
     const oldPath = path.join(directory, 'Example.d.ts');
     const newPath = path.join(directory, 'example.d.ts');
-    const sourceStats = { dev: 1n, ino: 1n };
+    const sourceStats = { dev: 1n, ino: 1n, isSymbolicLink: jest.fn().mockReturnValue(false) };
 
     // Model distinct case-sensitive entries, including aliases with the same target or inode.
     const stat = jest.spyOn(fs, 'stat').mockResolvedValue(sourceStats);
@@ -143,6 +143,52 @@ test.each([
         readdir.mockRestore();
         rename.mockRestore();
         copyFile.mockRestore();
+    }
+});
+
+test.each([ false, true ])('moving a declaration symlink preserves the link and handles occupied destinations (%s)', async occupied =>
+{
+    const oldPath = path.join(directory, 'old.d.ts');
+    const newPath = path.join(directory, 'new.d.ts');
+    const target = '../shared/declaration.d.ts';
+    const sourceStats = { isSymbolicLink: jest.fn().mockReturnValue(true) };
+    const lstat = jest.spyOn(fs, 'lstat').mockResolvedValue(sourceStats);
+    const readlink = jest.spyOn(fs, 'readlink').mockResolvedValue(target);
+    const symlink = jest.spyOn(fs, 'symlink').mockResolvedValue();
+    const copyFile = jest.spyOn(fs, 'copyFile').mockResolvedValue();
+    const unlink = jest.spyOn(fs, 'unlink').mockResolvedValue();
+    const collision = Object.assign(new Error('Destination exists'), { code: 'EEXIST' });
+    if(occupied)
+    {
+        symlink.mockRejectedValue(collision);
+    }
+
+    const callback = jest.fn();
+    try
+    {
+        await FileIO.rename(oldPath, newPath, callback);
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(readlink).toHaveBeenCalledWith(oldPath);
+        expect(symlink).toHaveBeenCalledWith(target, newPath, 'file');
+        expect(copyFile).not.toHaveBeenCalled();
+        if(occupied)
+        {
+            expect(callback).toHaveBeenCalledWith(collision);
+            expect(unlink).not.toHaveBeenCalled();
+        }
+        else
+        {
+            expect(callback).toHaveBeenCalledWith();
+            expect(unlink).toHaveBeenCalledWith(oldPath);
+        }
+    }
+    finally
+    {
+        lstat.mockRestore();
+        readlink.mockRestore();
+        symlink.mockRestore();
+        copyFile.mockRestore();
+        unlink.mockRestore();
     }
 });
 
@@ -196,6 +242,34 @@ test('a failed source removal rolls back the copied declaration so renaming can 
     await FileIO.rename(oldPath, newPath, callback);
     expect(callback).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledWith();
+    expect(await fs.readFile(newPath, 'utf8')).toBe('source');
+    await expect(fs.access(oldPath)).rejects.toHaveProperty('code', 'ENOENT');
+});
+
+test('a source removed concurrently leaves the copied declaration available for recovery', async () =>
+{
+    const oldPath = path.join(directory, 'old.d.ts');
+    const newPath = path.join(directory, 'new.d.ts');
+    await FileIO.writeFileContents(oldPath, 'source');
+    const removeFile = fs.unlink;
+    const unlink = jest.spyOn(fs, 'unlink').mockImplementationOnce(async filename =>
+    {
+        await removeFile(filename);
+        await removeFile(filename);
+    });
+
+    const callback = jest.fn();
+    try
+    {
+        await FileIO.rename(oldPath, newPath, callback);
+    }
+    finally
+    {
+        unlink.mockRestore();
+    }
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toHaveProperty('code', 'ENOENT');
     expect(await fs.readFile(newPath, 'utf8')).toBe('source');
     await expect(fs.access(oldPath)).rejects.toHaveProperty('code', 'ENOENT');
 });

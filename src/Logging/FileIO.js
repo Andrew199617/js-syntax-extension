@@ -104,6 +104,20 @@ async function tryCaseOnlyRename(oldPath, newPath)
     return true;
 }
 
+/** @description Copies a declaration or its symbolic link without replacing an occupied destination. */
+async function copyDeclaration(oldPath, newPath)
+{
+    const sourceStats = await fs.lstat(oldPath);
+    if(sourceStats.isSymbolicLink())
+    {
+        const target = await fs.readlink(oldPath);
+        await fs.symlink(target, newPath, 'file');
+        return;
+    }
+
+    await fs.copyFile(oldPath, newPath, COPYFILE_EXCL);
+}
+
 /** @description Removes the source or rolls back the copy, reporting both failures if cleanup is blocked. */
 async function removeSourceOrRollback(oldPath, newPath)
 {
@@ -113,6 +127,11 @@ async function removeSourceOrRollback(oldPath, newPath)
     }
     catch(error)
     {
+        if(error.code === 'ENOENT')
+        {
+            throw error;
+        }
+
         try
         {
             await fs.unlink(newPath);
@@ -166,7 +185,7 @@ async function rename(oldPath, newPath, callback)
         await fs.mkdir(path.dirname(newPath), { recursive: true });
         if(!await tryCaseOnlyRename(oldPath, newPath))
         {
-            await fs.copyFile(oldPath, newPath, COPYFILE_EXCL);
+            await copyDeclaration(oldPath, newPath);
             await removeSourceOrRollback(oldPath, newPath);
         }
     }
