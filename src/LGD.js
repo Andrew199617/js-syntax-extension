@@ -209,6 +209,7 @@ function activate(context)
         const activeEditor = vscode.window.activeTextEditor;
         if(!activeEditor || !activeEditor.document.fileName.endsWith(JS_EXT))
         {
+            lgd.outputChannel.appendLine('LGD: Cannot compile the current file. Open a JavaScript (.js) file and try again.');
             return;
         }
 

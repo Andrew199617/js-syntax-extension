@@ -320,13 +320,15 @@ test('actual content changes report parser errors without popups', async () =>
     expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
 });
 
-test.each([ undefined, { document: { fileName: 'notes.txt' } } ])('compile command quietly skips an unavailable JavaScript editor: %p', async activeEditor =>
+test.each([ undefined, { document: { fileName: 'notes.txt' } } ])('compile command logs an unavailable JavaScript editor without opening Output or a popup: %p', async activeEditor =>
 {
     vscode.window.activeTextEditor = activeEditor;
     const createCompilation = jest.spyOn(GenerateTypings, 'create');
     const registration = vscode.commands.registerCommand.mock.calls.find(([name]) => name === 'lgd.generateTypings');
     await registration[1]();
     expect(createCompilation).not.toHaveBeenCalled();
+    expect(getOutput()).toContain('Cannot compile the current file. Open a JavaScript (.js) file and try again.');
+    expect(lgd.outputChannel.show).not.toHaveBeenCalled();
     expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
     expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
     expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
