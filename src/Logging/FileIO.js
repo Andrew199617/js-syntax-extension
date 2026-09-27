@@ -2,6 +2,51 @@ const path = require('path');
 const fs = require('fs').promises;
 const { COPYFILE_EXCL } = require('fs').constants;
 
+/** @description Pending writes and moves, grouped by absolute filesystem path. */
+const pendingOperations = new Map();
+
+/** @description Shares a queue for equivalent Windows paths without conflating case-sensitive POSIX names. */
+function operationPath(filepath)
+{
+    const absolutePath = path.resolve(filepath);
+    return process.platform === 'win32' ? absolutePath.toLowerCase() : absolutePath;
+}
+
+/** @description Serializes operations on their source and destination while unrelated files remain independent. */
+async function queueFileOperation(filepaths, operation)
+{
+    const keys = filepaths.map(operationPath);
+    const previousOperations = keys.map(key => pendingOperations.get(key));
+    let release;
+    const completion = new Promise(resolve =>
+    {
+        release = resolve;
+    });
+
+    for(const key of keys)
+    {
+        pendingOperations.set(key, completion);
+    }
+
+    try
+    {
+        await Promise.all(previousOperations);
+        return await operation();
+    }
+    finally
+    {
+        for(const key of keys)
+        {
+            if(pendingOperations.get(key) === completion)
+            {
+                pendingOperations.delete(key);
+            }
+        }
+
+        release();
+    }
+}
+
 /** @description Changes casing only when both paths resolve to the same filesystem entry. */
 async function tryCaseOnlyRename(oldPath, newPath)
 {
@@ -69,8 +114,13 @@ const FileIO = {
     /** @description Creates the parent directory and writes the file contents. */
     async writeFileContents(filepath, content)
     {
-        await fs.mkdir(path.dirname(filepath), { recursive: true });
-        await fs.writeFile(filepath, content);
+        async function writeContents()
+        {
+            await fs.mkdir(path.dirname(filepath), { recursive: true });
+            await fs.writeFile(filepath, content);
+        }
+
+        await queueFileOperation([filepath], writeContents);
     },
 
     /** @description Creates a directory tree and passes any failure to the callback. */
@@ -92,7 +142,7 @@ const FileIO = {
     /** @description Moves a declaration without overwriting an existing destination, then removes its empty old directory. */
     async rename(oldPath, newPath, callback)
     {
-        try
+        async function moveDeclaration()
         {
             await fs.mkdir(path.dirname(newPath), { recursive: true });
             if(!await tryCaseOnlyRename(oldPath, newPath))
@@ -100,26 +150,31 @@ const FileIO = {
                 await fs.copyFile(oldPath, newPath, COPYFILE_EXCL);
                 await removeSourceOrRollback(oldPath, newPath);
             }
+
+            const oldDir = path.dirname(oldPath);
+            try
+            {
+                const files = await fs.readdir(oldDir);
+                if(!files.length)
+                {
+                    await fs.rmdir(oldDir);
+                    console.log(`LGD: Removed Old Dir ${oldDir}`);
+                }
+            }
+            catch(error)
+            {
+                console.error(error);
+            }
+        }
+
+        try
+        {
+            await queueFileOperation([ oldPath, newPath ], moveDeclaration);
         }
         catch(error)
         {
             callback(error);
             return;
-        }
-
-        const oldDir = path.dirname(oldPath);
-        try
-        {
-            const files = await fs.readdir(oldDir);
-            if(files.length === 0)
-            {
-                await fs.rmdir(oldDir);
-                console.log(`LGD: Removed Old Dir ${oldDir}`);
-            }
-        }
-        catch(error)
-        {
-            console.error(error);
         }
 
         callback();

@@ -206,6 +206,81 @@ test('concurrent renames to the same destination keep the losing source intact',
     }
 });
 
+test.each([ 'source', 'destination' ])('a write to the %s during a move keeps its latest contents', async writeTarget =>
+{
+    const oldPath = path.join(directory, 'old.d.ts');
+    const newPath = path.join(directory, 'new.d.ts');
+    const unrelatedPath = path.join(directory, 'unrelated.d.ts');
+    const writePath = writeTarget === 'source' ? oldPath : newPath;
+    await FileIO.writeFileContents(oldPath, 'original');
+    const copyFileContents = fs.copyFile;
+    const writeFile = jest.spyOn(fs, 'writeFile');
+
+    // All parents already exist. Resolve mkdir immediately to control write ordering.
+    const mkdir = jest.spyOn(fs, 'mkdir').mockResolvedValue();
+    let writing;
+    const copyFile = jest.spyOn(fs, 'copyFile').mockImplementation(async (...args) =>
+    {
+        await copyFileContents(...args);
+        writing = FileIO.writeFileContents(writePath, 'latest');
+
+        // An unrelated write must still finish while this move holds its paths.
+        await FileIO.writeFileContents(unrelatedPath, 'independent');
+
+        // Complete any writes that started during the copy before allowing unlink.
+        await Promise.all(writeFile.mock.results.map(result => result.value));
+    });
+
+    const callback = jest.fn();
+    try
+    {
+        await FileIO.rename(oldPath, newPath, callback);
+        await writing;
+    }
+    finally
+    {
+        copyFile.mockRestore();
+        mkdir.mockRestore();
+        writeFile.mockRestore();
+    }
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith();
+    expect(await fs.readFile(writePath, 'utf8')).toBe('latest');
+    expect(await fs.readFile(unrelatedPath, 'utf8')).toBe('independent');
+    if(writeTarget === 'source')
+    {
+        expect(await fs.readFile(newPath, 'utf8')).toBe('original');
+    }
+    else
+    {
+        await expect(fs.access(oldPath)).rejects.toHaveProperty('code', 'ENOENT');
+    }
+});
+
+test('a failed write does not block later writes or renames for the same path', async () =>
+{
+    const oldPath = path.join(directory, 'old.d.ts');
+    const newPath = path.join(directory, 'new.d.ts');
+    const failure = new Error('Cannot write declaration');
+    const writeFile = jest.spyOn(fs, 'writeFile').mockRejectedValueOnce(failure);
+    try
+    {
+        await expect(FileIO.writeFileContents(oldPath, 'failed')).rejects.toBe(failure);
+    }
+    finally
+    {
+        writeFile.mockRestore();
+    }
+
+    await FileIO.writeFileContents(oldPath, 'latest');
+    const callback = jest.fn();
+    await FileIO.rename(oldPath, newPath, callback);
+    expect(callback).toHaveBeenCalledWith();
+    expect(await fs.readFile(newPath, 'utf8')).toBe('latest');
+    await expect(fs.access(oldPath)).rejects.toHaveProperty('code', 'ENOENT');
+});
+
 test('recursive directory creation reports failures through its callback', async () =>
 {
     const filename = path.join(directory, 'file');
