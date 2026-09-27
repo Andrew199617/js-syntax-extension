@@ -244,17 +244,21 @@ test('wraps a nested unbraced if without changing its enclosing else', () =>
     expectSameBehavior(originalSource, invertedSource, [ `run(true, true)`, `run(true, false)`, `run(false, true)` ]);
 });
 
-test('reuses the following return value and preserves its side effects', () =>
+test('reuses the following return value and preserves its comments and side effects', () =>
 {
     const originalSource = `function run(ready) {
   if (ready) {
     output.push("work");
   }
 
+  // Report completion for either branch.
+  /* Keep the explanation next to the original return. */
   return output.push("done");
 }`;
     const invertedSource = invert(originalSource);
     expectSameBehavior(originalSource, invertedSource, [ `run(true)`, `run(false)` ]);
+    expect(invertedSource).toContain(`// Report completion for either branch.`);
+    expect(invertedSource).toContain(`/* Keep the explanation next to the original return. */`);
 });
 
 test('moves a returning else into the guard without skipping later work', () =>
@@ -632,7 +636,28 @@ function run(ready: boolean) {
     expect(invertedSource).toContain(declaration);
 });
 
-test('accepts the opening brace and whole-line selections', () =>
+test.each([
+    [ `type Value = string;`, `type Value = number;` ],
+    [ `interface Value { outer: string; }`, `interface Value { inner: number; }` ],
+    [ `enum Value { outer }`, `enum Value { inner }` ]
+])('keeps a TypeScript declaration separate from the destination declaration: %s', (outerDeclaration, innerDeclaration) =>
+{
+    const originalSource = `function run(ready: boolean) {
+  ${outerDeclaration}
+  if (ready) {
+    ${innerDeclaration}
+    consume(1);
+  }
+}`;
+    const invertedSource = invert(originalSource, 'if', { languageId: 'typescript' });
+    const syntax = parser.parse(invertedSource, { plugins: ['typescript'] });
+    const body = syntax.program.body[0].body.body;
+    expect(body.slice(1).map(statement => statement.type)).toEqual([ 'IfStatement', 'BlockStatement' ]);
+    expect(invertedSource).toContain(outerDeclaration);
+    expect(invertedSource).toContain(innerDeclaration);
+});
+
+test('accepts the opening brace and whole-line selections through enclosing braces', () =>
 {
     const originalSource = `function run(ready) {
   if (ready) {
@@ -644,6 +669,23 @@ test('accepts the opening brace and whole-line selections', () =>
     const start = originalSource.indexOf('  if');
     const end = originalSource.lastIndexOf('}');
     expect(InvertIf.createEdit(originalSource, { start: start, end: end })).not.toBeNull();
+    const edit = InvertIf.createEdit(originalSource, { start: start, end: originalSource.length });
+    expect(edit).not.toBeNull();
+    const invertedSource = originalSource.slice(0, edit.start) + edit.text + originalSource.slice(edit.end);
+    expectSameBehavior(originalSource, invertedSource, [ `run(true)`, `run(false)` ]);
+});
+
+test('rejects a selection that also includes a following statement', () =>
+{
+    const originalSource = `function run(ready) {
+  if (ready) {
+    output.push(1);
+  }
+  return 2;
+}`;
+    const start = originalSource.indexOf('if');
+    expect(plan(originalSource)).not.toBeNull();
+    expect(InvertIf.createEdit(originalSource, { start: start, end: originalSource.length })).toBeNull();
 });
 
 test('preserves JSX text and supports TSX', () =>
