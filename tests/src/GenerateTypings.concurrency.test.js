@@ -165,13 +165,17 @@ test('parallel compilations keep diagnostics and logs with their documents witho
     expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
 });
 
-test('single-file compilation reports its issues once and offers the Problems window', async () =>
+test('single-file compilation keeps issues in Problems and the status bar without popups', async () =>
 {
-    vscode.window.showErrorMessage.mockResolvedValueOnce('Show Problems');
     await createCompilation('Single').executeGenerateTypings();
-    expect(vscode.window.showErrorMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
     expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith('workbench.actions.view.problems');
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+    expect(vscode.window.createStatusBarItem).toHaveBeenCalledTimes(1);
+    const status = vscode.window.createStatusBarItem.mock.results[0].value;
+    expect(status.text).toContain('$(error)');
+    expect(status.command).toBe('workbench.action.showErrorsWarnings');
+    expect(status.show).toHaveBeenCalledTimes(1);
     expect(diagnostics.get('Single.js')).toHaveLength(2);
     expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
 });

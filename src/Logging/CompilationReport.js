@@ -4,7 +4,7 @@ const StatusBarMessageTypes = require('./StatusBarMessageTypes');
 const SeverityConverter = require('../Core/ServerityConverter');
 const ErrorTypes = require('../Errors/ErrorTypes');
 
-/** @description One output stream and one final notification for a compilation run. */
+/** @description One output stream and one final status-bar message for a compilation run. */
 const CompilationReport = {
     create(label, batch = false)
     {
@@ -79,28 +79,6 @@ const CompilationReport = {
         this.output.appendLine(`Error: ${error.message || String(error)}`);
     },
 
-    async notifyUser(summary)
-    {
-        let selection;
-        if(this.errors > 0)
-        {
-            selection = await vscode.window.showErrorMessage(summary, 'Show Problems', 'Show Output');
-        }
-        else if(this.warnings > 0)
-        {
-            selection = await vscode.window.showWarningMessage(summary, 'Show Problems', 'Show Output');
-        }
-
-        if(selection === 'Show Problems')
-        {
-            await vscode.commands.executeCommand('workbench.actions.view.problems');
-        }
-        else if(selection === 'Show Output')
-        {
-            this.output.show(true);
-        }
-    },
-
     async finish()
     {
         try
@@ -134,7 +112,6 @@ const CompilationReport = {
         }
 
         StatusBarMessage.show(this.batch ? summary : statusMessage, status);
-        await this.notifyUser(summary);
     }
 };
 
