@@ -52,3 +52,8 @@ Also follow the established project conventions in `.github/instructions/default
 - Avoid redundant tests, assertions coupled to implementation details, and
 elaborate test infrastructure for small changes. run broader checks when warranted or required by the project.
 - Stop expanding coverage once the relevant behavior is sufficiently verified.
+
+## Pull request review workflow
+
+- Address Copilot feedback with follow-up commits on the original pull request branch. Keep the work in one pull request; do not create replacement or follow-up pull requests or request a separate review for each fix.
+- Commit and push fixes so Copilot can recheck the existing pull request. If repository rules block the push, report the blocker instead of creating another pull request.
