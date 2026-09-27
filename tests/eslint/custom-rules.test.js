@@ -45,7 +45,10 @@ test('multiline callback bodies do not force inline chain links apart', () =>
 });
 
 test.each([
-    [ 'description without parameter tags', 'const service = { /** Saves a value. */ save(value, options) {} };' ],
+    [ 'one-line host callbacks', 'const host = {\n getCurrentDirectory: () => directory,\n getCompilationSettings: () => options\n};' ],
+    [ 'one-line object methods and functions', 'const service = { save(value) { return value; }, read: function() { return 1; } };' ],
+    [ 'one-line class members', 'class Service {\n constructor(value) { this.stored = value; }\n get value() { return this.stored; }\n set value(value) { this.stored = value; }\n read = () => this.stored;\n static save = function(value) { return value; };\n}' ],
+    [ 'description without parameter tags', 'const service = { /** Saves a value. */ save(value, options) {\n return value;\n} };' ],
     [ 'description tag', 'class Service { /** @description Saves a value. */ save(value) {} }' ],
     [ 'description alias', 'class Service { /** @desc Saves. */ save() {} }' ],
     [ 'all parameter tags', 'const service = { /**\n * Saves a value.\n * @param {string} value\n * @param {object} options\n */ save(value, options) {} };' ],
@@ -62,8 +65,8 @@ test.each([
     [ 'object function properties', 'const service = { /** Saves a value. */ save: function(value) {}, /** Reads a value. */ read: () => 1 };' ],
     [ 'class function fields', 'class Service { /** Saves a value. */ save = value => value; /** Reads a value. */ static read = function() {}; }' ],
     [ 'computed and generator methods', 'class Service { /** Reads entries. */ *[Symbol.iterator]() { yield 1; } }' ],
-    [ 'private names', 'class Service { #save(value) {} _read(value) {} #field = () => {}; } const service = { _save(value) {}, ["_read"]() {} };' ],
-    [ 'private access markers', 'class Service { /** @private */ save(value) {} /** @protected */ read() {} /** @access private */ reset() {} }' ],
+    [ 'private names', 'class Service { #save(value) {\n} _read(value) {\n} #field = () => {\n}; } const service = { _save(value) {\n}, ["_read"]() {\n} };' ],
+    [ 'private access markers', 'class Service { /** @private */ save(value) {\n} /** @protected */ read() {\n} /** @access private */ reset() {\n} }' ],
     [ 'functions and callbacks', 'function helper(value) {} const callback = value => value; values.map(value => value);' ],
     [ 'nonfunction properties', 'class Service { value = 1; } const service = { value: 1 };' ]
 ])('public method JSDoc accepts %s', (title, source) =>
@@ -74,12 +77,12 @@ test.each([
 });
 
 test.each([
-    [ 'undocumented class method', 'class Service { save(value) {} }', 'missing' ],
-    [ 'undocumented object method', 'const service = { save(value) {} };', 'missing' ],
-    [ 'ordinary comments', 'class Service { /* Saves a value. */ save(value) {} }', 'missing' ],
-    [ 'documentation on an earlier method', 'class Service { /** Saves a value. */ save() {} read() {} }', 'missing' ],
-    [ 'private marker on an earlier method', 'class Service { /** @private */ save() {} read() {} }', 'missing' ],
-    [ 'intervening comments', 'class Service { /** Saves a value. */ // Implementation note.\n save() {} }', 'missing' ],
+    [ 'undocumented class method', 'class Service { save(value) {\n} }', 'missing' ],
+    [ 'undocumented object method', 'const service = { save(value) {\n} };', 'missing' ],
+    [ 'ordinary comments', 'class Service { /* Saves a value. */ save(value) {\n} }', 'missing' ],
+    [ 'documentation on an earlier method', 'class Service { /** Saves a value. */ save() {} read() {\n} }', 'missing' ],
+    [ 'private marker on an earlier method', 'class Service { /** @private */ save() {} read() {\n} }', 'missing' ],
+    [ 'intervening comments', 'class Service { /** Saves a value. */ // Implementation note.\n save() {\n} }', 'missing' ],
     [ 'empty JSDoc', 'class Service { /** */ save() {} }', 'description' ],
     [ 'empty description tag', 'class Service { /** @description */ save() {} }', 'description' ],
     [ 'parameter tags without a description', 'class Service { /** @param value */ save(value) {} }', 'description' ],
@@ -94,13 +97,14 @@ test.each([
     [ 'bracketed property with an unknown root', 'class Service { /**\n * Saves entries.\n * @param entries\n * @param other[].value\n */ save(entries) {} }', 'parameters' ],
     [ 'undocumented destructured parameter', 'class Service { /**\n * Saves a value.\n * @param value\n */ save(value, {enabled}) {} }', 'parameters' ],
     [ 'malformed parameter tag', 'class Service { /**\n * Saves a value.\n * @param {string} [value\n */ save(value) {} }', 'parameters' ],
-    [ 'undocumented constructor', 'class Service { constructor(value) {} }', 'missing' ],
-    [ 'undocumented getter', 'class Service { get value() { return 1; } }', 'missing' ],
-    [ 'undocumented setter', 'const service = { set value(value) {} };', 'missing' ],
-    [ 'undocumented object function', 'const service = { save: function(value) {} };', 'missing' ],
-    [ 'undocumented object arrow', 'const service = { save: value => value };', 'missing' ],
-    [ 'undocumented class field', 'class Service { save = value => value; }', 'missing' ],
-    [ 'undocumented computed method', 'class Service { [methodName](value) {} }', 'missing' ]
+    [ 'undocumented constructor', 'class Service { constructor(value) {\n} }', 'missing' ],
+    [ 'undocumented getter', 'class Service { get value() {\n return 1;\n} }', 'missing' ],
+    [ 'undocumented setter', 'const service = { set value(value) {\n} };', 'missing' ],
+    [ 'undocumented object function', 'const service = { save: function(value) {\n} };', 'missing' ],
+    [ 'undocumented object arrow', 'const service = { save: value =>\n value };', 'missing' ],
+    [ 'undocumented class field', 'class Service { save = value =>\n value; }', 'missing' ],
+    [ 'undocumented computed method', 'class Service { [methodName](value) {\n} }', 'missing' ],
+    [ 'multiline parameters with a one-line body', 'class Service { save(\n value, options\n) { return value; } }', 'missing' ]
 ])('public method JSDoc rejects %s', (title, source, messageId) =>
 {
     const result = checkRule('require-public-method-jsdoc', source);
