@@ -5,14 +5,16 @@ const { COPYFILE_EXCL } = require('fs').constants;
 /** @description Pending writes and moves, grouped by absolute filesystem path. */
 const pendingOperations = new Map();
 
-/** @description Case-folds queue keys on every platform; filesystem paths keep their original spelling. */
+/** @description Groups case variants for scheduling on any filesystem; actual I/O paths remain unchanged. */
 function operationPath(filepath)
 {
     const absolutePath = path.resolve(filepath);
+
+    // Distinct case-sensitive names may wait too, keeping case-insensitive aliases from racing.
     return absolutePath.toLowerCase();
 }
 
-/** @description Serializes operations on their source and destination while unrelated files remain independent. */
+/** @description Serializes overlapping case-folded paths; operations with other keys can proceed independently. */
 async function queueFileOperation(filepaths, operation)
 {
     const keys = filepaths.map(operationPath);
