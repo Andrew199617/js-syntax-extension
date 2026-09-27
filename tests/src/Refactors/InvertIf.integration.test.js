@@ -18,8 +18,14 @@ function createEditor(source, marker = 'if')
     const edits = [];
     const document = {
         languageId: 'javascript',
+
+        /** @description Returns the mock document's source text. */
         getText: () => source,
+
+        /** @description Converts an offset to a position in the mock document. */
         positionAt: target => positionAt(source, target),
+
+        /** @description Converts a position in the mock document to an offset. */
         offsetAt(position)
         {
             const lines = source.split('\n');
@@ -32,13 +38,20 @@ function createEditor(source, marker = 'if')
             return start + position.character;
         }
     };
+
+    function recordReplacement(target, text)
+    {
+        edits.push({ range: target, text: text });
+    }
+
     const editor = {
         document: document,
         selection: range,
         options: { insertSpaces: true, tabSize: 2 },
         edit: jest.fn(callback =>
         {
-            callback({ replace: (target, text) => edits.push({ range: target, text: text }) });
+            const builder = { replace: recordReplacement };
+            callback(builder);
             return Promise.resolve(true);
         })
     };
