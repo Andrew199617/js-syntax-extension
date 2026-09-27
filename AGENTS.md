@@ -32,7 +32,8 @@
 Also follow the established project conventions in `.github/instructions/default.instructions.md`.
 # JSDoc formatting
 
-- Document every public method with `@description`. Include `@param` for every parameter or omit `@param` entirely; `@returns` is good to have for type, description is optional.
+- Document every public class or object method (including constructors, accessors, and function-valued fields) with a nonempty `@description`. Include matching `@param` tags for every parameter or omit them entirely. `@returns` is optional; its type is useful and its description is optional. Private methods (`#private`, underscore-prefixed, `@private`, or `@protected`) are exempt.
+
 - Use top-level JSDoc `@import` declarations for types from other modules; do not use inline `import()` types or imported `@typedef` aliases.
 
 - Keep short JSDoc with at most one `@` tag on one line, including typedef aliases. With multiple tags, put `/**`, each tag, and `*/` on separate lines, with no blank lines between tags.
