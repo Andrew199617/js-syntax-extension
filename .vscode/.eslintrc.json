@@ -921,6 +921,7 @@
       "never"
     ],
     "jsdoc-indent": "error",
+    "require-public-method-jsdoc": "error",
     "require-module-const-comment": "error",
     "no-inline-type-import": "error",
     "top-level-statements-last": "error"
