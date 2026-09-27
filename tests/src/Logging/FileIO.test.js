@@ -192,7 +192,7 @@ test('failed rollback preserves both errors and declarations and allows recovery
 
     expect(callback).toHaveBeenCalledTimes(1);
     const failure = callback.mock.calls[0][0];
-    expect(failure).toBeInstanceOf(globalThis.AggregateError);
+    expect(failure).toBeInstanceOf(Error);
     expect(failure.errors).toEqual([ removalError, cleanupError ]);
     expect(failure.cause).toBe(removalError);
     expect(failure.message).toContain(oldPath);

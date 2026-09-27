@@ -102,68 +102,72 @@ async function removeSourceOrRollback(oldPath, newPath)
         catch(cleanupError)
         {
             const message = `Could not remove ${oldPath}: ${error.message}. Rollback of ${newPath} also failed: ${cleanupError.message}. Both declarations remain; resolve the filesystem errors, inspect and remove the copied destination, then retry the rename.`;
-            throw new globalThis.AggregateError([ error, cleanupError ], message, { cause: error });
+            const failure = new Error(message);
+            failure.cause = error;
+            failure.errors = [ error, cleanupError ];
+            throw failure;
         }
 
         throw error;
     }
 }
 
-/** @description File operations used when writing and moving generated declarations. */
-const FileIO = {
-    /** @description Creates the parent directory and writes the file contents. */
-    async writeFileContents(filepath, content)
+/** @description Creates the parent directory and writes the file contents. */
+async function writeFileContents(filepath, content)
+{
+    async function writeContents()
     {
-        async function writeContents()
-        {
-            await fs.mkdir(path.dirname(filepath), { recursive: true });
-            await fs.writeFile(filepath, content);
-        }
-
-        await queueFileOperation([filepath], writeContents);
-    },
-
-    /** @description Creates a directory tree and passes any failure to the callback. */
-    async mkdirRecursive(fullDir, callback)
-    {
-        try
-        {
-            await fs.mkdir(fullDir, { recursive: true });
-        }
-        catch(error)
-        {
-            callback(error);
-            return;
-        }
-
-        callback();
-    },
-
-    /** @description Moves a declaration without overwriting its destination or deleting directories used by other writes. */
-    async rename(oldPath, newPath, callback)
-    {
-        async function moveDeclaration()
-        {
-            await fs.mkdir(path.dirname(newPath), { recursive: true });
-            if(!await tryCaseOnlyRename(oldPath, newPath))
-            {
-                await fs.copyFile(oldPath, newPath, COPYFILE_EXCL);
-                await removeSourceOrRollback(oldPath, newPath);
-            }
-        }
-
-        try
-        {
-            await queueFileOperation([ oldPath, newPath ], moveDeclaration);
-        }
-        catch(error)
-        {
-            callback(error);
-            return;
-        }
-
-        callback();
+        await fs.mkdir(path.dirname(filepath), { recursive: true });
+        await fs.writeFile(filepath, content);
     }
-};
 
-module.exports = FileIO;
+    await queueFileOperation([filepath], writeContents);
+}
+
+/** @description Creates a directory tree and passes any failure to the callback. */
+async function mkdirRecursive(fullDir, callback)
+{
+    try
+    {
+        await fs.mkdir(fullDir, { recursive: true });
+    }
+    catch(error)
+    {
+        callback(error);
+        return;
+    }
+
+    callback();
+}
+
+/** @description Moves a declaration without overwriting its destination or deleting directories used by other writes. */
+async function rename(oldPath, newPath, callback)
+{
+    async function moveDeclaration()
+    {
+        await fs.mkdir(path.dirname(newPath), { recursive: true });
+        if(!await tryCaseOnlyRename(oldPath, newPath))
+        {
+            await fs.copyFile(oldPath, newPath, COPYFILE_EXCL);
+            await removeSourceOrRollback(oldPath, newPath);
+        }
+    }
+
+    try
+    {
+        await queueFileOperation([ oldPath, newPath ], moveDeclaration);
+    }
+    catch(error)
+    {
+        callback(error);
+        return;
+    }
+
+    callback();
+}
+
+module.exports = {
+    writeFileContents: writeFileContents,
+    mkdirRecursive: mkdirRecursive,
+    rename: rename
+};
