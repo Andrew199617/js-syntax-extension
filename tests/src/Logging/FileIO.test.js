@@ -49,6 +49,40 @@ test('case-only renames update the declaration filename without reporting a coll
     expect(await fs.readdir(directory)).toEqual(['example.d.ts']);
 });
 
+test.each([
+    [ 'symlink', { dev: 1n, ino: 2n } ],
+    [ 'hard link', { dev: 1n, ino: 1n } ]
+])('a differently cased %s to the source remains a distinct occupied destination', async (linkType, destinationStats) =>
+{
+    const oldPath = path.join(directory, 'Example.d.ts');
+    const newPath = path.join(directory, 'example.d.ts');
+    const sourceStats = { dev: 1n, ino: 1n };
+
+    // Model distinct case-sensitive entries, including aliases with the same target or inode.
+    const stat = jest.spyOn(fs, 'stat').mockResolvedValue(sourceStats);
+    const lstat = jest.spyOn(fs, 'lstat').mockImplementation(filename => Promise.resolve(filename === oldPath ? sourceStats : destinationStats));
+    const realpath = jest.spyOn(fs, 'realpath').mockImplementation(filename => Promise.resolve(filename));
+    const rename = jest.spyOn(fs, 'rename').mockResolvedValue();
+    const collision = Object.assign(new Error('Destination exists'), { code: 'EEXIST' });
+    const copyFile = jest.spyOn(fs, 'copyFile').mockRejectedValue(collision);
+    const callback = jest.fn();
+    try
+    {
+        await FileIO.rename(oldPath, newPath, callback);
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledWith(collision);
+        expect(rename).not.toHaveBeenCalled();
+    }
+    finally
+    {
+        stat.mockRestore();
+        lstat.mockRestore();
+        realpath.mockRestore();
+        rename.mockRestore();
+        copyFile.mockRestore();
+    }
+});
+
 test('failed renames report the error once and preserve existing files', async () =>
 {
     const existingPath = path.join(directory, 'existing.d.ts');

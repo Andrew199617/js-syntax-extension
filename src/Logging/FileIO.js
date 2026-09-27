@@ -13,7 +13,7 @@ async function tryCaseOnlyRename(oldPath, newPath)
     let newStats;
     try
     {
-        newStats = await fs.stat(newPath, { bigint: true });
+        newStats = await fs.lstat(newPath, { bigint: true });
     }
     catch(error)
     {
@@ -25,8 +25,14 @@ async function tryCaseOnlyRename(oldPath, newPath)
         throw error;
     }
 
-    const oldStats = await fs.stat(oldPath, { bigint: true });
+    const oldStats = await fs.lstat(oldPath, { bigint: true });
     if(oldStats.dev !== newStats.dev || oldStats.ino !== newStats.ino)
+    {
+        return false;
+    }
+
+    const [ oldRealPath, newRealPath ] = await Promise.all([ fs.realpath(oldPath), fs.realpath(newPath) ]);
+    if(oldRealPath !== newRealPath)
     {
         return false;
     }

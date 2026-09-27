@@ -1,11 +1,18 @@
 ---
 name: code-review
-description: Review pull requests in js-syntax-extension and give an explicit approval decision or concrete, actionable findings grounded in the changed behavior.
+description: Review changes for bugs, regressions, and project-rule violations.
 ---
 
-# Review this extension
+# Code review
 
-Read `AGENTS.md`, the pull request's intended behavior, the current diff, and relevant callers and tests. Compare questionable behavior with the base revision so findings distinguish new regressions from existing limitations. Review the complete affected flow before submitting findings together.
+- Follow AGENTS.md.
+- Review the diff and relevant surrounding code and tests.
+- Report verified, actionable issues caused or exposed by the changes. Skip speculation and unrelated cleanup.
+- For each finding, give severity, location, trigger, impact, and the smallest reasonable fix.
+- Use existing CI results or focused checks. State what was verified and what remains uncertain.
+- If there are no actionable findings, say so.
+- Do not modify files unless asked.
+
 
 ## Actionable findings
 
@@ -14,14 +21,6 @@ Read `AGENTS.md`, the pull request's intended behavior, the current diff, and re
 - Set severity from the observed impact. Verify assumptions against callers, platform behavior, and tests. State missing evidence or context explicitly instead of presenting a hypothetical failure as a confirmed defect.
 - Keep optional improvements separate from approval-blocking findings. Avoid duplicate comments and subjective rewrites that do not improve correctness or an established readability requirement.
 - During re-review, check the new code against earlier findings. Treat fixed findings as resolved; report a remaining or newly introduced problem only with current evidence.
-
-## Project checks
-
-- Preserve parser acceptance and generated declarations unless the pull request intentionally changes them. Pay attention to incomplete editing states, automatic semicolon insertion, and isolated diagnostics for concurrent compilations.
-- LGD errors should remain visible through squiggles, Problems, status feedback, and Output. Check that error handling does not introduce popup notifications or silently discard diagnostics.
-- For declaration-file changes, check collision handling, failure cleanup, and supported Windows/POSIX paths. Check that tests demonstrate behavior rather than mirror implementation details.
-- Apply the readability, named-regex-capture, JSDoc, fixture, encoding, and line-ending conventions in `AGENTS.md`. Use `npm run lint` for the project's actual ESLint configuration when running checks; editor formatting is not a lint result.
-- Use relevant existing tests and proportionate regression coverage. Report which checks were run, which results were supplied by CI, and any material verification gaps.
 
 ## Approval decision
 

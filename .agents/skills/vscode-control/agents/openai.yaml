@@ -1,0 +1,4 @@
+interface:
+  display_name: "VS Code Control"
+  short_description: "Control a local VS Code fork that allows you to capture evidence for a git review."
+  default_prompt: "Use $vscode-control to reproduce this issue in our VS Code fork and capture the result. Then upload it to description of pull request to help user understand what code review is doing."
