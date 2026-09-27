@@ -40,6 +40,7 @@ export function create(context)
 {
     const source = context.sourceCode;
     return {
+        /** @description Requires descriptive comments on module constants other than imports. */
         VariableDeclaration(node)
         {
             if(node.kind !== 'const')

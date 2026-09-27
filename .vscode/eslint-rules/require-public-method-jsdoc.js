@@ -147,10 +147,9 @@ export function create(context)
             return;
         }
 
-        const comments = source.getCommentsBefore(node);
-        const comment = comments.reverse().find(candidate => candidate.type === 'Block' && candidate.value.startsWith('*'));
+        const comment = source.getTokenBefore(node, { includeComments: true });
         let documentation;
-        if(comment)
+        if(comment?.type === 'Block' && comment.value.startsWith('*'))
         {
             [documentation] = parse(source.getText(comment));
         }

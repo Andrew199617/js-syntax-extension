@@ -148,6 +148,7 @@ const ValueParser = {
     /**
      * @description Parses any property values.
      * @param {string} value the value of the property.
+     * @param {Function} createParser Creates a parser for nested object values.
      * @returns {string | null} the type.
      */
     async parseValue(value, createParser)

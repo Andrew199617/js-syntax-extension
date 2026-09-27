@@ -3,12 +3,14 @@ const fs = require('fs').promises;
 
 /** @description File operations used when writing and moving generated declarations. */
 const FileIO = {
+    /** @description Creates the parent directory and writes the file contents. */
     async writeFileContents(filepath, content)
     {
         await fs.mkdir(path.dirname(filepath), { recursive: true });
         await fs.writeFile(filepath, content);
     },
 
+    /** @description Creates a directory tree and passes any failure to the callback. */
     async mkdirRecursive(fullDir, callback)
     {
         try

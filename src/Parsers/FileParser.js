@@ -20,7 +20,10 @@ const ConstructorMethodName = 'create';
  * @type {FileParserType}
  */
 const FileParser = {
-    /** @returns {FileParserType}*/
+    /**
+     * @description Creates parser state and associates it with the current compilation.
+     * @returns {FileParserType}
+     */
     create(compilationContext = null)
     {
         const fileParser = Object.create(FileParser);
@@ -111,11 +114,13 @@ const FileParser = {
         vscodeError.notifyUser(this);
     },
 
+    /** @description Infers the element types of an array using the current parser context. */
     async parseArray(valuesStr)
     {
         return await ValueParser.parseArray.call(this, valuesStr);
     },
 
+    /** @description Infers a value type and supplies a parser for nested objects. */
     async parseValue(value)
     {
         return await ValueParser.parseValue.call(this, value, FileParser.create.bind(FileParser));
@@ -765,7 +770,7 @@ const FileParser = {
 
     /**
      * Update Position to a specific string.
-     * @param {string} str the string that was parsed. The string we are exec on.
+     * @param {string} content The source text used to locate the parsed string.
      * @param {string} string the string to update to.
      * @param {number} lastBegin The last begin line we were parsing.
      */

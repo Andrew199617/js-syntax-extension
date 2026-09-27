@@ -114,6 +114,7 @@ function calculateBinary(operator, left, right)
 
 /** @description Combines constant calculation with type inference for unresolved expressions. */
 const ExpressionInference = {
+    /** @description Infers an expression value or type within the recursion limit. */
     infer(node, depth = 0)
     {
         if(depth >= MAX_EXPRESSION_DEPTH)
@@ -155,6 +156,7 @@ const ExpressionInference = {
         }
     },
 
+    /** @description Resolves the built-in constant identifiers supported by inference. */
     inferIdentifier(name)
     {
         switch(name)
@@ -170,6 +172,7 @@ const ExpressionInference = {
         }
     },
 
+    /** @description Resolves supported constant properties on Math. */
     inferMember(node)
     {
         if(!node.computed && node.object.type === 'Identifier' && node.object.name === 'Math' && MATH_CONSTANTS.has(node.property.name))
@@ -180,6 +183,7 @@ const ExpressionInference = {
         return unknownValue();
     },
 
+    /** @description Evaluates constant template substitutions or falls back to a string type. */
     inferTemplate(node, depth)
     {
         let value = node.quasis[0].value.cooked;
@@ -197,6 +201,7 @@ const ExpressionInference = {
         return constantValue(value);
     },
 
+    /** @description Infers a unary expression from its operand and operator. */
     inferUnary(node, depth)
     {
         const argument = this.infer(node.argument, depth);
@@ -248,6 +253,7 @@ const ExpressionInference = {
         }
     },
 
+    /** @description Evaluates constant binary operands or infers the resulting type. */
     inferBinary(node, depth)
     {
         const left = this.infer(node.left, depth);
@@ -275,6 +281,7 @@ const ExpressionInference = {
         return unknownValue();
     },
 
+    /** @description Infers a conditional expression from its condition and possible branches. */
     inferConditional(node, depth)
     {
         const condition = this.infer(node.test, depth);
@@ -298,6 +305,7 @@ const ExpressionInference = {
         return unknownValue();
     },
 
+    /** @description Applies short-circuit evaluation when inferring a logical expression. */
     inferLogical(node, depth)
     {
         const left = this.infer(node.left, depth);

@@ -118,6 +118,7 @@ function init(modules)
     }
 
     return {
+        /** @description Wraps a supported TypeScript language service with callback-parameter highlighting. */
         create(info)
         {
             const service = info.languageService;

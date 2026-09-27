@@ -84,6 +84,7 @@ async function prepareExtensionOutput(compilation)
 
 // TypeScript loads this module in tsserver, separately from LGD.js in the extension host.
 const extensionOutput = {
+    /** @description Registers the post-build step that prepares the extension output. */
     apply(compiler)
     {
         compiler.hooks.afterEmit.tapPromise('PrepareExtensionOutput', prepareExtensionOutput);

@@ -21,6 +21,7 @@ const Document = {
         return document;
     },
 
+    /** @description Returns the source text stored in this document. */
     getText()
     {
         return this._text;

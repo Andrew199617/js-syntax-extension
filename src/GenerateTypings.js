@@ -64,6 +64,7 @@ const GenerateTypings = {
         return generateTypings;
     },
 
+    /** @description Compiles a JavaScript document and displays its compilation report. */
     async executeGenerateTypings()
     {
         if(this.document.fileName.endsWith(JS_EXT))
@@ -75,6 +76,7 @@ const GenerateTypings = {
         }
     },
 
+    /** @description Compiles the current document and records its result or error. */
     async execute()
     {
         try

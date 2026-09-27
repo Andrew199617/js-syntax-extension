@@ -6,6 +6,7 @@ const ErrorTypes = require('../Errors/ErrorTypes');
 
 /** @description One output stream and one final notification for a compilation run. */
 const CompilationReport = {
+    /** @description Creates a report that aggregates results for a single file or a batch. */
     create(label, batch = false)
     {
         const report = Object.assign({}, CompilationReport);
@@ -25,6 +26,7 @@ const CompilationReport = {
         return report;
     },
 
+    /** @description Adds a completed compilation to the report counters and output. */
     add(compilation)
     {
         let outcome = 'Skipped (no supported declarations)';
@@ -79,6 +81,7 @@ const CompilationReport = {
         this.output.appendLine(`Error: ${error.message || String(error)}`);
     },
 
+    /** @description Shows the summary with actions to inspect Problems or Output. */
     async notifyUser(summary)
     {
         let selection;
@@ -101,6 +104,7 @@ const CompilationReport = {
         }
     },
 
+    /** @description Writes the compilation log and presents the final summary. */
     async finish()
     {
         try

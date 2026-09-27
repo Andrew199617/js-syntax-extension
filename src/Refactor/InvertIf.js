@@ -129,6 +129,7 @@ const InvertIf = {
         return true;
     },
 
+    /** @description Registers the inversion command and adds it to extension subscriptions. */
     register(context)
     {
         const command = vscode.commands.registerCommand('lgd.invertIf', async () =>

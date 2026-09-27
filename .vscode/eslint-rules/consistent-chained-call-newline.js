@@ -65,7 +65,11 @@ function hasSeparatedLinks(chain, source)
         }
         else if(current.type === 'MemberExpression')
         {
-            const operator = source.getTokenAfter(current.object, { filter: token => token.value !== ')' });
+            const tokenOptions = {
+                /** @description Skips closing parentheses around a chain receiver. */
+                filter: token => token.value !== ')'
+            };
+            const operator = source.getTokenAfter(current.object, tokenOptions);
             const previous = source.getTokenBefore(operator);
             if(operator.loc.start.line !== previous.loc.end.line)
             {
