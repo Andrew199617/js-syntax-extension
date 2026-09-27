@@ -121,6 +121,18 @@ function hasCompleteParameters(parameters, tags)
         return false;
     }
 
+    const hasDocumentedRoots = names.every(name =>
+    {
+        const [objectName] = name.split('.');
+        const [rootName] = objectName.split('[');
+        return rootNames.includes(rootName);
+    });
+
+    if(!hasDocumentedRoots)
+    {
+        return false;
+    }
+
     return parameters.every(parameter =>
     {
         const name = getParameterName(parameter);
