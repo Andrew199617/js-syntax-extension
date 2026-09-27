@@ -41,7 +41,7 @@ const ValueParser = {
     /** @description Resolves constant aliases without recursing or following a cycle. */
     resolveConstant(value, content)
     {
-        if(!(/^[A-Z][A-Z0-9_]*$/).test(value))
+        if(!(/^[A-Z][\dA-Z_]*$/).test(value))
         {
             return value;
         }
@@ -53,7 +53,7 @@ const ValueParser = {
         }
 
         const visited = new Set();
-        while((/^[A-Z][A-Z0-9_]*$/).test(value))
+        while((/^[A-Z][\dA-Z_]*$/).test(value))
         {
             if(visited.has(value))
             {
@@ -165,7 +165,7 @@ const ValueParser = {
             return Types.ANY;
         }
 
-        if((/^process\.env\.[A-Z0-9_]+$/i).test(normalizedValue))
+        if((/^process\.env\.\w+$/i).test(normalizedValue))
         {
             return Types.STRING;
         }

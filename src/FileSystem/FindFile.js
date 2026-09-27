@@ -41,9 +41,9 @@ const FindFile = {
         {
             text = await fs.readFile(uri.fsPath, 'utf8');
         }
-        catch(err)
+        catch(error)
         {
-            lgd.logger.logError(`Could not read ${fileName}.`, err);
+            lgd.logger.logError(`Could not read ${fileName}.`, error);
             return;
         }
 

@@ -474,7 +474,7 @@ const InvertIf = {
         }
 
         const names = new Set(this.blockBindings(consequent));
-        if(!names.size)
+        if(names.size === 0)
         {
             return false;
         }
@@ -601,7 +601,7 @@ const InvertIf = {
             const keepElseBlock = Boolean(exit) && this.blockBindings(statementPath.get('alternate')).length > 0;
             guardParts.push(this.bodyText(statement.alternate, context, guardIndent, keepElseBlock));
             const comments = context.comments.filter(comment => comment.start >= statement.consequent.end && comment.end <= statement.alternate.start);
-            if(comments.length)
+            if(comments.length > 0)
             {
                 guardParts.unshift(comments.map(comment => source.slice(comment.start, comment.end)).join(newline + guardIndent));
             }

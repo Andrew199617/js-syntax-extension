@@ -80,7 +80,7 @@ function createService(typescript, initialSource, extension = '.js')
                 const contents = typescript.sys.readFile(name);
                 if(contents === undefined)
                 {
-                    return undefined;
+                    return;
                 }
 
                 dependencySnapshots.set(name, typescript.ScriptSnapshot.fromString(contents));

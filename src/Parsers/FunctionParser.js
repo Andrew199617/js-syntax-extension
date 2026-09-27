@@ -86,7 +86,7 @@ const FunctionParser = {
         catch
         {
             // Preserve the existing recovery behavior for incomplete parameter lists.
-            const regex = /\w+\s*=\s*[a-zA-Z0-9]+(?:,|)|\w+\s*=\s*\{[^}]+\}|\w+/g;
+            const regex = /\w+\s*=\s*[\dA-Za-z]+(?:,|)|\w+\s*=\s*{[^}]+}|\w+/g;
             return params.match(regex) || [];
         }
     },
@@ -194,7 +194,7 @@ const FunctionParser = {
     /** @description Rest parameters need an array or tuple, including when JSDoc specifies an element type. */
     getRestParameterType(type)
     {
-        type = type.trim().replace(/^\.\.\./, '').trim();
+        type = type.trim().replace(/^\.{3}/, '').trim();
         let annotation;
         try
         {

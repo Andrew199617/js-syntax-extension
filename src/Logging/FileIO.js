@@ -44,7 +44,7 @@ const FileIO = {
         try
         {
             const files = await fs.readdir(oldDir);
-            if(!files.length)
+            if(files.length === 0)
             {
                 await fs.rmdir(oldDir);
                 console.log(`LGD: Removed Old Dir ${oldDir}`);

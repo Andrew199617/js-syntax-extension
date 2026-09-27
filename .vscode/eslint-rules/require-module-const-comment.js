@@ -69,7 +69,7 @@ export function create(context)
             {
                 const text = comment.value.replace(/\*/g, '').trim();
                 const prefix = source.lines[comment.loc.start.line - 1].slice(0, comment.loc.start.column);
-                const isDirective = (/^(?:eslint(?:-|\s|$)|global(?:s)?(?:\s|$)|exported(?:\s|$))/).test(text);
+                const isDirective = (/^(?:eslint(?:-|\s|$)|globals?(?:\s|$)|exported(?:\s|$))/).test(text);
                 if(text && !isDirective && !prefix.trim() && comment.loc.end.line === declaration.loc.start.line - 1)
                 {
                     return;
