@@ -36,6 +36,19 @@ test('renaming creates the destination and removes an empty source directory', a
     await expect(fs.access(oldDirectory)).rejects.toHaveProperty('code', 'ENOENT');
 });
 
+test('case-only renames update the declaration filename without reporting a collision', async () =>
+{
+    const oldPath = path.join(directory, 'Example.d.ts');
+    const newPath = path.join(directory, 'example.d.ts');
+    await FileIO.writeFileContents(oldPath, 'source');
+    const callback = jest.fn();
+    await FileIO.rename(oldPath, newPath, callback);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith();
+    expect(await fs.readFile(newPath, 'utf8')).toBe('source');
+    expect(await fs.readdir(directory)).toEqual(['example.d.ts']);
+});
+
 test('failed renames report the error once and preserve existing files', async () =>
 {
     const existingPath = path.join(directory, 'existing.d.ts');
