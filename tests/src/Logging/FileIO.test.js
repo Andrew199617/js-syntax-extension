@@ -49,6 +49,36 @@ test('case-only renames update the declaration filename without reporting a coll
     expect(await fs.readdir(directory)).toEqual(['example.d.ts']);
 });
 
+test('a differently cased symlink to the source remains a distinct occupied destination', async () =>
+{
+    const oldPath = path.join(directory, 'Example.d.ts');
+    const newPath = path.join(directory, 'example.d.ts');
+    const sourceStats = { dev: 1n, ino: 1n };
+    const symlinkStats = { dev: 1n, ino: 2n };
+
+    // Model a case-sensitive filesystem, including stat following the destination symlink.
+    const stat = jest.spyOn(fs, 'stat').mockResolvedValue(sourceStats);
+    const lstat = jest.spyOn(fs, 'lstat').mockImplementation(filename => Promise.resolve(filename === oldPath ? sourceStats : symlinkStats));
+    const rename = jest.spyOn(fs, 'rename').mockResolvedValue();
+    const collision = Object.assign(new Error('Destination exists'), { code: 'EEXIST' });
+    const copyFile = jest.spyOn(fs, 'copyFile').mockRejectedValue(collision);
+    const callback = jest.fn();
+    try
+    {
+        await FileIO.rename(oldPath, newPath, callback);
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledWith(collision);
+        expect(rename).not.toHaveBeenCalled();
+    }
+    finally
+    {
+        stat.mockRestore();
+        lstat.mockRestore();
+        rename.mockRestore();
+        copyFile.mockRestore();
+    }
+});
+
 test('failed renames report the error once and preserve existing files', async () =>
 {
     const existingPath = path.join(directory, 'existing.d.ts');

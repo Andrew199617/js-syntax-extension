@@ -21,6 +21,7 @@ Read `AGENTS.md`, the pull request's intended behavior, the current diff, and re
 - LGD errors should remain visible through squiggles, Problems, status feedback, and Output. Check that error handling does not introduce popup notifications or silently discard diagnostics.
 - For declaration-file changes, check collision handling, failure cleanup, and supported Windows/POSIX paths. Check that tests demonstrate behavior rather than mirror implementation details.
 - Apply the readability, named-regex-capture, JSDoc, fixture, encoding, and line-ending conventions in `AGENTS.md`. Use `npm run lint` for the project's actual ESLint configuration when running checks; editor formatting is not a lint result.
+- Account for Git line-ending normalization before reporting formatting defects. The Windows development checkout uses `core.autocrlf=true`: saved files are CRLF while Git stores normalized LF, including existing base-revision files. Check attributes, checkout configuration, and the base revision; LF in a Git blob, diff, or differently configured review checkout alone does not establish a regression or invalidate the developer's CRLF byte check.
 - Use relevant existing tests and proportionate regression coverage. Report which checks were run, which results were supplied by CI, and any material verification gaps.
 
 ## Approval decision
