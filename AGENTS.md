@@ -28,6 +28,7 @@
 - Do not address a readability complaint by only wrapping the same dense expression across more lines. Simplify the structure.
 - Use named regex captures and `match.groups`; use `(?:...)` for non-capturing groups.
 - Preserve descriptive named captures when they improve regex readability, even if their values are not used. Do not replace them with non-capturing groups solely because they are unused.
+- When applying `unicorn/prefer-number-properties`, verify semantic equivalence in context before accepting a fix. In particular, global `isNaN` and `isFinite` coerce their arguments, while `Number.isNaN` and `Number.isFinite` do not; check the caller's possible input types and preserve intended behavior.
 
 Also follow the established project conventions in `.github/instructions/default.instructions.md`.
 # JSDoc formatting
