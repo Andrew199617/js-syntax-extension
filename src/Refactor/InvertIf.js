@@ -172,12 +172,31 @@ const InvertIf = {
                     start = lineStart;
                 }
 
-                // Whole-line selections may include closing braces of enclosing blocks.
-                const selectsFollowingCode = (/[^\s}]/u).test(source.slice(statement.end, selection.end));
-                if(selection.start >= start && selection.start <= statement.consequent.start && !selectsFollowingCode)
+                if(selection.start < start || selection.start > statement.consequent.start)
                 {
-                    selectedPath = statementPath;
+                    return;
                 }
+
+                function selectsFollowingCode(token)
+                {
+                    if(token.start < statement.end || token.start >= selection.end)
+                    {
+                        return false;
+                    }
+
+                    return typeof token.type !== 'string' && token.type.label !== '}';
+                }
+
+                if(selection.end > statement.end)
+                {
+                    // Whole-line selections may include comments and enclosing closing braces.
+                    if(syntax.tokens.some(selectsFollowingCode))
+                    {
+                        return;
+                    }
+                }
+
+                selectedPath = statementPath;
             }
         };
         traverse(syntax, visitor);

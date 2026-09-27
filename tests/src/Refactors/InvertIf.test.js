@@ -675,12 +675,45 @@ test('accepts the opening brace and whole-line selections through enclosing brac
     expectSameBehavior(originalSource, invertedSource, [ `run(true)`, `run(false)` ]);
 });
 
+test('accepts a selection of only the condition', () =>
+{
+    const originalSource = `function run(ready) {
+  if (ready) {
+    output.push("work");
+  }
+  return output.push("done");
+}`;
+    const start = originalSource.indexOf('ready', originalSource.indexOf('if'));
+    const edit = InvertIf.createEdit(originalSource, { start: start, end: start + 'ready'.length });
+    expect(edit).not.toBeNull();
+    const invertedSource = originalSource.slice(0, edit.start) + edit.text + originalSource.slice(edit.end);
+    expectSameBehavior(originalSource, invertedSource, [ `run(true)`, `run(false)` ]);
+    expect(invertedSource).toContain(`if (!ready)`);
+});
+
+test('accepts whole-line selections containing trailing comments and enclosing braces', () =>
+{
+    const originalSource = `function run(ready) {
+  if (ready) {
+    output.push("work");
+  } // Explain the conditional.
+} /* Explain the function. */`;
+    const start = originalSource.indexOf('if');
+    const edit = InvertIf.createEdit(originalSource, { start: start, end: originalSource.length });
+    expect(edit).not.toBeNull();
+    const invertedSource = originalSource.slice(0, edit.start) + edit.text + originalSource.slice(edit.end);
+    expectSameBehavior(originalSource, invertedSource, [ `run(true)`, `run(false)` ]);
+    expect(invertedSource).toContain(`// Explain the conditional.`);
+    expect(invertedSource).toContain(`/* Explain the function. */`);
+});
+
 test('rejects a selection that also includes a following statement', () =>
 {
     const originalSource = `function run(ready) {
   if (ready) {
     output.push(1);
   }
+  // A comment must not hide the following statement.
   return 2;
 }`;
     const start = originalSource.indexOf('if');
