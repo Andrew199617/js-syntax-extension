@@ -139,7 +139,7 @@ const FileIO = {
         callback();
     },
 
-    /** @description Moves a declaration without overwriting an existing destination, then removes its empty old directory. */
+    /** @description Moves a declaration without overwriting its destination or deleting directories used by other writes. */
     async rename(oldPath, newPath, callback)
     {
         async function moveDeclaration()
@@ -149,21 +149,6 @@ const FileIO = {
             {
                 await fs.copyFile(oldPath, newPath, COPYFILE_EXCL);
                 await removeSourceOrRollback(oldPath, newPath);
-            }
-
-            const oldDir = path.dirname(oldPath);
-            try
-            {
-                const files = await fs.readdir(oldDir);
-                if(!files.length)
-                {
-                    await fs.rmdir(oldDir);
-                    console.log(`LGD: Removed Old Dir ${oldDir}`);
-                }
-            }
-            catch(error)
-            {
-                console.error(error);
             }
         }
 

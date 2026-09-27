@@ -5,6 +5,17 @@ const FileIO = require('../../../src/Logging/FileIO');
 
 let directory;
 
+function deferred()
+{
+    let resolve;
+    const promise = new Promise(resolvePromise =>
+    {
+        resolve = resolvePromise;
+    });
+
+    return { promise: promise, resolve: resolve };
+}
+
 beforeEach(async () =>
 {
     directory = await fs.mkdtemp(path.join(os.tmpdir(), 'lgd-file-io-'));
@@ -22,18 +33,42 @@ test('writing creates every missing parent directory before resolving', async ()
     expect(await fs.readFile(filename, 'utf8')).toBe('declare const example: string;');
 });
 
-test('renaming creates the destination and removes an empty source directory', async () =>
+test('renaming creates the destination and preserves the directory of a pending sibling write', async () =>
 {
     const oldDirectory = path.join(directory, 'old');
     const oldPath = path.join(oldDirectory, 'example.d.ts');
     const newPath = path.join(directory, 'new', 'nested', 'example.d.ts');
+    const siblingPath = path.join(oldDirectory, 'sibling.d.ts');
     await FileIO.writeFileContents(oldPath, 'declaration');
+    const writeStarted = deferred();
+    const continueWrite = deferred();
+    const writeContents = fs.writeFile;
+    const writeFile = jest.spyOn(fs, 'writeFile').mockImplementationOnce(async (...args) =>
+    {
+        writeStarted.resolve();
+        await continueWrite.promise;
+        await writeContents(...args);
+    });
+
+    const writing = FileIO.writeFileContents(siblingPath, 'sibling');
     const callback = jest.fn();
-    await FileIO.rename(oldPath, newPath, callback);
+    try
+    {
+        await writeStarted.promise;
+        await FileIO.rename(oldPath, newPath, callback);
+    }
+    finally
+    {
+        continueWrite.resolve();
+        writeFile.mockRestore();
+        await writing;
+    }
+
     expect(await fs.readFile(newPath, 'utf8')).toBe('declaration');
+    expect(await fs.readFile(siblingPath, 'utf8')).toBe('sibling');
     expect(callback).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledWith();
-    await expect(fs.access(oldDirectory)).rejects.toHaveProperty('code', 'ENOENT');
+    await expect(fs.access(oldPath)).rejects.toHaveProperty('code', 'ENOENT');
 });
 
 test('case-only renames update the declaration filename without reporting a collision', async () =>
