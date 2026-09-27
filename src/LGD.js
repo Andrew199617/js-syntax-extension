@@ -137,6 +137,11 @@ function reportRename(error)
 
 function renameTypings(potentialPath)
 {
+    if(potentialPath.oldPath === potentialPath.newPath)
+    {
+        return;
+    }
+
     fs.exists(potentialPath.oldPath, sourceExists =>
     {
         if(!sourceExists)
@@ -271,21 +276,19 @@ function activate(context)
             const oldMaintainedRoot = path.relative(vscode.workspace.rootPath, oldParsedPath.dir);
             const newMaintainedRoot = path.relative(vscode.workspace.rootPath, newParsedPath.dir);
 
-            const typeFilePaths = [
-                {
-                    oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${oldFileName}${DEFAULT_EXT}`),
-                    newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${newFileName}${DEFAULT_EXT}`)
-                },
-                {
+            const flattenedPaths = {
+                oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${oldFileName}${DEFAULT_EXT}`),
+                newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${newFileName}${DEFAULT_EXT}`)
+            };
+            renameTypings(flattenedPaths);
+
+            if(oldMaintainedRoot || newMaintainedRoot)
+            {
+                const maintainedPaths = {
                     oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, oldMaintainedRoot, `${oldFileName}${DEFAULT_EXT}`),
                     newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, newMaintainedRoot, `${newFileName}${DEFAULT_EXT}`)
-                }
-            ];
-
-            for(let k = 0; k < typeFilePaths.length; ++k)
-            {
-                const potentialPath = typeFilePaths[k];
-                renameTypings(potentialPath);
+                };
+                renameTypings(maintainedPaths);
             }
         }
     });

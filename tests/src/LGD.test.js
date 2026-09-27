@@ -394,6 +394,39 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
         );
     });
 
+    test('renames a root-level declaration only once', () =>
+    {
+        fs.exists.mockImplementation((filename, callback) => callback(filename.endsWith('Old.d.ts')));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/Old.js`) },
+            newUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/New.js`) }
+        }] });
+        expect(FileIO.rename).toHaveBeenCalledTimes(1);
+        expect(FileIO.rename).toHaveBeenCalledWith(
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/Old.d.ts`),
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/New.d.ts`),
+            expect.any(Function)
+        );
+    });
+
+    test('moving a source file keeps the flattened declaration without reporting a false collision', () =>
+    {
+        fs.exists.mockImplementation((filename, callback) => callback(!filename.includes(`${path[platform].sep}new${path[platform].sep}`)));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/old/Example.js`) },
+            newUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/new/Example.js`) }
+        }] });
+        expect(FileIO.rename).toHaveBeenCalledTimes(1);
+        expect(FileIO.rename).toHaveBeenCalledWith(
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/old/Example.d.ts`),
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/new/Example.d.ts`),
+            expect.any(Function)
+        );
+        expect(lgd.outputChannel.appendLine).not.toHaveBeenCalled();
+    });
+
     test('an existing declaration is not overwritten and the collision is logged without a popup', () =>
     {
         fs.exists.mockImplementation((filename, callback) => callback(true));
