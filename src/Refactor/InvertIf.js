@@ -351,10 +351,14 @@ const InvertIf = {
     getIndentUnit(statement, source, settings)
     {
         const indent = this.getIndent(source, statement.start);
-        const body = statement.consequent;
-        if(body.type === 'BlockStatement' && body.body.length)
+        let first = statement.consequent;
+        if(first.type === 'BlockStatement')
         {
-            const first = body.body[0];
+            first = first.body[0];
+        }
+
+        if(first)
+        {
             const bodyIndent = this.getIndent(source, first.start);
             if(first.loc.start.line > statement.loc.start.line && bodyIndent.startsWith(indent) && bodyIndent.length > indent.length)
             {
@@ -487,7 +491,7 @@ const InvertIf = {
     },
 
     /**
-     * @description Lists a block's lexical bindings without including function-scoped var declarations.
+     * @description Lists a block's lexical bindings, including TypeScript declarations omitted by Babel's scope map.
      * @returns {string[]}
      */
     blockBindings(bodyPath)
@@ -497,7 +501,16 @@ const InvertIf = {
             return [];
         }
 
-        return Object.keys(bodyPath.scope.bindings);
+        const names = new Set(Object.keys(bodyPath.scope.bindings));
+        for(const statement of bodyPath.node.body)
+        {
+            if(statement.type.startsWith('TS') && statement.id?.type === 'Identifier')
+            {
+                names.add(statement.id.name);
+            }
+        }
+
+        return Array.from(names);
     },
 
     /** @description Checks for a line comment immediately before a block's closing brace. */
@@ -552,9 +565,15 @@ const InvertIf = {
         }
 
         const guardIndent = contentIndent + unit;
+        let bodyPrefix = source.slice(statement.test.end, statement.consequent.start);
+        if(statement.consequent.type !== 'BlockStatement')
+        {
+            bodyPrefix = bodyPrefix.replace(/(?<newline>\r?\n)[\t ]*$/u, `$<newline>${contentIndent}`);
+        }
+
         const header = source.slice(statement.start, statement.test.start)
             + this.negateExpression(statement.test, context)
-            + source.slice(statement.test.end, statement.consequent.start);
+            + bodyPrefix;
         const guardParts = [];
         if(statement.alternate)
         {

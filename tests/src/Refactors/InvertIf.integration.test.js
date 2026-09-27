@@ -1,5 +1,6 @@
 const vscode = require('vscode');
 const InvertIf = require('../../../src/Refactor/InvertIf');
+const extensionManifest = require('../../../package.json');
 const RefactorProvider = require('../../../src/Refactor/RefactorProvider');
 const StatusBarMessage = require('../../../src/Logging/StatusBarMessage');
 
@@ -175,7 +176,7 @@ test('offers the action only when the selected if can become a guard', () =>
     expect(createProvider().provideCodeActions(unsafe.document, unsafe.range, {})).toEqual([]);
 });
 
-test('registers JavaScript, JSX, TypeScript and TSX documents', () =>
+test('activates and registers JavaScript, JSX, TypeScript and TSX documents', () =>
 {
     const provider = createProvider();
     provider.context = { subscriptions: [] };
@@ -184,4 +185,9 @@ test('registers JavaScript, JSX, TypeScript and TSX documents', () =>
         .toEqual([
             'javascript', 'javascriptreact', 'typescript', 'typescriptreact'
         ]);
+
+    for(const languageId of vscode.languages.registerCodeActionsProvider.mock.calls[0][0])
+    {
+        expect(extensionManifest.activationEvents).toContain(`onLanguage:${languageId}`);
+    }
 });
