@@ -192,6 +192,7 @@
         "eslint-plugin-jsdoc": "50.8.0",
         "eslint-plugin-promise": "7.3.0",
         "eslint-plugin-react": "7.37.5",
+        "eslint-plugin-unicorn": "56.0.0",
         "espree": "10.4.0",
         "jest": "^25.2.2",
         "typescript-test-5-0": "npm:typescript@5.0.4",
