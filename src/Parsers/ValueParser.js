@@ -1,5 +1,6 @@
 const Types = require('./Types');
 const ExpressionType = require('./ExpressionType');
+const InitializerTypeInference = require('./InitializerTypeInference');
 const { parse, parseExpression } = require('@babel/parser');
 
 /** @description Value and array inference shared by file parser instances. */
@@ -158,6 +159,12 @@ const ValueParser = {
             return null;
         }
 
+        const localType = await InitializerTypeInference.inferIdentifier.call(this, value.trim());
+        if(localType)
+        {
+            return localType;
+        }
+
         const source = this.compilationContext?.source ?? this.content ?? '';
         const normalizedValue = ValueParser.resolveConstant.call(this, value.trim(), source);
         if(normalizedValue === null)
@@ -209,6 +216,7 @@ const ValueParser = {
 
             const tempParser = createParser(this.compilationContext);
             tempParser.content = source;
+            tempParser.inferenceContext = this.inferenceContext;
             tempParser.objectAncestors = new Set(this.objectAncestors);
             tempParser.objectAncestors.add(normalizedValue);
             tempParser.staticVariables = [];

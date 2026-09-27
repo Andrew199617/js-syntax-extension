@@ -1,5 +1,6 @@
 const ParserPosition = require('./ParserPosition');
 const ValueParser = require('./ValueParser');
+const InitializerTypeInference = require('./InitializerTypeInference');
 const VscodeError = require('../Errors/VscodeError');
 
 const ErrorTypes = require('../Errors/ErrorTypes');
@@ -29,6 +30,9 @@ const FileParser = {
         const fileParser = Object.create(FileParser);
         fileParser.compilationContext = compilationContext;
         fileParser.logger = compilationContext?.logger || lgd.logger;
+
+        /** @description The parameters and local variables available where the current value is assigned. */
+        fileParser.inferenceContext = null;
 
         /**
          * @description the variables that the class contains.
@@ -124,6 +128,28 @@ const FileParser = {
     async parseValue(value)
     {
         return await ValueParser.parseValue.call(this, value, FileParser.create.bind(FileParser));
+    },
+
+    /** @description Determine an assigned value's type using the variables available there, then restore the previous parser state. */
+    async parseInitializer(inferenceContext)
+    {
+        const previousContext = this.inferenceContext;
+        this.inferenceContext = inferenceContext;
+        try
+        {
+            const expression = inferenceContext.expression;
+            const value = inferenceContext.source.slice(expression.start, expression.end);
+            if(expression.type === 'ArrayExpression')
+            {
+                return await this.parseArray(value.slice(1, -1));
+            }
+
+            return await this.parseValue(value);
+        }
+        finally
+        {
+            this.inferenceContext = previousContext;
+        }
     },
 
     /**
@@ -407,13 +433,13 @@ const FileParser = {
     },
 
     /**
-     * @description parse the create function for variables.
-     * These variables are treated like normal variables
-     * variables on the object literal are treated like static.
-     * @param {string} insideFunction
-     * @returns {string}
+     * @description Find instance properties assigned inside a create method or constructor.
+     * @param {string} insideFunction The method body to inspect.
+     * @param {string} parameters The method's parameter list.
+     * @param {Object} parameterTypes Types from the method's JSDoc parameter comments.
+     * @returns {Promise<string>} The generated property declarations.
      */
-    async parseCreate(insideFunction)
+    async parseCreate(insideFunction, parameters = '()', parameterTypes = {})
     {
         this.tabSize += this.defaultTabSize;
         let className = this.getClassInCreate(insideFunction);
@@ -445,7 +471,7 @@ const FileParser = {
         const varEnd = `(;|$)(?=\\s*(^${tab}}|^${previousTab}}|^${tab}(\\/|\\w)|$(?!.)))`;
         const arrayRegex = `\\[(?<array>.*?)\\]\\s*${varEnd}`;
 
-        const commentRegex = '(?<comment>(\\/\\*\\*.*?\\*\\/.*?|))';
+        const commentRegex = '(?<comment>(?:\\/\\*\\*(?:(?!\\*\\/).)*\\*\\/\\s*|))';
         const tabRegex = `^(?<tabs>[ \t]{${this.tabSize},})`;
         const firstAccess = `(\\.|\\[')`;
         const objectAccessorEnd = `(\\[|\\['|\\.)`;
@@ -458,6 +484,7 @@ const FileParser = {
         const variableName = `${className}${objectAccessor}${varName}(\\]|'\\]|)${varDeliminator}`;
         const valueRegex = `(${arrayRegex}|(?<value>.*?)${varEnd})`;
 
+        const assignmentContexts = InitializerTypeInference.createAssignmentContexts(insideFunction, parameters, parameterTypes);
         const variablesRegex = new RegExp(
             [
                 commentRegex,
@@ -465,7 +492,7 @@ const FileParser = {
                 variableName,
                 valueRegex
             ].join(''),
-            'gms'
+            'dgms'
         );
 
         let variable;
@@ -475,7 +502,19 @@ const FileParser = {
             const options = {
                 type: undefined
             };
-            const assignmentValue = variable.groups.value;
+            const inferenceContext = assignmentContexts.get(variable.indices.groups.tabs[1]);
+            const expression = inferenceContext?.expression;
+            let assignmentValue = variable.groups.value;
+            let arrayValue = variable.groups.array;
+            if(expression?.type === 'ArrayExpression')
+            {
+                assignmentValue = undefined;
+                arrayValue = inferenceContext.source.slice(expression.start + 1, expression.end - 1);
+            }
+            else if(expression)
+            {
+                assignmentValue = inferenceContext.source.slice(expression.start, expression.end);
+            }
 
             const settingValueUsingVariable = variable.groups.objectAccessors.endsWith('[');
             if(settingValueUsingVariable)
@@ -497,8 +536,16 @@ const FileParser = {
                 options.type = this.fixType(options.type);
             }
 
-            const type = options.type || await this.parseValue(assignmentValue) || await this.parseArray(variable.groups.array);
+            let type = options.type;
+            if(!type && inferenceContext)
+            {
+                type = await this.parseInitializer(inferenceContext);
+            }
 
+            if(!type)
+            {
+                type = await this.parseValue(assignmentValue) || await this.parseArray(arrayValue);
+            }
 
             // Must be a es6 function.
             if(typeof type === 'undefined')
@@ -672,17 +719,18 @@ const FileParser = {
                 }
             }
 
+            const parsedComment = await this.parseComment(properties.groups.comment, options, isAsync);
             if(properties.groups.name === ConstructorMethodName)
             {
                 this.updatePosition(object, properties, 'function', lastBeginLine);
-                property += await this.parseCreate(properties.groups.function);
+                property += await this.parseCreate(properties.groups.function, properties.groups.params, options.params);
             }
 
             const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
 
             // eslint-disable-next-line newline-per-chained-call
             property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
-            property += await this.parseComment(properties.groups.comment, options, isAsync);
+            property += parsedComment;
             let functionParameters = '';
             if(properties.groups.params)
             {

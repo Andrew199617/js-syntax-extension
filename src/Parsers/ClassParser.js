@@ -165,14 +165,15 @@ const ClassParser = {
             const isAsync = !!properties.groups.async && properties.groups.async.includes('async');
             const isStatic = !!properties.groups.static && properties.groups.static.includes('static');
 
+            const parsedComment = await this.parseComment(properties.groups.comment, options, isAsync);
             if(properties.groups.name === ConstructorMethodName)
             {
                 this.updatePosition(classObj, properties, 'function', lastBeginLine);
-                property += await this.parseCreate(properties.groups.function);
+                property += await this.parseCreate(properties.groups.function, properties.groups.params, options.params);
             }
 
             property += `\n\t`;
-            property += await this.parseComment(properties.groups.comment, options, isAsync);
+            property += parsedComment;
 
             let functionParamaters = '';
             if(properties.groups.params)
