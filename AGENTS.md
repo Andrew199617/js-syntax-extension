@@ -28,6 +28,8 @@
 Also follow the established project conventions in `.github/instructions/default.instructions.md`.
 # JSDoc formatting
 
+- Public class and object methods (including constructors, accessors, and function-valued fields) need JSDoc with a nonempty description and either matching `@param` tags for every parameter or none. Return tags are optional; `#private`, underscore-prefixed, `@private`, and `@protected` methods are exempt.
+
 - Use top-level JSDoc `@import` declarations for types from other modules; do not use inline `import()` types or imported `@typedef` aliases.
 
 - Keep short JSDoc with at most one `@` tag on one line, including typedef aliases. With multiple tags, put `/**`, each tag, and `*/` on separate lines, with no blank lines between tags.
