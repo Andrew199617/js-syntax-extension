@@ -85,6 +85,37 @@ describe.each([ 'factory', 'constructor' ])('initializer bindings in a %s', init
         expect(result).toContain('count: number;');
     });
 
+    test('does not trust annotations on reassigned, forward, or uninitialized locals', async () =>
+    {
+        const result = await parseInitializer(`    /** @type {string} */
+    let changed = "first";
+    changed = 42;
+    /** @type {DocumentType} */
+    let missing;
+    instance.context = {
+      changed: changed,
+      forward: later,
+      missing: missing
+    };
+    /** @type {number} */
+    const later = 1;`);
+        expect(result).toContain('changed: any;');
+        expect(result).toContain('forward: any;');
+        expect(result).toContain('missing: any;');
+    });
+
+    test.each([ '/* explanation */ ', '// explanation\n    ' ])('preserves scoped inference with RHS comments: %s', async comment =>
+    {
+        const result = await parseInitializer(`    instance.document = ${comment}(document) /* trailing */;
+    instance.documents = ${comment}[document];
+    instance.context = ${comment}{
+      document: /* nested */ document
+    };`);
+        expect(result).toContain('document: DocumentType;');
+        expect(result).toContain('documents: DocumentType[];');
+        expect(result).toContain('static document: DocumentType;');
+    });
+
     test('uses the closest binding and keeps constructor scope out of static properties', async () =>
     {
         const result = await parseInitializer(`    {

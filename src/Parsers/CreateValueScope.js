@@ -1,4 +1,4 @@
-const { parse } = require('@babel/parser');
+const { parse, parseExpression } = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const Types = require('./Types');
 
@@ -36,16 +36,13 @@ function createAssignmentScopes(insideFunction, parameters, parameterTypes)
             const valueScope = {
                 source: source,
                 scope: assignmentPath.scope,
+                expression: expression,
                 position: expression.start,
                 parameterScope: parameterScope,
                 parameterTypes: parameterTypes,
                 ancestors: new Set()
             };
-            scopes.set(expression.start - prefix.length, valueScope);
-            if(expression.type === 'ArrayExpression')
-            {
-                scopes.set(expression.start - prefix.length + 1, valueScope);
-            }
+            scopes.set(assignmentPath.node.start - prefix.length, valueScope);
         }
     };
     traverse(parsedFunction, scopeVisitor);
@@ -94,15 +91,6 @@ async function inferBinding(binding, valueScope, parser)
         }
     }
 
-    if(binding.path.isVariableDeclarator() && binding.path.node.id.type === 'Identifier')
-    {
-        const declarationType = await getDeclarationType(binding, parser);
-        if(declarationType)
-        {
-            return declarationType;
-        }
-    }
-
     if(!binding.constant)
     {
         return Types.ANY;
@@ -121,6 +109,12 @@ async function inferBinding(binding, valueScope, parser)
     if(!initializer || initializer.end > valueScope.position)
     {
         return Types.ANY;
+    }
+
+    const declarationType = await getDeclarationType(binding, parser);
+    if(declarationType)
+    {
+        return declarationType;
     }
 
     const initializerScope = {
@@ -142,7 +136,27 @@ async function inferBinding(binding, valueScope, parser)
 /** @description Resolve local names before falling back to file-level constant inference. */
 async function inferIdentifier(value, valueScope, parser)
 {
-    const binding = valueScope?.scope.getBinding(value);
+    if(!valueScope)
+    {
+        return null;
+    }
+
+    let expression;
+    try
+    {
+        expression = parseExpression(value, { plugins: ['jsx'] });
+    }
+    catch
+    {
+        return null;
+    }
+
+    if(expression.type !== 'Identifier')
+    {
+        return null;
+    }
+
+    const binding = valueScope.scope.getBinding(expression.name);
     if(!binding)
     {
         return null;

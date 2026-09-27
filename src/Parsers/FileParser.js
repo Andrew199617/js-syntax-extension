@@ -472,9 +472,19 @@ const FileParser = {
             const options = {
                 type: undefined
             };
-            const assignmentValue = variable.groups.value;
-            const valueRange = variable.indices.groups.value || variable.indices.groups.array;
-            const valueScope = valueScopes.get(valueRange[0]);
+            const valueScope = valueScopes.get(variable.indices.groups.tabs[1]);
+            const expression = valueScope?.expression;
+            let assignmentValue = variable.groups.value;
+            let arrayValue = variable.groups.array;
+            if(expression?.type === 'ArrayExpression')
+            {
+                assignmentValue = undefined;
+                arrayValue = valueScope.source.slice(expression.start + 1, expression.end - 1);
+            }
+            else if(expression)
+            {
+                assignmentValue = valueScope.source.slice(expression.start, expression.end);
+            }
 
             const settingValueUsingVariable = variable.groups.objectAccessors.endsWith('[');
             if(settingValueUsingVariable)
@@ -496,7 +506,7 @@ const FileParser = {
                 options.type = this.fixType(options.type);
             }
 
-            const type = options.type || await this.parseValue(assignmentValue, valueScope) || await this.parseArray(variable.groups.array, valueScope);
+            const type = options.type || await this.parseValue(assignmentValue, valueScope) || await this.parseArray(arrayValue, valueScope);
 
 
             // Must be a es6 function.
