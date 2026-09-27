@@ -112,9 +112,9 @@
     // There are cases for == if you understand implicit coercion.
     "eqeqeq": "warn",
 
-    // Should never have more than 2 files in a class,
-    // just looks bad.
-    "max-classes-per-file": ["error", 2],
+    // Keep one class per file, and do not mix module definition styles.
+    "max-classes-per-file": ["error", 1],
+    "one-module-style": "error",
 
     // Use custom modal for alert, prompt, and confirm
     "no-alert": "error",

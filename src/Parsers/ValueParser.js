@@ -1,5 +1,5 @@
 const Types = require('./Types');
-const inferExpressionType = require('./ExpressionType');
+const ExpressionType = require('./ExpressionType');
 const { parse, parseExpression } = require('@babel/parser');
 
 /** @description Value and array inference shared by file parser instances. */
@@ -148,7 +148,8 @@ const ValueParser = {
     /**
      * @description Parses any property values.
      * @param {string} value the value of the property.
-     * @returns {string | null} the type.
+     * @param {Function} createParser Factory for parsing nested objects within the current compilation context.
+     * @returns {Promise<string | null>} The inferred type.
      */
     async parseValue(value, createParser)
     {
@@ -169,7 +170,7 @@ const ValueParser = {
             return Types.STRING;
         }
 
-        const expressionType = inferExpressionType(normalizedValue);
+        const expressionType = ExpressionType.infer(normalizedValue);
         if(expressionType !== Types.ANY)
         {
             return expressionType;
