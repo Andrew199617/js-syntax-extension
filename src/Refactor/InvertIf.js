@@ -172,7 +172,8 @@ const InvertIf = {
                     start = lineStart;
                 }
 
-                const selectsFollowingCode = selection.end > statement.end && Boolean(source.slice(statement.end, selection.end).trim());
+                // Whole-line selections may include closing braces of enclosing blocks.
+                const selectsFollowingCode = (/[^\s}]/u).test(source.slice(statement.end, selection.end));
                 if(selection.start >= start && selection.start <= statement.consequent.start && !selectsFollowingCode)
                 {
                     selectedPath = statementPath;

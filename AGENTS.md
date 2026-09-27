@@ -20,6 +20,7 @@
 - Use one module style per file: standalone functions, one class, or one OLOO object. Do not mix module-level functions with class or OLOO definitions, or put multiple classes/OLOO objects in one file.
 - Prefer adding related functions as methods of the existing OLOO object. If a module exports standalone functions, keep the whole module in that style instead of intermingling it with class or OLOO definitions.
 - Imports, constants, plain configuration objects, and local callbacks or helpers inside methods are allowed alongside the chosen module style.
+- Configuration objects may contain arrow callbacks. The module-style rule treats object methods, accessors, and function-expression properties as OLOO behavior; arrow callback properties alone do not define an OLOO object.
 - Prefer straightforward code that can be read once over compact code that saves lines.
 - For small, fixed sets of commands or actions, prefer explicit registration calls over building arrays of command/callback tuples and immediately iterating over them.
 - Extract repeated error handling and disposal into a named helper. Give substantial callbacks and configuration objects meaningful names before passing them to another function.
