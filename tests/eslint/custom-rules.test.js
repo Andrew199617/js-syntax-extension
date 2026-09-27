@@ -84,13 +84,25 @@ module.exports = Reader;` ],
     get value() { return 1; },
     run() { return this.value; }
 };` ],
-    [ 'one CommonJS object with arrow methods', `module.exports = {
+    [ 'one CommonJS object with arrow callbacks', `module.exports = {
     read: () => 1,
     write: value => value
 };` ],
     [ 'plain configuration beside standalone functions', `const settings = { enabled: true, nested: { limit: 1 } };
 function read() { return settings.enabled; }
 module.exports = read;` ],
+    [ 'callback configuration beside standalone functions', `function format(value) { return String(value); }
+const settings = {
+    enabled: true,
+    onError: error => format(error.message)
+};
+module.exports = { format, settings };` ],
+    [ 'callback configuration beside a class', `class Reader { read() { return 1; } }
+const settings = {
+    transform: value => String(value),
+    onError: error => error.message
+};
+module.exports = { Reader, settings };` ],
     [ 'imports and re-exports of existing definitions', `import Reader from './Reader.js';
 export { Reader };
 export function read() { return Reader.read(); }` ],

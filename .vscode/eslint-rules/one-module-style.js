@@ -23,8 +23,9 @@ function isBehaviorObject(node)
         return false;
     }
 
-    // Export bags such as { read, write } and plain configuration objects are not OLOO definitions.
-    return node.properties.some(property => property.type === 'Property' && isFunction(property.value));
+    // Arrow callbacks capture their surrounding receiver; they do not define object methods.
+    // Export bags such as { read, write } and callback configuration remain plain objects.
+    return node.properties.some(property => property.type === 'Property' && property.value.type === 'FunctionExpression');
 }
 
 function isCommonJsExport(node)
