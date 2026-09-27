@@ -135,7 +135,7 @@ function reportRename(error)
     StatusBarMessage.show('LGD: Renamed successful.', StatusBarMessageTypes.SUCCESS);
 }
 
-function renameTypings(potentialPath, context)
+function renameTypings(potentialPath)
 {
     fs.exists(potentialPath.oldPath, sourceExists =>
     {
@@ -149,11 +149,7 @@ function renameTypings(potentialPath, context)
         {
             if(targetExists)
             {
-                if(context.oldMaintainedRoot === context.newMaintainedRoot)
-                {
-                    vscode.window.showErrorMessage(`LGD: Renamed to existing file. ${context.oldFileName} -> ${context.newFileName}`);
-                }
-
+                lgd.outputChannel.appendLine(`LGD: Skipped renaming ${potentialPath.oldPath}: ${potentialPath.newPath} already exists.`);
                 return;
             }
 
@@ -208,20 +204,13 @@ function activate(context)
     const compileCommand = vscode.commands.registerCommand(COMPILE_COMMAND, async () =>
     {
         const activeEditor = vscode.window.activeTextEditor;
-        if(activeEditor)
+        if(!activeEditor || !activeEditor.document.fileName.endsWith(JS_EXT))
         {
-            const document = activeEditor.document;
-            await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();
+            return;
+        }
 
-            if(!document.fileName.endsWith(JS_EXT))
-            {
-                vscode.window.showWarningMessage('Can only compile .js file into .d.ts file.');
-            }
-        }
-        else
-        {
-            vscode.window.showInformationMessage('This command is only available when a .js editor is open.');
-        }
+        const document = activeEditor.document;
+        await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();
     });
 
     const compileAllCommand = vscode.commands.registerCommand(COMPILE_ALL_COMMAND, compileAllFiles);
@@ -285,25 +274,18 @@ function activate(context)
             const typeFilePaths = [
                 {
                     oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${oldFileName}${DEFAULT_EXT}`),
-                    newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${newFileName}${DEFAULT_EXT}`),
-                    isMaintained: false
+                    newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${newFileName}${DEFAULT_EXT}`)
                 },
                 {
                     oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, oldMaintainedRoot, `${oldFileName}${DEFAULT_EXT}`),
-                    newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, newMaintainedRoot, `${newFileName}${DEFAULT_EXT}`),
-                    isMaintained: true
+                    newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, newMaintainedRoot, `${newFileName}${DEFAULT_EXT}`)
                 }
             ];
 
             for(let k = 0; k < typeFilePaths.length; ++k)
             {
                 const potentialPath = typeFilePaths[k];
-                renameTypings(potentialPath, {
-                    oldMaintainedRoot: oldMaintainedRoot,
-                    newMaintainedRoot: newMaintainedRoot,
-                    oldFileName: oldFileName,
-                    newFileName: newFileName
-                });
+                renameTypings(potentialPath);
             }
         }
     });

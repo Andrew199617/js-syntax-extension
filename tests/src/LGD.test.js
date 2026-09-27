@@ -90,7 +90,8 @@ jest.mock('vscode', () => ({
         setStatusBarMessage: jest.fn(() => ({ dispose: jest.fn() })),
         createStatusBarItem: jest.fn(() => ({ show: jest.fn(), hide: jest.fn() })),
         showErrorMessage: jest.fn(),
-        showWarningMessage: jest.fn()
+        showWarningMessage: jest.fn(),
+        showInformationMessage: jest.fn()
     },
     DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2 },
     StatusBarAlignment: { Left: 1 },
@@ -112,6 +113,7 @@ beforeEach(() =>
 {
     previousLgd = globalThis.lgd;
     vscode.workspace.rootPath = 'workspace';
+    vscode.window.activeTextEditor = undefined;
     fs.exists.mockReset();
     fs.promises.readFile.mockReset();
     FileIO.rename.mockReset();
@@ -309,6 +311,18 @@ test('actual content changes report parser errors without popups', async () =>
     expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
 });
 
+test.each([ undefined, { document: { fileName: 'notes.txt' } } ])('compile command quietly skips an unavailable JavaScript editor: %p', async activeEditor =>
+{
+    vscode.window.activeTextEditor = activeEditor;
+    const createCompilation = jest.spyOn(GenerateTypings, 'create');
+    const registration = vscode.commands.registerCommand.mock.calls.find(([name]) => name === 'lgd.generateTypings');
+    await registration[1]();
+    expect(createCompilation).not.toHaveBeenCalled();
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+    expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
 describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
 {
     beforeEach(() =>
@@ -378,5 +392,22 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
             path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/new/New.d.ts`),
             expect.any(Function)
         );
+    });
+
+    test('an existing declaration is not overwritten and the collision is logged without a popup', () =>
+    {
+        fs.exists.mockImplementation((filename, callback) => callback(true));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/Old.js`) },
+            newUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/New.js`) }
+        }] });
+        expect(FileIO.rename).not.toHaveBeenCalled();
+        expect(getOutput()).toContain(`${path[platform].normalize(`${vscode.workspace.rootPath}/typings/New.d.ts`)} already exists.`);
+        expect(getOutput()).toContain(`${path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/New.d.ts`)} already exists.`);
+        expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+        expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+        expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+        expect(lgd.outputChannel.show).not.toHaveBeenCalled();
     });
 });
