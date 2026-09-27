@@ -1,5 +1,7 @@
 const DocumentCode = require('./DocumentCode');
 
+/** @import { CompletionItem, Position, TextDocument } from 'vscode' */
+
 /**
  * @description Provide completion for snippets that can't be added through snippets.json.
  * @type {CompletionItemProviderType}
@@ -25,10 +27,9 @@ const CompletionItemProvider = {
 
     /**
      * Provides documentation completions at the given document position.
-     * @param {vscode.TextDocument} document The document in which the command was invoked.
-     * @param {vscode.Range} position The position at which the command was invoked.
-     * @return {[]} A definition or a thenable that resolves to such. The lack of a result can be
-     * signaled by returning `undefined` or `null`.
+     * @param {TextDocument} document The document in which completion was requested.
+     * @param {Position} position The cursor position at which completion was requested.
+     * @returns {CompletionItem[] | undefined} Documentation snippets available at the cursor, or no result.
      */
     provideCompletionItems(document, position)
     {
