@@ -163,7 +163,7 @@ test('starts reads and compilations concurrently, then writes one debug log and 
     expect(getOutput()).toContain('2 compiled, 0 skipped, 0 failed; 0 errors, 0 warnings');
 });
 
-test('a failed read is put in Problems while another file finishes, followed by one popup', async () =>
+test('a failed read is put in Problems while another file finishes without a popup', async () =>
 {
     const compilation = deferred();
     const compile = jest.spyOn(GenerateTypings, 'compile').mockReturnValue(compilation.promise);
@@ -175,11 +175,11 @@ test('a failed read is put in Problems while another file finishes, followed by 
     expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
     compilation.resolve(true);
     await completion;
-    expect(vscode.window.showErrorMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
     expect(getOutput()).toContain('1 compiled, 0 skipped, 1 failed; 1 errors, 0 warnings');
 });
 
-test('multiple parser errors and warnings keep their files in Problems and show one summary popup', async () =>
+test('multiple parser errors and warnings stay in Problems and the status bar without popups', async () =>
 {
     fs.promises.readFile.mockImplementation(filename => Promise.resolve(`/** @template {number} Item */
 const Example = {
@@ -187,16 +187,20 @@ const Example = {
   ${filename.startsWith('first') ? 'firstValue' : 'secondValue'}: 2
 };`));
 
-    vscode.window.showErrorMessage.mockResolvedValueOnce('Show Output');
     await compileAll();
     expect(getDiagnostics('first.js')).toHaveLength(2);
     expect(getDiagnostics('second.js')).toHaveLength(2);
     expect(getDiagnostics('first.js')[1].message).toContain('firstValue');
     expect(getDiagnostics('second.js')[1].message).toContain('secondValue');
     expect(getOutput()).toContain('0 compiled, 0 skipped, 2 failed; 2 errors, 2 warnings');
-    expect(vscode.window.showErrorMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
     expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
-    expect(lgd.outputChannel.show).toHaveBeenCalledWith(true);
+    expect(lgd.outputChannel.show).not.toHaveBeenCalled();
+    expect(vscode.window.createStatusBarItem).toHaveBeenCalledTimes(1);
+    const status = vscode.window.createStatusBarItem.mock.results[0].value;
+    expect(status.text).toContain('0 compiled, 0 skipped, 2 failed; 2 errors, 2 warnings');
+    expect(status.command).toBe('workbench.action.showErrorsWarnings');
+    expect(status.show).toHaveBeenCalledTimes(1);
     expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
     expect(FileIO.writeFileContents.mock.calls[0][1]).toContain('first.js');
     expect(FileIO.writeFileContents.mock.calls[0][1]).toContain('second.js');
@@ -211,7 +215,7 @@ test('successful compilation retains warnings in Problems even with debug loggin
     expect(getDiagnostics('second.js')).toHaveLength(1);
     expect(getOutput()).toContain('2 compiled, 0 skipped, 0 failed; 0 errors, 2 warnings');
     expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
-    expect(vscode.window.showWarningMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
     expect(FileIO.writeFileContents).toHaveBeenCalledTimes(2);
     expect(FileIO.writeFileContents.mock.calls.every(([filename]) => filename.endsWith('.d.ts'))).toBe(true);
     fs.promises.readFile.mockResolvedValue('const Example = {\n  value: 1\n};');
@@ -227,16 +231,17 @@ test('a declaration write failure is assigned to the source file and included in
     await compileAll();
     expect(getDiagnostics('first.js')[0]).toMatchObject({ message: 'Cannot write declaration', severity: vscode.DiagnosticSeverity.Error });
     expect(getOutput()).toContain('1 compiled, 0 skipped, 1 failed; 1 errors, 0 warnings');
-    expect(vscode.window.showErrorMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
 });
 
-test('workspace discovery errors finish the progress indicator and show one error', async () =>
+test('workspace discovery errors finish the progress indicator and appear in the status bar', async () =>
 {
     vscode.workspace.findFiles.mockRejectedValueOnce(new Error('Cannot search workspace'));
     await compileAll();
     expect(getOutput()).toContain('Cannot search workspace');
     expect(vscode.window.setStatusBarMessage.mock.results[0].value.dispose).toHaveBeenCalledTimes(1);
-    expect(vscode.window.showErrorMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+    expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 errors, 0 warnings');
 });
 
 test('an empty workspace completes without reading files or showing a popup', async () =>
@@ -270,31 +275,38 @@ test('Save All groups neighboring saves into one report while compiling both doc
     expect(debugWrites).toHaveLength(1);
 });
 
-test('Save All with dirty-state changes produces one warning summary', async () =>
+test('Save All with dirty-state changes produces one status-bar warning summary without popups', async () =>
 {
     const source = '/** @template {number} Item */\nconst Example = {\n  value: 1\n};';
     const filenames = [ 'first.js', 'second.js' ];
     await saveFiles(filenames, source);
     expect(vscode.window.setStatusBarMessage).toHaveBeenCalledTimes(1);
-    expect(vscode.window.showWarningMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+    expect(vscode.window.createStatusBarItem).toHaveBeenCalledTimes(1);
+    expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('0 errors, 2 warnings');
     expect(getOutput()).toContain('2 compiled, 0 skipped, 0 failed; 0 errors, 2 warnings');
     expect(getDiagnostics('first.js')).toHaveLength(1);
     expect(getDiagnostics('second.js')).toHaveLength(1);
     expect(FileIO.writeFileContents).toHaveBeenCalledTimes(filenames.length + 1);
 });
 
-test('actual content changes still compile with single-file feedback', async () =>
+test('actual content changes report parser errors without popups', async () =>
 {
     const change = vscode.workspace.onDidChangeTextDocument.mock.calls[0][0];
     const document = {
         fileName: 'single.js',
         uri: { fsPath: 'single.js' },
-        getText: () => 'const Example = {\n  value: 1\n};'
+        getText: () => 'const Example = {\n  value: 1,\n  value: 2\n};'
     };
     await change({ document: document, contentChanges: [{ text: '1' }] });
     expect(vscode.window.setStatusBarMessage).toHaveBeenCalledTimes(1);
-    expect(getOutput()).toContain('1 compiled, 0 skipped, 0 failed; 0 errors, 0 warnings');
-    expect(FileIO.writeFileContents).toHaveBeenCalledTimes(2);
+    expect(getOutput()).toContain('0 compiled, 0 skipped, 1 failed; 1 errors, 0 warnings');
+    expect(getDiagnostics('single.js')[0].message).toContain('value');
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+    expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('$(error)');
+    expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
 });
 
 describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
