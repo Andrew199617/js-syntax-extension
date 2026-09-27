@@ -1,0 +1,2 @@
+# Normalize text to LF in Git and keep CRLF in every working tree.
+* text=auto eol=crlf

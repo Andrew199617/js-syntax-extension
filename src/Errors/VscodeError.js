@@ -33,7 +33,6 @@ const VscodeError = {
     {
         const vscodeError = Oloo.assign(new Error(message), VscodeError);
         vscodeError.name = 'VscodeError';
-        vscodeError.message = message;
 
         vscodeError.startLine = startLine;
         vscodeError.startCharacter = startCharacter || 0;
