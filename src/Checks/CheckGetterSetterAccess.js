@@ -4,11 +4,7 @@
  * @type {CheckCorrectGetterSetterAccessType}
  */
 const CheckCorrectGetterSetterAccess = {
-    /**
-     * @description Check Function for any errors.
-     * @param {string} insideFunction the entire inside of a function.
-     * @param {ClassParserType | FileParserType} fileParser
-     */
+    /** @description Provides the extension point for checking getter and setter access. */
     execute()
     {
     }

@@ -221,6 +221,7 @@ const FunctionParser = {
     /**
      * Parse the function paramaters.
      * @param {string} params
+     * @param {Object} commentParams Parameter options read from JSDoc.
      */
     async parseFunctionParams(params, commentParams)
     {

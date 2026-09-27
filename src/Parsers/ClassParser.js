@@ -37,6 +37,7 @@ const ClassParser = {
 
     },
 
+    /** @description Infers or normalizes the type of a parsed class member. */
     async parseType(options, properties)
     {
         if(options && !options.type)
@@ -223,7 +224,7 @@ const ClassParser = {
     },
 
     /**
-     * @description
+     * @description Extracts supported class declarations into the generated type file.
      * @param {string} content
      * @param {string} typeFile
      * @returns {{ typeFile: string, content: string }}

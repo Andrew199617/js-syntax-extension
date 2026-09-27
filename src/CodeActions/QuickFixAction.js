@@ -23,31 +23,46 @@ const QuickFixAction = {
         return quickFixAction;
     },
 
-    /** @type {vscode.Range}*/
+    /**
+     * @description Returns the range of the active code-action request.
+     * @type {vscode.Range}
+     */
     get range()
     {
         return lgd.codeActions.range;
     },
 
-    /** @type {vscode.CancellationToken}*/
+    /**
+     * @description Returns the cancellation token of the active code-action request.
+     * @type {vscode.CancellationToken}
+     */
     get token()
     {
         return lgd.codeActions.token;
     },
 
-    /** @type {vscode.TextDocument}*/
+    /**
+     * @description Returns the document of the active code-action request.
+     * @type {vscode.TextDocument}
+     */
     get document()
     {
         return lgd.codeActions.document;
     },
 
-    /** @type {vscode.CodeActionContext}*/
+    /**
+     * @description Returns the diagnostic context of the active code-action request.
+     * @type {vscode.CodeActionContext}
+     */
     get context()
     {
         return lgd.codeActions.context;
     },
 
-    /** @type {string} The name to register command with. */
+    /**
+     * @description Returns the identifier used to register the quick-fix command.
+     * @type {string}
+     */
     get commandName()
     {
         return this.command.command;
@@ -78,12 +93,14 @@ const QuickFixAction = {
         throw new Error('Not implemented');
     },
 
+    /** @description Attaches the current diagnostics to this code action. */
     getCommand()
     {
         this.diagnostics = this.context.diagnostics;
         return this;
     },
 
+    /** @description Registers the command that executes this quick fix. */
     createCommand(commandName, tooltip)
     {
         this.command = { command: commandName, title: this.title, tooltip };

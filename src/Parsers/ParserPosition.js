@@ -2,7 +2,7 @@
 const ParserPosition = {
     /**
      * Update Position to a specific string.
-     * @param {string} str the string that was parsed. The string we are exec on.
+     * @param {string} content The source text used to locate the parsed string.
      * @param {string} string the string to update to.
      * @param {number} lastBegin The last begin line we were parsing.
      */

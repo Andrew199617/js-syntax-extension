@@ -17,6 +17,7 @@ beforeEach(() =>
     };
 
     VscodeError.create = jest.fn(() => ({
+        /** @description Marks the parser as failed when the test publishes an error. */
         notifyUser(fileParser)
         {
             fileParser.errorOccurred = true;

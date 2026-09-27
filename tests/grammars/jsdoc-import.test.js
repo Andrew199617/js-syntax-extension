@@ -28,13 +28,20 @@ async function createRegistry(inject)
     const injection = textmate.parseRawGrammar(await fs.readFile(injectionPath, 'utf8'), injectionPath);
     const registryOptions = {
         onigLib: Promise.resolve({
+            /** @description Creates the regex scanner used by the test grammar registry. */
             createOnigScanner: patterns => new oniguruma.OnigScanner(patterns),
+
+            /** @description Wraps a test string for Oniguruma tokenization. */
             createOnigString: value => new oniguruma.OnigString(value)
         }),
+
+        /** @description Returns the JSDoc injection when it applies to the requested scope. */
         getInjections(scope)
         {
             return inject && contribution.injectTo.includes(scope) ? [injectionScope] : [];
         },
+
+        /** @description Loads the injection or host grammar needed by the registry. */
         async loadGrammar(scope)
         {
             if(scope === injectionScope)

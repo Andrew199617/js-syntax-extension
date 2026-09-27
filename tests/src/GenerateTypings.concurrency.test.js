@@ -36,6 +36,8 @@ const ${name} = {
     const document = {
         fileName: `${name}.js`,
         uri: { fsPath: `${name}.js` },
+
+        /** @description Returns the source text for this test document. */
         getText: () => source
     };
     const compilation = GenerateTypings.create(document, lgd.lgdDiagnosticCollection);
@@ -68,7 +70,10 @@ beforeEach(() =>
         logger: Logger.create('parser'),
         outputChannel: { appendLine: jest.fn(), show: jest.fn() },
         lgdDiagnosticCollection: {
+            /** @description Stores diagnostics by the test document path. */
             set: (uri, entries) => diagnostics.set(uri.fsPath, entries),
+
+            /** @description Reads diagnostics for the test document path. */
             get: uri => diagnostics.get(uri.fsPath)
         }
     };
@@ -100,6 +105,8 @@ const Example = {
     const document = {
         fileName: 'Example.js',
         uri: { fsPath: 'Example.js' },
+
+        /** @description Returns the source used to verify constant inference. */
         getText: () => source
     };
     const compilation = GenerateTypings.create(document, lgd.lgdDiagnosticCollection);

@@ -17,6 +17,7 @@ const MoveCreateReactClass = {
         return moveCreateReactClass;
     },
 
+    /** @description Builds the edits that move the React class export after its declaration. */
     setupFix()
     {
         const text = this.document.getText();
@@ -49,6 +50,7 @@ const MoveCreateReactClass = {
         return true;
     },
 
+    /** @description Runs the base quick-fix command after preparing the class move. */
     executeCommand()
     {
         Oloo.base(this, this.executeCommand);

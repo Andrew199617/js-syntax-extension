@@ -9,6 +9,7 @@ const ErrorTypes = require('../Errors/ErrorTypes');
  * @static
  */
 const ServerityConverter = {
+    /** @description Converts an internal error severity to a VS Code diagnostic severity. */
     getDiagnosticSeverity(severity)
     {
         switch(severity)
@@ -24,6 +25,7 @@ const ServerityConverter = {
         }
     },
 
+    /** @description Converts an internal error severity to a status-bar message type. */
     getMessageType(severity)
     {
         switch(severity)
@@ -39,6 +41,7 @@ const ServerityConverter = {
         }
     },
 
+    /** @description Builds the status-bar text for an internal error severity. */
     getStatusBarMessage(severity)
     {
         switch(severity)

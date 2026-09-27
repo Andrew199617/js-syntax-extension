@@ -31,11 +31,13 @@ const DocumentCode = {
         return documentCode;
     },
 
+    /** @description Builds the JSDoc snippet inserted by this completion item. */
     get insertText()
     {
         return this.insertDocumentation();
     },
 
+    /** @description Prepares a documentation completion for the current document and cursor. */
     getCompletionItem(document, position)
     {
         this.document = document;

@@ -31,6 +31,7 @@ const KeywordOrderCheck = {
         }
     },
 
+    /** @description Reports invalid keyword order at the current parser range. */
     throwError(message)
     {
         VscodeError.create(

@@ -17,7 +17,7 @@ const vscode = require('vscode');
  */
 const Configuration = {
     /**
-     * @description
+     * @description Creates configuration state from the workspace extension settings.
      * @returns {ConfigurationType}
      */
     create()
@@ -93,32 +93,38 @@ const Configuration = {
         return vscode.workspace.getConfiguration('editor').get('tabSize') || 2;
     },
 
+    /** @description Returns completion settings, enabling completion by default. */
     get autoComplete()
     {
         const defaults = { enabled: true };
         return this.options.autoComplete || defaults;
     },
 
+    /** @description Reports whether generated typings preserve the source folder hierarchy. */
     get maintainHierarchy()
     {
         return this.options.maintainHierarchy ?? true;
     },
 
+    /** @description Reports whether compilation writes a debug log. */
     get createDebugLog()
     {
         return this.options.createDebugLog ?? true;
     },
 
+    /** @description Reports whether React props and state receive separate interfaces. */
     get extractPropsAndState()
     {
         return this.options.extractPropsAndState ?? true;
     },
 
+    /** @description Reports whether typing generation is enabled. */
     get generateTypings()
     {
         return this.options.generateTypings ?? true;
     },
 
+    /** @description Reports whether document changes trigger typing generation. */
     get generateTypingsOnChange()
     {
         return this.options.generateTypingsOnChange ?? true;

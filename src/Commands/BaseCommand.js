@@ -24,7 +24,10 @@ const BaseCommand = {
         return baseCommand;
     },
 
-    /** @type {string}*/
+    /**
+     * @description Returns the identifier used to register this command.
+     * @type {string}
+     */
     get commandName()
     {
         return this.command.command;
@@ -39,7 +42,10 @@ const BaseCommand = {
         return vscode.commands.registerCommand(this.commandName, this.executeCommand);
     },
 
-    /** @virtual */
+    /**
+     * @description Requires derived commands to implement their execution behavior.
+     * @virtual
+     */
     executeCommand()
     {
         throw new Error('Did not implement!');

@@ -50,7 +50,14 @@ async function saveFiles(filenames, source = 'const Example = {\n  value: 1\n};'
     {
         const document = {
             fileName: filename,
-            uri: { fsPath: filename, toString: () => filename },
+            uri: {
+                fsPath: filename,
+
+                /** @description Returns the test document path as its URI string. */
+                toString: () => filename
+            },
+
+            /** @description Returns the source for the simulated changed document. */
             getText: () => source
         };
         await change({ document: document, contentChanges: [] });
@@ -297,6 +304,8 @@ test('actual content changes report parser errors without popups', async () =>
     const document = {
         fileName: 'single.js',
         uri: { fsPath: 'single.js' },
+
+        /** @description Returns duplicate properties to test error reporting on document changes. */
         getText: () => 'const Example = {\n  value: 1,\n  value: 2\n};'
     };
     await change({ document: document, contentChanges: [{ text: '1' }] });
@@ -330,6 +339,8 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
         const document = {
             fileName: filename,
             uri: { fsPath: filename },
+
+            /** @description Returns the source used to verify generated output paths. */
             getText: () => 'const Example = {\n  value: 1\n};'
         };
         const result = await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).execute();
@@ -348,6 +359,8 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
         const document = {
             fileName: filename,
             uri: { fsPath: filename },
+
+            /** @description Returns the source used to verify generated declarations and logs. */
             getText: () => 'const Example = {\n  value: 1\n};'
         };
         await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();

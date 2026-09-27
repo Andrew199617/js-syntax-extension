@@ -24,10 +24,9 @@ const CompletionItemProvider = {
     },
 
     /**
-     * Provide the definition of the symbol at the given position and document.
+     * Provides documentation completions at the given document position.
      * @param {vscode.TextDocument} document The document in which the command was invoked.
      * @param {vscode.Range} position The position at which the command was invoked.
-     * @param {vscode.CancellationToken} token A cancellation token.
      * @return {[]} A definition or a thenable that resolves to such. The lack of a result can be
      * signaled by returning `undefined` or `null`.
      */
