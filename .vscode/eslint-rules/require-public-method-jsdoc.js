@@ -7,7 +7,7 @@ import { parse } from 'comment-parser';
 /** @description Requires descriptions and all-or-none parameter documentation on public methods. */
 export const meta = {
     type: 'suggestion',
-    docs: { description: 'Require public methods to have JSDoc with a description and either all parameter tags or none.' },
+    docs: { description: 'Require multiline public methods to have JSDoc with a description and either all parameter tags or none.' },
     schema: [],
     messages: {
         missing: 'Add JSDoc with a description to this public method.',
@@ -173,7 +173,11 @@ export function create(context)
 
         if(!documentation)
         {
-            context.report({ node: node.key, messageId: 'missing' });
+            if(node.value.loc.start.line !== node.value.loc.end.line)
+            {
+                context.report({ node: node.key, messageId: 'missing' });
+            }
+
             return;
         }
 

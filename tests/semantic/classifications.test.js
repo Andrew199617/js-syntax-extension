@@ -58,7 +58,6 @@ function createService(typescript, initialSource, extension = '.js')
 
     const options = { allowJs: true, checkJs: true, types: [], target: typescript.ScriptTarget.ESNext };
     const host = {
-        /** @description Lists the in-memory source file exposed to the language service. */
         getScriptFileNames: () => [fileName],
 
         /** @description Returns the current version of the test source. */
@@ -89,13 +88,8 @@ function createService(typescript, initialSource, extension = '.js')
             return dependencySnapshots.get(name);
         },
 
-        /** @description Supplies the working directory for the test language service. */
         getCurrentDirectory: () => __dirname,
-
-        /** @description Supplies compiler options for the test language service. */
         getCompilationSettings: () => options,
-
-        /** @description Resolves the standard library for the requested compiler settings. */
         getDefaultLibFileName: settings => typescript.getDefaultLibFilePath(settings),
         fileExists: typescript.sys.fileExists,
         readFile: typescript.sys.readFile,
@@ -105,14 +99,7 @@ function createService(typescript, initialSource, extension = '.js')
     const service = typescript.createLanguageService(host, environment.registry);
     const info = {
         languageService: service,
-        project: {
-            projectService: {
-                logger: {
-                    /** @description Ignores plugin log messages during this test. */
-                    info: () => undefined
-                }
-            }
-        }
+        project: { projectService: { logger: { info: () => undefined } } }
     };
 
     return {
@@ -414,10 +401,7 @@ for(const moduleName of versions)
             assert.equal(plugin.getEncodedSemanticClassifications(context.fileName, range, '2020'), original);
             service.getProgram = () => program;
             assert.equal(plugin.getEncodedSemanticClassifications('missing.js', range, '2020'), original);
-            program.getTypeChecker = () => ({
-                /** @description Simulates a location for which no symbol is available. */
-                getSymbolAtLocation: () => undefined
-            });
+            program.getTypeChecker = () => ({ getSymbolAtLocation: () => undefined });
             assert.equal(plugin.getEncodedSemanticClassifications(context.fileName, range, '2020'), original);
             program.getTypeChecker = () => originalChecker;
             const legacy = init({ typescript: { ...typescript, versionMajorMinor: '4.9' } }).create(context.info);

@@ -22,6 +22,7 @@
 - Imports, constants, plain configuration objects, and local callbacks or helpers inside methods are allowed alongside the chosen module style.
 - Configuration objects may contain arrow callbacks. The module-style rule treats object methods, accessors, and function-expression properties as OLOO behavior; arrow callback properties alone do not define an OLOO object.
 - Prefer straightforward code that can be read once over compact code that saves lines.
+- Keep small test stubs compact when they fit comfortably on one line. Expand them when they gain several properties, meaningful logic, or comments explaining non-obvious behavior.
 - For small, fixed sets of commands or actions, prefer explicit registration calls over building arrays of command/callback tuples and immediately iterating over them.
 - Extract repeated error handling and disposal into a named helper. Give substantial callbacks and configuration objects meaningful names before passing them to another function.
 - Use ordinary conditionals instead of nested ternaries. Keep distinct operations on separate lines and use explicit object properties when mapping a small, fixed set of settings.
@@ -32,7 +33,7 @@
 
 ## JSDoc formatting
 
-- Document every public class or object method (including constructors, accessors, and function-valued fields) with a nonempty `@description`. Include matching `@param` tags for every parameter or omit them entirely. `@returns` is optional; its type is useful and its description is optional. Private methods (`#private`, underscore-prefixed, `@private`, or `@protected`) are exempt.
+- Public class or object methods (including constructors, accessors, and function-valued fields) require JSDoc unless their function signature and body fit on one source line. When provided, JSDoc needs a nonempty `@description` and matching `@param` tags for every parameter or none. `@returns` is optional; its type is useful and its description is optional. Private methods (`#private`, underscore-prefixed, `@private`, or `@protected`) are exempt.
 - Use top-level JSDoc `@import` declarations for types from other modules; do not use inline `import()` types or imported `@typedef` aliases.
 - Keep short JSDoc with at most one `@` tag on one line, including typedef aliases. With multiple tags, put `/**`, each tag, and `*/` on separate lines, with no blank lines between tags.
 
