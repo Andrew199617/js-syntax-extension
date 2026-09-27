@@ -4,10 +4,10 @@ import { parse } from 'comment-parser';
 /** @import { Block, Spec } from 'comment-parser' */
 /** @import { MethodDefinition, Property, PropertyDefinition, Pattern } from 'estree' */
 
-/** @description Requires descriptions and all-or-none parameter documentation on public methods. */
+/** @description Requires JSDoc on multiline public methods and validates documentation on all public methods. */
 export const meta = {
     type: 'suggestion',
-    docs: { description: 'Require multiline public methods to have JSDoc with a description and either all parameter tags or none.' },
+    docs: { description: 'Require JSDoc on multiline public methods; validate descriptions and all-or-none parameter tags on all documented public methods.' },
     schema: [],
     messages: {
         missing: 'Add JSDoc with a description to this public method.',
