@@ -280,16 +280,19 @@ function activate(context)
                 oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${oldFileName}${DEFAULT_EXT}`),
                 newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, `${newFileName}${DEFAULT_EXT}`)
             };
-            renameTypings(flattenedPaths);
-
-            if(oldMaintainedRoot || newMaintainedRoot)
+            const maintainedPaths = {
+                oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, oldMaintainedRoot, `${oldFileName}${DEFAULT_EXT}`),
+                newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, newMaintainedRoot, `${newFileName}${DEFAULT_EXT}`)
+            };
+            if(flattenedPaths.oldPath === maintainedPaths.oldPath || flattenedPaths.newPath === maintainedPaths.newPath)
             {
-                const maintainedPaths = {
-                    oldPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, oldMaintainedRoot, `${oldFileName}${DEFAULT_EXT}`),
-                    newPath: path.join(vscode.workspace.rootPath, DEFAULT_DIR, newMaintainedRoot, `${newFileName}${DEFAULT_EXT}`)
-                };
-                renameTypings(maintainedPaths);
+                const preferredPaths = lgd.configuration.maintainHierarchy ? maintainedPaths : flattenedPaths;
+                renameTypings(preferredPaths);
+                continue;
             }
+
+            renameTypings(flattenedPaths);
+            renameTypings(maintainedPaths);
         }
     });
 

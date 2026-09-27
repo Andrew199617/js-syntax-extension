@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs').promises;
+const { COPYFILE_EXCL } = require('fs').constants;
 
 /** @description File operations used when writing and moving generated declarations. */
 const FileIO = {
@@ -24,13 +25,14 @@ const FileIO = {
         callback();
     },
 
-    /** @description Moves a declaration and removes its old directory if it is empty. */
+    /** @description Moves a declaration without overwriting an existing destination, then removes its empty old directory. */
     async rename(oldPath, newPath, callback)
     {
         try
         {
             await fs.mkdir(path.dirname(newPath), { recursive: true });
-            await fs.rename(oldPath, newPath);
+            await fs.copyFile(oldPath, newPath, COPYFILE_EXCL);
+            await fs.unlink(oldPath);
         }
         catch(error)
         {

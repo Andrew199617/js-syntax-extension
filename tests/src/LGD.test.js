@@ -427,6 +427,30 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
         expect(lgd.outputChannel.appendLine).not.toHaveBeenCalled();
     });
 
+    test.each([
+        [ true, '', 'src' ],
+        [ false, '', 'src' ],
+        [ true, 'src', '' ],
+        [ false, 'src', '' ]
+    ])('uses maintainHierarchy=%s for overlapping paths when moving from "%s" to "%s"', (maintainHierarchy, oldDirectory, newDirectory) =>
+    {
+        lgd.configuration.maintainHierarchy = maintainHierarchy;
+        fs.exists.mockImplementation((filename, callback) => callback(filename.endsWith('Old.d.ts')));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path.join(vscode.workspace.rootPath, oldDirectory, 'Old.js') },
+            newUri: { fsPath: path.join(vscode.workspace.rootPath, newDirectory, 'New.js') }
+        }] });
+        const oldTypingsDirectory = maintainHierarchy ? oldDirectory : '';
+        const newTypingsDirectory = maintainHierarchy ? newDirectory : '';
+        expect(FileIO.rename).toHaveBeenCalledTimes(1);
+        expect(FileIO.rename).toHaveBeenCalledWith(
+            path.join(vscode.workspace.rootPath, 'typings', oldTypingsDirectory, 'Old.d.ts'),
+            path.join(vscode.workspace.rootPath, 'typings', newTypingsDirectory, 'New.d.ts'),
+            expect.any(Function)
+        );
+    });
+
     test('an existing declaration is not overwritten and the collision is logged without a popup', () =>
     {
         fs.exists.mockImplementation((filename, callback) => callback(true));

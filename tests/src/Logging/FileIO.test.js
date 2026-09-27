@@ -47,6 +47,53 @@ test('failed renames report the error once and preserve existing files', async (
     expect(await fs.readFile(existingPath, 'utf8')).toBe('keep');
 });
 
+test('renaming preserves both declarations when the destination already exists', async () =>
+{
+    const oldPath = path.join(directory, 'old.d.ts');
+    const newPath = path.join(directory, 'new.d.ts');
+    await FileIO.writeFileContents(oldPath, 'source');
+    await FileIO.writeFileContents(newPath, 'destination');
+    const callback = jest.fn();
+    await FileIO.rename(oldPath, newPath, callback);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toHaveProperty('code', 'EEXIST');
+    expect(await fs.readFile(oldPath, 'utf8')).toBe('source');
+    expect(await fs.readFile(newPath, 'utf8')).toBe('destination');
+});
+
+test('concurrent renames to the same destination keep the losing source intact', async () =>
+{
+    const firstPath = path.join(directory, 'first.d.ts');
+    const secondPath = path.join(directory, 'second.d.ts');
+    const targetPath = path.join(directory, 'target.d.ts');
+    await FileIO.writeFileContents(firstPath, 'first');
+    await FileIO.writeFileContents(secondPath, 'second');
+    const firstCallback = jest.fn();
+    const secondCallback = jest.fn();
+    await Promise.all([
+        FileIO.rename(firstPath, targetPath, firstCallback),
+        FileIO.rename(secondPath, targetPath, secondCallback)
+    ]);
+    expect(firstCallback).toHaveBeenCalledTimes(1);
+    expect(secondCallback).toHaveBeenCalledTimes(1);
+    const callbacks = [ firstCallback, secondCallback ];
+    expect(callbacks.filter(callback => callback.mock.calls[0].length === 0)).toHaveLength(1);
+    const failure = callbacks.find(callback => callback.mock.calls[0].length > 0);
+    expect(failure.mock.calls[0][0]).toHaveProperty('code', 'EEXIST');
+    if(failure === firstCallback)
+    {
+        expect(await fs.readFile(firstPath, 'utf8')).toBe('first');
+        expect(await fs.readFile(targetPath, 'utf8')).toBe('second');
+        await expect(fs.access(secondPath)).rejects.toHaveProperty('code', 'ENOENT');
+    }
+    else
+    {
+        expect(await fs.readFile(secondPath, 'utf8')).toBe('second');
+        expect(await fs.readFile(targetPath, 'utf8')).toBe('first');
+        await expect(fs.access(firstPath)).rejects.toHaveProperty('code', 'ENOENT');
+    }
+});
+
 test('recursive directory creation reports failures through its callback', async () =>
 {
     const filename = path.join(directory, 'file');
