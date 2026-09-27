@@ -134,6 +134,7 @@ function reportRename(potentialPath, error)
     if(error)
     {
         console.error(error);
+        lgd.outputChannel.appendLine(`LGD: Rename failed. ${error.message}`);
         StatusBarMessage.show('LGD: Rename failed.', StatusBarMessageTypes.ERROR);
         return;
     }

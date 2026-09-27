@@ -103,6 +103,42 @@ test('a failed source removal rolls back the copied declaration so renaming can 
     await expect(fs.access(oldPath)).rejects.toHaveProperty('code', 'ENOENT');
 });
 
+test('failed rollback preserves both errors and declarations and allows recovery', async () =>
+{
+    const oldPath = path.join(directory, 'old.d.ts');
+    const newPath = path.join(directory, 'new.d.ts');
+    await FileIO.writeFileContents(oldPath, 'source');
+    const removalError = new Error('Cannot remove source');
+    const cleanupError = new Error('Cannot remove copied destination');
+    const unlink = jest.spyOn(fs, 'unlink').mockRejectedValueOnce(removalError).mockRejectedValueOnce(cleanupError);
+    const callback = jest.fn();
+    try
+    {
+        await FileIO.rename(oldPath, newPath, callback);
+    }
+    finally
+    {
+        unlink.mockRestore();
+    }
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    const failure = callback.mock.calls[0][0];
+    expect(failure).toBeInstanceOf(globalThis.AggregateError);
+    expect(failure.errors).toEqual([ removalError, cleanupError ]);
+    expect(failure.cause).toBe(removalError);
+    expect(failure.message).toContain(oldPath);
+    expect(failure.message).toContain(newPath);
+    expect(await fs.readFile(oldPath, 'utf8')).toBe('source');
+    expect(await fs.readFile(newPath, 'utf8')).toBe('source');
+    await fs.unlink(newPath);
+    callback.mockClear();
+    await FileIO.rename(oldPath, newPath, callback);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith();
+    expect(await fs.readFile(newPath, 'utf8')).toBe('source');
+    await expect(fs.access(oldPath)).rejects.toHaveProperty('code', 'ENOENT');
+});
+
 test('concurrent renames to the same destination keep the losing source intact', async () =>
 {
     const firstPath = path.join(directory, 'first.d.ts');

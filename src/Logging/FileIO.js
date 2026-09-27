@@ -35,6 +35,29 @@ async function tryCaseOnlyRename(oldPath, newPath)
     return true;
 }
 
+/** @description Removes the source or rolls back the copy, reporting both failures if cleanup is blocked. */
+async function removeSourceOrRollback(oldPath, newPath)
+{
+    try
+    {
+        await fs.unlink(oldPath);
+    }
+    catch(error)
+    {
+        try
+        {
+            await fs.unlink(newPath);
+        }
+        catch(cleanupError)
+        {
+            const message = `Could not remove ${oldPath}: ${error.message}. Rollback of ${newPath} also failed: ${cleanupError.message}. Both declarations remain; resolve the filesystem errors, inspect and remove the copied destination, then retry the rename.`;
+            throw new globalThis.AggregateError([ error, cleanupError ], message, { cause: error });
+        }
+
+        throw error;
+    }
+}
+
 /** @description File operations used when writing and moving generated declarations. */
 const FileIO = {
     async writeFileContents(filepath, content)
@@ -67,15 +90,7 @@ const FileIO = {
             if(!await tryCaseOnlyRename(oldPath, newPath))
             {
                 await fs.copyFile(oldPath, newPath, COPYFILE_EXCL);
-                try
-                {
-                    await fs.unlink(oldPath);
-                }
-                catch(error)
-                {
-                    await fs.unlink(newPath);
-                    throw error;
-                }
+                await removeSourceOrRollback(oldPath, newPath);
             }
         }
         catch(error)

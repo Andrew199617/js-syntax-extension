@@ -47,3 +47,8 @@ Also follow the established project conventions in `.github/instructions/default
 - Avoid redundant tests, assertions coupled to implementation details, and
 elaborate test infrastructure for small changes. run broader checks when warranted or required by the project.
 - Stop expanding coverage once the relevant behavior is sufficiently verified.
+
+## VS Code control
+
+- For extension UI reproduction and screenshots, use the local HTTP workflow in [.agents/skills/vscode-control/SKILL.md](.agents/skills/vscode-control/SKILL.md).
+- Use its desktop `--dev` mode. Prefer screenshots using skill to computer use.
