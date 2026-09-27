@@ -40,7 +40,10 @@
         "Programming Languages"
     ],
     "activationEvents": [
-        "onLanguage:javascript"
+        "onLanguage:javascript",
+        "onLanguage:javascriptreact",
+        "onLanguage:typescript",
+        "onLanguage:typescriptreact"
     ],
     "main": "./dist/extension.js",
     "contributes": {

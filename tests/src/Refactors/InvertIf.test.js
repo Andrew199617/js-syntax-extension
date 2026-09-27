@@ -212,6 +212,25 @@ test('wraps unbraced loop bodies before lifting statements', () =>
     expectSameBehavior(originalSource, invertedSource, [`run([0, 1, 2])`]);
 });
 
+test('infers two-space indentation from an unbraced body', () =>
+{
+    const originalSource = `function run(ready) {
+  if (ready)
+    output.push("ready");
+}`;
+    const expected = `function run(ready) {
+  if (!ready)
+  {
+    return;
+  }
+
+  output.push("ready");
+}`;
+    const invertedSource = invert(originalSource);
+    expectSameBehavior(originalSource, invertedSource, [ `run(true)`, `run(false)` ]);
+    expect(invertedSource).toBe(expected);
+});
+
 test('wraps a nested unbraced if without changing its enclosing else', () =>
 {
     const originalSource = `function run(outer, inner) {
@@ -590,6 +609,27 @@ test('supports TypeScript assertions and generic arrows without enabling JSX', (
 };`;
     const invertedSource = invert(originalSource, 'if', { languageId: 'typescript' });
     expect(invertedSource).toContain(`!(<boolean>ready)`);
+});
+
+test.each([
+    `type Value = number;`,
+    `interface Value { count: number; }`,
+    `enum Value { ready }`
+])('retains the scope of a TypeScript declaration: %s', declaration =>
+{
+    const originalSource = `type Value = string;
+function run(ready: boolean) {
+  const read = (value: Value) => value;
+  if (ready) {
+    ${declaration}
+    consume(read("ready"));
+  }
+}`;
+    const invertedSource = invert(originalSource, 'if', { languageId: 'typescript' });
+    const syntax = parser.parse(invertedSource, { plugins: ['typescript'] });
+    const body = syntax.program.body[1].body.body;
+    expect(body.map(statement => statement.type)).toEqual([ 'VariableDeclaration', 'IfStatement', 'BlockStatement' ]);
+    expect(invertedSource).toContain(declaration);
 });
 
 test('accepts the opening brace and whole-line selections', () =>
