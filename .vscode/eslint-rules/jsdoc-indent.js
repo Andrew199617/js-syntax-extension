@@ -17,57 +17,63 @@ export const meta = {
 export function create(context)
 {
     const source = context.sourceCode;
-    return {
-        /** @description Checks every JSDoc block against the indentation of its declaration. */
-        'Program:exit'()
+
+    function checkCommentIndentation(comment)
+    {
+        if(comment.type !== 'Block' || !comment.value.startsWith('*'))
         {
-            for(const comment of source.getAllComments())
-            {
-                if(comment.type !== 'Block' || !comment.value.startsWith('*'))
-                {
-                    continue;
-                }
-
-                const next = source.getTokenAfter(comment);
-                const line = source.lines[comment.loc.start.line - 1];
-                const indentation = line.slice(0, comment.loc.start.column);
-                if(!next || next.loc.start.line <= comment.loc.end.line || (/\S/).test(indentation) || next.value === '}')
-                {
-                    continue;
-                }
-
-                const expected = source.lines[next.loc.start.line - 1].slice(0, next.loc.start.column);
-                if((/\S/).test(expected) || indentation === expected)
-                {
-                    continue;
-                }
-
-                const range = [ comment.range[0] - indentation.length, comment.range[1] ];
-                const original = source.text.slice(range[0], range[1]);
-                const replacement = original.split('\n')
-                    .map(lineText =>
-                    {
-                        if(lineText.startsWith(indentation))
-                        {
-                            return expected + lineText.slice(indentation.length);
-                        }
-
-                        return lineText;
-                    })
-                    .join('\n');
-
-                const report = {
-                    node: comment,
-                    messageId: 'alignment',
-
-                    /** @description Replaces the comment with its correctly indented text. */
-                    fix(fixer)
-                    {
-                        return fixer.replaceTextRange(range, replacement);
-                    }
-                };
-                context.report(report);
-            }
+            return;
         }
-    };
+
+        const next = source.getTokenAfter(comment);
+        const line = source.lines[comment.loc.start.line - 1];
+        const indentation = line.slice(0, comment.loc.start.column);
+        if(!next || next.loc.start.line <= comment.loc.end.line || (/\S/).test(indentation) || next.value === '}')
+        {
+            return;
+        }
+
+        const expected = source.lines[next.loc.start.line - 1].slice(0, next.loc.start.column);
+        if((/\S/).test(expected) || indentation === expected)
+        {
+            return;
+        }
+
+        const range = [ comment.range[0] - indentation.length, comment.range[1] ];
+        const original = source.text.slice(range[0], range[1]);
+        const replacement = original.split('\n')
+            .map(lineText =>
+            {
+                if(lineText.startsWith(indentation))
+                {
+                    return expected + lineText.slice(indentation.length);
+                }
+
+                return lineText;
+            })
+            .join('\n');
+
+        function fixIndentation(fixer)
+        {
+            return fixer.replaceTextRange(range, replacement);
+        }
+
+        const report = {
+            node: comment,
+            messageId: 'alignment',
+            fix: fixIndentation
+        };
+        context.report(report);
+    }
+
+    function checkAllComments()
+    {
+        for(const comment of source.getAllComments())
+        {
+            checkCommentIndentation(comment);
+        }
+    }
+
+    // ESLint calls this listener once after it finishes traversing the file.
+    return { 'Program:exit': checkAllComments };
 }
