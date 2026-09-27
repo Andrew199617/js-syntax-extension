@@ -97,7 +97,8 @@ jest.mock('vscode', () => ({
         setStatusBarMessage: jest.fn(() => ({ dispose: jest.fn() })),
         createStatusBarItem: jest.fn(() => ({ show: jest.fn(), hide: jest.fn() })),
         showErrorMessage: jest.fn(),
-        showWarningMessage: jest.fn()
+        showWarningMessage: jest.fn(),
+        showInformationMessage: jest.fn()
     },
     DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2 },
     StatusBarAlignment: { Left: 1 },
@@ -119,6 +120,7 @@ beforeEach(() =>
 {
     previousLgd = globalThis.lgd;
     vscode.workspace.rootPath = 'workspace';
+    vscode.window.activeTextEditor = undefined;
     fs.exists.mockReset();
     fs.promises.readFile.mockReset();
     FileIO.rename.mockReset();
@@ -318,6 +320,20 @@ test('actual content changes report parser errors without popups', async () =>
     expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
 });
 
+test.each([ undefined, { document: { fileName: 'notes.txt' } } ])('compile command logs an unavailable JavaScript editor without opening Output or a popup: %p', async activeEditor =>
+{
+    vscode.window.activeTextEditor = activeEditor;
+    const createCompilation = jest.spyOn(GenerateTypings, 'create');
+    const registration = vscode.commands.registerCommand.mock.calls.find(([name]) => name === 'lgd.generateTypings');
+    await registration[1]();
+    expect(createCompilation).not.toHaveBeenCalled();
+    expect(getOutput()).toContain('Cannot compile the current file. Open a JavaScript (.js) file and try again.');
+    expect(lgd.outputChannel.show).not.toHaveBeenCalled();
+    expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+    expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
 describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
 {
     beforeEach(() =>
@@ -391,5 +407,99 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
             path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/new/New.d.ts`),
             expect.any(Function)
         );
+    });
+
+    test('renames a root-level declaration only once', () =>
+    {
+        fs.exists.mockImplementation((filename, callback) => callback(filename.endsWith('Old.d.ts')));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/Old.js`) },
+            newUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/New.js`) }
+        }] });
+        expect(FileIO.rename).toHaveBeenCalledTimes(1);
+        expect(FileIO.rename).toHaveBeenCalledWith(
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/Old.d.ts`),
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/New.d.ts`),
+            expect.any(Function)
+        );
+    });
+
+    test('moving a source file keeps the flattened declaration without reporting a false collision', () =>
+    {
+        fs.exists.mockImplementation((filename, callback) => callback(!filename.includes(`${path[platform].sep}new${path[platform].sep}`)));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/old/Example.js`) },
+            newUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/new/Example.js`) }
+        }] });
+        expect(FileIO.rename).toHaveBeenCalledTimes(1);
+        expect(FileIO.rename).toHaveBeenCalledWith(
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/old/Example.d.ts`),
+            path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/new/Example.d.ts`),
+            expect.any(Function)
+        );
+        expect(lgd.outputChannel.appendLine).not.toHaveBeenCalled();
+    });
+
+    test.each([
+        [ true, '', 'src' ],
+        [ false, '', 'src' ],
+        [ true, 'src', '' ],
+        [ false, 'src', '' ]
+    ])('uses maintainHierarchy=%s for overlapping paths when moving from "%s" to "%s"', (maintainHierarchy, oldDirectory, newDirectory) =>
+    {
+        lgd.configuration.maintainHierarchy = maintainHierarchy;
+        fs.exists.mockImplementation((filename, callback) => callback(filename.endsWith('Old.d.ts')));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path.join(vscode.workspace.rootPath, oldDirectory, 'Old.js') },
+            newUri: { fsPath: path.join(vscode.workspace.rootPath, newDirectory, 'New.js') }
+        }] });
+        const oldTypingsDirectory = maintainHierarchy ? oldDirectory : '';
+        const newTypingsDirectory = maintainHierarchy ? newDirectory : '';
+        expect(FileIO.rename).toHaveBeenCalledTimes(1);
+        expect(FileIO.rename).toHaveBeenCalledWith(
+            path.join(vscode.workspace.rootPath, 'typings', oldTypingsDirectory, 'Old.d.ts'),
+            path.join(vscode.workspace.rootPath, 'typings', newTypingsDirectory, 'New.d.ts'),
+            expect.any(Function)
+        );
+    });
+
+    test('an exclusive rename collision is logged without a popup', () =>
+    {
+        fs.exists.mockImplementation((filename, callback) => callback(true));
+        FileIO.rename.mockImplementation((oldPath, newPath, callback) => callback({ code: 'EEXIST' }));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/Old.js`) },
+            newUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/New.js`) }
+        }] });
+        expect(FileIO.rename).toHaveBeenCalledTimes(2);
+        expect(getOutput()).toContain(`${path[platform].normalize(`${vscode.workspace.rootPath}/typings/New.d.ts`)} already exists.`);
+        expect(getOutput()).toContain(`${path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/New.d.ts`)} already exists.`);
+        expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+        expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+        expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+        expect(vscode.window.createStatusBarItem).not.toHaveBeenCalled();
+        expect(lgd.outputChannel.show).not.toHaveBeenCalled();
+    });
+
+    test('unexpected rename failures retain recovery details in Output without opening it', () =>
+    {
+        const failure = new Error('Source deletion and rollback failed; inspect both declarations before retrying.');
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        fs.exists.mockImplementation((filename, callback) => callback(true));
+        FileIO.rename.mockImplementation((oldPath, newPath, callback) => callback(failure));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path.join(vscode.workspace.rootPath, 'Old.js') },
+            newUri: { fsPath: path.join(vscode.workspace.rootPath, 'New.js') }
+        }] });
+        expect(getOutput()).toContain(failure.message);
+        expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+        expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+        expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+        expect(lgd.outputChannel.show).not.toHaveBeenCalled();
     });
 });
