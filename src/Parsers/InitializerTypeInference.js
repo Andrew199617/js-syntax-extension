@@ -86,6 +86,11 @@ async function getDeclarationType(binding)
  */
 async function inferBinding(binding)
 {
+    if(!binding.constant)
+    {
+        return Types.ANY;
+    }
+
     const inferenceContext = this.inferenceContext;
     if(binding.kind === 'param' && binding.scope === inferenceContext.parameterScope)
     {
@@ -99,11 +104,6 @@ async function inferBinding(binding)
 
             return annotation;
         }
-    }
-
-    if(!binding.constant)
-    {
-        return Types.ANY;
     }
 
     let initializer;

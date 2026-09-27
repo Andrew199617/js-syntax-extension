@@ -102,6 +102,18 @@ ${body}
         expect(result).toContain('count: number;');
     });
 
+    test('does not trust a parameter annotation after reassignment', async () =>
+    {
+        const result = await parseInitializer(`    document = "changed";
+    const current = document;
+    instance.context = {
+      document: document,
+      documents: [current]
+    };`);
+        expect(result).toContain('document: any;');
+        expect(result).toContain('documents: any[];');
+    });
+
     test('does not trust annotations on reassigned, forward, or uninitialized locals', async () =>
     {
         const result = await parseInitializer(`    /** @type {string} */
@@ -173,6 +185,30 @@ ${body}
         expect(result).toContain('cycle: any;');
         expect(result).toContain('hidden: any;');
     });
+});
+
+test('uses parameter annotations and defaults in function component constructors', async () =>
+{
+    const source = `
+  /** @param {DocumentType} document */
+  constructor(document, count = 3) {
+    const current = document;
+    this.context = {
+      document: current
+    };
+    this.count = count;
+  }
+`;
+    const componentParser = FunctionComponentParser.create();
+    componentParser.variables = {};
+    componentParser.staticVariables = [];
+    componentParser.className = 'Example';
+    componentParser.isReactComponent = true;
+    componentParser.content = source;
+    const result = await componentParser.parseClass(source);
+
+    expect(result).toContain('document: DocumentType;');
+    expect(result).toContain('count: number;');
 });
 
 test('forgets function variables when parsing an assigned value fails', async () =>
