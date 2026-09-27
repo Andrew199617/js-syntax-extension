@@ -7,86 +7,94 @@ const fs = require('node:fs/promises');
 // Use the existing extension manifest as the source of package metadata.
 const extensionManifest = require('./package.json');
 
-/** @import { Configuration } from 'webpack' */
-
-async function writeManifest(fileName, manifest)
-{
-    const contents = `${JSON.stringify(manifest, null, 2)}\n`.replaceAll('\n', '\r\n');
-    await fs.writeFile(fileName, contents);
-}
-
-async function copyAsset(source, destination)
-{
-    const sourceStats = await fs.stat(source);
-    if(sourceStats.isDirectory())
-    {
-        // Create fresh directories without copying Windows read-only attributes.
-        await fs.mkdir(destination, { recursive: true });
-        for(const entry of await fs.readdir(source))
-        {
-            await copyAsset(path.join(source, entry), path.join(destination, entry));
-        }
-
-        return;
-    }
-
-    await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.copyFile(source, destination);
-}
-
-async function prepareExtensionOutput(compilation)
-{
-    const output = compilation.outputOptions.path;
-    const pluginName = extensionManifest.contributes.typescriptServerPlugins[0].name;
-    const target = path.join(output, 'node_modules', pluginName);
-    const source = path.join(__dirname, 'src/SemanticHighlighting/CallbackParameters.js');
-    const pluginManifest = {
-        name: pluginName,
-        version: extensionManifest.version,
-        private: true,
-        main: 'index.js'
-    };
-    await fs.mkdir(target, { recursive: true });
-    await fs.copyFile(source, path.join(target, 'index.js'));
-    await writeManifest(path.join(target, 'package.json'), pluginManifest);
-
-    // Application dependencies are bundled in extension.js; tsserver loads its own module.
-    const outputManifest = {
-        ...extensionManifest,
-        main: `./${path.basename(extensionManifest.main)}`,
-        dependencies: { [pluginName]: extensionManifest.version }
-    };
-    delete outputManifest.scripts;
-    delete outputManifest.devDependencies;
-    delete outputManifest.imports;
-    await writeManifest(path.join(output, 'package.json'), outputManifest);
-
-    const assets = new Set([
-        'README.md',
-        'CHANGELOG.md',
-        'LICENSE',
-        'language-configuration.json',
-        '.vscodeignore',
-        'images',
-        extensionManifest.icon
-    ]);
-    for(const grammar of extensionManifest.contributes.grammars)
-    {
-        assets.add(grammar.path);
-    }
-
-    for(const asset of assets)
-    {
-        const destination = path.join(output, asset);
-        await copyAsset(path.join(__dirname, asset), destination);
-    }
-}
+/** @import { Compiler, Configuration } from 'webpack' */
 
 // TypeScript loads this module in tsserver, separately from LGD.js in the extension host.
 const extensionOutput = {
+    /**
+     * @description Registers asset and manifest preparation after webpack emits the extension bundle.
+     * @param {Compiler} compiler Webpack compiler that owns the build hooks.
+     */
     apply(compiler)
     {
-        compiler.hooks.afterEmit.tapPromise('PrepareExtensionOutput', prepareExtensionOutput);
+        const prepareOutput = this.prepareExtensionOutput.bind(this);
+        compiler.hooks.afterEmit.tapPromise('PrepareExtensionOutput', prepareOutput);
+    },
+
+    /** @description Writes a formatted package manifest with CRLF line endings. */
+    async writeManifest(fileName, manifest)
+    {
+        const contents = `${JSON.stringify(manifest, null, 2)}\n`.replaceAll('\n', '\r\n');
+        await fs.writeFile(fileName, contents);
+    },
+
+    /** @description Copies an asset or directory tree without preserving read-only directory attributes. */
+    async copyAsset(source, destination)
+    {
+        const sourceStats = await fs.stat(source);
+        if(sourceStats.isDirectory())
+        {
+            // Create fresh directories without copying Windows read-only attributes.
+            await fs.mkdir(destination, { recursive: true });
+            for(const entry of await fs.readdir(source))
+            {
+                await this.copyAsset(path.join(source, entry), path.join(destination, entry));
+            }
+
+            return;
+        }
+
+        await fs.mkdir(path.dirname(destination), { recursive: true });
+        await fs.copyFile(source, destination);
+    },
+
+    /** @description Adds the TypeScript server plugin, package manifest, and extension assets to the build output. */
+    async prepareExtensionOutput(compilation)
+    {
+        const output = compilation.outputOptions.path;
+        const pluginName = extensionManifest.contributes.typescriptServerPlugins[0].name;
+        const target = path.join(output, 'node_modules', pluginName);
+        const source = path.join(__dirname, 'src/SemanticHighlighting/CallbackParameters.js');
+        const pluginManifest = {
+            name: pluginName,
+            version: extensionManifest.version,
+            private: true,
+            main: 'index.js'
+        };
+        await fs.mkdir(target, { recursive: true });
+        await fs.copyFile(source, path.join(target, 'index.js'));
+        await this.writeManifest(path.join(target, 'package.json'), pluginManifest);
+
+        // Application dependencies are bundled in extension.js; tsserver loads its own module.
+        const outputManifest = {
+            ...extensionManifest,
+            main: `./${path.basename(extensionManifest.main)}`,
+            dependencies: { [pluginName]: extensionManifest.version }
+        };
+        delete outputManifest.scripts;
+        delete outputManifest.devDependencies;
+        delete outputManifest.imports;
+        await this.writeManifest(path.join(output, 'package.json'), outputManifest);
+
+        const assets = new Set([
+            'README.md',
+            'CHANGELOG.md',
+            'LICENSE',
+            'language-configuration.json',
+            '.vscodeignore',
+            'images',
+            extensionManifest.icon
+        ]);
+        for(const grammar of extensionManifest.contributes.grammars)
+        {
+            assets.add(grammar.path);
+        }
+
+        for(const asset of assets)
+        {
+            const destination = path.join(output, asset);
+            await this.copyAsset(path.join(__dirname, asset), destination);
+        }
     }
 };
 

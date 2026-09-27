@@ -39,6 +39,30 @@
 
 # Features
 
+## Invert if into a guard clause
+
+Place the cursor on an `if` condition and choose **Invert If Statement**, or run the LGD invert-if command. The action lifts the body out of the conditional and uses an early `return`, a loop `continue`, or an existing exit:
+
+```js
+// Before
+function process(item) {
+    if (item) {
+        save(item);
+    }
+}
+
+// After
+function process(item) {
+    if (!item) {
+        return;
+    }
+
+    save(item);
+}
+```
+
+Repeat on nested conditions to flatten a tree. JavaScript, JSX, TypeScript, and TSX are supported, including multiline conditions and `else` branches. The action preserves comments, literal contents, and indentation. It retains a block when removing it would change variable scope, and is only offered when an early exit preserves the surrounding control flow.
+
 ## JSDoc import highlighting
 
 JSDoc imports such as `/** @import { Node as AstNode } from 'estree' */` now highlight imported names, aliases, `as`/`from`, and module strings using normal import theme scopes. Supports JavaScript and JSX, including multiline, default and namespace imports. Reload VS Code after installing the updated VSIX. Colors follow your theme; no settings changes are needed for this syntax rule.

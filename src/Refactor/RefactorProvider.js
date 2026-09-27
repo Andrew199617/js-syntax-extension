@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const InvertIf = require('./InvertIf');
 const { Oloo } = require('@mavega/oloo');
 const ExtractFunction = require('./ExtractFunction');
 
@@ -27,7 +28,7 @@ const RefactorProvider = {
     register()
     {
         const provider = vscode.languages.registerCodeActionsProvider(
-            [ 'javascript', 'typescript' ],
+            [ 'javascript', 'javascriptreact', 'typescript', 'typescriptreact' ],
             this,
             {
                 providedCodeActionKinds: this.providedCodeActionKinds
@@ -61,11 +62,7 @@ const RefactorProvider = {
             codeActions.push(this.extractFunction.createCodeAction(document, range, context));
         }
 
-        const lineText = document.lineAt(range.start.line).text;
-        const ifRegex = /if\s*\(/;
-        const match = ifRegex.exec(lineText);
-
-        if(!match)
+        if(!InvertIf.getEdit(document, range))
         {
             return codeActions;
         }
