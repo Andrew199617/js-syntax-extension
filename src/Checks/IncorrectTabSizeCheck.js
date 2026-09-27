@@ -31,6 +31,7 @@ const IncorrectTabSizeCheck = {
         }
     },
 
+    /** @description Reports an indentation error at the current parser range. */
     throwError(message)
     {
         VscodeError.create(

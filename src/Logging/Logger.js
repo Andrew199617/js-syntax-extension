@@ -48,6 +48,7 @@ const Logger = {
         this.document = document;
     },
 
+    /** @description Writes the current document heading once before its log messages. */
     logHeader()
     {
         if(!this._loggedHeading && this.document)
@@ -57,12 +58,14 @@ const Logger = {
         }
     },
 
+    /** @description Appends an informational message under the current document heading. */
     logInfo(info)
     {
         this.logHeader();
         this.log.push(`INFO: ${info}`);
     },
 
+    /** @description Logs a warning and publishes its diagnostic. */
     logWarning(warning)
     {
         this.logHeader();
@@ -70,6 +73,7 @@ const Logger = {
         this.reportDiagnostic(warning, ErrorTypes.WARNING);
     },
 
+    /** @description Logs an error and publishes its diagnostic. */
     logError(error)
     {
         this.logHeader();

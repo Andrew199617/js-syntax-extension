@@ -78,6 +78,7 @@ const ExtractFunction = {
         return true;
     },
 
+    /** @description Checks whether the selected source range lies inside a class body. */
     checkIfInsideClass(document, selection)
     {
         const syntax = parser.parse(document.getText(), {
@@ -88,6 +89,7 @@ const ExtractFunction = {
         const end = document.offsetAt(selection.end);
         let insideClass = false;
         const visitor = {
+            /** @description Marks a containing class body and stops the search. */
             ClassBody(classPath)
             {
                 const body = classPath.node;
@@ -118,6 +120,7 @@ const ExtractFunction = {
         const importedVars = [];
 
         traverse(ast, {
+            /** @description Collects the local names introduced by import declarations. */
             ImportDeclaration(path)
             {
                 path.node.specifiers.forEach(specifier =>
@@ -221,6 +224,7 @@ const ExtractFunction = {
         return true;
     },
 
+    /** @description Builds the Extract Function code action for the selected range. */
     createCodeAction(document, range)
     {
         const extractFunctionAction = new vscode.CodeAction(
@@ -235,6 +239,7 @@ const ExtractFunction = {
         return extractFunctionAction;
     },
 
+    /** @description Registers the extraction command and code-action provider for disposal. */
     register(context)
     {
         const command = vscode.commands.registerCommand('lgd.extractFunction', async () =>

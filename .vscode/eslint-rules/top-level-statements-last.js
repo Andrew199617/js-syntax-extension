@@ -34,6 +34,7 @@ function isDefinition(node)
 export function create(context)
 {
     return {
+        /** @description Reports executable statements that precede later module definitions. */
         Program(program)
         {
             let hasLaterDefinition = false;

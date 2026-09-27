@@ -37,6 +37,7 @@ const ParseFunctionParams = {
 
         // Traverse the AST
         traverse(ast, {
+            /** @description Collects referenced identifiers that can become extracted function parameters. */
             Identifier(path)
             {
                 // Skip if the identifier is part of a declaration

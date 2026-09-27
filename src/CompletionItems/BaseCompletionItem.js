@@ -10,6 +10,7 @@ const BaseCompletionItem = {
     /**
      * @description Initialize an instance of BaseCompletionItem.
      * @param {string} label
+     * @param {string} detail Text shown alongside the completion label.
      * @returns {BaseCompletionItemType}
      */
     create(label, detail)
@@ -28,12 +29,7 @@ const BaseCompletionItem = {
         return baseCompletionItem;
     },
 
-    /**
-     * @description Although we inherit from CompletionItem we still want to
-     * initialize some values before handing ourself off to CompletionProvider.
-     * @param {vscode.TextDocument} document
-     * @param {vscode.Range} position
-     */
+    /** @description Requires derived completion items to prepare their values before returning them to the completion provider. */
     getCompletionItem()
     {
         throw new Error('Not implemented.');

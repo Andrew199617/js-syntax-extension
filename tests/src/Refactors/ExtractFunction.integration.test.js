@@ -35,6 +35,8 @@ function createEditor(source, selectedText)
         document: {
             lineCount: lines.length,
             offsetAt: offsetAt,
+
+            /** @description Returns either the selected text or the complete test document. */
             getText(range)
             {
                 if(range)
@@ -44,19 +46,26 @@ function createEditor(source, selectedText)
 
                 return source;
             },
+
+            /** @description Returns the requested line of the test document. */
             lineAt(line)
             {
                 return { text: lines[line] };
             }
         },
+
+        /** @description Collects edits through the simulated VS Code edit builder. */
         edit(callback)
         {
             const builder = {
+                /** @description Records an insertion at the requested source position. */
                 insert(position, text)
                 {
                     const offset = offsetAt(position);
                     edits.push({ start: offset, end: offset, text: text });
                 },
+
+                /** @description Records replacement of the selected source range. */
                 replace(range, text)
                 {
                     expect(range).toBe(selection);
@@ -71,6 +80,8 @@ function createEditor(source, selectedText)
     return {
         editor: editor,
         edits: edits,
+
+        /** @description Applies recorded edits from the end of the source backward. */
         applyEdits()
         {
             let result = source;

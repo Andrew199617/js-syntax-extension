@@ -160,45 +160,45 @@ const InvertIf = {
     findSelectedIf(syntax, source, selection)
     {
         let selectedPath = null;
-        const visitor = {
-            IfStatement(statementPath)
+        function considerIfStatement(statementPath)
+        {
+            const statement = statementPath.node;
+            const lineStart = source.lastIndexOf('\n', statement.start - 1) + 1;
+            const prefix = source.slice(lineStart, statement.start);
+            let start = statement.start;
+            if(!prefix.trim())
             {
-                const statement = statementPath.node;
-                const lineStart = source.lastIndexOf('\n', statement.start - 1) + 1;
-                const prefix = source.slice(lineStart, statement.start);
-                let start = statement.start;
-                if(!prefix.trim())
+                start = lineStart;
+            }
+
+            if(selection.start < start || selection.start > statement.consequent.start)
+            {
+                return;
+            }
+
+            function selectsFollowingCode(token)
+            {
+                if(token.start < statement.end || token.start >= selection.end)
                 {
-                    start = lineStart;
+                    return false;
                 }
 
-                if(selection.start < start || selection.start > statement.consequent.start)
+                return typeof token.type !== 'string' && token.type.label !== '}';
+            }
+
+            if(selection.end > statement.end)
+            {
+                // Whole-line selections may include comments and enclosing closing braces.
+                if(syntax.tokens.some(selectsFollowingCode))
                 {
                     return;
                 }
-
-                function selectsFollowingCode(token)
-                {
-                    if(token.start < statement.end || token.start >= selection.end)
-                    {
-                        return false;
-                    }
-
-                    return typeof token.type !== 'string' && token.type.label !== '}';
-                }
-
-                if(selection.end > statement.end)
-                {
-                    // Whole-line selections may include comments and enclosing closing braces.
-                    if(syntax.tokens.some(selectsFollowingCode))
-                    {
-                        return;
-                    }
-                }
-
-                selectedPath = statementPath;
             }
-        };
+
+            selectedPath = statementPath;
+        }
+
+        const visitor = { IfStatement: considerIfStatement };
         traverse(syntax, visitor);
         return selectedPath;
     },
@@ -494,18 +494,18 @@ const InvertIf = {
             }
         }
 
-        const visitor = {
-            Identifier(identifierPath)
+        function checkIdentifierScope(identifierPath)
+        {
+            const identifier = identifierPath.node;
+            const outsideBody = identifier.start < consequent.node.start || identifier.end > consequent.node.end;
+            if(identifier.name === 'eval' || outsideBody && names.has(identifier.name))
             {
-                const identifier = identifierPath.node;
-                const outsideBody = identifier.start < consequent.node.start || identifier.end > consequent.node.end;
-                if(identifier.name === 'eval' || outsideBody && names.has(identifier.name))
-                {
-                    preserveScope = true;
-                    identifierPath.stop();
-                }
+                preserveScope = true;
+                identifierPath.stop();
             }
-        };
+        }
+
+        const visitor = { Identifier: checkIdentifierScope };
         destination.path.traverse(visitor);
         return preserveScope;
     },

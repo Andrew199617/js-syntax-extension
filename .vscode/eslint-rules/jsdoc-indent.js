@@ -18,6 +18,7 @@ export function create(context)
 {
     const source = context.sourceCode;
     return {
+        /** @description Checks every JSDoc block against the indentation of its declaration. */
         'Program:exit'()
         {
             for(const comment of source.getAllComments())
@@ -55,7 +56,17 @@ export function create(context)
                     })
                     .join('\n');
 
-                context.report({ node: comment, messageId: 'alignment', fix: fixer => fixer.replaceTextRange(range, replacement) });
+                const report = {
+                    node: comment,
+                    messageId: 'alignment',
+
+                    /** @description Replaces the comment with its correctly indented text. */
+                    fix(fixer)
+                    {
+                        return fixer.replaceTextRange(range, replacement);
+                    }
+                };
+                context.report(report);
             }
         }
     };

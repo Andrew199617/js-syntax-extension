@@ -59,10 +59,14 @@ function parseDirectInstanceReturn(insideFunction)
     let foundInstanceReturn = false;
     const returnVisitor = {
         noScope: true,
+
+        /** @description Skips nested functions so their returns do not affect the enclosing method. */
         Function(functionPath)
         {
             functionPath.skip();
         },
+
+        /** @description Stops traversal after finding a direct instance-creation return. */
         ReturnStatement(returnPath)
         {
             if(isInstanceCreation(returnPath.node.argument))

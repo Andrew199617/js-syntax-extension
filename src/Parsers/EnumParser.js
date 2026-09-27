@@ -42,6 +42,7 @@ const EnumParser = {
         return enumParser;
     },
 
+    /** @description Updates the source range using the parent file parser. */
     updatePosition()
     {
         this.fileParser.updatePosition.bind(this)(...arguments);
@@ -56,6 +57,7 @@ const EnumParser = {
         return (/@enum/).test(comment);
     },
 
+    /** @description Writes an interface property whose type references an enum member. */
     writeInterfaceVar(name, keywords)
     {
         let property = '';
@@ -67,6 +69,7 @@ const EnumParser = {
         return property;
     },
 
+    /** @description Writes an enum member with its assigned value. */
     writeEnumVar(name, _keywords, value)
     {
         let property = '';
@@ -77,6 +80,7 @@ const EnumParser = {
         return property;
     },
 
+    /** @description Parses enum properties with the supplied member writer. */
     parseEnum(object, writeOut)
     {
         this.tabSize += this.defaultTabSize;
@@ -177,14 +181,16 @@ const EnumParser = {
         return property;
     },
 
+    /** @description Locates a source string using the parent file parser. */
     updatePositionToString(content, string, lastBegin = 0)
     {
         this.fileParser.updatePositionToString.bind(this)(content, string, lastBegin);
     },
 
     /**
-     * @description
-     * @param {string} str
+     * @description Generates an interface and enum from a matched enum object.
+     * @param {string} content Source used to locate the enum for diagnostics.
+     * @param {RegExpExecArray} object Matched enum declaration and its named captures.
      */
     parse(content, object)
     {

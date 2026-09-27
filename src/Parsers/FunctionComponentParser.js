@@ -31,6 +31,7 @@ const FunctionComponentParser = {
         return functionComponentParser;
     },
 
+    /** @description Infers or normalizes a function component member type. */
     async parseType(options, properties)
     {
         if(options && !options.type)
@@ -217,7 +218,7 @@ const FunctionComponentParser = {
     },
 
     /**
-     * @description
+     * @description Extracts function component declarations into the generated type file.
      * @param {string} content
      * @param {string} typeFile
      * @returns {{ typeFile: string, content: string }}
