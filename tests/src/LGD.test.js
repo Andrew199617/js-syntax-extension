@@ -451,20 +451,22 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
         );
     });
 
-    test('an existing declaration is not overwritten and the collision is logged without a popup', () =>
+    test('an exclusive rename collision is logged without a popup', () =>
     {
         fs.exists.mockImplementation((filename, callback) => callback(true));
+        FileIO.rename.mockImplementation((oldPath, newPath, callback) => callback({ code: 'EEXIST' }));
         const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
         rename({ files: [{
             oldUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/Old.js`) },
             newUri: { fsPath: path[platform].normalize(`${vscode.workspace.rootPath}/src/New.js`) }
         }] });
-        expect(FileIO.rename).not.toHaveBeenCalled();
+        expect(FileIO.rename).toHaveBeenCalledTimes(2);
         expect(getOutput()).toContain(`${path[platform].normalize(`${vscode.workspace.rootPath}/typings/New.d.ts`)} already exists.`);
         expect(getOutput()).toContain(`${path[platform].normalize(`${vscode.workspace.rootPath}/typings/src/New.d.ts`)} already exists.`);
         expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
         expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
         expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+        expect(vscode.window.createStatusBarItem).not.toHaveBeenCalled();
         expect(lgd.outputChannel.show).not.toHaveBeenCalled();
     });
 });

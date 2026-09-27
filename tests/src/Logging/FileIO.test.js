@@ -61,6 +61,35 @@ test('renaming preserves both declarations when the destination already exists',
     expect(await fs.readFile(newPath, 'utf8')).toBe('destination');
 });
 
+test('a failed source removal rolls back the copied declaration so renaming can be retried', async () =>
+{
+    const oldPath = path.join(directory, 'old.d.ts');
+    const newPath = path.join(directory, 'new.d.ts');
+    await FileIO.writeFileContents(oldPath, 'source');
+    const removalError = new Error('Cannot remove source');
+    const unlink = jest.spyOn(fs, 'unlink').mockRejectedValueOnce(removalError);
+    const callback = jest.fn();
+    try
+    {
+        await FileIO.rename(oldPath, newPath, callback);
+    }
+    finally
+    {
+        unlink.mockRestore();
+    }
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(removalError);
+    expect(await fs.readFile(oldPath, 'utf8')).toBe('source');
+    await expect(fs.access(newPath)).rejects.toHaveProperty('code', 'ENOENT');
+    callback.mockClear();
+    await FileIO.rename(oldPath, newPath, callback);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith();
+    expect(await fs.readFile(newPath, 'utf8')).toBe('source');
+    await expect(fs.access(oldPath)).rejects.toHaveProperty('code', 'ENOENT');
+});
+
 test('concurrent renames to the same destination keep the losing source intact', async () =>
 {
     const firstPath = path.join(directory, 'first.d.ts');

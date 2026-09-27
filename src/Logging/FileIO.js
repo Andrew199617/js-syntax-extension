@@ -32,7 +32,15 @@ const FileIO = {
         {
             await fs.mkdir(path.dirname(newPath), { recursive: true });
             await fs.copyFile(oldPath, newPath, COPYFILE_EXCL);
-            await fs.unlink(oldPath);
+            try
+            {
+                await fs.unlink(oldPath);
+            }
+            catch(error)
+            {
+                await fs.unlink(newPath);
+                throw error;
+            }
         }
         catch(error)
         {

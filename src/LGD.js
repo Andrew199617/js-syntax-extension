@@ -123,8 +123,14 @@ async function compileAllFiles()
     await report.finish();
 }
 
-function reportRename(error)
+function reportRename(potentialPath, error)
 {
+    if(error?.code === 'EEXIST')
+    {
+        lgd.outputChannel.appendLine(`LGD: Skipped renaming ${potentialPath.oldPath}: ${potentialPath.newPath} already exists.`);
+        return;
+    }
+
     if(error)
     {
         console.error(error);
@@ -150,16 +156,7 @@ function renameTypings(potentialPath)
             return;
         }
 
-        fs.exists(potentialPath.newPath, targetExists =>
-        {
-            if(targetExists)
-            {
-                lgd.outputChannel.appendLine(`LGD: Skipped renaming ${potentialPath.oldPath}: ${potentialPath.newPath} already exists.`);
-                return;
-            }
-
-            FileIO.rename(potentialPath.oldPath, potentialPath.newPath, reportRename);
-        });
+        FileIO.rename(potentialPath.oldPath, potentialPath.newPath, error => reportRename(potentialPath, error));
     });
 }
 
