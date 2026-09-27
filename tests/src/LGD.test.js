@@ -469,4 +469,22 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
         expect(vscode.window.createStatusBarItem).not.toHaveBeenCalled();
         expect(lgd.outputChannel.show).not.toHaveBeenCalled();
     });
+
+    test('unexpected rename failures retain recovery details in Output without opening it', () =>
+    {
+        const failure = new Error('Source deletion and rollback failed; inspect both declarations before retrying.');
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        fs.exists.mockImplementation((filename, callback) => callback(true));
+        FileIO.rename.mockImplementation((oldPath, newPath, callback) => callback(failure));
+        const rename = vscode.workspace.onDidRenameFiles.mock.calls[0][0];
+        rename({ files: [{
+            oldUri: { fsPath: path.join(vscode.workspace.rootPath, 'Old.js') },
+            newUri: { fsPath: path.join(vscode.workspace.rootPath, 'New.js') }
+        }] });
+        expect(getOutput()).toContain(failure.message);
+        expect(vscode.window.showErrorMessage).not.toHaveBeenCalled();
+        expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+        expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+        expect(lgd.outputChannel.show).not.toHaveBeenCalled();
+    });
 });
