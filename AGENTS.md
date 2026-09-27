@@ -17,6 +17,9 @@
 - Keep edited text files in CRLF; do not leave LF-only or mixed line endings after applying patches. Check the final bytes before finishing so saving in the editor does not rewrite the entire file.
 
 ## General guidelines
+- Use one module style per file: standalone functions, one class, or one OLOO object. Do not mix module-level functions with class or OLOO definitions, or put multiple classes/OLOO objects in one file.
+- Prefer adding related functions as methods of the existing OLOO object. If a module exports standalone functions, keep the whole module in that style instead of intermingling it with class or OLOO definitions.
+- Imports, constants, plain configuration objects, and local callbacks or helpers inside methods are allowed alongside the chosen module style.
 - Prefer straightforward code that can be read once over compact code that saves lines.
 - For small, fixed sets of commands or actions, prefer explicit registration calls over building arrays of command/callback tuples and immediately iterating over them.
 - Extract repeated error handling and disposal into a named helper. Give substantial callbacks and configuration objects meaningful names before passing them to another function.
@@ -28,6 +31,7 @@
 Also follow the established project conventions in `.github/instructions/default.instructions.md`.
 # JSDoc formatting
 
+- Document every public method with `@description`. Include `@param` for every parameter or omit `@param` entirely; `@returns` is good to have for type, description is optional.
 - Use top-level JSDoc `@import` declarations for types from other modules; do not use inline `import()` types or imported `@typedef` aliases.
 
 - Keep short JSDoc with at most one `@` tag on one line, including typedef aliases. With multiple tags, put `/**`, each tag, and `*/` on separate lines, with no blank lines between tags.

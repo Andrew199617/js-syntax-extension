@@ -1,4 +1,4 @@
-const inferExpressionType = require('../../../src/Parsers/ExpressionType');
+const ExpressionType = require('../../../src/Parsers/ExpressionType');
 const FileParser = require('../../../src/Parsers/FileParser');
 
 let previousLgd;
@@ -39,7 +39,7 @@ test.each([
     [ 'invalid(', 'any' ]
 ])('infers the discussed example %s as %s through both entry points', async (expression, expected) =>
 {
-    expect(inferExpressionType(expression)).toBe(expected);
+    expect(ExpressionType.infer(expression)).toBe(expected);
     expect(await parser.parseValue(expression)).toBe(expected);
 });
 
@@ -97,7 +97,7 @@ test.each([
     [ '"hello";', 'string' ]
 ])('preserves primitive semantics for %s', async (expression, expected) =>
 {
-    expect(inferExpressionType(expression)).toBe(expected);
+    expect(ExpressionType.infer(expression)).toBe(expected);
     expect(await parser.parseValue(expression)).toBe(expected);
 });
 
@@ -105,8 +105,8 @@ test('bounds expression length and recursive inference', () =>
 {
     const excessiveLength = 20000;
     const excessiveDepth = 200;
-    expect(inferExpressionType(`${'1+'.repeat(excessiveLength)}1`)).toBe('any');
-    expect(inferExpressionType(`${'1+'.repeat(excessiveDepth)}1`)).toBe('any');
+    expect(ExpressionType.infer(`${'1+'.repeat(excessiveLength)}1`)).toBe('any');
+    expect(ExpressionType.infer(`${'1+'.repeat(excessiveDepth)}1`)).toBe('any');
 });
 
 test.each([
@@ -184,7 +184,7 @@ test('parsing never executes assignments, calls, getters or coercion hooks', asy
         ];
         for(const expression of expressions)
         {
-            expect(inferExpressionType(expression)).toBe('any');
+            expect(ExpressionType.infer(expression)).toBe('any');
             expect(await parser.parseValue(expression)).toBe('any');
         }
 
