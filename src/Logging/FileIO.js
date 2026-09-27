@@ -5,11 +5,11 @@ const { COPYFILE_EXCL } = require('fs').constants;
 /** @description Pending writes and moves, grouped by absolute filesystem path. */
 const pendingOperations = new Map();
 
-/** @description Shares a queue for equivalent Windows paths without conflating case-sensitive POSIX names. */
+/** @description Case-folds queue keys on every platform; filesystem paths keep their original spelling. */
 function operationPath(filepath)
 {
     const absolutePath = path.resolve(filepath);
-    return process.platform === 'win32' ? absolutePath.toLowerCase() : absolutePath;
+    return absolutePath.toLowerCase();
 }
 
 /** @description Serializes operations on their source and destination while unrelated files remain independent. */
@@ -76,10 +76,26 @@ async function tryCaseOnlyRename(oldPath, newPath)
         return false;
     }
 
-    const [ oldRealPath, newRealPath ] = await Promise.all([ fs.realpath(oldPath), fs.realpath(newPath) ]);
-    if(oldRealPath !== newRealPath)
+    const oldDirectory = path.dirname(oldPath);
+    const newDirectory = path.dirname(newPath);
+    const [ oldDirectoryStats, newDirectoryStats ] = await Promise.all([
+        fs.stat(oldDirectory, { bigint: true }),
+        fs.stat(newDirectory, { bigint: true })
+    ]);
+    if(oldDirectoryStats.dev !== newDirectoryStats.dev || oldDirectoryStats.ino !== newDirectoryStats.ino)
     {
         return false;
+    }
+
+    const oldName = path.basename(oldPath);
+    const newName = path.basename(newPath);
+    if(oldName !== newName)
+    {
+        const filenames = await fs.readdir(oldDirectory);
+        if(filenames.includes(oldName) && filenames.includes(newName))
+        {
+            return false;
+        }
     }
 
     await fs.rename(oldPath, newPath);

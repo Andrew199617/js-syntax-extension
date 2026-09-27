@@ -84,6 +84,34 @@ test('case-only renames update the declaration filename without reporting a coll
     expect(await fs.readdir(directory)).toEqual(['example.d.ts']);
 });
 
+test('case-only renames accept case-preserving realpath results for the same entry', async () =>
+{
+    const oldPath = path.join(directory, 'Example.d.ts');
+    const newPath = path.join(directory, 'example.d.ts');
+    await FileIO.writeFileContents(oldPath, 'source');
+    const readStats = fs.lstat;
+    const lstat = jest.spyOn(fs, 'lstat').mockImplementation((filename, options) => readStats(filename === newPath ? oldPath : filename, options));
+    const realpath = jest.spyOn(fs, 'realpath').mockImplementation(filename => Promise.resolve(filename));
+    const collision = Object.assign(new Error('Destination exists'), { code: 'EEXIST' });
+    const copyFile = jest.spyOn(fs, 'copyFile').mockRejectedValue(collision);
+    const callback = jest.fn();
+    try
+    {
+        await FileIO.rename(oldPath, newPath, callback);
+    }
+    finally
+    {
+        lstat.mockRestore();
+        realpath.mockRestore();
+        copyFile.mockRestore();
+    }
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith();
+    expect(await fs.readFile(newPath, 'utf8')).toBe('source');
+    expect(await fs.readdir(directory)).toEqual(['example.d.ts']);
+});
+
 test.each([
     [ 'symlink', { dev: 1n, ino: 2n } ],
     [ 'hard link', { dev: 1n, ino: 1n } ]
@@ -96,7 +124,7 @@ test.each([
     // Model distinct case-sensitive entries, including aliases with the same target or inode.
     const stat = jest.spyOn(fs, 'stat').mockResolvedValue(sourceStats);
     const lstat = jest.spyOn(fs, 'lstat').mockImplementation(filename => Promise.resolve(filename === oldPath ? sourceStats : destinationStats));
-    const realpath = jest.spyOn(fs, 'realpath').mockImplementation(filename => Promise.resolve(filename));
+    const readdir = jest.spyOn(fs, 'readdir').mockResolvedValue([ 'Example.d.ts', 'example.d.ts' ]);
     const rename = jest.spyOn(fs, 'rename').mockResolvedValue();
     const collision = Object.assign(new Error('Destination exists'), { code: 'EEXIST' });
     const copyFile = jest.spyOn(fs, 'copyFile').mockRejectedValue(collision);
@@ -112,7 +140,7 @@ test.each([
     {
         stat.mockRestore();
         lstat.mockRestore();
-        realpath.mockRestore();
+        readdir.mockRestore();
         rename.mockRestore();
         copyFile.mockRestore();
     }
@@ -241,15 +269,36 @@ test('concurrent renames to the same destination keep the losing source intact',
     }
 });
 
-test.each([ 'source', 'destination' ])('a write to the %s during a move keeps its latest contents', async writeTarget =>
+test.each([ 'source', 'destination', 'case-variant destination' ])('a write to the %s during a move keeps its latest contents', async writeTarget =>
 {
     const oldPath = path.join(directory, 'old.d.ts');
     const newPath = path.join(directory, 'new.d.ts');
     const unrelatedPath = path.join(directory, 'unrelated.d.ts');
-    const writePath = writeTarget === 'source' ? oldPath : newPath;
+    let writePath = newPath;
+    if(writeTarget === 'source')
+    {
+        writePath = oldPath;
+    }
+    else if(writeTarget === 'case-variant destination')
+    {
+        writePath = path.join(directory, 'NEW.d.ts');
+    }
+
     await FileIO.writeFileContents(oldPath, 'original');
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform');
     const copyFileContents = fs.copyFile;
-    const writeFile = jest.spyOn(fs, 'writeFile');
+    const writeFileContents = fs.writeFile;
+    let copying = false;
+    let wroteDuringCopy = false;
+    const writeFile = jest.spyOn(fs, 'writeFile').mockImplementation((...args) =>
+    {
+        if(args[0] === writePath && copying)
+        {
+            wroteDuringCopy = true;
+        }
+
+        return writeFileContents(...args);
+    });
 
     // All parents already exist. Resolve mkdir immediately to control write ordering.
     const mkdir = jest.spyOn(fs, 'mkdir').mockResolvedValue();
@@ -257,6 +306,7 @@ test.each([ 'source', 'destination' ])('a write to the %s during a move keeps it
     const copyFile = jest.spyOn(fs, 'copyFile').mockImplementation(async (...args) =>
     {
         await copyFileContents(...args);
+        copying = true;
         writing = FileIO.writeFileContents(writePath, 'latest');
 
         // An unrelated write must still finish while this move holds its paths.
@@ -264,21 +314,29 @@ test.each([ 'source', 'destination' ])('a write to the %s during a move keeps it
 
         // Complete any writes that started during the copy before allowing unlink.
         await Promise.all(writeFile.mock.results.map(result => result.value));
+        copying = false;
     });
 
     const callback = jest.fn();
     try
     {
+        if(writeTarget === 'case-variant destination')
+        {
+            Object.defineProperty(process, 'platform', { value: 'darwin' });
+        }
+
         await FileIO.rename(oldPath, newPath, callback);
         await writing;
     }
     finally
     {
+        Object.defineProperty(process, 'platform', platform);
         copyFile.mockRestore();
         mkdir.mockRestore();
         writeFile.mockRestore();
     }
 
+    expect(wroteDuringCopy).toBe(false);
     expect(callback).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledWith();
     expect(await fs.readFile(writePath, 'utf8')).toBe('latest');
