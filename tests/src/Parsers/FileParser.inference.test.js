@@ -42,6 +42,84 @@ test('nested source propagation stops recursive constant-backed objects', async 
     expect(type).toContain('child: any;');
 });
 
+describe.each([ 'factory', 'constructor' ])('initializer bindings in a %s', initialization =>
+{
+    async function parseInitializer(body, parameters = 'document', annotation = '/** @param {DocumentType} document */')
+    {
+        if(initialization === 'constructor')
+        {
+            const source = `class Example extends Parent {\n  ${annotation}\n  constructor(${parameters}) {\n${body.replace(/instance\./g, 'this.')}\n  }\n}`;
+            return (await ClassParser.create().parse(source, '')).typeFile;
+        }
+
+        const source = `const Example = {\n  ${annotation}\n  create(${parameters}) {\n    const instance = Object.create(Example);\n${body}\n    return instance;\n  }\n};`;
+        return await parser.parse('', source);
+    }
+
+    test('propagates parameter types, local annotations, aliases, and array element types into nested objects', async () =>
+    {
+        const result = await parseInitializer(`    const current = document;
+    const logger = Logger.create();
+    /** @type {Diagnostic[]} */
+    const diagnostics = [];
+    const labels = ["first", "second"];
+    instance.context = {
+      document: current,
+      diagnostics: diagnostics,
+      labels: labels,
+      nested: {
+        logger: logger,
+        documents: [current]
+      }
+    };`);
+        expect(result).toContain('document: DocumentType;');
+        expect(result).toContain('diagnostics: Diagnostic[];');
+        expect(result).toContain('labels: string[];');
+        expect(result).toContain('logger: LoggerType;');
+        expect(result).toContain('documents: DocumentType[];');
+    });
+
+    test('infers default parameter types', async () =>
+    {
+        const result = await parseInitializer('    instance.count = count;', 'count = 3', '');
+        expect(result).toContain('count: number;');
+    });
+
+    test('uses the closest binding and keeps constructor scope out of static properties', async () =>
+    {
+        const result = await parseInitializer(`    {
+      const document = "local";
+      instance.label = document;
+    }
+    instance.document = document;`);
+        expect(result).toContain('label: string|undefined;');
+        expect(result).toContain('document: DocumentType;');
+        expect(await parser.parse('', 'const Other = {\n  document: document\n};')).toContain('document: any;');
+    });
+
+    test('does not infer stale, forward, cyclic, or unrelated local values', async () =>
+    {
+        const result = await parseInitializer(`    let changed = "first";
+    changed = 42;
+    const first = second;
+    const second = first;
+    function unrelated() {
+      const hidden = "hidden";
+    }
+    instance.context = {
+      changed: changed,
+      forward: later,
+      cycle: first,
+      hidden: hidden
+    };
+    const later = 1;`);
+        expect(result).toContain('changed: any;');
+        expect(result).toContain('forward: any;');
+        expect(result).toContain('cycle: any;');
+        expect(result).toContain('hidden: any;');
+    });
+});
+
 test.each([ 'OtherType', 'Example', 'ExampleType' ])('preserves the Promise contract for %s', async type =>
 {
     parser.className = 'Example';

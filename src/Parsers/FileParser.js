@@ -1,5 +1,6 @@
 const ParserPosition = require('./ParserPosition');
 const ValueParser = require('./ValueParser');
+const CreateValueScope = require('./CreateValueScope');
 const VscodeError = require('../Errors/VscodeError');
 
 const ErrorTypes = require('../Errors/ErrorTypes');
@@ -111,14 +112,14 @@ const FileParser = {
         vscodeError.notifyUser(this);
     },
 
-    async parseArray(valuesStr)
+    async parseArray(valuesStr, valueScope = this.valueScope)
     {
-        return await ValueParser.parseArray.call(this, valuesStr);
+        return await ValueParser.parseArray.call(this, valuesStr, valueScope);
     },
 
-    async parseValue(value)
+    async parseValue(value, valueScope = this.valueScope)
     {
-        return await ValueParser.parseValue.call(this, value, FileParser.create.bind(FileParser));
+        return await ValueParser.parseValue.call(this, value, FileParser.create.bind(FileParser), valueScope);
     },
 
     /**
@@ -408,7 +409,7 @@ const FileParser = {
      * @param {string} insideFunction
      * @returns {string}
      */
-    async parseCreate(insideFunction)
+    async parseCreate(insideFunction, parameters = '()', parameterTypes = {})
     {
         this.tabSize += this.defaultTabSize;
         let className = this.getClassInCreate(insideFunction);
@@ -440,7 +441,7 @@ const FileParser = {
         const varEnd = `(;|$)(?=\\s*(^${tab}}|^${previousTab}}|^${tab}(\\/|\\w)|$(?!.)))`;
         const arrayRegex = `\\[(?<array>.*?)\\]\\s*${varEnd}`;
 
-        const commentRegex = '(?<comment>(\\/\\*\\*.*?\\*\\/.*?|))';
+        const commentRegex = '(?<comment>(?:\\/\\*\\*(?:(?!\\*\\/).)*\\*\\/\\s*|))';
         const tabRegex = `^(?<tabs>[ \t]{${this.tabSize},})`;
         const firstAccess = `(\\.|\\[')`;
         const objectAccessorEnd = `(\\[|\\['|\\.)`;
@@ -453,6 +454,7 @@ const FileParser = {
         const variableName = `${className}${objectAccessor}${varName}(\\]|'\\]|)${varDeliminator}`;
         const valueRegex = `(${arrayRegex}|(?<value>.*?)${varEnd})`;
 
+        const valueScopes = CreateValueScope.createAssignmentScopes(insideFunction, parameters, parameterTypes);
         const variablesRegex = new RegExp(
             [
                 commentRegex,
@@ -460,7 +462,7 @@ const FileParser = {
                 variableName,
                 valueRegex
             ].join(''),
-            'gms'
+            'dgms'
         );
 
         let variable;
@@ -471,6 +473,8 @@ const FileParser = {
                 type: undefined
             };
             const assignmentValue = variable.groups.value;
+            const valueRange = variable.indices.groups.value || variable.indices.groups.array;
+            const valueScope = valueScopes.get(valueRange[0]);
 
             const settingValueUsingVariable = variable.groups.objectAccessors.endsWith('[');
             if(settingValueUsingVariable)
@@ -492,7 +496,7 @@ const FileParser = {
                 options.type = this.fixType(options.type);
             }
 
-            const type = options.type || await this.parseValue(assignmentValue) || await this.parseArray(variable.groups.array);
+            const type = options.type || await this.parseValue(assignmentValue, valueScope) || await this.parseArray(variable.groups.array, valueScope);
 
 
             // Must be a es6 function.
@@ -667,17 +671,18 @@ const FileParser = {
                 }
             }
 
+            const parsedComment = await this.parseComment(properties.groups.comment, options, isAsync);
             if(properties.groups.name === ConstructorMethodName)
             {
                 this.updatePosition(object, properties, 'function', lastBeginLine);
-                property += await this.parseCreate(properties.groups.function);
+                property += await this.parseCreate(properties.groups.function, properties.groups.params, options.params);
             }
 
             const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
 
             // eslint-disable-next-line newline-per-chained-call
             property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
-            property += await this.parseComment(properties.groups.comment, options, isAsync);
+            property += parsedComment;
             let functionParameters = '';
             if(properties.groups.params)
             {

@@ -1,5 +1,6 @@
 const Types = require('./Types');
 const inferExpressionType = require('./ExpressionType');
+const CreateValueScope = require('./CreateValueScope');
 const { parse, parseExpression } = require('@babel/parser');
 
 /** @description Value and array inference shared by file parser instances. */
@@ -78,7 +79,7 @@ const ValueParser = {
      * @param {string} valuesStr the source between the array brackets.
      * @returns {Promise<string | null>} the inferred array type.
      */
-    async parseArray(valuesStr)
+    async parseArray(valuesStr, valueScope)
     {
         if(typeof valuesStr === 'undefined')
         {
@@ -122,7 +123,7 @@ const ValueParser = {
             }
 
             const value = source.slice(element.start, element.end);
-            const type = await this.parseValue(value);
+            const type = await this.parseValue(value, valueScope);
             if(!type)
             {
                 return Types.ANYARRAY;
@@ -150,11 +151,17 @@ const ValueParser = {
      * @param {string} value the value of the property.
      * @returns {string | null} the type.
      */
-    async parseValue(value, createParser)
+    async parseValue(value, createParser, valueScope)
     {
         if(typeof value === 'undefined')
         {
             return null;
+        }
+
+        const localType = await CreateValueScope.inferIdentifier(value.trim(), valueScope, this);
+        if(localType)
+        {
+            return localType;
         }
 
         const source = this.compilationContext?.source ?? this.content ?? '';
@@ -208,6 +215,7 @@ const ValueParser = {
 
             const tempParser = createParser(this.compilationContext);
             tempParser.content = source;
+            tempParser.valueScope = valueScope;
             tempParser.objectAncestors = new Set(this.objectAncestors);
             tempParser.objectAncestors.add(normalizedValue);
             tempParser.staticVariables = [];

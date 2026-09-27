@@ -84,4 +84,9 @@ describe('Object Linked to Other Objects Parser.', () =>
     {
         await checkFile('/ObjectTests/CopilotAdapter');
     });
+
+    test('GenerateTypings infers its compilation context from parameters and local initializers.', async () =>
+    {
+        await checkFile('ObjectTests/GenerateTypings');
+    });
 });
