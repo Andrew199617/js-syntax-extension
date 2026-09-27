@@ -29,7 +29,7 @@
     "unicorn/prefer-number-properties": "error",
     "unicorn/prefer-date-now": "error",
     "unicorn/no-useless-undefined": ["error", { "checkArrowFunctionBody": false }],
-    "unicorn/catch-error-name": "error",
+    "unicorn/catch-error-name": ["error", { "ignore": ["^[Ee]rr(?:or)?", "[Ee]rr(?:or)?$"] }],
     "unicorn/better-regex": "error",
     //
     // Possible Errors in https://eslint.org/docs/rules/

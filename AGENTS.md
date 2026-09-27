@@ -15,6 +15,8 @@
 
 - Save new text files with CRLF line endings and UTF-8 encoding without a BOM. Preserve an existing file's encoding and BOM when editing it.
 - Keep edited text files in CRLF; do not leave LF-only or mixed line endings after applying patches. Check the final bytes before finishing so saving in the editor does not rewrite the entire file.
+- `.gitattributes` stores normalized LF in Git and checks text out as CRLF on every platform; `.editorconfig` keeps editor saves in CRLF. This applies to local and cloud agents, including GitHub Copilot. Do not commit raw CRLF blobs to match the working tree.
+- Before committing, stage changed text files with `git add --renormalize -- <tracked-files>` (use `git add -- <new-files>` for additions), then check `git ls-files --eol -- <files>` for `i/lf` and `w/crlf`. Review the staged diff against the pull request base without ignoring whitespace to catch whole-file line-ending churn. Normalize only files in scope; preserve parser fixtures.
 
 ## General guidelines
 - Use one module style per file: standalone functions, one class, or one OLOO object. Do not mix module-level functions with class or OLOO definitions, or put multiple classes/OLOO objects in one file.
