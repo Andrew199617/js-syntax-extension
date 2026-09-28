@@ -441,7 +441,21 @@ const FileParser = {
      */
     async parseCreate(insideFunction, parameters = '()', parameterTypes = {})
     {
+        const previousTabSize = this.tabSize;
         this.tabSize += this.defaultTabSize;
+        try
+        {
+            return await this.parseInstanceProperties(insideFunction, parameters, parameterTypes);
+        }
+        finally
+        {
+            this.tabSize = previousTabSize;
+        }
+    },
+
+    /** @description Read property assignments using the indentation and variables of the current method. */
+    async parseInstanceProperties(insideFunction, parameters, parameterTypes)
+    {
         let className = this.getClassInCreate(insideFunction);
 
         if(!this.isReactComponent)
@@ -453,7 +467,6 @@ const FileParser = {
         {
             if(!this.isReactComponent)
             {
-                this.tabSize -= this.defaultTabSize;
                 return '';
             }
 
@@ -637,7 +650,6 @@ const FileParser = {
             this.stateInterface += '};\n';
         }
 
-        this.tabSize -= this.defaultTabSize;
         return variables || '';
     },
 

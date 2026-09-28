@@ -236,6 +236,31 @@ test('forgets function variables when parsing an assigned value fails', async ()
     expect(await parser.parseValue('document')).toBe('any');
 });
 
+test('restores indentation before reusing a constructor parser after an error', async () =>
+{
+    const source = `    const documents = [document];
+    this.documents = documents;`;
+    const classParser = ClassParser.create();
+    classParser.className = 'Example';
+    classParser.variables = {};
+    classParser.staticVariables = [];
+    classParser.tabSize = 2;
+    const parameterTypes = { document: 'DocumentType' };
+    const failure = new Error('Array parsing failed');
+    const parseArray = jest.spyOn(classParser, 'parseArray').mockRejectedValueOnce(failure);
+    try
+    {
+        await expect(classParser.parseCreate(source, '(document)', parameterTypes)).rejects.toBe(failure);
+    }
+    finally
+    {
+        parseArray.mockRestore();
+    }
+
+    const result = await classParser.parseCreate(source, '(document)', parameterTypes);
+    expect(result).toContain('documents: DocumentType[];');
+});
+
 test('keeps each parser\'s variables separate when sharing a compilation context', async () =>
 {
     const source = `const Factory = {
