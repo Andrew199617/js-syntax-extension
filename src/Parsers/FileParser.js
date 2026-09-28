@@ -68,7 +68,7 @@ const FileParser = {
         fileParser.enumParser = EnumParser.create(fileParser);
 
         /** @type {FunctionParserType} */
-        fileParser.functionParser = FunctionParser.create(this.parseValue.bind(fileParser));
+        fileParser.functionParser = FunctionParser.create(this.parseMethodValue.bind(fileParser));
 
         /** @description Compilation was not a success don't reset problems. */
         fileParser.errorOccurred = false;
@@ -128,6 +128,21 @@ const FileParser = {
     async parseValue(value)
     {
         return await ValueParser.parseValue.call(this, value, FileParser.create.bind(FileParser));
+    },
+
+    /** @description Infer a method's values without using variables from the object containing it. */
+    async parseMethodValue(value)
+    {
+        const previousContext = this.inferenceContext;
+        this.inferenceContext = null;
+        try
+        {
+            return await this.parseValue(value);
+        }
+        finally
+        {
+            this.inferenceContext = previousContext;
+        }
     },
 
     /** @description Determine an assigned value's type using the variables available there, then restore the previous parser state. */

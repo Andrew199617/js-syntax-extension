@@ -96,6 +96,18 @@ ${body}
         expect(result).toContain('documents: DocumentType[];');
     });
 
+    test('does not use outer variable types for nested method parameters or returns', async () =>
+    {
+        const result = await parseInitializer(`    instance.context = {
+      convert(document, current = document) {
+        return document;
+      },
+      document: document
+    };`);
+        expect(result).toContain('convert(document: any, current: any): any;');
+        expect(result).toContain('document: DocumentType;');
+    });
+
     test('infers default parameter types', async () =>
     {
         const result = await parseInitializer('    instance.count = count;', 'count = 3', '');
