@@ -23,6 +23,7 @@
 - Configuration objects may contain arrow callbacks. The module-style rule treats object methods, accessors, and function-expression properties as OLOO behavior; arrow callback properties alone do not define an OLOO object.
 - Prefer straightforward code that can be read once over compact code that saves lines.
 - Keep small test stubs compact when they fit comfortably on one line. Expand them when they gain several properties, meaningful logic, or comments explaining non-obvious behavior.
+- Use plain language in comments, test descriptions, and explanations. Describe what the code knows or does instead of relying on compiler jargon. For example, say "the parameters and local variables available at this point" instead of "lexical bindings". When a technical term is necessary, explain it with a concrete example.
 - For small, fixed sets of commands or actions, prefer explicit registration calls over building arrays of command/callback tuples and immediately iterating over them.
 - Extract repeated error handling and disposal into a named helper. Give substantial callbacks and configuration objects meaningful names before passing them to another function.
 - Use ordinary conditionals instead of nested ternaries. Keep distinct operations on separate lines and use explicit object properties when mapping a small, fixed set of settings.
@@ -47,6 +48,7 @@
 
 ## Testing
 
+- Write source-code snippets in tests as readable multiline template literals with actual line breaks and the intended source indentation. Do not compress multiline source into a single line with escaped `\n` separators.
 - Keep testing proportional to the change. Prefer extending existing tests.
 - Add tests for meaningful behavior, important edge cases, and bug regressions.
 - Avoid redundant tests, assertions coupled to implementation details, and

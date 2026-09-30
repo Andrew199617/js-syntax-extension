@@ -23,7 +23,8 @@ afterEach(() =>
 
 test('nested objects retain file-level constant declarations', async () =>
 {
-    parser.content = 'const COUNT = 1; const LABEL = "example";';
+    parser.content = `const COUNT = 1;
+const LABEL = "example";`;
     const value = `{
   settings: {
     count: COUNT,
@@ -37,15 +38,281 @@ test('nested objects retain file-level constant declarations', async () =>
 
 test('nested source propagation stops recursive constant-backed objects', async () =>
 {
-    parser.content = 'const NODE = {\n  child: NODE\n};';
+    parser.content = `const NODE = {
+  child: NODE
+};`;
     const type = await parser.parseValue('NODE');
     expect(type).toContain('child: any;');
+});
+
+describe.each([ 'factory', 'constructor' ])('parameter and local variable types in a %s', initialization =>
+{
+    let classParser;
+    beforeEach(() =>
+    {
+        classParser = ClassParser.create();
+    });
+
+    async function generateDeclarations(body, parameters = 'document', annotation = '/** @param {DocumentType} document */')
+    {
+        if(initialization === 'constructor')
+        {
+            const source = `class Example extends Parent {
+  ${annotation}
+  constructor(${parameters}) {
+${body.replace(/instance\./g, 'this.')}
+  }
+}`;
+
+            return (await classParser.parse(source, '')).typeFile;
+        }
+
+        const source = `const Example = {
+  ${annotation}
+  create(${parameters}) {
+    const instance = Object.create(Example);
+${body}
+    return instance;
+  }
+};`;
+
+        return await parser.parse('', source);
+    }
+
+    test('propagates parameter types, local annotations, aliases, and array element types into nested objects', async () =>
+    {
+        const result = await generateDeclarations(`    const current = document;
+    const logger = Logger.create();
+    /** @type {Diagnostic[]} */
+    const diagnostics = [];
+    const labels = ["first", "second"];
+    instance.context = {
+      document: current,
+      diagnostics: diagnostics,
+      labels: labels,
+      nested: {
+        logger: logger,
+        documents: [current]
+      }
+    };`);
+        expect(result).toContain('document: DocumentType;');
+        expect(result).toContain('diagnostics: Diagnostic[];');
+        expect(result).toContain('labels: string[];');
+        expect(result).toContain('logger: LoggerType;');
+        expect(result).toContain('documents: DocumentType[];');
+    });
+
+    test('does not use outer variable types for nested method parameters or returns', async () =>
+    {
+        const result = await generateDeclarations(`    instance.context = {
+      convert(document, current = document) {
+        return document;
+      },
+      document: document
+    };`);
+        expect(result).toContain('convert(document: any, current: any): any;');
+        expect(result).toContain('document: DocumentType;');
+    });
+
+    test('infers default parameter types', async () =>
+    {
+        const result = await generateDeclarations('    instance.count = count;', 'count = 3', '');
+        expect(result).toContain('count: number;');
+    });
+
+    test('does not trust a parameter annotation after reassignment', async () =>
+    {
+        const result = await generateDeclarations(`    document = "changed";
+    const current = document;
+    instance.context = {
+      document: document,
+      documents: [current]
+    };`);
+        expect(result).toContain('document: any;');
+        expect(result).toContain('documents: any[];');
+    });
+
+    test('does not trust annotations on reassigned, forward, or uninitialized locals', async () =>
+    {
+        const result = await generateDeclarations(`    /** @type {string} */
+    let changed = "first";
+    changed = 42;
+    /** @type {DocumentType} */
+    let missing;
+    instance.context = {
+      changed: changed,
+      forward: later,
+      missing: missing
+    };
+    /** @type {number} */
+    const later = 1;`);
+        expect(result).toContain('changed: any;');
+        expect(result).toContain('forward: any;');
+        expect(result).toContain('missing: any;');
+    });
+
+    test.each([
+        '/* explanation */ ',
+        `// explanation
+    `
+    ])('infers assigned types when comments surround the value: %s', async comment =>
+    {
+        const result = await generateDeclarations(`    instance.document = ${comment}(document) /* trailing */;
+    instance.documents = ${comment}[document];
+    instance.context = ${comment}{
+      document: /* nested */ document
+    };`);
+        expect(result).toContain('document: DocumentType;');
+        expect(result).toContain('documents: DocumentType[];');
+        expect(result).toContain('static document: DocumentType;');
+    });
+
+    test('uses the nearest variable declaration and keeps function variables out of static properties', async () =>
+    {
+        const result = await generateDeclarations(`    {
+      const document = "local";
+      instance.label = document;
+    }
+    instance.document = document;`);
+        expect(result).toContain('label: string|undefined;');
+        expect(result).toContain('document: DocumentType;');
+        const source = `const Other = {
+  document: document
+};`;
+        expect(await parser.parse('', source)).toContain('document: any;');
+    });
+
+    test('restores indentation and forgets function variables after a failed full parse', async () =>
+    {
+        const body = `    const documents = [document];
+    instance.documents = documents;`;
+        const activeParser = initialization === 'constructor' ? classParser : parser;
+        const failure = new Error('Array parsing failed');
+        const parseArray = jest.spyOn(activeParser, 'parseArray').mockRejectedValueOnce(failure);
+        try
+        {
+            await expect(generateDeclarations(body)).rejects.toBe(failure);
+        }
+        finally
+        {
+            parseArray.mockRestore();
+        }
+
+        expect(await activeParser.parseValue('document')).toBe('any');
+        const result = await generateDeclarations(body);
+        expect(result).toContain('documents: DocumentType[];');
+    });
+
+    test('does not infer stale, forward, cyclic, or unrelated local values', async () =>
+    {
+        const result = await generateDeclarations(`    let changed = "first";
+    changed = 42;
+    const first = second;
+    const second = first;
+    function unrelated() {
+      const hidden = "hidden";
+    }
+    instance.context = {
+      changed: changed,
+      forward: later,
+      cycle: first,
+      hidden: hidden
+    };
+    const later = 1;`);
+        expect(result).toContain('changed: any;');
+        expect(result).toContain('forward: any;');
+        expect(result).toContain('cycle: any;');
+        expect(result).toContain('hidden: any;');
+    });
+});
+
+test('uses parameter annotations and defaults in function component constructors', async () =>
+{
+    const source = `
+  /** @param {DocumentType} document */
+  constructor(document, count = 3) {
+    const current = document;
+    this.context = {
+      document: current
+    };
+    this.count = count;
+  }
+`;
+    const componentParser = FunctionComponentParser.create();
+    componentParser.variables = {};
+    componentParser.staticVariables = [];
+    componentParser.className = 'Example';
+    componentParser.isReactComponent = true;
+    componentParser.content = source;
+    const result = await componentParser.parseClass(source);
+
+    expect(result).toContain('document: DocumentType;');
+    expect(result).toContain('count: number;');
+});
+
+test('restores indentation before reusing a constructor parser after an error', async () =>
+{
+    const source = `    const documents = [document];
+    this.documents = documents;`;
+    const classParser = ClassParser.create();
+    classParser.className = 'Example';
+    classParser.variables = {};
+    classParser.staticVariables = [];
+    classParser.tabSize = 2;
+    const parameterTypes = { document: 'DocumentType' };
+    const failure = new Error('Array parsing failed');
+    const parseArray = jest.spyOn(classParser, 'parseArray').mockRejectedValueOnce(failure);
+    try
+    {
+        await expect(classParser.parseCreate(source, '(document)', parameterTypes)).rejects.toBe(failure);
+    }
+    finally
+    {
+        parseArray.mockRestore();
+    }
+
+    const result = await classParser.parseCreate(source, '(document)', parameterTypes);
+    expect(result).toContain('documents: DocumentType[];');
+});
+
+test('keeps each parser\'s variables separate when sharing a compilation context', async () =>
+{
+    const source = `const Factory = {
+  /** @param {DocumentType} document */
+  create(document) {
+    const instance = Object.create(Factory);
+    const current = document;
+    instance.document = current;
+    return instance;
+  }
+};
+class Example extends Parent {
+  /** @param {OtherType} document */
+  constructor(document) {
+    const current = document;
+    this.document = current;
+  }
+}`;
+    const compilationContext = { source: source, logger: lgd.logger };
+    const fileParser = FileParser.create(compilationContext);
+    const classParser = ClassParser.create(compilationContext);
+    const [ factoryTypes, classTypes ] = await Promise.all([
+        fileParser.parse('', source),
+        classParser.parse(source, '')
+    ]);
+
+    expect(factoryTypes).toContain('document: DocumentType;');
+    expect(classTypes.typeFile).toContain('document: OtherType;');
 });
 
 test.each([ 'OtherType', 'Example', 'ExampleType' ])('preserves the Promise contract for %s', async type =>
 {
     parser.className = 'Example';
-    parser.content = '/**\n * @template Item\n */\nconst Example = {\n};';
+    parser.content = `/**
+ * @template Item
+ */
+const Example = {
+};`;
     const result = parser.getTypeWithTemplates(type);
     expect(result).toBeInstanceOf(Promise);
     const expected = type === 'OtherType' ? 'OtherType' : 'ExampleType<Item>';
@@ -55,7 +322,11 @@ test.each([ 'OtherType', 'Example', 'ExampleType' ])('preserves the Promise cont
 test('expands template types through the active JSDoc caller', async () =>
 {
     parser.className = 'Example';
-    parser.content = '/**\n * @template Item\n */\nconst Example = {\n};';
+    parser.content = `/**
+ * @template Item
+ */
+const Example = {
+};`;
     const options = {};
     await parser.parseComment('/** @returns {Example} */', options);
     expect(options.type).toBe('ExampleType<Item>');
@@ -102,25 +373,36 @@ describe.each([
 {
     test('property type', async () =>
     {
-        const source = `const Example = {\n  value: ${expression}\n};`;
+        const source = `const Example = {
+  value: ${expression}
+};`;
         expect(await parser.parse('', source)).toContain(`static value: ${expected};`);
     });
 
     test('array element type', async () =>
     {
-        const source = `const Example = {\n  values: [${expression}, ${expression}]\n};`;
+        const source = `const Example = {
+  values: [${expression}, ${expression}]
+};`;
         expect(await parser.parse('', source)).toContain(`static values: ${expected}[];`);
     });
 
     test('function return type', async () =>
     {
-        const source = `const Example = {\n  result() {\n    return ${expression};\n  }\n};`;
+        const source = `const Example = {
+  result() {
+    return ${expression};
+  }
+};`;
         expect(await parser.parse('', source)).toContain(`result(): ${expected};`);
     });
 
     test('default parameter type', async () =>
     {
-        const source = `const Example = {\n  result(value = ${expression}) {\n  }\n};`;
+        const source = `const Example = {
+  result(value = ${expression}) {
+  }
+};`;
         expect(await parser.parse('', source)).toContain(`result(value: ${expected}): void;`);
     });
 });
@@ -167,7 +449,10 @@ test.each([
     [ 'value /* = comment */ = 2', '(value: number)' ]
 ])('emits valid declarations for parameter bindings: %s', async (parameters, expected) =>
 {
-    const source = `const Example = {\n  run(${parameters}) {\n  }\n};`;
+    const source = `const Example = {
+  run(${parameters}) {
+  }
+};`;
     const declaration = await parser.parse('', source);
     expect(declaration).toContain(`run${expected}: void;`);
     const parsedDeclaration = typescript.createSourceFile('Example.d.ts', declaration, typescript.ScriptTarget.Latest, true);
@@ -221,7 +506,10 @@ describe.each([
 {
     test('object fields', async () =>
     {
-        const source = `const Example = {\n  values: ${expression},\n  next: true\n};`;
+        const source = `const Example = {
+  values: ${expression},
+  next: true
+};`;
         expect(await parser.parse('', source)).toContain(`static values: ${expected};`);
     });
 
@@ -230,13 +518,20 @@ describe.each([
         const classParser = parserDefinition.create();
         classParser.variables = {};
         classParser.staticVariables = [];
-        const source = `\n  values = ${expression};\n  next = true;\n`;
+        const source = `
+  values = ${expression};
+  next = true;
+`;
         expect(await classParser.parseClass(source)).toContain(`values: ${expected};`);
     });
 
     test('class constructor assignments', async () =>
     {
-        const source = `class Example extends Parent {\n  constructor() {\n    this.values = ${expression};\n  }\n}`;
+        const source = `class Example extends Parent {
+  constructor() {
+    this.values = ${expression};
+  }
+}`;
         const result = await ClassParser.create().parse(source, '');
         expect(result.typeFile).toContain(`values: ${expected};`);
     });

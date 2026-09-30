@@ -1,5 +1,6 @@
 const ParserPosition = require('./ParserPosition');
 const ValueParser = require('./ValueParser');
+const InitializerTypeInference = require('./InitializerTypeInference');
 const VscodeError = require('../Errors/VscodeError');
 
 const ErrorTypes = require('../Errors/ErrorTypes');
@@ -11,6 +12,8 @@ const hasDirectInstanceReturn = require('./HasDirectInstanceReturn');
 
 const reportInvalidThisUsageInCreate = require('../Checks/ReportInvalidThisUsageInCreate');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
+
+/** @import { InferenceContext } from './InitializerTypeInference' */
 
 // Method that initializes instances in this parser.
 const ConstructorMethodName = 'create';
@@ -29,6 +32,12 @@ const FileParser = {
         const fileParser = Object.create(FileParser);
         fileParser.compilationContext = compilationContext;
         fileParser.logger = compilationContext?.logger || lgd.logger;
+
+        /**
+         * @description The parameters and local variables available where the current value is assigned.
+         * @type {InferenceContext | null}
+         */
+        fileParser.inferenceContext = null;
 
         /**
          * @description the variables that the class contains.
@@ -64,7 +73,7 @@ const FileParser = {
         fileParser.enumParser = EnumParser.create(fileParser);
 
         /** @type {FunctionParserType} */
-        fileParser.functionParser = FunctionParser.create(this.parseValue.bind(fileParser));
+        fileParser.functionParser = FunctionParser.create(this.inferReturnOrDefaultType.bind(fileParser));
 
         /** @description Compilation was not a success don't reset problems. */
         fileParser.errorOccurred = false;
@@ -124,6 +133,51 @@ const FileParser = {
     async parseValue(value)
     {
         return await ValueParser.parseValue.call(this, value, FileParser.create.bind(FileParser));
+    },
+
+    /**
+     * @description Determine a return value or parameter default's type without borrowing outer variables.
+     * @param {string} value The return value or parameter default to inspect.
+     * @returns {Promise<string | null>} The inferred type.
+     */
+    async inferReturnOrDefaultType(value)
+    {
+        const previousContext = this.inferenceContext;
+        this.inferenceContext = null;
+        try
+        {
+            return await this.parseValue(value);
+        }
+        finally
+        {
+            this.inferenceContext = previousContext;
+        }
+    },
+
+    /**
+     * @description Determine an assigned value's type using the variables available there, then restore the previous parser state.
+     * @param {InferenceContext} inferenceContext The value and the variables available where it is assigned.
+     * @returns {Promise<string | null>} The inferred type.
+     */
+    async inferAssignedValueType(inferenceContext)
+    {
+        const previousContext = this.inferenceContext;
+        this.inferenceContext = inferenceContext;
+        try
+        {
+            const expression = inferenceContext.expression;
+            const value = inferenceContext.source.slice(expression.start, expression.end);
+            if(expression.type === 'ArrayExpression')
+            {
+                return await this.parseArray(value.slice(1, -1));
+            }
+
+            return await this.parseValue(value);
+        }
+        finally
+        {
+            this.inferenceContext = previousContext;
+        }
     },
 
     /**
@@ -407,15 +461,29 @@ const FileParser = {
     },
 
     /**
-     * @description parse the create function for variables.
-     * These variables are treated like normal variables
-     * variables on the object literal are treated like static.
-     * @param {string} insideFunction
-     * @returns {string}
+     * @description Find instance properties assigned inside a create method or constructor.
+     * @param {string} insideFunction The method body to inspect.
+     * @param {string} parameters The method's parameter list.
+     * @param {Object} parameterTypes Types from the method's JSDoc parameter comments.
+     * @returns {Promise<string>} The generated property declarations.
      */
-    async parseCreate(insideFunction)
+    async parseCreate(insideFunction, parameters = '()', parameterTypes = {})
     {
+        const previousTabSize = this.tabSize;
         this.tabSize += this.defaultTabSize;
+        try
+        {
+            return await this.parseInstanceProperties(insideFunction, parameters, parameterTypes);
+        }
+        finally
+        {
+            this.tabSize = previousTabSize;
+        }
+    },
+
+    /** @description Read property assignments using the indentation and variables of the current method. */
+    async parseInstanceProperties(insideFunction, parameters, parameterTypes)
+    {
         let className = this.getClassInCreate(insideFunction);
 
         if(!this.isReactComponent)
@@ -427,7 +495,6 @@ const FileParser = {
         {
             if(!this.isReactComponent)
             {
-                this.tabSize -= this.defaultTabSize;
                 return '';
             }
 
@@ -445,7 +512,7 @@ const FileParser = {
         const varEnd = `(;|$)(?=\\s*(^${tab}}|^${previousTab}}|^${tab}(\\/|\\w)|$(?!.)))`;
         const arrayRegex = `\\[(?<array>.*?)\\]\\s*${varEnd}`;
 
-        const commentRegex = '(?<comment>(\\/\\*\\*.*?\\*\\/.*?|))';
+        const commentRegex = '(?<comment>(?:\\/\\*\\*(?:(?!\\*\\/).)*\\*\\/\\s*|))';
         const tabRegex = `^(?<tabs>[ \t]{${this.tabSize},})`;
         const firstAccess = `(\\.|\\[')`;
         const objectAccessorEnd = `(\\[|\\['|\\.)`;
@@ -458,14 +525,15 @@ const FileParser = {
         const variableName = `${className}${objectAccessor}${varName}(\\]|'\\]|)${varDeliminator}`;
         const valueRegex = `(${arrayRegex}|(?<value>.*?)${varEnd})`;
 
+        const assignedValuesByPosition = InitializerTypeInference.findAssignedValues(insideFunction, parameters, parameterTypes);
         const variablesRegex = new RegExp(
             [
                 commentRegex,
                 tabRegex,
-                variableName,
+                `(?<assignment>${variableName})`,
                 valueRegex
             ].join(''),
-            'gms'
+            'dgms'
         );
 
         let variable;
@@ -475,7 +543,22 @@ const FileParser = {
             const options = {
                 type: undefined
             };
-            const assignmentValue = variable.groups.value;
+
+            // Match the statement by where "instance.property = value" starts in the method body.
+            const assignmentStart = variable.indices.groups.assignment[0];
+            const inferenceContext = assignedValuesByPosition.get(assignmentStart);
+            const expression = inferenceContext?.expression;
+            let assignmentValue = variable.groups.value;
+            let arrayValue = variable.groups.array;
+            if(expression?.type === 'ArrayExpression')
+            {
+                assignmentValue = undefined;
+                arrayValue = inferenceContext.source.slice(expression.start + 1, expression.end - 1);
+            }
+            else if(expression)
+            {
+                assignmentValue = inferenceContext.source.slice(expression.start, expression.end);
+            }
 
             const settingValueUsingVariable = variable.groups.objectAccessors.endsWith('[');
             if(settingValueUsingVariable)
@@ -497,8 +580,16 @@ const FileParser = {
                 options.type = this.fixType(options.type);
             }
 
-            const type = options.type || await this.parseValue(assignmentValue) || await this.parseArray(variable.groups.array);
+            let type = options.type;
+            if(!type && inferenceContext)
+            {
+                type = await this.inferAssignedValueType(inferenceContext);
+            }
 
+            if(!type)
+            {
+                type = await this.parseValue(assignmentValue) || await this.parseArray(arrayValue);
+            }
 
             // Must be a es6 function.
             if(typeof type === 'undefined')
@@ -590,7 +681,6 @@ const FileParser = {
             this.stateInterface += '};\n';
         }
 
-        this.tabSize -= this.defaultTabSize;
         return variables || '';
     },
 
@@ -602,170 +692,178 @@ const FileParser = {
      */
     async parseObject(object, parsingOptions = { preferComments: false, ignoreDuplicate: false })
     {
+        const previousTabSize = this.tabSize;
         this.tabSize += this.defaultTabSize;
-        const lastBeginLine = this.beginLine;
-
-        const tab = `\\s{${this.tabSize}}`;
-        const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
-
-        const varName = '\\w+?';
-        const varDeliminator = '\\s*?:\\s*';
-        const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.)))`;
-        const valueEnd = `(,|$)${varEndLookAhead}`;
-        const functionEnd = `(},|}|$)${varEndLookAhead}`;
-
-        const invalidKeyword = '(?<invalid>(async\\s+(get|set)\\s+|))';
-        const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s+|)(?<getter>get\\s+|)(?<setter>set\\s+|)`;
-
-        const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
-        const tabRegex = `^(?<tabs>${tab})`;
-        const varaibleNameRegex = `(?<name>${varName})`;
-        const functionRegex = `(?<params>\\(.*?\\))\\s*?{(?<function>.*?)${functionEnd}`;
-        const arrayRegex = `\\[(?<array>.*?)\\]\\s*${valueEnd}`;
-        const valueRegex = `${varDeliminator}(${arrayRegex}|(?<value>.*?)${valueEnd})`;
-
-        const propertiesRegex = new RegExp(
-            [
-                comment,
-                tabRegex,
-                keywordsRegex,
-                varaibleNameRegex,
-                `(${functionRegex}|${valueRegex})`
-            ].join(''),
-            'gms'
-        );
-
-        let properties;
-        let property = '';
-
-        while((properties = propertiesRegex.exec(object)) !== null)
+        try
         {
-            let keywords = '';
-            const options = {
-                type: undefined,
-                isFunction: false,
-                params: {}
-            };
+            const lastBeginLine = this.beginLine;
 
-            if(properties.groups.invalid)
+            const tab = `\\s{${this.tabSize}}`;
+            const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
+
+            const varName = '\\w+?';
+            const varDeliminator = '\\s*?:\\s*';
+            const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.)))`;
+            const valueEnd = `(,|$)${varEndLookAhead}`;
+            const functionEnd = `(},|}|$)${varEndLookAhead}`;
+
+            const invalidKeyword = '(?<invalid>(async\\s+(get|set)\\s+|))';
+            const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s+|)(?<getter>get\\s+|)(?<setter>set\\s+|)`;
+
+            const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
+            const tabRegex = `^(?<tabs>${tab})`;
+            const varaibleNameRegex = `(?<name>${varName})`;
+            const functionRegex = `(?<params>\\(.*?\\))\\s*?{(?<function>.*?)${functionEnd}`;
+            const arrayRegex = `\\[(?<array>.*?)\\]\\s*${valueEnd}`;
+            const valueRegex = `${varDeliminator}(${arrayRegex}|(?<value>.*?)${valueEnd})`;
+
+            const propertiesRegex = new RegExp(
+                [
+                    comment,
+                    tabRegex,
+                    keywordsRegex,
+                    varaibleNameRegex,
+                    `(${functionRegex}|${valueRegex})`
+                ].join(''),
+                'gms'
+            );
+
+            let properties;
+            let property = '';
+
+            while((properties = propertiesRegex.exec(object)) !== null)
             {
-                this.updatePosition(object, properties, 'name', lastBeginLine);
-                KeywordOrderCheck.execute.bind(this)(properties[0]);
-            }
+                let keywords = '';
+                const options = {
+                    type: undefined,
+                    isFunction: false,
+                    params: {}
+                };
 
-            const isAsync = typeof properties.groups.keyword === 'string' && properties.groups.keyword.includes('async');
-            const isGetter = typeof properties.groups.getter === 'string' && properties.groups.getter.includes('get');
-            const isSetter = typeof properties.groups.setter === 'string' && properties.groups.setter.includes('set');
-
-            if(isSetter || isGetter)
-            {
-                // Accessors currently remain instance members even when their bodies do not use this.
-                const varExisted = !this.addVariable(properties.groups.name, false);
-                if(varExisted && isSetter)
+                if(properties.groups.invalid)
                 {
-                    property = property.replace(`readonly ${properties.groups.name}`, properties.groups.name);
-                    continue;
+                    this.updatePosition(object, properties, 'name', lastBeginLine);
+                    KeywordOrderCheck.execute.bind(this)(properties[0]);
                 }
-                else if(varExisted)
+
+                const isAsync = typeof properties.groups.keyword === 'string' && properties.groups.keyword.includes('async');
+                const isGetter = typeof properties.groups.getter === 'string' && properties.groups.getter.includes('get');
+                const isSetter = typeof properties.groups.setter === 'string' && properties.groups.setter.includes('set');
+
+                if(isSetter || isGetter)
                 {
-                    continue;
+                    // Accessors currently remain instance members even when their bodies do not use this.
+                    const varExisted = !this.addVariable(properties.groups.name, false);
+                    if(varExisted && isSetter)
+                    {
+                        property = property.replace(`readonly ${properties.groups.name}`, properties.groups.name);
+                        continue;
+                    }
+                    else if(varExisted)
+                    {
+                        continue;
+                    }
                 }
-            }
 
-            if(properties.groups.name === ConstructorMethodName)
-            {
-                this.updatePosition(object, properties, 'function', lastBeginLine);
-                property += await this.parseCreate(properties.groups.function);
-            }
-
-            const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
-
-            // eslint-disable-next-line newline-per-chained-call
-            property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
-            property += await this.parseComment(properties.groups.comment, options, isAsync);
-            let functionParameters = '';
-            if(properties.groups.params)
-            {
-                // Already updated.
-                if(properties.groups.name !== ConstructorMethodName)
+                const parsedComment = await this.parseComment(properties.groups.comment, options, isAsync);
+                if(properties.groups.name === ConstructorMethodName)
                 {
                     this.updatePosition(object, properties, 'function', lastBeginLine);
+                    property += await this.parseCreate(properties.groups.function, properties.groups.params, options.params);
                 }
 
-                if(isGetter)
+                const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
+
+                // eslint-disable-next-line newline-per-chained-call
+                property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
+                property += parsedComment;
+                let functionParameters = '';
+                if(properties.groups.params)
                 {
-                    keywords = 'readonly ';
+                    // Already updated.
+                    if(properties.groups.name !== ConstructorMethodName)
+                    {
+                        this.updatePosition(object, properties, 'function', lastBeginLine);
+                    }
+
+                    if(isGetter)
+                    {
+                        keywords = 'readonly ';
+                    }
+                    else if(!isSetter)
+                    {
+                        functionParameters = await this.functionParser.parseFunctionParams(properties.groups.params, options.params);
+                    }
+
+                    // Check for errors in Function.
+                    this.functionParser.checkFunction(properties.groups.function, this);
                 }
-                else if(!isSetter)
+                else
                 {
-                    functionParameters = await this.functionParser.parseFunctionParams(properties.groups.params, options.params);
+                    keywords = 'static ';
                 }
 
-                // Check for errors in Function.
-                this.functionParser.checkFunction(properties.groups.function, this);
-            }
-            else
-            {
-                keywords = 'static ';
-            }
-
-            if(!options.type)
-            {
-                options.type = 'any';
-
-                // Setter has no return.
-                if(properties.groups.function && !isSetter)
+                if(!options.type)
                 {
-                    options.type = await this.functionParser.parseFunctionReturn(properties.groups.function);
-                }
+                    options.type = 'any';
 
-                if(isGetter && options.type === 'void')
+                    // Setter has no return.
+                    if(properties.groups.function && !isSetter)
+                    {
+                        options.type = await this.functionParser.parseFunctionReturn(properties.groups.function);
+                    }
+
+                    if(isGetter && options.type === 'void')
+                    {
+                        // Getter needs to have a return.
+                        options.type = 'null';
+                    }
+                }
+                else
                 {
-                    // Getter needs to have a return.
-                    options.type = 'null';
+                    options.type = this.fixType(options.type);
                 }
-            }
-            else
-            {
-                options.type = this.fixType(options.type);
+
+                options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
+
+                let type = null;
+
+                if(parsingOptions.preferComments)
+                {
+                    type = options.type || await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array);
+                }
+                else
+                {
+                    type = await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array) || options.type;
+                }
+
+                if(this.staticVariables.includes(properties.groups.name))
+                {
+                    VscodeError.create(`LGD: Already defined ${properties.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
+                        .notifyUser(this);
+                }
+
+                // Use comment type if not parsed type.
+                if(type === 'any' || !type)
+                {
+                    type = options.type;
+                }
+
+                if(!properties.groups.function && !parsingOptions.ignoreDuplicate)
+                {
+                    this.staticVariables.push(properties.groups.name);
+                }
+
+                property += `${keywords}${properties.groups.name}${functionParameters}: ${type};`;
+                property += `\n`;
             }
 
-            options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
-
-            let type = null;
-
-            if(parsingOptions.preferComments)
-            {
-                type = options.type || await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array);
-            }
-            else
-            {
-                type = await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array) || options.type;
-            }
-
-            if(this.staticVariables.includes(properties.groups.name))
-            {
-                VscodeError.create(`LGD: Already defined ${properties.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
-                    .notifyUser(this);
-            }
-
-            // Use comment type if not parsed type.
-            if(type === 'any' || !type)
-            {
-                type = options.type;
-            }
-
-            if(!properties.groups.function && !parsingOptions.ignoreDuplicate)
-            {
-                this.staticVariables.push(properties.groups.name);
-            }
-
-            property += `${keywords}${properties.groups.name}${functionParameters}: ${type};`;
-            property += `\n`;
+            return property;
         }
-
-        this.tabSize -= this.defaultTabSize;
-        return property;
+        finally
+        {
+            this.tabSize = previousTabSize;
+        }
     },
 
     /**

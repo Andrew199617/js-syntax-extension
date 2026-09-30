@@ -102,119 +102,127 @@ const FunctionComponentParser = {
      */
     async parseClass(object)
     {
+        const previousTabSize = this.tabSize;
         this.tabSize += this.defaultTabSize;
-        const lastBeginLine = this.beginLine;
-
-        const tab = `\\s{${this.tabSize}}`;
-        const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
-
-        const varName = '\\w+?';
-        const varDeliminator = '\\s*?=\\s*';
-
-        const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.{1})))`;
-        const varEnd = `(;|$)${varEndLookAhead}`;
-        const functionEnd = `(};|}|$)${varEndLookAhead}`;
-
-        const arrayRegex = `\\[(?<array>.*?)\\]\\s*${varEnd}`;
-
-        const invalidKeyword = '(?<invalid>(async\\s+(static|get|set)\\s+|))';
-        const keywordsRegex = `${invalidKeyword}(?<static>static\\s+|)(?<async>async\\s+|)`;
-
-        const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
-        const tabRegex = `^(?<tabs>${tab})`;
-        const varaibleNameRegex = `(?<name>${varName})`;
-        const functionRegex = `((?<params>\\(.*?\\))\\s*?{(?<function>.*?)${functionEnd}`;
-        const valueRegex = `|${varDeliminator}(${arrayRegex}|(?<value>.*?)${varEnd})|;|$)`;
-
-        const propertiesRegex = new RegExp(
-            [
-                comment,
-                tabRegex,
-                keywordsRegex,
-                varaibleNameRegex,
-                functionRegex,
-                valueRegex
-            ].join(''),
-            'gms'
-        );
-
-        let properties;
-        let property = '';
-
-        while((properties = propertiesRegex.exec(object)) !== null)
+        try
         {
-            let keywords = '';
-            const options = {
-                type: undefined,
-                isFunction: false,
-                params: {}
-            };
+            const lastBeginLine = this.beginLine;
 
-            if(properties.groups.invalid)
+            const tab = `\\s{${this.tabSize}}`;
+            const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
+
+            const varName = '\\w+?';
+            const varDeliminator = '\\s*?=\\s*';
+
+            const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.{1})))`;
+            const varEnd = `(;|$)${varEndLookAhead}`;
+            const functionEnd = `(};|}|$)${varEndLookAhead}`;
+
+            const arrayRegex = `\\[(?<array>.*?)\\]\\s*${varEnd}`;
+
+            const invalidKeyword = '(?<invalid>(async\\s+(static|get|set)\\s+|))';
+            const keywordsRegex = `${invalidKeyword}(?<static>static\\s+|)(?<async>async\\s+|)`;
+
+            const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
+            const tabRegex = `^(?<tabs>${tab})`;
+            const varaibleNameRegex = `(?<name>${varName})`;
+            const functionRegex = `((?<params>\\(.*?\\))\\s*?{(?<function>.*?)${functionEnd}`;
+            const valueRegex = `|${varDeliminator}(${arrayRegex}|(?<value>.*?)${varEnd})|;|$)`;
+
+            const propertiesRegex = new RegExp(
+                [
+                    comment,
+                    tabRegex,
+                    keywordsRegex,
+                    varaibleNameRegex,
+                    functionRegex,
+                    valueRegex
+                ].join(''),
+                'gms'
+            );
+
+            let properties;
+            let property = '';
+
+            while((properties = propertiesRegex.exec(object)) !== null)
             {
-                this.updatePosition(object, properties, 'name', lastBeginLine);
-                KeywordOrderCheck.execute.bind(this)(properties[0]);
-            }
+                let keywords = '';
+                const options = {
+                    type: undefined,
+                    isFunction: false,
+                    params: {}
+                };
 
-            const isAsync = !!properties.groups.async && properties.groups.async.includes('async');
-            const isStatic = !!properties.groups.static && properties.groups.static.includes('static');
-
-            if(properties.groups.name === ConstructorMethodName)
-            {
-                this.updatePosition(object, properties, 'function', lastBeginLine);
-                property += await this.parseCreate(properties.groups.function);
-            }
-
-            property += `\n\t`;
-            property += await this.parseComment(properties.groups.comment, options, isAsync);
-
-            let functionParamaters = '';
-            if(properties.groups.params)
-            {
-                // Already updated.
-                if(properties.groups.name !== ConstructorMethodName)
+                if(properties.groups.invalid)
                 {
-                    this.updatePosition(object, properties, 'function', lastBeginLine);
+                    this.updatePosition(object, properties, 'name', lastBeginLine);
+                    KeywordOrderCheck.execute.bind(this)(properties[0]);
                 }
 
-                functionParamaters = await this.functionParser.parseFunctionParams(properties.groups.params, options.params);
-                StaticAccessorCheck.execute.bind(this)(properties.groups.function);
+                const isAsync = !!properties.groups.async && properties.groups.async.includes('async');
+                const isStatic = !!properties.groups.static && properties.groups.static.includes('static');
+
+                const parsedComment = await this.parseComment(properties.groups.comment, options, isAsync);
+                if(properties.groups.name === ConstructorMethodName)
+                {
+                    this.updatePosition(object, properties, 'function', lastBeginLine);
+                    property += await this.parseCreate(properties.groups.function, properties.groups.params, options.params);
+                }
+
+                property += `\n\t`;
+                property += parsedComment;
+
+                let functionParamaters = '';
+                if(properties.groups.params)
+                {
+                    // Already updated.
+                    if(properties.groups.name !== ConstructorMethodName)
+                    {
+                        this.updatePosition(object, properties, 'function', lastBeginLine);
+                    }
+
+                    functionParamaters = await this.functionParser.parseFunctionParams(properties.groups.params, options.params);
+                    StaticAccessorCheck.execute.bind(this)(properties.groups.function);
+                }
+
+                if(isStatic)
+                {
+                    keywords = 'static ';
+                }
+
+                await this.parseType(options, properties);
+
+                options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
+
+                let type = await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array) || options.type;
+
+                if(this.staticVariables.includes(properties.groups.name))
+                {
+                    VscodeError.create(`LGD: Already defined ${properties.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
+                        .notifyUser(this);
+                }
+
+                // Use comment type if not parsed type.
+                if(type === Types.ANY || !type)
+                {
+                    type = options.type;
+                }
+
+                if(isStatic)
+                {
+                    this.staticVariables.push(properties.groups.name);
+                }
+
+                property += `${keywords}${properties.groups.name}${functionParamaters}: ${type};`;
+                property += `\n`;
             }
 
-            if(isStatic)
-            {
-                keywords = 'static ';
-            }
-
-            await this.parseType(options, properties);
-
-            options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
-
-            let type = await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array) || options.type;
-
-            if(this.staticVariables.includes(properties.groups.name))
-            {
-                VscodeError.create(`LGD: Already defined ${properties.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
-                    .notifyUser(this);
-            }
-
-            // Use comment type if not parsed type.
-            if(type === Types.ANY || !type)
-            {
-                type = options.type;
-            }
-
-            if(isStatic)
-            {
-                this.staticVariables.push(properties.groups.name);
-            }
-
-            property += `${keywords}${properties.groups.name}${functionParamaters}: ${type};`;
-            property += `\n`;
+            return property;
         }
-
-        this.tabSize -= this.defaultTabSize;
-        return property;
+        finally
+        {
+            this.tabSize = previousTabSize;
+        }
     },
 
     /**
