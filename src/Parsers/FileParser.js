@@ -692,171 +692,178 @@ const FileParser = {
      */
     async parseObject(object, parsingOptions = { preferComments: false, ignoreDuplicate: false })
     {
+        const previousTabSize = this.tabSize;
         this.tabSize += this.defaultTabSize;
-        const lastBeginLine = this.beginLine;
-
-        const tab = `\\s{${this.tabSize}}`;
-        const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
-
-        const varName = '\\w+?';
-        const varDeliminator = '\\s*?:\\s*';
-        const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.)))`;
-        const valueEnd = `(,|$)${varEndLookAhead}`;
-        const functionEnd = `(},|}|$)${varEndLookAhead}`;
-
-        const invalidKeyword = '(?<invalid>(async\\s+(get|set)\\s+|))';
-        const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s+|)(?<getter>get\\s+|)(?<setter>set\\s+|)`;
-
-        const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
-        const tabRegex = `^(?<tabs>${tab})`;
-        const varaibleNameRegex = `(?<name>${varName})`;
-        const functionRegex = `(?<params>\\(.*?\\))\\s*?{(?<function>.*?)${functionEnd}`;
-        const arrayRegex = `\\[(?<array>.*?)\\]\\s*${valueEnd}`;
-        const valueRegex = `${varDeliminator}(${arrayRegex}|(?<value>.*?)${valueEnd})`;
-
-        const propertiesRegex = new RegExp(
-            [
-                comment,
-                tabRegex,
-                keywordsRegex,
-                varaibleNameRegex,
-                `(${functionRegex}|${valueRegex})`
-            ].join(''),
-            'gms'
-        );
-
-        let properties;
-        let property = '';
-
-        while((properties = propertiesRegex.exec(object)) !== null)
+        try
         {
-            let keywords = '';
-            const options = {
-                type: undefined,
-                isFunction: false,
-                params: {}
-            };
+            const lastBeginLine = this.beginLine;
 
-            if(properties.groups.invalid)
+            const tab = `\\s{${this.tabSize}}`;
+            const previousTab = `\\s{${this.tabSize - this.defaultTabSize}}`;
+
+            const varName = '\\w+?';
+            const varDeliminator = '\\s*?:\\s*';
+            const varEndLookAhead = `(?=\\s*(^${tab}\\/|^${previousTab}}|^${tab}${varName}|$(?!.)))`;
+            const valueEnd = `(,|$)${varEndLookAhead}`;
+            const functionEnd = `(},|}|$)${varEndLookAhead}`;
+
+            const invalidKeyword = '(?<invalid>(async\\s+(get|set)\\s+|))';
+            const keywordsRegex = `${invalidKeyword}(?<keyword>async\\s+|)(?<getter>get\\s+|)(?<setter>set\\s+|)`;
+
+            const comment = '(?<comment>\\/\\*\\*.*?\\*\\/.*?|)';
+            const tabRegex = `^(?<tabs>${tab})`;
+            const varaibleNameRegex = `(?<name>${varName})`;
+            const functionRegex = `(?<params>\\(.*?\\))\\s*?{(?<function>.*?)${functionEnd}`;
+            const arrayRegex = `\\[(?<array>.*?)\\]\\s*${valueEnd}`;
+            const valueRegex = `${varDeliminator}(${arrayRegex}|(?<value>.*?)${valueEnd})`;
+
+            const propertiesRegex = new RegExp(
+                [
+                    comment,
+                    tabRegex,
+                    keywordsRegex,
+                    varaibleNameRegex,
+                    `(${functionRegex}|${valueRegex})`
+                ].join(''),
+                'gms'
+            );
+
+            let properties;
+            let property = '';
+
+            while((properties = propertiesRegex.exec(object)) !== null)
             {
-                this.updatePosition(object, properties, 'name', lastBeginLine);
-                KeywordOrderCheck.execute.bind(this)(properties[0]);
-            }
+                let keywords = '';
+                const options = {
+                    type: undefined,
+                    isFunction: false,
+                    params: {}
+                };
 
-            const isAsync = typeof properties.groups.keyword === 'string' && properties.groups.keyword.includes('async');
-            const isGetter = typeof properties.groups.getter === 'string' && properties.groups.getter.includes('get');
-            const isSetter = typeof properties.groups.setter === 'string' && properties.groups.setter.includes('set');
-
-            if(isSetter || isGetter)
-            {
-                // Accessors currently remain instance members even when their bodies do not use this.
-                const varExisted = !this.addVariable(properties.groups.name, false);
-                if(varExisted && isSetter)
+                if(properties.groups.invalid)
                 {
-                    property = property.replace(`readonly ${properties.groups.name}`, properties.groups.name);
-                    continue;
+                    this.updatePosition(object, properties, 'name', lastBeginLine);
+                    KeywordOrderCheck.execute.bind(this)(properties[0]);
                 }
-                else if(varExisted)
+
+                const isAsync = typeof properties.groups.keyword === 'string' && properties.groups.keyword.includes('async');
+                const isGetter = typeof properties.groups.getter === 'string' && properties.groups.getter.includes('get');
+                const isSetter = typeof properties.groups.setter === 'string' && properties.groups.setter.includes('set');
+
+                if(isSetter || isGetter)
                 {
-                    continue;
+                    // Accessors currently remain instance members even when their bodies do not use this.
+                    const varExisted = !this.addVariable(properties.groups.name, false);
+                    if(varExisted && isSetter)
+                    {
+                        property = property.replace(`readonly ${properties.groups.name}`, properties.groups.name);
+                        continue;
+                    }
+                    else if(varExisted)
+                    {
+                        continue;
+                    }
                 }
-            }
 
-            const parsedComment = await this.parseComment(properties.groups.comment, options, isAsync);
-            if(properties.groups.name === ConstructorMethodName)
-            {
-                this.updatePosition(object, properties, 'function', lastBeginLine);
-                property += await this.parseCreate(properties.groups.function, properties.groups.params, options.params);
-            }
-
-            const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
-
-            // eslint-disable-next-line newline-per-chained-call
-            property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
-            property += parsedComment;
-            let functionParameters = '';
-            if(properties.groups.params)
-            {
-                // Already updated.
-                if(properties.groups.name !== ConstructorMethodName)
+                const parsedComment = await this.parseComment(properties.groups.comment, options, isAsync);
+                if(properties.groups.name === ConstructorMethodName)
                 {
                     this.updatePosition(object, properties, 'function', lastBeginLine);
+                    property += await this.parseCreate(properties.groups.function, properties.groups.params, options.params);
                 }
 
-                if(isGetter)
+                const tabSize = this.tabSize > this.defaultTabSize ? this.tabSize - this.defaultTabSize : this.tabSize;
+
+                // eslint-disable-next-line newline-per-chained-call
+                property += `\n${new Array(tabSize / this.defaultTabSize).fill('\t').join('')}`;
+                property += parsedComment;
+                let functionParameters = '';
+                if(properties.groups.params)
                 {
-                    keywords = 'readonly ';
+                    // Already updated.
+                    if(properties.groups.name !== ConstructorMethodName)
+                    {
+                        this.updatePosition(object, properties, 'function', lastBeginLine);
+                    }
+
+                    if(isGetter)
+                    {
+                        keywords = 'readonly ';
+                    }
+                    else if(!isSetter)
+                    {
+                        functionParameters = await this.functionParser.parseFunctionParams(properties.groups.params, options.params);
+                    }
+
+                    // Check for errors in Function.
+                    this.functionParser.checkFunction(properties.groups.function, this);
                 }
-                else if(!isSetter)
+                else
                 {
-                    functionParameters = await this.functionParser.parseFunctionParams(properties.groups.params, options.params);
+                    keywords = 'static ';
                 }
 
-                // Check for errors in Function.
-                this.functionParser.checkFunction(properties.groups.function, this);
-            }
-            else
-            {
-                keywords = 'static ';
-            }
-
-            if(!options.type)
-            {
-                options.type = 'any';
-
-                // Setter has no return.
-                if(properties.groups.function && !isSetter)
+                if(!options.type)
                 {
-                    options.type = await this.functionParser.parseFunctionReturn(properties.groups.function);
-                }
+                    options.type = 'any';
 
-                if(isGetter && options.type === 'void')
+                    // Setter has no return.
+                    if(properties.groups.function && !isSetter)
+                    {
+                        options.type = await this.functionParser.parseFunctionReturn(properties.groups.function);
+                    }
+
+                    if(isGetter && options.type === 'void')
+                    {
+                        // Getter needs to have a return.
+                        options.type = 'null';
+                    }
+                }
+                else
                 {
-                    // Getter needs to have a return.
-                    options.type = 'null';
+                    options.type = this.fixType(options.type);
                 }
-            }
-            else
-            {
-                options.type = this.fixType(options.type);
+
+                options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
+
+                let type = null;
+
+                if(parsingOptions.preferComments)
+                {
+                    type = options.type || await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array);
+                }
+                else
+                {
+                    type = await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array) || options.type;
+                }
+
+                if(this.staticVariables.includes(properties.groups.name))
+                {
+                    VscodeError.create(`LGD: Already defined ${properties.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
+                        .notifyUser(this);
+                }
+
+                // Use comment type if not parsed type.
+                if(type === 'any' || !type)
+                {
+                    type = options.type;
+                }
+
+                if(!properties.groups.function && !parsingOptions.ignoreDuplicate)
+                {
+                    this.staticVariables.push(properties.groups.name);
+                }
+
+                property += `${keywords}${properties.groups.name}${functionParameters}: ${type};`;
+                property += `\n`;
             }
 
-            options.type = isAsync && !options.type.includes('Promise') ? `Promise<${options.type}>` : options.type;
-
-            let type = null;
-
-            if(parsingOptions.preferComments)
-            {
-                type = options.type || await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array);
-            }
-            else
-            {
-                type = await this.parseValue(properties.groups.value) || await this.parseArray(properties.groups.array) || options.type;
-            }
-
-            if(this.staticVariables.includes(properties.groups.name))
-            {
-                VscodeError.create(`LGD: Already defined ${properties.groups.name} as static variable or function.`, this.beginLine, this.beginCharacter, this.endLine, this.endCharacter, ErrorTypes.ERROR)
-                    .notifyUser(this);
-            }
-
-            // Use comment type if not parsed type.
-            if(type === 'any' || !type)
-            {
-                type = options.type;
-            }
-
-            if(!properties.groups.function && !parsingOptions.ignoreDuplicate)
-            {
-                this.staticVariables.push(properties.groups.name);
-            }
-
-            property += `${keywords}${properties.groups.name}${functionParameters}: ${type};`;
-            property += `\n`;
+            return property;
         }
-
-        this.tabSize -= this.defaultTabSize;
-        return property;
+        finally
+        {
+            this.tabSize = previousTabSize;
+        }
     },
 
     /**

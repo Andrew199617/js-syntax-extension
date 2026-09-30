@@ -47,6 +47,12 @@ test('nested source propagation stops recursive constant-backed objects', async 
 
 describe.each([ 'factory', 'constructor' ])('parameter and local variable types in a %s', initialization =>
 {
+    let classParser;
+    beforeEach(() =>
+    {
+        classParser = ClassParser.create();
+    });
+
     async function generateDeclarations(body, parameters = 'document', annotation = '/** @param {DocumentType} document */')
     {
         if(initialization === 'constructor')
@@ -58,7 +64,7 @@ ${body.replace(/instance\./g, 'this.')}
   }
 }`;
 
-            return (await ClassParser.create().parse(source, '')).typeFile;
+            return (await classParser.parse(source, '')).typeFile;
         }
 
         const source = `const Example = {
@@ -176,6 +182,27 @@ ${body}
         expect(await parser.parse('', source)).toContain('document: any;');
     });
 
+    test('restores indentation and forgets function variables after a failed full parse', async () =>
+    {
+        const body = `    const documents = [document];
+    instance.documents = documents;`;
+        const activeParser = initialization === 'constructor' ? classParser : parser;
+        const failure = new Error('Array parsing failed');
+        const parseArray = jest.spyOn(activeParser, 'parseArray').mockRejectedValueOnce(failure);
+        try
+        {
+            await expect(generateDeclarations(body)).rejects.toBe(failure);
+        }
+        finally
+        {
+            parseArray.mockRestore();
+        }
+
+        expect(await activeParser.parseValue('document')).toBe('any');
+        const result = await generateDeclarations(body);
+        expect(result).toContain('documents: DocumentType[];');
+    });
+
     test('does not infer stale, forward, cyclic, or unrelated local values', async () =>
     {
         const result = await generateDeclarations(`    let changed = "first";
@@ -221,31 +248,6 @@ test('uses parameter annotations and defaults in function component constructors
 
     expect(result).toContain('document: DocumentType;');
     expect(result).toContain('count: number;');
-});
-
-test('forgets function variables when parsing an assigned value fails', async () =>
-{
-    const source = `const Example = {
-  /** @param {DocumentType} document */
-  create(document) {
-    const instance = Object.create(Example);
-    const documents = [document];
-    instance.documents = documents;
-    return instance;
-  }
-};`;
-    const failure = new Error('Array parsing failed');
-    const parseArray = jest.spyOn(parser, 'parseArray').mockRejectedValueOnce(failure);
-    try
-    {
-        await expect(parser.parse('', source)).rejects.toBe(failure);
-    }
-    finally
-    {
-        parseArray.mockRestore();
-    }
-
-    expect(await parser.parseValue('document')).toBe('any');
 });
 
 test('restores indentation before reusing a constructor parser after an error', async () =>
