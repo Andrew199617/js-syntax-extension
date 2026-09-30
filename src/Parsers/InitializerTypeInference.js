@@ -2,15 +2,37 @@ const { parse, parseExpression } = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const Types = require('./Types');
 
+/** @import { Binding, Scope } from '@babel/traverse' */
+/** @import { Expression } from '@babel/types' */
+
+/**
+ * @typedef {Object} InferenceContext
+ * @property {string} source The source containing the value and its variable declarations.
+ * @property {Scope} scope Babel's lookup of the parameters and local variables available at this point.
+ * @property {Expression} expression The assigned value, such as document in instance.document = document.
+ * @property {number} position The value's offset in source, used to reject variables declared after it.
+ * @property {Scope} parameterScope Babel's lookup for the function that owns the documented parameters.
+ * @property {Record<string, string | number>} parameterTypes Parameter types by name, plus the JSDoc parser's numeric length entry.
+ * @property {Set<Binding>} ancestors Variables already followed while resolving this value, used to stop circular references.
+ */
+
 /** @description Limit how many variables we follow when one variable refers to another. */
 const MAX_ALIAS_DEPTH = 64;
 
-/** @description Record the parameters and local variables available at each assignment. */
-function createAssignmentContexts(insideFunction, parameters, parameterTypes)
+/**
+ * @description Find assigned values and the variables needed to determine their types.
+ * @param {string} insideFunction The create method or constructor body.
+ * @param {string} parameters The method's parameter list, including parentheses.
+ * @param {Record<string, string | number>} parameterTypes Types and parameter count read from JSDoc.
+ * @returns {Map<number, InferenceContext>} Assigned values keyed by where the assignment starts in insideFunction.
+ */
+function findAssignedValues(insideFunction, parameters, parameterTypes)
 {
     const prefix = `async function inferred${parameters} {`;
     const source = `${prefix}${insideFunction}}`;
-    const assignmentContexts = new Map();
+
+    /** @type {Map<number, InferenceContext>} */
+    const assignedValuesByPosition = new Map();
     let parsedFunction;
     try
     {
@@ -18,7 +40,7 @@ function createAssignmentContexts(insideFunction, parameters, parameterTypes)
     }
     catch
     {
-        return assignmentContexts;
+        return assignedValuesByPosition;
     }
 
     let parameterScope;
@@ -36,6 +58,8 @@ function createAssignmentContexts(insideFunction, parameters, parameterTypes)
         AssignmentExpression(assignmentPath)
         {
             const expression = assignmentPath.node.right;
+
+            /** @type {InferenceContext} */
             const inferenceContext = {
                 source: source,
                 scope: assignmentPath.scope,
@@ -45,11 +69,14 @@ function createAssignmentContexts(insideFunction, parameters, parameterTypes)
                 parameterTypes: parameterTypes,
                 ancestors: new Set()
             };
-            assignmentContexts.set(assignmentPath.node.start - prefix.length, inferenceContext);
+
+            // Remove the added function header to get the position in insideFunction.
+            const assignmentStart = assignmentPath.node.start - prefix.length;
+            assignedValuesByPosition.set(assignmentStart, inferenceContext);
         }
     };
     traverse(parsedFunction, assignmentVisitor);
-    return assignmentContexts;
+    return assignedValuesByPosition;
 }
 
 /**
@@ -91,6 +118,7 @@ async function inferBinding(binding)
         return Types.ANY;
     }
 
+    /** @type {InferenceContext} */
     const inferenceContext = this.inferenceContext;
     if(binding.kind === 'param' && binding.scope === inferenceContext.parameterScope)
     {
@@ -127,6 +155,7 @@ async function inferBinding(binding)
         return declarationType;
     }
 
+    /** @type {InferenceContext} */
     const initializerContext = {
         ...inferenceContext,
         scope: binding.path.scope,
@@ -135,7 +164,7 @@ async function inferBinding(binding)
         ancestors: new Set(inferenceContext.ancestors)
     };
     initializerContext.ancestors.add(binding);
-    return await this.parseInitializer(initializerContext);
+    return await this.inferAssignedValueType(initializerContext);
 }
 
 /**
@@ -144,6 +173,7 @@ async function inferBinding(binding)
  */
 async function inferIdentifier(value)
 {
+    /** @type {InferenceContext | null} */
     const inferenceContext = this.inferenceContext;
     if(!inferenceContext)
     {
@@ -179,4 +209,4 @@ async function inferIdentifier(value)
     return await inferBinding.call(this, binding);
 }
 
-module.exports = { createAssignmentContexts: createAssignmentContexts, inferIdentifier: inferIdentifier };
+module.exports = { findAssignedValues: findAssignedValues, inferIdentifier: inferIdentifier };

@@ -47,7 +47,7 @@ test('nested source propagation stops recursive constant-backed objects', async 
 
 describe.each([ 'factory', 'constructor' ])('parameter and local variable types in a %s', initialization =>
 {
-    async function parseInitializer(body, parameters = 'document', annotation = '/** @param {DocumentType} document */')
+    async function generateDeclarations(body, parameters = 'document', annotation = '/** @param {DocumentType} document */')
     {
         if(initialization === 'constructor')
         {
@@ -75,7 +75,7 @@ ${body}
 
     test('propagates parameter types, local annotations, aliases, and array element types into nested objects', async () =>
     {
-        const result = await parseInitializer(`    const current = document;
+        const result = await generateDeclarations(`    const current = document;
     const logger = Logger.create();
     /** @type {Diagnostic[]} */
     const diagnostics = [];
@@ -98,7 +98,7 @@ ${body}
 
     test('does not use outer variable types for nested method parameters or returns', async () =>
     {
-        const result = await parseInitializer(`    instance.context = {
+        const result = await generateDeclarations(`    instance.context = {
       convert(document, current = document) {
         return document;
       },
@@ -110,13 +110,13 @@ ${body}
 
     test('infers default parameter types', async () =>
     {
-        const result = await parseInitializer('    instance.count = count;', 'count = 3', '');
+        const result = await generateDeclarations('    instance.count = count;', 'count = 3', '');
         expect(result).toContain('count: number;');
     });
 
     test('does not trust a parameter annotation after reassignment', async () =>
     {
-        const result = await parseInitializer(`    document = "changed";
+        const result = await generateDeclarations(`    document = "changed";
     const current = document;
     instance.context = {
       document: document,
@@ -128,7 +128,7 @@ ${body}
 
     test('does not trust annotations on reassigned, forward, or uninitialized locals', async () =>
     {
-        const result = await parseInitializer(`    /** @type {string} */
+        const result = await generateDeclarations(`    /** @type {string} */
     let changed = "first";
     changed = 42;
     /** @type {DocumentType} */
@@ -151,7 +151,7 @@ ${body}
     `
     ])('infers assigned types when comments surround the value: %s', async comment =>
     {
-        const result = await parseInitializer(`    instance.document = ${comment}(document) /* trailing */;
+        const result = await generateDeclarations(`    instance.document = ${comment}(document) /* trailing */;
     instance.documents = ${comment}[document];
     instance.context = ${comment}{
       document: /* nested */ document
@@ -163,7 +163,7 @@ ${body}
 
     test('uses the nearest variable declaration and keeps function variables out of static properties', async () =>
     {
-        const result = await parseInitializer(`    {
+        const result = await generateDeclarations(`    {
       const document = "local";
       instance.label = document;
     }
@@ -178,7 +178,7 @@ ${body}
 
     test('does not infer stale, forward, cyclic, or unrelated local values', async () =>
     {
-        const result = await parseInitializer(`    let changed = "first";
+        const result = await generateDeclarations(`    let changed = "first";
     changed = 42;
     const first = second;
     const second = first;

@@ -13,6 +13,8 @@ const hasDirectInstanceReturn = require('./HasDirectInstanceReturn');
 const reportInvalidThisUsageInCreate = require('../Checks/ReportInvalidThisUsageInCreate');
 const KeywordOrderCheck = require('../Checks/KeywordOrderCheck');
 
+/** @import { InferenceContext } from './InitializerTypeInference' */
+
 // Method that initializes instances in this parser.
 const ConstructorMethodName = 'create';
 
@@ -31,7 +33,10 @@ const FileParser = {
         fileParser.compilationContext = compilationContext;
         fileParser.logger = compilationContext?.logger || lgd.logger;
 
-        /** @description The parameters and local variables available where the current value is assigned. */
+        /**
+         * @description The parameters and local variables available where the current value is assigned.
+         * @type {InferenceContext | null}
+         */
         fileParser.inferenceContext = null;
 
         /**
@@ -68,7 +73,7 @@ const FileParser = {
         fileParser.enumParser = EnumParser.create(fileParser);
 
         /** @type {FunctionParserType} */
-        fileParser.functionParser = FunctionParser.create(this.parseMethodValue.bind(fileParser));
+        fileParser.functionParser = FunctionParser.create(this.inferReturnOrDefaultType.bind(fileParser));
 
         /** @description Compilation was not a success don't reset problems. */
         fileParser.errorOccurred = false;
@@ -130,8 +135,12 @@ const FileParser = {
         return await ValueParser.parseValue.call(this, value, FileParser.create.bind(FileParser));
     },
 
-    /** @description Infer a method's values without using variables from the object containing it. */
-    async parseMethodValue(value)
+    /**
+     * @description Determine a return value or parameter default's type without borrowing outer variables.
+     * @param {string} value The return value or parameter default to inspect.
+     * @returns {Promise<string | null>} The inferred type.
+     */
+    async inferReturnOrDefaultType(value)
     {
         const previousContext = this.inferenceContext;
         this.inferenceContext = null;
@@ -145,8 +154,12 @@ const FileParser = {
         }
     },
 
-    /** @description Determine an assigned value's type using the variables available there, then restore the previous parser state. */
-    async parseInitializer(inferenceContext)
+    /**
+     * @description Determine an assigned value's type using the variables available there, then restore the previous parser state.
+     * @param {InferenceContext} inferenceContext The value and the variables available where it is assigned.
+     * @returns {Promise<string | null>} The inferred type.
+     */
+    async inferAssignedValueType(inferenceContext)
     {
         const previousContext = this.inferenceContext;
         this.inferenceContext = inferenceContext;
@@ -512,12 +525,12 @@ const FileParser = {
         const variableName = `${className}${objectAccessor}${varName}(\\]|'\\]|)${varDeliminator}`;
         const valueRegex = `(${arrayRegex}|(?<value>.*?)${varEnd})`;
 
-        const assignmentContexts = InitializerTypeInference.createAssignmentContexts(insideFunction, parameters, parameterTypes);
+        const assignedValuesByPosition = InitializerTypeInference.findAssignedValues(insideFunction, parameters, parameterTypes);
         const variablesRegex = new RegExp(
             [
                 commentRegex,
                 tabRegex,
-                variableName,
+                `(?<assignment>${variableName})`,
                 valueRegex
             ].join(''),
             'dgms'
@@ -530,7 +543,10 @@ const FileParser = {
             const options = {
                 type: undefined
             };
-            const inferenceContext = assignmentContexts.get(variable.indices.groups.tabs[1]);
+
+            // Match the statement by where "instance.property = value" starts in the method body.
+            const assignmentStart = variable.indices.groups.assignment[0];
+            const inferenceContext = assignedValuesByPosition.get(assignmentStart);
             const expression = inferenceContext?.expression;
             let assignmentValue = variable.groups.value;
             let arrayValue = variable.groups.array;
@@ -567,7 +583,7 @@ const FileParser = {
             let type = options.type;
             if(!type && inferenceContext)
             {
-                type = await this.parseInitializer(inferenceContext);
+                type = await this.inferAssignedValueType(inferenceContext);
             }
 
             if(!type)
