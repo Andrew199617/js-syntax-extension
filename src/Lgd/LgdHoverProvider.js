@@ -81,7 +81,7 @@ const LgdHoverProvider = {
     },
 
     /**
-     * @description Renders a TypeScript-style type summary for a declared nominal type or function signature.
+     * @description Renders an LGD-style type summary for a declared nominal type or function signature.
      * @param {Object} summary the {name, typeName, readonly, members, params} type summary.
      * @returns {string} the markdown hover content.
      */
@@ -94,7 +94,7 @@ const LgdHoverProvider = {
                 .map(this.formatTypedParameter)
                 .join(', ');
 
-            return [ '```lgd', `${modifier}${summary.name}: (${params}) => ${summary.typeName}`, '```' ].join('\n');
+            return [ '```lgd', `${modifier}${summary.name}: ${summary.typeName}(${params})`, '```' ].join('\n');
         }
 
         const lines = summary.members.map(member => `    ${member.name}${member.kind === 'method' ? '()' : ''},`);

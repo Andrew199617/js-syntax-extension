@@ -267,7 +267,7 @@ describe('LgdHoverProvider typed function parameters', () =>
         const hover = await provider.provideHover(document, new vscode.Position(0, RECORD_NAME_CHARACTER));
 
         expect(hover).not.toBeNull();
-        expect(hover.contents).toBe([ '```lgd', 'record: (Number value) => Function', '```' ].join('\n'));
+        expect(hover.contents).toBe([ '```lgd', 'record: Function(Number value)', '```' ].join('\n'));
         expect(hover.range.start).toEqual(expect.objectContaining({ line: 0, character: 9 }));
         expect(hover.range.end).toEqual(expect.objectContaining({ line: 0, character: 15 }));
     });
