@@ -85,8 +85,11 @@ jest.mock('vscode', () => ({
         registerHoverProvider: jest.fn(() => ({ dispose: jest.fn() })),
         registerCompletionItemProvider: jest.fn(() => ({ dispose: jest.fn() })),
         registerDefinitionProvider: jest.fn(() => ({ dispose: jest.fn() })),
-        registerReferenceProvider: jest.fn(() => ({ dispose: jest.fn() }))
+        registerReferenceProvider: jest.fn(() => ({ dispose: jest.fn() })),
+        registerDocumentSemanticTokensProvider: jest.fn(() => ({ dispose: jest.fn() }))
     },
+    SemanticTokensLegend: jest.fn(),
+    SemanticTokensBuilder: jest.fn(),
     workspace: {
         rootPath: 'workspace',
         textDocuments: [],

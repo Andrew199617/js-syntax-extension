@@ -22,6 +22,7 @@ const LgdHoverProvider = require('./Lgd/LgdHoverProvider');
 const LgdDefinitionProvider = require('./Lgd/LgdDefinitionProvider');
 const LgdReferenceProvider = require('./Lgd/LgdReferenceProvider');
 const LgdCompletionProvider = require('./Lgd/LgdCompletionProvider');
+const LgdSemanticTokensProvider = require('./Lgd/LgdSemanticTokensProvider');
 const LgdCompiler = require('./Compilers/LgdCompiler');
 const LgdTransform = require('./Parsers/LgdTransform');
 const InvertIf = require('./Refactor/InvertIf');
@@ -304,10 +305,17 @@ function activate(context)
         '.'
     );
 
+    const lgdSemanticTokensProvider = vscode.languages.registerDocumentSemanticTokensProvider(
+        LGD_DOCUMENT_SELECTOR,
+        LgdSemanticTokensProvider.create(lgd.languageService),
+        LgdSemanticTokensProvider.legend
+    );
+
     context.subscriptions.push(lgdHoverProvider);
     context.subscriptions.push(lgdDefinitionProvider);
     context.subscriptions.push(lgdReferenceProvider);
     context.subscriptions.push(lgdCompletionProvider);
+    context.subscriptions.push(lgdSemanticTokensProvider);
 
     // The open event fires before activation when it triggers it, so pick up
     // any LGD documents that are already visible.

@@ -228,6 +228,48 @@ function makeTextDocument(uriKey, text)
 }
 
 /**
+ * @description Makes a fake vscode SemanticTokensLegend.
+ * @param {Array} tokenTypes the token types.
+ * @param {Array} tokenModifiers the token modifiers.
+ * @returns {object} the fake legend.
+ */
+function makeSemanticTokensLegend(tokenTypes, tokenModifiers)
+{
+    return { tokenTypes: tokenTypes, tokenModifiers: tokenModifiers };
+}
+
+/**
+ * @description Makes a fake vscode SemanticTokensBuilder that records pushed tokens.
+ * @returns {object} the fake builder.
+ */
+function makeSemanticTokensBuilder()
+{
+    const pushed = [];
+
+    /**
+     * @description Records one pushed token.
+     * @param {object} range the token range.
+     * @param {string} tokenType the token type.
+     * @returns {void}
+     */
+    function pushToken(range, tokenType)
+    {
+        pushed.push({ range: range, tokenType: tokenType });
+    }
+
+    /**
+     * @description Builds the fake token result.
+     * @returns {object} the recorded tokens.
+     */
+    function buildTokens()
+    {
+        return { pushed: pushed };
+    }
+
+    return { pushed: pushed, push: pushToken, build: buildTokens };
+}
+
+/**
  * @description Shared vscode mock for LGD language service tests. Use with
  * `jest.mock('vscode', () => require('./fakeVscode').createFakeVscode(jest))`.
  * @param {object} jestApi the jest api, for creating mock functions.
@@ -246,6 +288,8 @@ function createFakeVscode(jestApi)
         Diagnostic: makeDiagnostic,
         WorkspaceEdit: makeWorkspaceEdit,
         DiagnosticSeverity: { Error: 0, Warning: 1 },
+        SemanticTokensLegend: makeSemanticTokensLegend,
+        SemanticTokensBuilder: makeSemanticTokensBuilder,
 
         /** @description Clears the opened mirror documents. */
         __reset: () => registry.clear(),
