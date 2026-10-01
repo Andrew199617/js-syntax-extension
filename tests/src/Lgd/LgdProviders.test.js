@@ -1,3 +1,4 @@
+const path = require('path');
 const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
@@ -364,5 +365,19 @@ describe('LgdCompletionProvider', () =>
         const items = await provider.provideCompletionItems(document, new vscode.Position(ACCESS_LINE, VALUE_DOT_CHARACTER));
 
         expect(items).toBeNull();
+    });
+});
+
+describe('LgdLanguageService require resolution', () =>
+{
+    test('maps compiled .js requires back to the .lgd source', () =>
+    {
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+
+        expect(service.resolveLgdSourcePath('/repo/src', './Commands/Foo.js')).toBe(path.resolve('/repo/src/Commands/Foo.lgd'));
+        expect(service.resolveLgdSourcePath('/repo/src', './Commands/Foo.lgd.js')).toBe(path.resolve('/repo/src/Commands/Foo.lgd'));
+        expect(service.resolveLgdSourcePath('/repo/src', './Commands/Foo.lgd')).toBe(path.resolve('/repo/src/Commands/Foo.lgd'));
+        expect(service.resolveLgdSourcePath('/repo/src', './Commands/Foo')).toBe(path.resolve('/repo/src/Commands/Foo.lgd'));
+        expect(service.resolveLgdSourcePath('/repo/src', 'vscode')).toBeNull();
     });
 });

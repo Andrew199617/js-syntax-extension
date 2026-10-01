@@ -216,6 +216,7 @@ const LgdLanguageService = {
      * @description Maps a require spec to the sibling .lgd source it was compiled from.
      * Compiled output is required with its dotted name (./Foo.lgd.js), so the source
      * is the same path without the trailing .js; a bare ./Foo also maps to ./Foo.lgd.
+     * LGD sources require the compiled './Foo.js' spelling, which maps back to ./Foo.lgd.
      * @param {string} fromDir the directory of the requiring document.
      * @param {string} spec the require spec as written.
      * @returns {string|null} the absolute .lgd source path, or null for bare imports.
@@ -236,6 +237,11 @@ const LgdLanguageService = {
         if(candidate.endsWith('.lgd'))
         {
             return candidate;
+        }
+
+        if(candidate.endsWith('.js'))
+        {
+            return `${candidate.slice(0, -'.js'.length)}.lgd`;
         }
 
         return `${candidate}.lgd`;
