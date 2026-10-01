@@ -1,6 +1,7 @@
 const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
+const LgdTypeChecker = require('./LgdTypeChecker');
 
 /** @description Matches the head of a typed declaration, from the line start through the '='. */
 const declarationHeadPattern = /^(?<indent>[\t ]*)(?<exportKeyword>export[\t ]+)?(?<readonlyKeyword>readonly[\t ]+)?(?<typeKeyword>Number|String|Boolean|BigInt|Symbol|Object|Array|Function)[\t ]+(?<variableName>[$A-Z_a-z][\w$]*)[\t ]*=/gm;
@@ -153,6 +154,12 @@ const LgdCompiler = {
         }
 
         this.collectMalformedErrors(content, found, failedHeadStarts, errors);
+
+        for(const typeError of LgdTypeChecker.checkTypes(content, found))
+        {
+            errors.push(this.createError(content, typeError.offset, typeError.message));
+        }
+
         const declarations = this.buildTree(found);
         return { declarations: declarations, allDeclarations: found, errors: errors };
     },
