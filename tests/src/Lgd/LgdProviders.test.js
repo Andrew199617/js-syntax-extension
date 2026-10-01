@@ -43,6 +43,18 @@ const MIRROR_USAGE_END = 5;
 /** @description End character of the throwaway range used for outside-mirror locations. */
 const THROWAWAY_RANGE_END = 5;
 
+/** @description Line holding 'this.' inside the execute method. */
+const THIS_DOT_LINE = 8;
+
+/** @description Character just past 'this.' on the execute line. */
+const AFTER_THIS_DOT_CHARACTER = 9;
+
+/** @description Line holding a top-level 'this.'. */
+const TOP_LEVEL_THIS_LINE = 1;
+
+/** @description Character just past 'this.' on a top-level line. */
+const TOP_LEVEL_THIS_DOT_CHARACTER = 5;
+
 /**
  * @description Opens an LGD document in a fresh language service.
  * @returns {Promise<object>} the service, document, and state.
@@ -363,6 +375,46 @@ describe('LgdCompletionProvider', () =>
         const provider = LgdCompletionProvider.create(service);
 
         const items = await provider.provideCompletionItems(document, new vscode.Position(ACCESS_LINE, VALUE_DOT_CHARACTER));
+
+        expect(items).toBeNull();
+    });
+
+    test('lists create() assigned properties after this dot', async () =>
+    {
+        const source = [
+            'Object Cmd = {',
+            '  create() {',
+            '    const cmd = Object.create(Cmd);',
+            '    cmd.command = { title: "t" };',
+            '    this.kind = "x";',
+            '    return cmd;',
+            '  },',
+            '  execute() {',
+            '    this.',
+            '  }',
+            '};',
+            ''
+        ].join('\n');
+        const { service, document } = await openObjectDocument(source);
+        const provider = LgdCompletionProvider.create(service);
+
+        const items = await provider.provideCompletionItems(document, new vscode.Position(THIS_DOT_LINE, AFTER_THIS_DOT_CHARACTER));
+
+        expect(items.map(item => item.label)).toEqual([ 'create', 'execute', 'command', 'kind' ]);
+        expect(items.map(item => item.kind)).toEqual([
+            vscode.CompletionItemKind.Method,
+            vscode.CompletionItemKind.Method,
+            vscode.CompletionItemKind.Property,
+            vscode.CompletionItemKind.Property
+        ]);
+    });
+
+    test('returns null for this dot outside an object literal', async () =>
+    {
+        const { service, document } = await openObjectDocument('Number value = 0;\nthis.');
+        const provider = LgdCompletionProvider.create(service);
+
+        const items = await provider.provideCompletionItems(document, new vscode.Position(TOP_LEVEL_THIS_LINE, TOP_LEVEL_THIS_DOT_CHARACTER));
 
         expect(items).toBeNull();
     });

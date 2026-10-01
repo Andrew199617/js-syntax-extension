@@ -379,6 +379,288 @@ const LgdLanguageService = {
     },
 
     /**
+     * @description Lists the members visible through `this` at the cursor: the own members
+     * of the enclosing object literal plus the properties its create() method assigns.
+     * @param {TextDocument} document the LGD document.
+     * @param {Position} position the cursor position just past `this.`.
+     * @returns {Array} the {name, kind} members, or an empty array outside an object literal.
+     */
+    getThisMembers(document, position)
+    {
+        const state = this.getState(document.uri);
+        if(!state || !state.declarations)
+        {
+            return [];
+        }
+
+        const declaration = this.findEnclosingObjectDeclaration(state.declarations, document.offsetAt(position));
+        if(!declaration)
+        {
+            return [];
+        }
+
+        const members = [...declaration.members || []];
+        const seen = new Set(members.map(member => member.name));
+        for(const extra of this.extractCreateMembers(declaration.initializerText || ''))
+        {
+            if(!seen.has(extra.name))
+            {
+                seen.add(extra.name);
+                members.push(extra);
+            }
+        }
+
+        return members;
+    },
+
+    /**
+     * @description Finds the innermost object literal declaration containing an offset,
+     * so `this` inside a nested literal resolves to that literal.
+     * @param {Array} declarations the flat parsed declarations.
+     * @param {number} offset the cursor offset.
+     * @returns {Object|null} the enclosing object literal declaration, or null.
+     */
+    findEnclosingObjectDeclaration(declarations, offset)
+    {
+        let best = null;
+        for(const declaration of declarations)
+        {
+            if(typeof declaration.start !== 'number' || typeof declaration.end !== 'number')
+            {
+                continue;
+            }
+
+            if(offset < declaration.start || offset > declaration.end)
+            {
+                continue;
+            }
+
+            if(!(declaration.initializerText || '').trimStart().startsWith('{'))
+            {
+                continue;
+            }
+
+            if(!best || declaration.end - declaration.start < best.end - best.start)
+            {
+                best = declaration;
+            }
+        }
+
+        return best;
+    },
+
+    /**
+     * @description Collects the instance properties a create() method assigns, either on
+     * `this` directly or on the local variable it returns (the OLOO builder pattern).
+     * @param {string} initializerText the object literal source text.
+     * @returns {Array} the {name, kind: 'property'} members assigned in create().
+     */
+    extractCreateMembers(initializerText)
+    {
+        const body = this.findCreateBody(initializerText);
+        if(!body)
+        {
+            return [];
+        }
+
+        const built = new Set();
+        for(const returned of body.matchAll(/\breturn\s+(?<name>[$A-Z_a-z][\w$]*)\s*;/g))
+        {
+            built.add(returned.groups.name);
+        }
+
+        const members = [];
+        const seen = new Set();
+        const pattern = /\b(?<object>this|[$A-Z_a-z][\w$]*)\.(?<property>[$A-Z_a-z][\w$]*)\s*=(?![=>])/g;
+        let match = pattern.exec(body);
+        while(match)
+        {
+            const target = match.groups.object;
+            const property = match.groups.property;
+            if((target === 'this' || built.has(target)) && !seen.has(property))
+            {
+                seen.add(property);
+                members.push({ name: property, kind: 'property' });
+            }
+
+            match = pattern.exec(body);
+        }
+
+        return members;
+    },
+
+    /**
+     * @description Finds the body of the create() method in an object literal, skipping
+     * matches that sit inside strings or comments.
+     * @param {string} initializerText the object literal source text.
+     * @returns {string|null} the method body without its braces, or null when absent.
+     */
+    findCreateBody(initializerText)
+    {
+        const pattern = /(?:^|[\s,;{])(?:async\s+)?create\s*\([^)]*\)\s*{/g;
+        let match = pattern.exec(initializerText);
+        while(match)
+        {
+            if(!this.isInsideStringOrComment(initializerText, match.index))
+            {
+                const openIndex = match.index + match[0].lastIndexOf('{');
+                return this.extractBalancedBody(initializerText, openIndex);
+            }
+
+            match = pattern.exec(initializerText);
+        }
+
+        return null;
+    },
+
+    /**
+     * @description Reports whether an index sits inside a string literal or comment.
+     * @param {string} text the source text.
+     * @param {number} index the index to test.
+     * @returns {boolean} true inside a string or comment.
+     */
+    isInsideStringOrComment(text, index)
+    {
+        let mode = 'code';
+        let quote = '';
+        let position = 0;
+        while(position < index)
+        {
+            const character = text[position];
+            const next = position + 1 < text.length ? text[position + 1] : '';
+            if(mode === 'code')
+            {
+                if(character === "'" || character === '"' || character === '`')
+                {
+                    mode = 'string';
+                    quote = character;
+                }
+                else if(character === '/' && next === '/')
+                {
+                    mode = 'line';
+                    position++;
+                }
+                else if(character === '/' && next === '*')
+                {
+                    mode = 'block';
+                    position++;
+                }
+            }
+            else if(mode === 'string')
+            {
+                if(character === '\\')
+                {
+                    position++;
+                }
+                else if(character === quote)
+                {
+                    mode = 'code';
+                }
+            }
+            else if(mode === 'line')
+            {
+                if(character === '\n')
+                {
+                    mode = 'code';
+                }
+            }
+            else if(mode === 'block')
+            {
+                if(character === '*' && next === '/')
+                {
+                    mode = 'code';
+                    position++;
+                }
+            }
+
+            position++;
+        }
+
+        return mode !== 'code';
+    },
+
+    /**
+     * @description Extracts the body between a brace pair, skipping string literals and
+     * comments so their braces do not affect the depth count. Template literals are
+     * treated as opaque strings; `${}` interpolation inside them is not parsed.
+     * @param {string} text the source text.
+     * @param {number} openIndex the index of the opening brace.
+     * @returns {string|null} the body without the outer braces, or null when unbalanced.
+     */
+    extractBalancedBody(text, openIndex)
+    {
+        let depth = 0;
+        let index = openIndex;
+        let mode = 'code';
+        let quote = '';
+        while(index < text.length)
+        {
+            const character = text[index];
+            const next = index + 1 < text.length ? text[index + 1] : '';
+            if(mode === 'code')
+            {
+                if(character === "'" || character === '"' || character === '`')
+                {
+                    mode = 'string';
+                    quote = character;
+                }
+                else if(character === '/' && next === '/')
+                {
+                    mode = 'line';
+                    index++;
+                }
+                else if(character === '/' && next === '*')
+                {
+                    mode = 'block';
+                    index++;
+                }
+                else if(character === '{')
+                {
+                    depth++;
+                }
+                else if(character === '}')
+                {
+                    depth--;
+                    if(depth === 0)
+                    {
+                        return text.slice(openIndex + 1, index);
+                    }
+                }
+            }
+            else if(mode === 'string')
+            {
+                if(character === '\\')
+                {
+                    index++;
+                }
+                else if(character === quote)
+                {
+                    mode = 'code';
+                }
+            }
+            else if(mode === 'line')
+            {
+                if(character === '\n')
+                {
+                    mode = 'code';
+                }
+            }
+            else if(mode === 'block')
+            {
+                if(character === '*' && next === '/')
+                {
+                    mode = 'code';
+                    index++;
+                }
+            }
+
+            index++;
+        }
+
+        return null;
+    },
+
+    /**
      * @description Describes the typed parameters of a declaration for hover and completions.
      * @param {Object|undefined} typedParams the parsed {hasTypes, params} parameter info.
      * @returns {Array} the {name, typeName} parameter summaries, or an empty array.

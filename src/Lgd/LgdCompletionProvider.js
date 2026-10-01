@@ -6,6 +6,8 @@ const vscode = require('vscode');
  * @description Provides member completions for LGD documents. After 'object.',
  * lists the members of the LGD-declared object from the language service type
  * summary (object literal members, nominal type members, and cross-file exports).
+ * After 'this.', lists the enclosing object literal members plus the properties its
+ * create() method assigns.
  * @type {LgdCompletionProviderType}
  */
 const LgdCompletionProvider = {
@@ -38,6 +40,17 @@ const LgdCompletionProvider = {
         if(!match)
         {
             return null;
+        }
+
+        if(match.groups.objectName === 'this')
+        {
+            const members = this.languageService.getThisMembers(document, position);
+            if(members.length === 0)
+            {
+                return null;
+            }
+
+            return members.map(member => this.toCompletionItem(member));
         }
 
         const summary = await this.languageService.getTypeSummary(document.uri, match.groups.objectName);
