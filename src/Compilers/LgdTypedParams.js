@@ -46,6 +46,179 @@ function skipParamKeyword(text, index, keyword)
 }
 
 /**
+ * @description Reports whether an offset sits inside a line or block comment.
+ * Scans forward from the start of the offset's line, tracking strings.
+ * @param {string} text the text to scan.
+ * @param {number} index the offset to test.
+ * @returns {boolean} true when the offset is inside a comment.
+ */
+function isInComment(text, index)
+{
+    let cursor = text.lastIndexOf('\n', index - 1) + 1;
+    let stringMode = null;
+    while(cursor < index)
+    {
+        const character = text[cursor];
+        const next = cursor + 1 < text.length ? text[cursor + 1] : '';
+        if(stringMode)
+        {
+            if(character === '\\')
+            {
+                cursor += 2;
+                continue;
+            }
+
+            if(character === stringMode)
+            {
+                stringMode = null;
+            }
+
+            cursor++;
+            continue;
+        }
+
+        if(character === "'" || character === '"' || character === '`')
+        {
+            stringMode = character;
+        }
+        else if(character === '/' && next === '/')
+        {
+            return true;
+        }
+        else if(character === '/' && next === '*')
+        {
+            const close = text.indexOf('*/', cursor + 2);
+            if(close === -1 || close >= index)
+            {
+                return true;
+            }
+
+            cursor = close + 2;
+            continue;
+        }
+
+        cursor++;
+    }
+
+    return false;
+}
+
+/**
+ * @description Decides whether a slash starts a regex literal instead of division.
+ * A slash opens a regex when the previous significant token cannot end an expression:
+ * an opener, an operator, a comma or semicolon, or a keyword like return or typeof.
+ * @param {string} text the text to scan.
+ * @param {number} index the offset of the slash.
+ * @returns {boolean} true when the slash likely starts a regex literal.
+ */
+function isRegexStart(text, index)
+{
+    let before = index - 1;
+    while(before >= 0)
+    {
+        if((/\s/).test(text[before]))
+        {
+            before--;
+            continue;
+        }
+
+        if(text[before] === '/' && before - 1 >= 0 && text[before - 1] === '*')
+        {
+            const open = text.lastIndexOf('/*', before - 2);
+            before = open === -1 ? -1 : open - 1;
+            continue;
+        }
+
+        if(isInComment(text, before))
+        {
+            before = text.lastIndexOf('\n', before - 1);
+            continue;
+        }
+
+        break;
+    }
+
+    if(before < 0)
+    {
+        return true;
+    }
+
+    const character = text[before];
+    if('(,=:[!&|?{};+-*%<>^~'.includes(character))
+    {
+        return true;
+    }
+
+    if(character === ')' || character === ']' || character === '"' || character === "'" || character === '`')
+    {
+        return false;
+    }
+
+    if(!(/[\w$]/).test(character))
+    {
+        return true;
+    }
+
+    let wordStart = before;
+    while(wordStart >= 0 && (/[\w$]/).test(text[wordStart]))
+    {
+        wordStart--;
+    }
+
+    const word = text.slice(wordStart + 1, before + 1);
+    return (/^(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/).test(word);
+}
+
+/**
+ * @description Skips a regex literal starting at the given slash.
+ * Handles escapes and character classes; the literal cannot span lines.
+ * @param {string} text the text to scan.
+ * @param {number} index the offset of the opening slash.
+ * @returns {number} the offset just past the regex flags, or -1 when unterminated.
+ */
+function skipRegexLiteral(text, index)
+{
+    let cursor = index + 1;
+    let inClass = false;
+    while(cursor < text.length)
+    {
+        const character = text[cursor];
+        if(character === '\\')
+        {
+            cursor += 2;
+            continue;
+        }
+
+        if(character === '[')
+        {
+            inClass = true;
+        }
+        else if(character === ']')
+        {
+            inClass = false;
+        }
+        else if(character === '/' && !inClass)
+        {
+            cursor++;
+            while(cursor < text.length && (/[a-z]/).test(text[cursor]))
+            {
+                cursor++;
+            }
+
+            return cursor;
+        }
+        else if(character === '\n')
+        {
+            return -1;
+        }
+
+        cursor++;
+    }
+
+    return -1;
+}
+
+/**
  * @description Finds the closing paren matching the opener, skipping string and comment contents.
  * @param {string} text the text to scan.
  * @param {number} openIndex the offset of the opening paren.
@@ -86,6 +259,14 @@ function findParamGroupEnd(text, openIndex)
         {
             const close = text.indexOf('*/', index + 2);
             index = close === -1 ? text.length : close + 1;
+        }
+        else if(character === '/' && isRegexStart(text, index))
+        {
+            const regexEnd = skipRegexLiteral(text, index);
+            if(regexEnd !== -1)
+            {
+                index = regexEnd - 1;
+            }
         }
         else if(character === '(')
         {
@@ -286,6 +467,14 @@ function splitTopLevelChunks(text)
                 modes.push('block');
                 index++;
             }
+            else if(character === '/' && isRegexStart(text, index))
+            {
+                const regexEnd = skipRegexLiteral(text, index);
+                if(regexEnd !== -1)
+                {
+                    index = regexEnd - 1;
+                }
+            }
             else if(character === '{' || character === '[' || character === '(')
             {
                 depth++;
@@ -406,6 +595,14 @@ function findBraceGroupEnd(text, openIndex)
         {
             const close = text.indexOf('*/', index + 2);
             index = close === -1 ? text.length : close + 1;
+        }
+        else if(character === '/' && isRegexStart(text, index))
+        {
+            const regexEnd = skipRegexLiteral(text, index);
+            if(regexEnd !== -1)
+            {
+                index = regexEnd - 1;
+            }
         }
         else if(character === '{')
         {

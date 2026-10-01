@@ -627,6 +627,27 @@ describe('LGD typed function parameters.', () =>
         expect(mismatched.errors[0].message).toBe('Cannot assign String to Number.');
     });
 
+    test('Finds typed methods whose bodies contain regex literals.', () =>
+    {
+        const source = [
+            'Object o = {',
+            '  // Detect the pattern first.',
+            '  match(String line) {',
+            '    const patterns = [',
+            '      // function foo() {',
+            '      /^function\\s+\\w+\\s*\\([^)]*\\)\\s*\\{/,',
+            '      // C# methods with modifiers',
+            '      /^(?:public\\s+)?\\w+\\s*\\([^)]*\\)\\s*\\{/',
+            '    ];',
+            '    return patterns.some(pattern => pattern.test(line));',
+            '  }',
+            '};'
+        ].join('\n');
+        const result = compileJs(source);
+        expect(result.errors).toEqual([]);
+        expect(result.code).toContain('match(line) {');
+    });
+
     test('Checks method parameter defaults against their declared type.', () =>
     {
         expect(compileJs('Object o = { m(Number offset = 0) { return offset; } };').errors).toEqual([]);
