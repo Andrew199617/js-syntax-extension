@@ -316,7 +316,7 @@ const LgdCompiler = {
                 segments.push(this.shiftSegment(innerSegment, output.length));
             }
 
-            output += backend.rewriteInitializer(declaration, inner.code);
+            output += backend.rewriteInitializer(declaration, inner.code, inner.segments);
             output += ';';
             segments.push({
                 srcStart: declaration.end - 1,

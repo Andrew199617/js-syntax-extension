@@ -76,12 +76,13 @@ const JsBackend = {
      * @description Rewrites a compiled initializer for JavaScript, stripping LGD parameter types.
      * @param {LgdDeclarationType} declaration the parsed typed declaration.
      * @param {string} compiledInitializer the recursively compiled initializer text.
+     * @param {Array} segments the emit segments mapping source offsets to output offsets.
      * @returns {string} the initializer with plain JavaScript parameters.
      */
-    rewriteInitializer(declaration, compiledInitializer)
+    rewriteInitializer(declaration, compiledInitializer, segments = [])
     {
         let code = compiledInitializer;
-        for(const group of lgdTypedParams.typedParamGroups(declaration))
+        for(const group of lgdTypedParams.typedParamGroupsForOutput(declaration, segments))
         {
             code = this.stripParamTypes(group, code);
         }

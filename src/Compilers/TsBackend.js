@@ -79,12 +79,13 @@ const TsBackend = {
      * @description Rewrites a compiled initializer for TypeScript, annotating every typed parameter list.
      * @param {LgdDeclarationType} declaration the parsed typed declaration.
      * @param {string} compiledInitializer the recursively compiled initializer text.
+     * @param {Array} segments the emit segments mapping source offsets to output offsets.
      * @returns {string} the initializer with typed parameters.
      */
-    rewriteInitializer(declaration, compiledInitializer)
+    rewriteInitializer(declaration, compiledInitializer, segments = [])
     {
         let code = compiledInitializer;
-        for(const group of lgdTypedParams.typedParamGroups(declaration))
+        for(const group of lgdTypedParams.typedParamGroupsForOutput(declaration, segments))
         {
             code = this.annotateParamTypes(group, code);
         }

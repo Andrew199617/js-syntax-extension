@@ -792,9 +792,61 @@ function typedParamGroups(declaration)
     return groups.sort((left, right) => right.start - left.start);
 }
 
+/**
+ * @description Maps a source offset through emit segments to the compiled output offset.
+ * Only verbatim segments map linearly, which covers parameter lists: a method parameter
+ * list never overlaps a compiled declaration.
+ * @param {Array} segments the {srcStart, srcEnd, outStart, outEnd, verbatim} emit segments.
+ * @param {number} absoluteOffset the source offset to map.
+ * @returns {number} the output offset, or -1 when the offset cannot be mapped.
+ */
+function mapSourceOffset(segments, absoluteOffset)
+{
+    for(const segment of segments)
+    {
+        if(absoluteOffset >= segment.srcStart && absoluteOffset < segment.srcEnd)
+        {
+            if(!segment.verbatim)
+            {
+                return -1;
+            }
+
+            return segment.outStart + (absoluteOffset - segment.srcStart);
+        }
+    }
+
+    return -1;
+}
+
+/**
+ * @description Remaps typed parameter groups from source offsets to compiled-output offsets
+ * using the emit segments. Backends rewrite the recursively compiled initializer, whose
+ * lengths can differ from the source when it contains typed declarations, so the source
+ * offsets would land in the wrong place.
+ * @param {Object} declaration the parsed declaration record.
+ * @param {Array} segments the emit segments for the compiled initializer.
+ * @returns {Array} the {start, end, params, hasTypes} groups with output-relative offsets,
+ * ordered right to left.
+ */
+function typedParamGroupsForOutput(declaration, segments)
+{
+    return typedParamGroups(declaration).map(group =>
+    {
+        const start = mapSourceOffset(segments, declaration.initializerStart + group.start);
+        const end = mapSourceOffset(segments, declaration.initializerStart + group.end);
+        if(start === -1 || end === -1)
+        {
+            return group;
+        }
+
+        return { ...group, start: start, end: end };
+    });
+}
+
 module.exports = {
     parseTypedParams: parseTypedParams,
     parseObjectMethodParams: parseObjectMethodParams,
     splitTopLevelChunks: splitTopLevelChunks,
-    typedParamGroups: typedParamGroups
+    typedParamGroups: typedParamGroups,
+    typedParamGroupsForOutput: typedParamGroupsForOutput
 };

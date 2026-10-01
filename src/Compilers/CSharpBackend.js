@@ -93,9 +93,10 @@ const CSharpBackend = {
      * @description Rewrites a compiled initializer for C#: array literals and typed lambda parameters.
      * @param {Object} declaration the parsed typed declaration.
      * @param {string} compiledInitializer the recursively compiled initializer text.
+     * @param {Array} segments the emit segments mapping source offsets to output offsets.
      * @returns {string} the C#-shaped initializer.
      */
-    rewriteInitializer(declaration, compiledInitializer)
+    rewriteInitializer(declaration, compiledInitializer, segments = [])
     {
         if(declaration.typeName === 'Array')
         {
@@ -108,7 +109,7 @@ const CSharpBackend = {
         }
 
         let code = compiledInitializer;
-        for(const group of lgdTypedParams.typedParamGroups(declaration))
+        for(const group of lgdTypedParams.typedParamGroupsForOutput(declaration, segments))
         {
             code = this.rewriteParamTypes(group, code);
         }
