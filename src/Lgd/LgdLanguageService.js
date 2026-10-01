@@ -252,7 +252,7 @@ const LgdLanguageService = {
         let targetText;
         try
         {
-            targetText = await fs.readFile(sourcePath, 'utf8');
+            targetText = await fs.promises.readFile(sourcePath, 'utf8');
         }
         catch
         {
