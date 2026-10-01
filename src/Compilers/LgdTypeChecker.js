@@ -744,6 +744,41 @@ function checkAssignments(context)
  * @param {Map} externals require specs to {exportName, keyword} entries for cross-file typing.
  * @returns {Array} errors as {message, offset} pairs; the caller attaches line numbers.
  */
+/**
+ * @description Builds a typedFunctions record for one parameter group, resolving each
+ * parameter type against the scope. Used for both declaration-level typed parameters
+ * and object literal method parameters.
+ * @param {Object} context the {declaration, group, bodyStart, bodyEnd, scope, errors} context:
+ * the parsed declaration, the {start, end, params} parameter group with param type offsets
+ * relative to the declaration initializer text, the absolute offsets bounding the parameter
+ * scope, the scope to resolve parameter types against, and the error list to append to.
+ * @returns {Object} the {bodyStart, bodyEnd, paramStart, paramEnd, params} record.
+ */
+function createTypedFunctionRecord(context)
+{
+    const declaration = context.declaration;
+    const group = context.group;
+    const params = [];
+    for(const param of group.params)
+    {
+        if(!param.name)
+        {
+            continue;
+        }
+
+        const typeOffset = param.typeStart === -1 ? declaration.initializerStart : declaration.initializerStart + param.typeStart;
+        params.push({ name: param.name, entry: resolveParamType(param.typeName, context.scope, context.errors, typeOffset) });
+    }
+
+    return {
+        bodyStart: context.bodyStart,
+        bodyEnd: context.bodyEnd,
+        paramStart: declaration.initializerStart + group.start,
+        paramEnd: declaration.initializerStart + group.end,
+        params: params
+    };
+}
+
 function checkTypes(content, declarations, externals = new Map())
 {
     const errors = [];
@@ -801,25 +836,31 @@ function checkTypes(content, declarations, externals = new Map())
 
         if(declaration.typedParams && declaration.typedParams.hasTypes)
         {
-            const params = [];
-            for(const param of declaration.typedParams.params)
-            {
-                if(!param.name)
-                {
-                    continue;
-                }
-
-                const typeOffset = param.typeStart === -1 ? declaration.initializerStart : declaration.initializerStart + param.typeStart;
-                params.push({ name: param.name, entry: resolveParamType(param.typeName, extendedScope, errors, typeOffset) });
-            }
-
-            typedFunctions.push({
+            typedFunctions.push(createTypedFunctionRecord({
+                declaration: declaration,
+                group: declaration.typedParams,
                 bodyStart: declaration.initializerStart,
                 bodyEnd: declaration.initializerEnd,
-                paramStart: declaration.initializerStart + declaration.typedParams.start,
-                paramEnd: declaration.initializerStart + declaration.typedParams.end,
-                params: params
-            });
+                scope: extendedScope,
+                errors: errors
+            }));
+        }
+
+        for(const methodParams of declaration.methodTypedParams || [])
+        {
+            if(!methodParams.hasTypes)
+            {
+                continue;
+            }
+
+            typedFunctions.push(createTypedFunctionRecord({
+                declaration: declaration,
+                group: methodParams,
+                bodyStart: declaration.initializerStart + methodParams.bodyStart,
+                bodyEnd: declaration.initializerStart + methodParams.bodyEnd,
+                scope: extendedScope,
+                errors: errors
+            }));
         }
 
         scope.set(declaration.name, {

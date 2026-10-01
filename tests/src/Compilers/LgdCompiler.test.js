@@ -577,6 +577,39 @@ describe('LGD typed function parameters.', () =>
         expect(result.errors[0].message).toBe("Unknown type 'vscode.TextDocument'.");
     });
 
+    test('Rejects unknown types in object literal method parameters.', () =>
+    {
+        const result = compileJs('Object o = { create(Numer name) {} };');
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe("Unknown type 'Numer'.");
+    });
+
+    test('Accepts dotted method parameter types rooted at a required module.', () =>
+    {
+        const source = [
+            'const vscode = require(\'vscode\');',
+            'Object o = { find(vscode.TextDocument document, vscode.Position position) {} };'
+        ].join('\n');
+        expect(compileJs(source).errors).toEqual([]);
+    });
+
+    test('Checks assignments to method parameters against their declared type.', () =>
+    {
+        const source = [
+            'Number count = 0;',
+            'Object o = { f(String count) { count = 1; } };'
+        ].join('\n');
+        const result = compileJs(source);
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe('Cannot assign Number to String.');
+    });
+
+    test('Leaves untyped object methods and getters alone.', () =>
+    {
+        const source = 'Object o = { f(x) { return x; }, get name() { return \'x\'; } };';
+        expect(compileJs(source).errors).toEqual([]);
+    });
+
     test('Accepts nominal parameter types for declared names.', () =>
     {
         const source = [

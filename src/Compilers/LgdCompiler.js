@@ -2,7 +2,7 @@ const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
 const LgdTypeChecker = require('./LgdTypeChecker');
-const { parseTypedParams } = require('./LgdTypedParams');
+const { parseTypedParams, parseObjectMethodParams, splitTopLevelChunks } = require('./LgdTypedParams');
 
 /** @description Matches a declaration type name: Number, a declared name (GoToNextParagraph), or a dotted type (vscode.Command); the final segment must be capitalized. */
 const typeNamePattern = String.raw`(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*`;
@@ -162,6 +162,7 @@ const LgdCompiler = {
                 initializerText: initializerText,
                 members: this.extractMembers(initializerText),
                 typedParams: parseTypedParams(initializerText),
+                methodTypedParams: parseObjectMethodParams(initializerText),
                 children: []
             });
             headMatch = declarationHeadPattern.exec(content);
@@ -415,116 +416,13 @@ const LgdCompiler = {
         }
 
         const members = [];
-        const modes = ['code'];
-        const templateDepths = [];
-        let depth = 0;
-        let chunkStart = 0;
-        let index = 0;
-
-        const commitChunk = endIndex =>
+        for(const chunk of splitTopLevelChunks(text))
         {
-            const member = this.parseMemberChunk(text.slice(chunkStart, endIndex).trim());
+            const member = this.parseMemberChunk(chunk.text.trim());
             if(member)
             {
                 members.push(member);
             }
-        };
-
-        while(index < text.length)
-        {
-            const mode = modes[modes.length - 1];
-            const character = text[index];
-            const next = index + 1 < text.length ? text[index + 1] : '';
-            if(mode === 'code')
-            {
-                if(character === "'" || character === '"' || character === '`')
-                {
-                    modes.push(character);
-                }
-                else if(character === '/' && next === '/')
-                {
-                    modes.push('line');
-                    index++;
-                }
-                else if(character === '/' && next === '*')
-                {
-                    modes.push('block');
-                    index++;
-                }
-                else if(character === '{' || character === '[' || character === '(')
-                {
-                    depth++;
-                    if(depth === 1)
-                    {
-                        chunkStart = index + 1;
-                    }
-                }
-                else if(character === '}' || character === ']' || character === ')')
-                {
-                    depth--;
-                    if(depth === 0)
-                    {
-                        commitChunk(index);
-                    }
-
-                    if(templateDepths.length > 0 && templateDepths[templateDepths.length - 1] === depth)
-                    {
-                        templateDepths.pop();
-                        modes.pop();
-                    }
-                }
-                else if(character === ',' && depth === 1)
-                {
-                    commitChunk(index);
-                    chunkStart = index + 1;
-                }
-            }
-            else if(mode === '`')
-            {
-                if(character === '\\')
-                {
-                    index++;
-                }
-                else if(character === '`')
-                {
-                    modes.pop();
-                }
-                else if(character === '$' && next === '{')
-                {
-                    templateDepths.push(depth);
-                    depth++;
-                    modes.push('code');
-                    index++;
-                }
-            }
-            else if(mode === "'" || mode === '"')
-            {
-                if(character === '\\')
-                {
-                    index++;
-                }
-                else if(character === mode)
-                {
-                    modes.pop();
-                }
-            }
-            else if(mode === 'line')
-            {
-                if(character === '\n')
-                {
-                    modes.pop();
-                }
-            }
-            else if(mode === 'block')
-            {
-                if(character === '*' && next === '/')
-                {
-                    modes.pop();
-                    index++;
-                }
-            }
-
-            index++;
         }
 
         return members;
