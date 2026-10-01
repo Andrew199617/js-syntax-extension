@@ -609,6 +609,7 @@ describe('LGD typed function parameters.', () =>
         const source = 'Object o = { f(x) { return x; }, get name() { return \'x\'; } };';
         expect(compileJs(source).errors).toEqual([]);
     });
+
     test('Checks method parameter defaults against their declared type.', () =>
     {
         expect(compileJs('Object o = { m(Number offset = 0) { return offset; } };').errors).toEqual([]);
@@ -620,7 +621,10 @@ describe('LGD typed function parameters.', () =>
 
     test('Ignores assignments to parameter names outside their scope.', () =>
     {
-        const source = 'Function f = (Number offset) => { return offset; };' + '\n' + 'offset = 5;';
+        const source = [
+            'Function f = (Number offset) => { return offset; };',
+            'offset = 5;'
+        ].join('\n');
         expect(compileJs(source).errors).toEqual([]);
     });
 
