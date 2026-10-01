@@ -59,19 +59,23 @@ function clearPendingSaves()
 
 /**
  * @description Compiles an LGD document to JavaScript next to the source file.
+ * When the compiler reports errors the previous output is left untouched, so a
+ * broken save never overwrites working JavaScript with invalid code.
  * @param {object} document the saved LGD document.
  * @returns {Promise<void>}
  */
 async function compileLgdDocument(document)
 {
     const result = LgdCompiler.create().compileToJs(document.getText());
+    if(result.errors.length > 0)
+    {
+        StatusBarMessage.show(`LGD: ${result.errors.length} error(s), .js output not updated.`, StatusBarMessageTypes.ERROR);
+        return result;
+    }
+
     const parsedPath = path.parse(document.fileName);
     const jsPath = path.join(parsedPath.dir, `${parsedPath.name}.js`);
     await FileIO.writeFileContents(jsPath, result.code);
-    if(result.errors.length > 0)
-    {
-        StatusBarMessage.show(`LGD: Compiled with ${result.errors.length} error(s).`, StatusBarMessageTypes.ERROR);
-    }
 
     return result;
 }

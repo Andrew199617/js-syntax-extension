@@ -399,3 +399,46 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
         );
     });
 });
+
+describe('LGD compile on save', () =>
+{
+    function saveLgdDocument(fileName, source)
+    {
+        const registrations = vscode.workspace.onDidSaveTextDocument.mock.calls;
+        const saveLgd = registrations[registrations.length - 1][0];
+        saveLgd({
+            languageId: 'lgd',
+            fileName: fileName,
+            getText: () => source
+        });
+    }
+
+    test('saving LGD with errors leaves the previous .js output untouched', async () =>
+    {
+        vscode.window.createStatusBarItem.mockClear();
+
+        saveLgdDocument(path.join('workspace', 'broken.lgd'), 'Number = ;');
+        await nextTurn();
+        await nextTurn();
+
+        expect(FileIO.writeFileContents).not.toHaveBeenCalled();
+        expect(vscode.window.createStatusBarItem).toHaveBeenCalledTimes(1);
+        expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 error(s)');
+    });
+
+    test('saving valid LGD writes the compiled .js next to the source', async () =>
+    {
+        vscode.window.createStatusBarItem.mockClear();
+
+        saveLgdDocument(path.join('workspace', 'working.lgd'), 'Number x = 1;');
+        await nextTurn();
+        await nextTurn();
+
+        expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(
+            path.join('workspace', 'working.js'),
+            '/** @type {number} */\nlet x = 1;'
+        );
+        expect(vscode.window.createStatusBarItem).not.toHaveBeenCalled();
+    });
+});
