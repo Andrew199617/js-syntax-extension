@@ -1,0 +1,54 @@
+/**
+ * A small running-total calculator written in LGD.
+ * Exercises typed declarations, JSDoc, and arrow functions
+ * across the JavaScript, TypeScript, and C# backends.
+ */
+
+/** Display name shown in reports. */
+readonly String calculatorName = "LGD Calculator";
+
+/** Running total of all calculations. */
+Number total = 0;
+
+/** True once any calculation has run. */
+Boolean hasRun = false;
+
+/** Totals recorded after each operation. */
+Array history = [];
+
+/** Records a total in the history. */
+Function record = (value) => {
+    history.push(value);
+};
+
+/** Adds a value to the running total. */
+export Function add = (value) => {
+    Number next = total + value;
+    total = next;
+    hasRun = true;
+    record(next);
+    return next;
+};
+
+/** Multiplies the running total by a factor. */
+export Function multiply = (factor) => {
+    Number next = total * factor;
+    total = next;
+    hasRun = true;
+    record(next);
+    return next;
+};
+
+/** Resets the calculator to its initial state. */
+export Function reset = () => {
+    total = 0;
+    hasRun = false;
+    history = [];
+    return total;
+};
+
+/** Describes the current calculator state. */
+export Function describe = () => {
+    String state = hasRun ? "used" : "fresh";
+    return calculatorName + " is " + state + " with total " + total;
+};
