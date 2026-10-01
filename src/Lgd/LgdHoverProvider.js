@@ -8,6 +8,9 @@ const vscode = require('vscode');
  * @type {LgdHoverProviderType}
  */
 const LgdHoverProvider = {
+    /** @description Length of the `this.` receiver prefix checked before a hovered word. */
+    THIS_DOT_LENGTH: 5,
+
     /**
      * @description Creates a hover provider bound to the LGD language service.
      * @param {LgdLanguageServiceType} languageService the LGD language service.
@@ -56,6 +59,12 @@ const LgdHoverProvider = {
             {
                 return new vscode.Hover(this.renderTypeSummary(summary), wordRange);
             }
+
+            const memberHover = this.provideThisMemberHover(document, position, wordRange);
+            if(memberHover)
+            {
+                return memberHover;
+            }
         }
 
         if(!state.jsDocument)
@@ -78,6 +87,56 @@ const LgdHoverProvider = {
         const hover = hovers[0];
         const range = hover.range ? this.languageService.toLgdRange(document.uri, hover.range) : null;
         return new vscode.Hover(hover.contents, range);
+    },
+
+    /**
+     * @description Provides hover for a `this.member` access by resolving the member through
+     * the properties the enclosing object's create() method assigns to the instance.
+     * @param {TextDocument} document the LGD document.
+     * @param {Position} position the hovered position.
+     * @param {Range} wordRange the range of the hovered member name.
+     * @returns {Hover|null} the hover, or null when the word is not a this. member access.
+     */
+    provideThisMemberHover(document, position, wordRange)
+    {
+        if(wordRange.start.character < this.THIS_DOT_LENGTH)
+        {
+            return null;
+        }
+
+        const receiverRange = new vscode.Range(
+            new vscode.Position(wordRange.start.line, wordRange.start.character - this.THIS_DOT_LENGTH),
+            wordRange.start
+        );
+        if(document.getText(receiverRange) !== 'this.')
+        {
+            return null;
+        }
+
+        const detail = this.languageService.getThisMemberDetail(document, position, document.getText(wordRange));
+        if(!detail)
+        {
+            return null;
+        }
+
+        return new vscode.Hover(this.renderPropertySummary(detail), wordRange);
+    },
+
+    /**
+     * @description Renders an LGD-style summary for one create()-assigned instance property.
+     * @param {Object} detail the {name, typeName, properties} member detail.
+     * @returns {string} the markdown hover content.
+     */
+    renderPropertySummary(detail)
+    {
+        const type = detail.typeName ? `: ${detail.typeName}` : '';
+        if(!detail.properties || detail.properties.length === 0)
+        {
+            return [ '```lgd', `(property) ${detail.name}${type}`, '```' ].join('\n');
+        }
+
+        const lines = detail.properties.map(property => `    ${property},`);
+        return [ '```lgd', `(property) ${detail.name}${type} {`, ...lines, '}', '```' ].join('\n');
     },
 
     /**

@@ -363,7 +363,7 @@ const LgdLanguageService = {
             return null;
         }
 
-        let members = declaration.members || [];
+        let members = this.getObjectMembers(declaration);
         if(members.length === 0)
         {
             const target = await this.resolveRequireTarget(state.document, declaration);
@@ -399,6 +399,17 @@ const LgdLanguageService = {
             return [];
         }
 
+        return this.getObjectMembers(declaration);
+    },
+
+    /**
+     * @description Lists every member visible on an object literal declaration: its own
+     * literal members plus the properties its create() method assigns to the instance.
+     * @param {Object} declaration the object literal declaration.
+     * @returns {Array} the deduplicated {name, kind} members.
+     */
+    getObjectMembers(declaration)
+    {
         const members = [...declaration.members || []];
         const seen = new Set(members.map(member => member.name));
         for(const extra of this.extractCreateMembers(declaration.initializerText || ''))
@@ -411,6 +422,33 @@ const LgdLanguageService = {
         }
 
         return members;
+    },
+
+    /**
+     * @description Finds the detail for one instance property at a `this.` access: the
+     * create()-assigned member with its declared type and literal shape.
+     * @param {TextDocument} document the LGD document.
+     * @param {Position} position the cursor position inside the member access.
+     * @param {string} name the accessed member name.
+     * @returns {Object|null} the {name, kind, typeName, properties} member, or null.
+     */
+    getThisMemberDetail(document, position, name)
+    {
+        const state = this.getState(document.uri);
+        if(!state || !state.declarations)
+        {
+            return null;
+        }
+
+        const declaration = this.findEnclosingObjectDeclaration(state.declarations, document.offsetAt(position));
+        if(!declaration)
+        {
+            return null;
+        }
+
+        const createMembers = this.extractCreateMembers(declaration.initializerText || '');
+        const found = createMembers.find(member => member.name === name);
+        return found || null;
     },
 
     /**
@@ -452,8 +490,10 @@ const LgdLanguageService = {
     /**
      * @description Collects the instance properties a create() method assigns, either on
      * `this` directly or on the local variable it returns (the OLOO builder pattern).
+     * Each member carries the `@type {X}` JSDoc declared above its assignment when one
+     * is present, plus the property names when the assigned value is an object literal.
      * @param {string} initializerText the object literal source text.
-     * @returns {Array} the {name, kind: 'property'} members assigned in create().
+     * @returns {Array} the {name, kind: 'property', typeName, properties} members assigned in create().
      */
     extractCreateMembers(initializerText)
     {
@@ -480,13 +520,93 @@ const LgdLanguageService = {
             if((target === 'this' || built.has(target)) && !seen.has(property))
             {
                 seen.add(property);
-                members.push({ name: property, kind: 'property' });
+                members.push({
+                    name: property,
+                    kind: 'property',
+                    typeName: this.findAssignmentTypeName(body, match.index),
+                    properties: this.findAssignedLiteralProperties(body, match.index + match[0].length)
+                });
             }
 
             match = pattern.exec(body);
         }
 
         return members;
+    },
+
+    /**
+     * @description Reads the `@type {X}` JSDoc tag from a docblock immediately preceding an
+     * assignment, so hover can name the declared type of a create()-assigned property.
+     * @param {string} body the create() method body.
+     * @param {number} assignmentIndex the index where the assignment match starts.
+     * @returns {string|null} the declared type name, or null when absent.
+     */
+    findAssignmentTypeName(body, assignmentIndex)
+    {
+        const before = body.slice(0, assignmentIndex);
+        const docblock = before.match(/\/\*\*\s*@type\s*{(?<type>[^}]+)}\s*\*\/\s*$/);
+        return docblock ? docblock.groups.type.trim() : null;
+    },
+
+    /**
+     * @description Lists the top-level property names of an object literal assigned at an
+     * index, so hover can show the shape of a create()-assigned property.
+     * @param {string} body the create() method body.
+     * @param {number} valueIndex the index just past the assignment operator.
+     * @returns {Array} the property names, or an empty array when the value is not an object literal.
+     */
+    findAssignedLiteralProperties(body, valueIndex)
+    {
+        let index = valueIndex;
+        while(index < body.length && (/\s/).test(body[index]))
+        {
+            index++;
+        }
+
+        if(body[index] !== '{')
+        {
+            return [];
+        }
+
+        const literal = this.extractBalancedBody(body, index);
+        if(literal === null)
+        {
+            return [];
+        }
+
+        const segments = [];
+        let depth = 0;
+        let segmentStart = 0;
+        for(let position = 0; position < literal.length; position++)
+        {
+            const character = literal[position];
+            if(character === '{' || character === '(' || character === '[')
+            {
+                depth++;
+            }
+            else if(character === '}' || character === ')' || character === ']')
+            {
+                depth--;
+            }
+            else if(character === ',' && depth === 0)
+            {
+                segments.push(literal.slice(segmentStart, position));
+                segmentStart = position + 1;
+            }
+        }
+
+        segments.push(literal.slice(segmentStart));
+        const properties = [];
+        for(const segment of segments)
+        {
+            const key = segment.match(/^\s*["']?(?<name>[$A-Z_a-z][\w$]*)["']?\s*[(:{]/);
+            if(key && !properties.includes(key.groups.name))
+            {
+                properties.push(key.groups.name);
+            }
+        }
+
+        return properties;
     },
 
     /**
