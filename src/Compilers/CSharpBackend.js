@@ -20,7 +20,7 @@ const CSharpBackend = {
     /**
      * @description Emits the C# head for one typed declaration, converting JSDoc to a summary comment.
      * @param {LgdDeclarationType} declaration the parsed typed declaration.
-     * @returns {string} the emitted head, ending with '='.
+     * @returns {Object} the emitted head text ending with '=', and the variable name span within it.
      */
     emitHead(declaration)
     {
@@ -30,12 +30,16 @@ const CSharpBackend = {
         if(declaration.typeKeyword === 'Function')
         {
             const funcType = this.inferFuncType(declaration.initializerText);
-            return `${summaryPrefix}${indent}${funcType} ${declaration.name} =`;
+            const text = `${summaryPrefix}${indent}${funcType} ${declaration.name} =`;
+            const nameStart = text.length - declaration.name.length - 2;
+            return { text: text, nameStart: nameStart, nameEnd: nameStart + declaration.name.length };
         }
 
         const csType = typeMaps.csharpTypeMap[declaration.typeKeyword];
         const constantKeyword = declaration.readonly && this.isLiteralInitializer(declaration.initializerText) ? 'const ' : '';
-        return `${summaryPrefix}${indent}${constantKeyword}${csType} ${declaration.name} =`;
+        const text = `${summaryPrefix}${indent}${constantKeyword}${csType} ${declaration.name} =`;
+        const nameStart = text.length - declaration.name.length - 2;
+        return { text: text, nameStart: nameStart, nameEnd: nameStart + declaration.name.length };
     },
 
     /**

@@ -31,47 +31,49 @@ const LgdCompiler = {
     /**
      * @description Compiles LGD source to JavaScript.
      * @param {string} content the LGD source text.
-     * @returns {LgdCompileResultType} the compiled code, declarations, and errors.
+     * @returns {LgdCompileResultType} the compiled code, source mappings, declarations, and errors.
      */
     compileToJs(content)
     {
         const parsed = this.parse(content);
         const newline = this.detectNewline(content);
-        const code = this.emitRange(content, JsBackend.create(newline), this.fullRange(content, parsed.declarations));
-        return { code: code, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
+        const emitted = this.emitRange(content, JsBackend.create(newline), this.fullRange(content, parsed.declarations));
+        return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
     },
 
     /**
      * @description Compiles LGD source to TypeScript.
      * @param {string} content the LGD source text.
-     * @returns {LgdCompileResultType} the compiled code, declarations, and errors.
+     * @returns {LgdCompileResultType} the compiled code, source mappings, declarations, and errors.
      */
     compileToTs(content)
     {
         const parsed = this.parse(content);
         const newline = this.detectNewline(content);
-        const code = this.emitRange(content, TsBackend.create(newline), this.fullRange(content, parsed.declarations));
-        return { code: code, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
+        const emitted = this.emitRange(content, TsBackend.create(newline), this.fullRange(content, parsed.declarations));
+        return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
     },
 
     /**
      * @description Compiles LGD source to C#.
      * @param {string} content the LGD source text.
-     * @returns {LgdCompileResultType} the compiled code, declarations, and errors.
+     * @returns {LgdCompileResultType} the compiled code, source mappings, declarations, and errors.
      */
     compileToCSharp(content)
     {
         const parsed = this.parse(content);
         const newline = this.detectNewline(content);
-        const body = this.emitRange(content, CSharpBackend.create(newline), this.fullRange(content, parsed.declarations));
+        const emitted = this.emitRange(content, CSharpBackend.create(newline), this.fullRange(content, parsed.declarations));
+        const body = emitted.code;
         const header = `// Generated from an LGD source file by the LGD compiler (C# backend v0.2.0).${newline}`
             + `// v1 mock: typed declarations are translated to C#. Other statements pass${newline}`
             + `// through with light rewrites (.push -> .Add, === -> ==, = [] -> new List).${newline}`
             + `// export modifiers are dropped: this file uses top-level statements.${newline}`
             + `using System;${newline}`
             + `using System.Collections.Generic;${newline}`;
+        const mappings = emitted.segments.map(segment => this.shiftSegment(segment, header.length));
 
-        return { code: `${header}${body}`, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
+        return { code: `${header}${body}`, mappings: mappings, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
     },
 
     /**
@@ -120,9 +122,21 @@ const LgdCompiler = {
                 continue;
             }
 
+            // The head match ends with the '=', so walk back over trailing
+            // whitespace to find the variable name span.
+            let nameEnd = headEnd - 1;
+            while(nameEnd > headStart && (content[nameEnd - 1] === ' ' || content[nameEnd - 1] === '\t'))
+            {
+                nameEnd--;
+            }
+
+            const nameStart = nameEnd - head.variableName.length;
+
             found.push({
                 typeKeyword: head.typeKeyword,
                 name: head.variableName,
+                nameStart: nameStart,
+                nameEnd: nameEnd,
                 readonly: Boolean(head.readonlyKeyword),
                 exported: Boolean(head.exportKeyword),
                 indent: head.indent,
@@ -231,31 +245,103 @@ const LgdCompiler = {
 
     /**
      * @description Emits compiled code for a source range, compiling nested declarations recursively.
+     * Segments map source offsets to output offsets: gaps and separators are verbatim,
+     * declaration heads are rewritten with an exact variable name span. Segments are exact
+     * for backends that pass gaps and initializers through unchanged (JsBackend, TsBackend).
      * @param {string} content the LGD source text.
      * @param {Object} backend the target backend.
      * @param {Object} range the range to emit, with start, end, and declarations.
-     * @returns {string} the compiled code.
+     * @returns {Object} the compiled code and its source mapping segments.
      */
     emitRange(content, backend, range)
     {
         let output = '';
+        const segments = [];
         let cursor = range.start;
         for(const declaration of range.declarations)
         {
-            output += backend.rewriteGap(content.slice(cursor, declaration.start));
-            output += backend.emitHead(declaration);
-            const compiledInitializer = this.emitRange(content, backend, {
+            const gap = backend.rewriteGap(content.slice(cursor, declaration.start));
+            segments.push({
+                srcStart: cursor,
+                srcEnd: declaration.start,
+                outStart: output.length,
+                outEnd: output.length + gap.length,
+                verbatim: true
+            });
+            output += gap;
+
+            const head = backend.emitHead(declaration);
+            segments.push({
+                srcStart: declaration.start,
+                srcEnd: declaration.initializerStart,
+                outStart: output.length,
+                outEnd: output.length + head.text.length,
+                verbatim: false,
+                nameSrcStart: declaration.nameStart,
+                nameSrcEnd: declaration.nameEnd,
+                nameOutStart: output.length + head.nameStart,
+                nameOutEnd: output.length + head.nameEnd
+            });
+            output += head.text;
+
+            const inner = this.emitRange(content, backend, {
                 start: declaration.initializerStart,
                 end: declaration.initializerEnd,
                 declarations: declaration.children
             });
-            output += backend.rewriteInitializer(declaration, compiledInitializer);
+            for(const innerSegment of inner.segments)
+            {
+                segments.push(this.shiftSegment(innerSegment, output.length));
+            }
+
+            output += backend.rewriteInitializer(declaration, inner.code);
             output += ';';
+            segments.push({
+                srcStart: declaration.end - 1,
+                srcEnd: declaration.end,
+                outStart: output.length - 1,
+                outEnd: output.length,
+                verbatim: true
+            });
             cursor = declaration.end;
         }
 
-        output += backend.rewriteGap(content.slice(cursor, range.end));
-        return output;
+        const tailGap = backend.rewriteGap(content.slice(cursor, range.end));
+        segments.push({
+            srcStart: cursor,
+            srcEnd: range.end,
+            outStart: output.length,
+            outEnd: output.length + tailGap.length,
+            verbatim: true
+        });
+        output += tailGap;
+        return { code: output, segments: segments };
+    },
+
+    /**
+     * @description Shifts a mapping segment's output offsets by a base amount, for nested or prefixed output.
+     * @param {Object} segment the mapping segment.
+     * @param {number} base the amount to shift output offsets by.
+     * @returns {Object} a new segment with shifted output offsets.
+     */
+    shiftSegment(segment, base)
+    {
+        const shifted = {
+            srcStart: segment.srcStart,
+            srcEnd: segment.srcEnd,
+            outStart: segment.outStart + base,
+            outEnd: segment.outEnd + base,
+            verbatim: segment.verbatim
+        };
+        if(segment.nameSrcStart !== undefined)
+        {
+            shifted.nameSrcStart = segment.nameSrcStart;
+            shifted.nameSrcEnd = segment.nameSrcEnd;
+            shifted.nameOutStart = segment.nameOutStart + base;
+            shifted.nameOutEnd = segment.nameOutEnd + base;
+        }
+
+        return shifted;
     },
 
     /**

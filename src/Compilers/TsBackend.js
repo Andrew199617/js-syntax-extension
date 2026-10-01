@@ -20,7 +20,7 @@ const TsBackend = {
     /**
      * @description Emits the TypeScript head for one typed declaration, keeping the original JSDoc and adding a type annotation.
      * @param {LgdDeclarationType} declaration the parsed typed declaration.
-     * @returns {string} the emitted head, ending with '='.
+     * @returns {Object} the emitted head text ending with '=', and the variable name span within it.
      */
     emitHead(declaration)
     {
@@ -28,7 +28,9 @@ const TsBackend = {
         const exportKeyword = declaration.exported ? 'export ' : '';
         const tsType = typeMaps.tsTypeMap[declaration.typeKeyword];
         const commentPrefix = declaration.jsdoc ? `${declaration.jsdoc}${this.newline}` : '';
-        return `${commentPrefix}${declaration.indent}${exportKeyword}${kind} ${declaration.name}: ${tsType} =`;
+        const namePrefix = `${commentPrefix}${declaration.indent}${exportKeyword}${kind} `;
+        const text = `${namePrefix}${declaration.name}: ${tsType} =`;
+        return { text: text, nameStart: namePrefix.length, nameEnd: namePrefix.length + declaration.name.length };
     },
 
     /**

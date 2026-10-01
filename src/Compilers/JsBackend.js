@@ -23,7 +23,7 @@ const JsBackend = {
     /**
      * @description Emits the JavaScript head for one typed declaration, merging any JSDoc with a synthetic @type tag.
      * @param {LgdDeclarationType} declaration the parsed typed declaration.
-     * @returns {string} the emitted head, ending with '='.
+     * @returns {Object} the emitted head text ending with '=', and the variable name span within it.
      */
     emitHead(declaration)
     {
@@ -31,7 +31,9 @@ const JsBackend = {
         const exportKeyword = declaration.exported ? 'export ' : '';
         const comment = this.mergeJsdoc(declaration);
         const commentPrefix = comment ? `${comment}${this.newline}` : '';
-        return `${commentPrefix}${declaration.indent}${exportKeyword}${kind} ${declaration.name} =`;
+        const text = `${commentPrefix}${declaration.indent}${exportKeyword}${kind} ${declaration.name} =`;
+        const nameStart = text.length - declaration.name.length - 2;
+        return { text: text, nameStart: nameStart, nameEnd: nameStart + declaration.name.length };
     },
 
     /**

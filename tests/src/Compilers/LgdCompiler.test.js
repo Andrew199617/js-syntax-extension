@@ -198,3 +198,57 @@ describe('LgdTransform facade.', () =>
         expect(code).toContain('@type {number}');
     });
 });
+
+describe('LGD source mappings.', () =>
+{
+    const LgdSourceMap = require('../../../src/Compilers/LgdSourceMap');
+
+    test('Declaration names map to the emitted JavaScript name span.', () =>
+    {
+        const source = '/** The total. */\nNumber total = 0;\n';
+        const result = LgdCompiler.create().compileToJs(source);
+        const map = LgdSourceMap.create(result.mappings);
+        const nameOffset = source.indexOf('total =');
+        const jsOffset = map.toOutput(nameOffset);
+        expect(result.code.slice(jsOffset, jsOffset + 'total'.length)).toBe('total');
+        expect(result.code.slice(jsOffset - 'let '.length, jsOffset)).toBe('let ');
+    });
+
+    test('Usages in verbatim gaps map 1:1 with exact roundtrips.', () =>
+    {
+        const source = 'Number total = 0;\ntotal += 5;\n';
+        const result = LgdCompiler.create().compileToJs(source);
+        const map = LgdSourceMap.create(result.mappings);
+        const usageOffset = source.indexOf('total', source.indexOf('total =') + 'total'.length);
+        const jsOffset = map.toOutput(usageOffset);
+        expect(result.code.slice(jsOffset, jsOffset + 'total'.length)).toBe('total');
+        expect(map.toSource(jsOffset)).toBe(usageOffset);
+    });
+
+    test('Positions on the type keyword resolve to the emitted variable name.', () =>
+    {
+        const source = 'Number total = 0;\n';
+        const result = LgdCompiler.create().compileToJs(source);
+        const map = LgdSourceMap.create(result.mappings);
+        const jsOffset = map.toOutput(source.indexOf('Number'));
+        expect(result.code.slice(jsOffset, jsOffset + 'total'.length)).toBe('total');
+    });
+
+    test('Mappings survive nested declarations and readonly heads.', () =>
+    {
+        const source = 'readonly Number outer = 1;\nFunction f = () => {\n  Number inner = 2;\n  return inner;\n};\n';
+        const result = LgdCompiler.create().compileToJs(source);
+        expect(result.errors).toEqual([]);
+        const map = LgdSourceMap.create(result.mappings);
+        const innerOffset = source.indexOf('inner =');
+        const jsOffset = map.toOutput(innerOffset);
+        expect(result.code.slice(jsOffset, jsOffset + 'inner'.length)).toBe('inner');
+        expect(result.code.slice(jsOffset - 'let '.length, jsOffset)).toBe('let ');
+        expect(map.toSource(jsOffset)).toBe(innerOffset);
+        const outerOffset = source.indexOf('outer =');
+        const jsOuter = map.toOutput(outerOffset);
+        expect(result.code.slice(jsOuter - 'const '.length, jsOuter)).toBe('const ');
+        const returnOffset = source.indexOf('return inner;') + 'return '.length;
+        expect(map.toSource(map.toOutput(returnOffset))).toBe(returnOffset);
+    });
+});
