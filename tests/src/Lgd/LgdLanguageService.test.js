@@ -1,0 +1,127 @@
+const vscode = require('vscode');
+const { makeTextDocument } = require('./fakeVscode');
+const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
+
+/** @description Uri of the LGD document used across language service tests. */
+const LGD_URI = 'file:///workspace/examples/Calculator.lgd';
+
+/** @description Character where the variable name starts in 'Number value = 0;'. */
+const NAME_START_CHARACTER = 7;
+
+/** @description Length of the variable name 'value'. */
+const NAME_LENGTH = 5;
+
+/**
+ * @description Creates a language service with a recording diagnostic collection.
+ * @returns {object} the service and its recordings.
+ */
+function createService()
+{
+    const setCalls = [];
+    const deleted = [];
+    const diagnosticCollection = {
+        set: (uri, diagnostics) => setCalls.push({ uri: uri, diagnostics: diagnostics }),
+        delete: uri => deleted.push(uri)
+    };
+    const errors = [];
+    const service = LgdLanguageService.create(diagnosticCollection, error => errors.push(error));
+
+    return { service: service, setCalls: setCalls, deleted: deleted, errors: errors };
+}
+
+/**
+ * @description Reads text from the compiled mirror at a position.
+ * @param {object} service the language service.
+ * @param {object} uri the LGD document uri.
+ * @param {object} position the mirror position.
+ * @param {number} length how many characters to read.
+ * @returns {string} the mirror text.
+ */
+function mirrorTextAt(service, uri, position, length)
+{
+    const state = service.getState(uri);
+    const offset = state.jsDocument.offsetAt(position);
+
+    return state.jsDocument.getText().slice(offset, offset + length);
+}
+
+jest.mock('vscode', () => require('./fakeVscode').createFakeVscode(jest));
+
+beforeEach(() =>
+{
+    vscode.__reset();
+    vscode.workspace.openTextDocument.mockClear();
+    vscode.workspace.applyEdit.mockClear();
+    vscode.commands.executeCommand.mockReset();
+});
+
+describe('LgdLanguageService', () =>
+{
+    test('openDocument compiles the LGD text into a JavaScript mirror', async () =>
+    {
+        const { service } = createService();
+        const document = makeTextDocument(LGD_URI, 'Number value = 0;\n');
+
+        const state = await service.openDocument(document);
+
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledTimes(1);
+        expect(state.jsDocument.getText()).toContain('let value = 0;');
+        expect(state.map).toBeTruthy();
+    });
+
+    test('positions roundtrip between LGD source and compiled output', async () =>
+    {
+        const { service } = createService();
+        const document = makeTextDocument(LGD_URI, 'Number value = 0;\n');
+        await service.openDocument(document);
+
+        const jsPosition = service.toJsPosition(document.uri, new vscode.Position(0, NAME_START_CHARACTER));
+
+        expect(jsPosition).toBeTruthy();
+        expect(mirrorTextAt(service, document.uri, jsPosition, NAME_LENGTH)).toBe('value');
+
+        const backToLgd = service.toLgdPosition(document.uri, jsPosition);
+        expect(backToLgd.line).toBe(0);
+        expect(backToLgd.character).toBe(NAME_START_CHARACTER);
+    });
+
+    test('updateDocument recompiles and refreshes the mirror content', async () =>
+    {
+        const { service } = createService();
+        const document = makeTextDocument(LGD_URI, 'Number value = 0;\n');
+        const state = await service.openDocument(document);
+
+        document.setText('Number value = 0;\nString name = "Andrew";\n');
+        await service.updateDocument(document);
+
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledTimes(1);
+        expect(vscode.workspace.applyEdit).toHaveBeenCalledTimes(1);
+        expect(state.jsDocument.getText()).toContain('let name = "Andrew";');
+    });
+
+    test('compiler errors are published as diagnostics on the LGD document', async () =>
+    {
+        const { service, setCalls } = createService();
+        const document = makeTextDocument(LGD_URI, 'Number = 0;\nNumber ok = 1;\n');
+
+        await service.openDocument(document);
+
+        expect(setCalls).toHaveLength(1);
+        expect(setCalls[0].uri).toBe(document.uri);
+        expect(setCalls[0].diagnostics).toHaveLength(1);
+        expect(setCalls[0].diagnostics[0].message).toContain('Invalid typed declaration');
+        expect(setCalls[0].diagnostics[0].range.start.line).toBe(0);
+    });
+
+    test('closeDocument drops the state and clears diagnostics', async () =>
+    {
+        const { service, deleted } = createService();
+        const document = makeTextDocument(LGD_URI, 'Number value = 0;\n');
+        await service.openDocument(document);
+
+        service.closeDocument(document);
+
+        expect(service.getState(document.uri)).toBeUndefined();
+        expect(deleted).toEqual([document.uri]);
+    });
+});

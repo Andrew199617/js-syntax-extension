@@ -1,0 +1,198 @@
+const vscode = require('vscode');
+const { makeTextDocument } = require('./fakeVscode');
+const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
+const LgdHoverProvider = require('../../../src/Lgd/LgdHoverProvider');
+const LgdDefinitionProvider = require('../../../src/Lgd/LgdDefinitionProvider');
+const LgdReferenceProvider = require('../../../src/Lgd/LgdReferenceProvider');
+
+/** @description Uri of the LGD document used across provider tests. */
+const LGD_URI = 'file:///workspace/examples/Calculator.lgd';
+
+/** @description LGD source with one declaration and one usage. */
+const LGD_TEXT = 'Number value = 0;\nvalue = value + 1;\n';
+
+/** @description LGD line holding the typed declaration. */
+const DECLARATION_LINE = 0;
+
+/** @description LGD line holding the variable usage. */
+const USAGE_LINE = 1;
+
+/** @description Character where the variable name starts in 'Number value = 0;'. */
+const NAME_START_CHARACTER = 7;
+
+/** @description Character where the variable name ends in 'Number value = 0;'. */
+const NAME_END_CHARACTER = 12;
+
+/** @description Mirror line of the compiled declaration; the JSDoc tag occupies line 0. */
+const MIRROR_DECLARATION_LINE = 1;
+
+/** @description Mirror character where the compiled variable name starts. */
+const MIRROR_NAME_START = 4;
+
+/** @description Mirror character where the compiled variable name ends. */
+const MIRROR_NAME_END = 9;
+
+/** @description Mirror line holding the compiled variable usage. */
+const MIRROR_USAGE_LINE = 2;
+
+/** @description End character of the compiled variable usage range. */
+const MIRROR_USAGE_END = 5;
+
+/** @description End character of the throwaway range used for outside-mirror locations. */
+const THROWAWAY_RANGE_END = 5;
+
+/**
+ * @description Opens an LGD document in a fresh language service.
+ * @returns {Promise<object>} the service, document, and state.
+ */
+async function openLgdDocument()
+{
+    const diagnosticCollection = { set: () => undefined, delete: () => undefined };
+    const service = LgdLanguageService.create(diagnosticCollection, () => undefined);
+    const document = makeTextDocument(LGD_URI, LGD_TEXT);
+    const state = await service.openDocument(document);
+
+    return { service: service, document: document, state: state };
+}
+
+/**
+ * @description Makes a mirror range for the compiled variable name.
+ * @returns {object} the range.
+ */
+function makeMirrorNameRange()
+{
+    return new vscode.Range(
+        new vscode.Position(MIRROR_DECLARATION_LINE, MIRROR_NAME_START),
+        new vscode.Position(MIRROR_DECLARATION_LINE, MIRROR_NAME_END)
+    );
+}
+
+jest.mock('vscode', () => require('./fakeVscode').createFakeVscode(jest));
+
+beforeEach(() =>
+{
+    vscode.__reset();
+    vscode.commands.executeCommand.mockReset();
+});
+
+describe('LgdHoverProvider', () =>
+{
+    test('returns null when the document is not open', async () =>
+    {
+        const diagnosticCollection = { set: () => undefined, delete: () => undefined };
+        const service = LgdLanguageService.create(diagnosticCollection, () => undefined);
+        const provider = LgdHoverProvider.create(service);
+        const document = makeTextDocument(LGD_URI, LGD_TEXT);
+
+        const hover = await provider.provideHover(document, new vscode.Position(DECLARATION_LINE, NAME_START_CHARACTER));
+
+        expect(hover).toBeNull();
+        expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+    });
+
+    test('delegates to the mirror and maps the hover range back to LGD', async () =>
+    {
+        const { service, document, state } = await openLgdDocument();
+        const provider = LgdHoverProvider.create(service);
+        const jsRange = makeMirrorNameRange();
+        vscode.commands.executeCommand.mockResolvedValue([
+            { contents: [{ language: 'typescript', value: 'let value: number' }], range: jsRange }
+        ]);
+
+        const hover = await provider.provideHover(document, new vscode.Position(DECLARATION_LINE, NAME_START_CHARACTER));
+
+        expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+            'vscode.executeHoverProvider',
+            state.jsDocument.uri,
+            expect.objectContaining({ line: MIRROR_DECLARATION_LINE, character: MIRROR_NAME_START })
+        );
+        expect(hover.contents).toEqual([{ language: 'typescript', value: 'let value: number' }]);
+        expect(hover.range.start.line).toBe(DECLARATION_LINE);
+        expect(hover.range.start.character).toBe(NAME_START_CHARACTER);
+        expect(hover.range.end.character).toBe(NAME_END_CHARACTER);
+    });
+
+    test('returns null when the language service has no hover', async () =>
+    {
+        const { service, document } = await openLgdDocument();
+        const provider = LgdHoverProvider.create(service);
+        vscode.commands.executeCommand.mockResolvedValue([]);
+
+        const hover = await provider.provideHover(document, new vscode.Position(DECLARATION_LINE, 0));
+
+        expect(hover).toBeNull();
+    });
+});
+
+describe('LgdDefinitionProvider', () =>
+{
+    test('maps mirror definitions back to the LGD document', async () =>
+    {
+        const { service, document, state } = await openLgdDocument();
+        const provider = LgdDefinitionProvider.create(service);
+        const jsRange = makeMirrorNameRange();
+        vscode.commands.executeCommand.mockResolvedValue([
+            { targetUri: state.jsDocument.uri, targetRange: jsRange }
+        ]);
+
+        const definitions = await provider.provideDefinition(document, new vscode.Position(USAGE_LINE, 1));
+
+        expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+            'vscode.executeDefinitionProvider',
+            state.jsDocument.uri,
+            expect.objectContaining({ line: MIRROR_USAGE_LINE, character: 1 })
+        );
+        expect(definitions).toHaveLength(1);
+        expect(definitions[0].uri).toBe(document.uri);
+        expect(definitions[0].range.start.line).toBe(DECLARATION_LINE);
+        expect(definitions[0].range.start.character).toBe(NAME_START_CHARACTER);
+    });
+
+    test('drops definitions that point outside the mirror document', async () =>
+    {
+        const { service, document } = await openLgdDocument();
+        const provider = LgdDefinitionProvider.create(service);
+        vscode.commands.executeCommand.mockResolvedValue([
+            {
+                targetUri: { toString: () => 'file:///other/lib.js' },
+                targetRange: new vscode.Range(new vscode.Position(0, 0), new vscode.Position(0, THROWAWAY_RANGE_END))
+            }
+        ]);
+
+        const definitions = await provider.provideDefinition(document, new vscode.Position(USAGE_LINE, 1));
+
+        expect(definitions).toEqual([]);
+    });
+});
+
+describe('LgdReferenceProvider', () =>
+{
+    test('maps mirror references back to LGD and passes includeDeclaration through', async () =>
+    {
+        const { service, document, state } = await openLgdDocument();
+        const provider = LgdReferenceProvider.create(service);
+        const jsDeclaration = makeMirrorNameRange();
+        const jsUsage = new vscode.Range(new vscode.Position(MIRROR_USAGE_LINE, 0), new vscode.Position(MIRROR_USAGE_LINE, MIRROR_USAGE_END));
+        vscode.commands.executeCommand.mockResolvedValue([
+            new vscode.Location(state.jsDocument.uri, jsDeclaration),
+            new vscode.Location(state.jsDocument.uri, jsUsage)
+        ]);
+
+        const references = await provider.provideReferences(
+            document,
+            new vscode.Position(DECLARATION_LINE, NAME_START_CHARACTER),
+            { includeDeclaration: true }
+        );
+
+        expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+            'vscode.executeReferenceProvider',
+            state.jsDocument.uri,
+            expect.objectContaining({ line: MIRROR_DECLARATION_LINE, character: MIRROR_NAME_START }),
+            { includeDeclaration: true }
+        );
+        expect(references).toHaveLength(2);
+        expect(references[0].uri).toBe(document.uri);
+        expect(references[0].range.start).toEqual(expect.objectContaining({ line: DECLARATION_LINE, character: NAME_START_CHARACTER }));
+        expect(references[1].range.start).toEqual(expect.objectContaining({ line: USAGE_LINE, character: 0 }));
+    });
+});
