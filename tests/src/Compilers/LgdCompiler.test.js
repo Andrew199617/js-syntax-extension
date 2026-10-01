@@ -652,6 +652,30 @@ describe('LGD typed function parameters.', () =>
         expect(result.errors).toEqual([]);
         expect(result.code).toBe('let record: Function = (value: number, label: string = "x") => {};');
     });
+    test('JavaScript backend strips object method parameter types.', () =>
+    {
+        const source = 'Object o = { create(String name, Number count = 1) { return name; }, async run() { return 1; } };';
+        const result = LgdCompiler.create().compileToJs(source);
+        expect(result.errors).toEqual([]);
+        expect(result.code).toContain('create(name, count = 1) { return name; }');
+        expect(result.code).toContain('async run() { return 1; }');
+    });
+
+    test('TypeScript backend annotates object method parameter types.', () =>
+    {
+        const source = 'Object o = { create(String name, Number count = 1) { return name; } };';
+        const result = LgdCompiler.create().compileToTs(source);
+        expect(result.errors).toEqual([]);
+        expect(result.code).toContain('create(name: string, count: number = 1) { return name; }');
+    });
+
+    test('C# backend types object method parameters.', () =>
+    {
+        const source = 'Object o = { create(String name) { return name; } };';
+        const result = LgdCompiler.create().compileToCSharp(source);
+        expect(result.errors).toEqual([]);
+        expect(result.code).toContain('create(string name)');
+    });
 
     test('C# backend types the lambda parameters and the delegate.', () =>
     {

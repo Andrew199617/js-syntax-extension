@@ -1,4 +1,5 @@
 const typeMaps = require('./LgdTypeMaps');
+const lgdTypedParams = require('./LgdTypedParams');
 
 /**
  * @description Emits C# for LGD typed declarations. v1 mock: declarations are translated, other statements pass through with light rewrites.
@@ -106,12 +107,13 @@ const CSharpBackend = {
             return this.rewriteBigIntLiteral(compiledInitializer);
         }
 
-        if(declaration.typeName === 'Function' && declaration.typedParams && declaration.typedParams.hasTypes)
+        let code = compiledInitializer;
+        for(const group of lgdTypedParams.typedParamGroups(declaration))
         {
-            return this.rewriteParamTypes(declaration.typedParams, compiledInitializer);
+            code = this.rewriteParamTypes(group, code);
         }
 
-        return compiledInitializer;
+        return code;
     },
 
     /**

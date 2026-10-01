@@ -1,4 +1,5 @@
 const typeMaps = require('./LgdTypeMaps');
+const lgdTypedParams = require('./LgdTypedParams');
 
 /**
  * @description Emits TypeScript for LGD typed declarations.
@@ -44,19 +45,14 @@ const TsBackend = {
     },
 
     /**
-     * @description Annotates the parameter list with TypeScript types: (Number value) becomes (value: number).
-     * @param {LgdDeclarationType} declaration the parsed typed declaration.
+     * @description Annotates one parameter list with TypeScript types: (Number value) becomes (value: number).
+     * @param {Object} group the {start, end, params, hasTypes} parameter group.
      * @param {string} compiledInitializer the recursively compiled initializer text.
      * @returns {string} the initializer with typed parameters.
      */
-    rewriteInitializer(declaration, compiledInitializer)
+    annotateParamTypes(group, compiledInitializer)
     {
-        const typedParams = declaration.typedParams;
-        if(!typedParams || !typedParams.hasTypes)
-        {
-            return compiledInitializer;
-        }
-
+        const typedParams = group;
         const params = typedParams.params.map(parameter =>
         {
             if(!parameter.name)
@@ -77,6 +73,23 @@ const TsBackend = {
         return `${compiledInitializer.slice(0, typedParams.start)
         }(${params.join(', ')})${
             compiledInitializer.slice(typedParams.end)}`;
+    },
+
+    /**
+     * @description Rewrites a compiled initializer for TypeScript, annotating every typed parameter list.
+     * @param {LgdDeclarationType} declaration the parsed typed declaration.
+     * @param {string} compiledInitializer the recursively compiled initializer text.
+     * @returns {string} the initializer with typed parameters.
+     */
+    rewriteInitializer(declaration, compiledInitializer)
+    {
+        let code = compiledInitializer;
+        for(const group of lgdTypedParams.typedParamGroups(declaration))
+        {
+            code = this.annotateParamTypes(group, code);
+        }
+
+        return code;
     }
 };
 

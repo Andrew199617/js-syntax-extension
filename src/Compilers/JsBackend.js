@@ -1,4 +1,5 @@
 const typeMaps = require('./LgdTypeMaps');
+const lgdTypedParams = require('./LgdTypedParams');
 
 /** @description Length of the JSDoc closing marker, stripped before merging the synthetic type tag. */
 const jsdocCloseLength = 2;
@@ -79,12 +80,13 @@ const JsBackend = {
      */
     rewriteInitializer(declaration, compiledInitializer)
     {
-        if(declaration.typedParams && declaration.typedParams.hasTypes)
+        let code = compiledInitializer;
+        for(const group of lgdTypedParams.typedParamGroups(declaration))
         {
-            return this.stripParamTypes(declaration.typedParams, compiledInitializer);
+            code = this.stripParamTypes(group, code);
         }
 
-        return compiledInitializer;
+        return code;
     },
 
     /**

@@ -538,8 +538,28 @@ function parseObjectMethodParams(initializerText)
     return groups;
 }
 
+
+/**
+ * @description Collects every typed parameter group on a declaration: the object
+ * method groups plus the declaration-level group, ordered right to left so rewriting
+ * one group never shifts an earlier group's offsets.
+ * @param {Object} declaration the parsed declaration record.
+ * @returns {Array} the {start, end, params, hasTypes} groups that carry types.
+ */
+function typedParamGroups(declaration)
+{
+    const groups = (declaration.methodTypedParams || []).filter(group => group.hasTypes);
+    if(declaration.typedParams && declaration.typedParams.hasTypes)
+    {
+        groups.push(declaration.typedParams);
+    }
+
+    return groups.sort((left, right) => right.start - left.start);
+}
+
 module.exports = {
     parseTypedParams: parseTypedParams,
     parseObjectMethodParams: parseObjectMethodParams,
-    splitTopLevelChunks: splitTopLevelChunks
+    splitTopLevelChunks: splitTopLevelChunks,
+    typedParamGroups: typedParamGroups
 };
