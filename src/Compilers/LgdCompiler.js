@@ -2,12 +2,16 @@ const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
 const LgdTypeChecker = require('./LgdTypeChecker');
+const { parseTypedParams } = require('./LgdTypedParams');
+
+/** @description Matches a declaration type name: Number, a declared name (GoToNextParagraph), or a dotted type (vscode.Command); the final segment must be capitalized. */
+const typeNamePattern = String.raw`(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*`;
 
 /** @description Matches the head of a typed declaration, from the line start through the '='. */
-const declarationHeadPattern = /^(?<indent>[\t ]*)(?<exportKeyword>export[\t ]+)?(?<readonlyKeyword>readonly[\t ]+)?(?<typeKeyword>Number|String|Boolean|BigInt|Symbol|Object|Array|Function)[\t ]+(?<variableName>[$A-Z_a-z][\w$]*)[\t ]*=/gm;
+const declarationHeadPattern = new RegExp(`^(?<indent>[\\t ]*)(?<exportKeyword>export[\\t ]+)?(?<readonlyKeyword>readonly[\\t ]+)?(?<typeName>${typeNamePattern})[\\t ]+(?<variableName>[$A-Z_a-z][\\w$]*)[\\t ]*=`, 'gm');
 
-/** @description Matches lines that start with a type keyword, used to flag malformed declarations. */
-const typeKeywordLinePattern = /^[\t ]*(?:export[\t ]+)?(?:readonly[\t ]+)?(?<typeKeyword>Number|String|Boolean|BigInt|Symbol|Object|Array|Function)\b(?![\t ]*\()/gm;
+/** @description Matches malformed declaration heads: lines starting with a type name that never parsed as a declaration. */
+const typeNameLinePattern = new RegExp(`^[\\t ]*(?:export[\\t ]+)?(?:readonly[\\t ]+)?(?<typeName>${typeNamePattern})(?![\\w$.])(?![\\t ]*\\()`, 'gm');
 
 /** @description Length of the JSDoc opening marker. */
 const jsdocOpenLength = 3;
@@ -32,11 +36,12 @@ const LgdCompiler = {
     /**
      * @description Compiles LGD source to JavaScript.
      * @param {string} content the LGD source text.
+     * @param {Map} externals require specs to {exportName, keyword} entries for cross-file typing.
      * @returns {LgdCompileResultType} the compiled code, source mappings, declarations, and errors.
      */
-    compileToJs(content)
+    compileToJs(content, externals = new Map())
     {
-        const parsed = this.parse(content);
+        const parsed = this.parse(content, externals);
         const newline = this.detectNewline(content);
         const emitted = this.emitRange(content, JsBackend.create(newline), this.fullRange(content, parsed.declarations));
         return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
@@ -45,11 +50,12 @@ const LgdCompiler = {
     /**
      * @description Compiles LGD source to TypeScript.
      * @param {string} content the LGD source text.
+     * @param {Map} externals require specs to {exportName, keyword} entries for cross-file typing.
      * @returns {LgdCompileResultType} the compiled code, source mappings, declarations, and errors.
      */
-    compileToTs(content)
+    compileToTs(content, externals = new Map())
     {
-        const parsed = this.parse(content);
+        const parsed = this.parse(content, externals);
         const newline = this.detectNewline(content);
         const emitted = this.emitRange(content, TsBackend.create(newline), this.fullRange(content, parsed.declarations));
         return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
@@ -58,11 +64,12 @@ const LgdCompiler = {
     /**
      * @description Compiles LGD source to C#.
      * @param {string} content the LGD source text.
+     * @param {Map} externals require specs to {exportName, keyword} entries for cross-file typing.
      * @returns {LgdCompileResultType} the compiled code, source mappings, declarations, and errors.
      */
-    compileToCSharp(content)
+    compileToCSharp(content, externals = new Map())
     {
-        const parsed = this.parse(content);
+        const parsed = this.parse(content, externals);
         const newline = this.detectNewline(content);
         const emitted = this.emitRange(content, CSharpBackend.create(newline), this.fullRange(content, parsed.declarations));
         const body = emitted.code;
@@ -90,9 +97,10 @@ const LgdCompiler = {
     /**
      * @description Parses typed declarations out of LGD source, building a containment tree for nested declarations.
      * @param {string} content the LGD source text.
+     * @param {Map} externals require specs to {exportName, keyword} entries for cross-file typing.
      * @returns {LgdParseResultType} the root declarations, the flat declaration list, and any errors.
      */
-    parse(content)
+    parse(content, externals = new Map())
     {
         const found = [];
         const errors = [];
@@ -132,9 +140,13 @@ const LgdCompiler = {
             }
 
             const nameStart = nameEnd - head.variableName.length;
+            const typeStart = headStart + head.indent.length + (head.exportKeyword || '').length + (head.readonlyKeyword || '').length;
+            const typeEnd = typeStart + head.typeName.length;
 
             found.push({
-                typeKeyword: head.typeKeyword,
+                typeName: head.typeName,
+                typeStart: typeStart,
+                typeEnd: typeEnd,
                 name: head.variableName,
                 nameStart: nameStart,
                 nameEnd: nameEnd,
@@ -148,6 +160,8 @@ const LgdCompiler = {
                 initializerEnd: scan.end,
                 end: scan.end + 1,
                 initializerText: initializerText,
+                members: this.extractMembers(initializerText),
+                typedParams: parseTypedParams(initializerText),
                 children: []
             });
             headMatch = declarationHeadPattern.exec(content);
@@ -155,7 +169,7 @@ const LgdCompiler = {
 
         this.collectMalformedErrors(content, found, failedHeadStarts, errors);
 
-        for(const typeError of LgdTypeChecker.checkTypes(content, found))
+        for(const typeError of LgdTypeChecker.checkTypes(content, found, externals))
         {
             errors.push(this.createError(content, typeError.offset, typeError.message));
         }
@@ -174,8 +188,8 @@ const LgdCompiler = {
      */
     collectMalformedErrors(content, found, failedHeadStarts, errors)
     {
-        typeKeywordLinePattern.lastIndex = 0;
-        let lineMatch = typeKeywordLinePattern.exec(content);
+        typeNameLinePattern.lastIndex = 0;
+        let lineMatch = typeNameLinePattern.exec(content);
         while(lineMatch)
         {
             let covered = false;
@@ -203,7 +217,7 @@ const LgdCompiler = {
                 errors.push(this.createError(content, lineMatch.index, 'Invalid typed declaration.'));
             }
 
-            lineMatch = typeKeywordLinePattern.exec(content);
+            lineMatch = typeNameLinePattern.exec(content);
         }
     },
 
@@ -387,6 +401,185 @@ const LgdCompiler = {
     },
 
     /**
+     * @description Extracts the top-level member names of an object literal initializer, powering hover summaries and member completions.
+     * Only a direct brace literal is read; anything else yields no members rather than a guess.
+     * @param {string} initializerText the raw initializer text.
+     * @returns {Array} the {name, kind} members, kind being 'method' or 'property'.
+     */
+    extractMembers(initializerText)
+    {
+        const text = initializerText.trim();
+        if(text.length < 2 || text[0] !== '{' || text[text.length - 1] !== '}')
+        {
+            return [];
+        }
+
+        const members = [];
+        const modes = ['code'];
+        const templateDepths = [];
+        let depth = 0;
+        let chunkStart = 0;
+        let index = 0;
+
+        const commitChunk = endIndex =>
+        {
+            const member = this.parseMemberChunk(text.slice(chunkStart, endIndex).trim());
+            if(member)
+            {
+                members.push(member);
+            }
+        };
+
+        while(index < text.length)
+        {
+            const mode = modes[modes.length - 1];
+            const character = text[index];
+            const next = index + 1 < text.length ? text[index + 1] : '';
+            if(mode === 'code')
+            {
+                if(character === "'" || character === '"' || character === '`')
+                {
+                    modes.push(character);
+                }
+                else if(character === '/' && next === '/')
+                {
+                    modes.push('line');
+                    index++;
+                }
+                else if(character === '/' && next === '*')
+                {
+                    modes.push('block');
+                    index++;
+                }
+                else if(character === '{' || character === '[' || character === '(')
+                {
+                    depth++;
+                    if(depth === 1)
+                    {
+                        chunkStart = index + 1;
+                    }
+                }
+                else if(character === '}' || character === ']' || character === ')')
+                {
+                    depth--;
+                    if(depth === 0)
+                    {
+                        commitChunk(index);
+                    }
+
+                    if(templateDepths.length > 0 && templateDepths[templateDepths.length - 1] === depth)
+                    {
+                        templateDepths.pop();
+                        modes.pop();
+                    }
+                }
+                else if(character === ',' && depth === 1)
+                {
+                    commitChunk(index);
+                    chunkStart = index + 1;
+                }
+            }
+            else if(mode === '`')
+            {
+                if(character === '\\')
+                {
+                    index++;
+                }
+                else if(character === '`')
+                {
+                    modes.pop();
+                }
+                else if(character === '$' && next === '{')
+                {
+                    templateDepths.push(depth);
+                    depth++;
+                    modes.push('code');
+                    index++;
+                }
+            }
+            else if(mode === "'" || mode === '"')
+            {
+                if(character === '\\')
+                {
+                    index++;
+                }
+                else if(character === mode)
+                {
+                    modes.pop();
+                }
+            }
+            else if(mode === 'line')
+            {
+                if(character === '\n')
+                {
+                    modes.pop();
+                }
+            }
+            else if(mode === 'block')
+            {
+                if(character === '*' && next === '/')
+                {
+                    modes.pop();
+                    index++;
+                }
+            }
+
+            index++;
+        }
+
+        return members;
+    },
+
+    /**
+     * @description Reads one top-level object literal member chunk into a {name, kind} record.
+     * @param {string} chunk the trimmed member text.
+     * @returns {Object|null} the member, or null for spreads, computed keys, and shorthand edge cases.
+     */
+    parseMemberChunk(chunk)
+    {
+        if(chunk === '' || chunk.startsWith('...') || chunk[0] === '[')
+        {
+            return null;
+        }
+
+        const methodMatch = (/^(?:async\s+)?(?:get\s+|set\s+)?(?<name>[$A-Z_a-z][\w$]*|'[^\n']*'|"[^\n"]*")\s*\(/).exec(chunk);
+        if(methodMatch)
+        {
+            return { name: this.unquoteName(methodMatch.groups.name), kind: 'method' };
+        }
+
+        const propertyMatch = (/^(?<name>[$A-Z_a-z][\w$]*|'[^\n']*'|"[^\n"]*")\s*:/).exec(chunk);
+        if(propertyMatch)
+        {
+            return { name: this.unquoteName(propertyMatch.groups.name), kind: 'property' };
+        }
+
+        const shorthandMatch = (/^(?<name>[$A-Z_a-z][\w$]*)$/).exec(chunk);
+        if(shorthandMatch)
+        {
+            return { name: shorthandMatch.groups.name, kind: 'property' };
+        }
+
+        return null;
+    },
+
+    /**
+     * @description Strips surrounding quotes from an object literal member name.
+     * @param {string} name the raw member name, possibly quoted.
+     * @returns {string} the unquoted name.
+     */
+    unquoteName(name)
+    {
+        if(name.length >= 2 && (name[0] === "'" || name[0] === '"') && name[name.length - 1] === name[0])
+        {
+            return name.slice(1, -1);
+        }
+
+        return name;
+    },
+
+
+    /**
      * @description Scans an initializer for its terminating semicolon, tracking brackets, strings, and comments.
      * @param {string} content the LGD source text.
      * @param {number} from the offset just after the declaration '='.
@@ -509,7 +702,8 @@ const LgdCompiler = {
      */
     nextLineStartsDeclaration(content, from)
     {
-        return (/^\s*(?:export[\t ]+)?(?:readonly[\t ]+)?(?:Number|String|Boolean|BigInt|Symbol|Object|Array|Function)[\t ]+[$A-Z_a-z][\w$]*[\t ]*=/).test(content.slice(from));
+        const pattern = new RegExp(`^\\s*(?:export[\\t ]+)?(?:readonly[\\t ]+)?${typeNamePattern}[\\t ]+[$A-Z_a-z][\\w$]*[\\t ]*=`);
+        return pattern.test(content.slice(from));
     },
 
     /**

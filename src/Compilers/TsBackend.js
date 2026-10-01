@@ -26,7 +26,7 @@ const TsBackend = {
     {
         const kind = declaration.readonly ? 'const' : 'let';
         const exportKeyword = declaration.exported ? 'export ' : '';
-        const tsType = typeMaps.tsTypeMap[declaration.typeKeyword];
+        const tsType = typeMaps.tsTypeMap[declaration.typeName] || declaration.typeName;
         const commentPrefix = declaration.jsdoc ? `${declaration.jsdoc}${this.newline}` : '';
         const namePrefix = `${commentPrefix}${declaration.indent}${exportKeyword}${kind} `;
         const text = `${namePrefix}${declaration.name}: ${tsType} =`;
@@ -44,14 +44,39 @@ const TsBackend = {
     },
 
     /**
-     * @description Compiled initializers need no rewriting for TypeScript.
+     * @description Annotates the parameter list with TypeScript types: (Number value) becomes (value: number).
      * @param {LgdDeclarationType} declaration the parsed typed declaration.
      * @param {string} compiledInitializer the recursively compiled initializer text.
-     * @returns {string} the initializer unchanged.
+     * @returns {string} the initializer with typed parameters.
      */
     rewriteInitializer(declaration, compiledInitializer)
     {
-        return compiledInitializer;
+        const typedParams = declaration.typedParams;
+        if(!typedParams || !typedParams.hasTypes)
+        {
+            return compiledInitializer;
+        }
+
+        const params = typedParams.params.map(parameter =>
+        {
+            if(!parameter.name)
+            {
+                return parameter.raw;
+            }
+
+            const tsType = parameter.typeName ? typeMaps.tsTypeMap[parameter.typeName] || parameter.typeName : null;
+            const defaultText = parameter.defaultText === null ? '' : ` = ${parameter.defaultText}`;
+            if(parameter.rest)
+            {
+                return `...${parameter.name}${tsType ? `: ${tsType}[]` : ''}${defaultText}`;
+            }
+
+            return `${parameter.name}${tsType ? `: ${tsType}` : ''}${defaultText}`;
+        });
+
+        return `${compiledInitializer.slice(0, typedParams.start)
+        }(${params.join(', ')})${
+            compiledInitializer.slice(typedParams.end)}`;
     }
 };
 

@@ -27,15 +27,15 @@ const CSharpBackend = {
         const summary = this.toSummary(declaration.jsdoc);
         const summaryPrefix = summary ? `${summary}${this.newline}` : '';
         const indent = declaration.indent;
-        if(declaration.typeKeyword === 'Function')
+        if(declaration.typeName === 'Function')
         {
-            const funcType = this.inferFuncType(declaration.initializerText);
+            const funcType = this.inferFuncType(declaration.initializerText, declaration.typedParams);
             const text = `${summaryPrefix}${indent}${funcType} ${declaration.name} =`;
             const nameStart = text.length - declaration.name.length - 2;
             return { text: text, nameStart: nameStart, nameEnd: nameStart + declaration.name.length };
         }
 
-        const csType = typeMaps.csharpTypeMap[declaration.typeKeyword];
+        const csType = typeMaps.csharpTypeMap[declaration.typeName] || 'dynamic';
         const constantKeyword = declaration.readonly && this.isLiteralInitializer(declaration.initializerText) ? 'const ' : '';
         const text = `${summaryPrefix}${indent}${constantKeyword}${csType} ${declaration.name} =`;
         const nameStart = text.length - declaration.name.length - 2;
@@ -48,16 +48,67 @@ const CSharpBackend = {
      * @param {string} compiledInitializer the recursively compiled initializer text.
      * @returns {string} the rewritten initializer.
      */
+    /**
+     * @description Maps a typed parameter to its C# type name.
+     * @param {Object} parameter the {name, typeName, rest} parameter record.
+     * @returns {string} the C# type name, dynamic when the parameter is untyped or nominal.
+     */
+    paramCsType(parameter)
+    {
+        return parameter.typeName ? typeMaps.csharpTypeMap[parameter.typeName] || 'dynamic' : 'dynamic';
+    },
+
+    /**
+     * @description Renders the parameter list with C# types: (Number value) becomes (double value).
+     * @param {Object} typedParams the {start, end, params, hasTypes} parameter group.
+     * @param {string} compiledInitializer the recursively compiled initializer text.
+     * @returns {string} the initializer with typed lambda parameters.
+     */
+    rewriteParamTypes(typedParams, compiledInitializer)
+    {
+        const params = typedParams.params.map(parameter =>
+        {
+            if(!parameter.name)
+            {
+                return parameter.raw;
+            }
+
+            const csType = this.paramCsType(parameter);
+            const defaultText = parameter.defaultText === null ? '' : ` = ${parameter.defaultText}`;
+            if(parameter.rest)
+            {
+                return `params ${csType}[] ${parameter.name}`;
+            }
+
+            return `${csType} ${parameter.name}${defaultText}`;
+        });
+
+        return `${compiledInitializer.slice(0, typedParams.start)
+        }(${params.join(', ')})${
+            compiledInitializer.slice(typedParams.end)}`;
+    },
+
+    /**
+     * @description Rewrites a compiled initializer for C#: array literals and typed lambda parameters.
+     * @param {Object} declaration the parsed typed declaration.
+     * @param {string} compiledInitializer the recursively compiled initializer text.
+     * @returns {string} the C#-shaped initializer.
+     */
     rewriteInitializer(declaration, compiledInitializer)
     {
-        if(declaration.typeKeyword === 'Array')
+        if(declaration.typeName === 'Array')
         {
             return this.rewriteArrayLiteral(compiledInitializer);
         }
 
-        if(declaration.typeKeyword === 'BigInt')
+        if(declaration.typeName === 'BigInt')
         {
             return this.rewriteBigIntLiteral(compiledInitializer);
+        }
+
+        if(declaration.typeName === 'Function' && declaration.typedParams && declaration.typedParams.hasTypes)
+        {
+            return this.rewriteParamTypes(declaration.typedParams, compiledInitializer);
         }
 
         return compiledInitializer;
@@ -115,22 +166,36 @@ const CSharpBackend = {
 
     /**
      * @description Infers a Func or Action type for an arrow function initializer based on parameter count and whether the block body returns.
+     * Typed parameters contribute their C# types; the return type stays dynamic.
      * @param {string} initializerText the raw initializer text.
+     * @param {Object|null} typedParams the {start, end, params, hasTypes} parameter group, if any.
      * @returns {string} the inferred delegate type.
      */
-    inferFuncType(initializerText)
+    inferFuncType(initializerText, typedParams = null)
     {
-        const parameterMatch = (/\(\s*(?<parameters>[^)]*)\)\s*=>/).exec(initializerText);
-        const bareParameterMatch = (/^[$A-Z_a-z][\w$]*\s*=>/).exec(initializerText.trimStart());
-        let parameterCount = 0;
-        if(parameterMatch)
+        let parameterTypes = null;
+        if(typedParams && typedParams.hasTypes)
         {
-            const parameters = parameterMatch.groups.parameters.trim();
-            parameterCount = parameters ? parameters.split(',').length : 0;
+            parameterTypes = typedParams.params
+                .filter(parameter => parameter.name)
+                .map(parameter => this.paramCsType(parameter));
         }
-        else if(bareParameterMatch)
+        else
         {
-            parameterCount = 1;
+            const parameterMatch = (/\(\s*(?<parameters>[^)]*)\)\s*=>/).exec(initializerText);
+            const bareParameterMatch = (/^[$A-Z_a-z][\w$]*\s*=>/).exec(initializerText.trimStart());
+            let parameterCount = 0;
+            if(parameterMatch)
+            {
+                const parameters = parameterMatch.groups.parameters.trim();
+                parameterCount = parameters ? parameters.split(',').length : 0;
+            }
+            else if(bareParameterMatch)
+            {
+                parameterCount = 1;
+            }
+
+            parameterTypes = parameterCount === 0 ? [] : this.dynamicList(parameterCount).split(', ');
         }
 
         const arrowIndex = initializerText.indexOf('=>');
@@ -139,10 +204,10 @@ const CSharpBackend = {
         const returnsValue = (/\breturn\b/).test(body);
         if(isBlockBody && !returnsValue)
         {
-            return parameterCount === 0 ? 'Action' : `Action<${this.dynamicList(parameterCount)}>`;
+            return parameterTypes.length === 0 ? 'Action' : `Action<${parameterTypes.join(', ')}>`;
         }
 
-        return `Func<${this.dynamicList(parameterCount + 1)}>`;
+        return `Func<${[ ...parameterTypes, 'dynamic' ].join(', ')}>`;
     },
 
     /**

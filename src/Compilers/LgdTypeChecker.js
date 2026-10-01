@@ -6,8 +6,15 @@
  * missed bug (false negative) is acceptable; a false alarm (false positive) is not,
  * because compiler errors now suppress the .js output write on save.
  *
- * Checked: initializer expressions against the declared type keyword, later
- * assignments to declared variables, and assignments to readonly variables.
+ * Type names are keywords (Number), declared names used nominally
+ * (GoToNextParagraph), or dotted external types (vscode.Command). A declared name
+ * used as a type accepts only itself, Unknown, or Null: GoToNextParagraph x =
+ * GoToLastParagraph is an error. Dotted types are opaque: they accept references,
+ * calls, and reference-kind literals, but never primitive literals. Unknown type
+ * names are errors, so typos like Numer are caught.
+ *
+ * Checked: initializer expressions against the declared type, later assignments to
+ * declared variables, and assignments to readonly variables.
  *
  * Never an error in v1: null and undefined assigned to any type (nullable Type?
  * syntax is planned), unknowable expressions (calls, member access, unbound
@@ -15,38 +22,17 @@
  * bindings outside the modeled cases in checkAssignments.
  */
 
-/** @description Marks an expression whose type cannot be determined; never an error. */
-const UNKNOWN = 'Unknown';
+const { UNKNOWN, NULL, inferExpression, maskCode } = require('./LgdInfer');
 
-/** @description Marks the null and undefined literals, assignable to every type in v1. */
-const NULL = 'Null';
+/** @description The eight LGD type keywords; anything else in type position is a name or dotted type. */
+const typeKeywords = [ 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object', 'Array', 'Function' ];
 
-/** @description Splits first: the lowest-precedence binary operators. */
-const precedenceCoalesce = 1;
+/** @description Literal kinds that can plausibly be an external or self-defined object type. */
+const referenceKinds = [ 'Object', 'Array', 'Function' ];
 
-/** @description Splits second: logical and. */
-const precedenceAnd = 2;
+/** @description Matches a require('spec') call so cross-file externals can type it. */
+const requireCallPattern = /\brequire\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\)/g;
 
-/** @description Splits third: bitwise or. */
-const precedenceBitwiseOr = 3;
-
-/** @description Splits fourth: bitwise xor. */
-const precedenceBitwiseXor = 4;
-
-/** @description Splits fifth: bitwise and. */
-const precedenceBitwiseAnd = 5;
-
-/** @description Splits sixth: comparisons, instanceof, and in. */
-const precedenceComparison = 6;
-
-/** @description Splits seventh: bit shifts. */
-const precedenceShift = 7;
-
-/** @description Splits eighth: addition and subtraction. */
-const precedenceAdditive = 8;
-
-/** @description Splits last: multiplication, division, remainder, and exponent. */
-const precedenceMultiplicative = 9;
 
 /** @description Characters kept before an assigned name to detect let, const, and var. */
 const lookbehindWidth = 16;
@@ -54,450 +40,148 @@ const lookbehindWidth = 16;
 /** @description Longest assigned value scanned; longer values stay Unknown. */
 const maxValueLength = 500;
 
-/** @description Widest operator scanned (===, !==, >>>). */
-const maxOperatorWidth = 3;
 
 /**
  * @description Blanks string literals, template literals, and comments while preserving offsets.
  * @param {string} text the source text to mask.
  * @returns {string} the masked text, the same length as the input.
  */
-function maskCode(text)
+
+/**
+ * @description Resolves a declaration's type name to a checkable type descriptor.
+ * Keywords check as before; a declared name checks nominally; a dotted name is an
+ * opaque external type; a self-named declaration (M M = ...) defines its own type.
+ * Unknown type names are reported once here.
+ * @param {Object} declaration the parsed declaration with typeName, name, and typeStart.
+ * @param {Map} scope declared variable names to {keyword, readonly, kind} entries.
+ * @param {Array} errors the error list to append to.
+ * @returns {Object} the {kind, keyword, ref, typeName} descriptor.
+ */
+function resolveDeclaredType(declaration, scope, errors)
 {
-    const output = [];
-    let mode = 'code';
-    for(let index = 0; index < text.length; index++)
+    const typeName = declaration.typeName;
+    if(typeKeywords.includes(typeName))
     {
-        const character = text[index];
-        const next = index + 1 < text.length ? text[index + 1] : '';
-        if(mode === 'code')
-        {
-            if(character === "'" || character === '"' || character === '`')
-            {
-                mode = character;
-                output.push(character);
-            }
-            else if(character === '/' && next === '/')
-            {
-                mode = 'line';
-                output.push(' ', ' ');
-                index++;
-            }
-            else if(character === '/' && next === '*')
-            {
-                mode = 'block';
-                output.push(' ', ' ');
-                index++;
-            }
-            else
-            {
-                output.push(character);
-            }
-        }
-        else if(mode === 'line')
-        {
-            if(character === '\n')
-            {
-                mode = 'code';
-                output.push(character);
-            }
-            else
-            {
-                output.push(' ');
-            }
-        }
-        else if(mode === 'block')
-        {
-            if(character === '*' && next === '/')
-            {
-                mode = 'code';
-                output.push(' ', ' ');
-                index++;
-            }
-            else
-            {
-                output.push(character === '\n' ? '\n' : ' ');
-            }
-        }
-        else if(character === '\\')
-        {
-            output.push(' ', ' ');
-            index++;
-        }
-        else if(character === mode)
-        {
-            mode = 'code';
-            output.push(character);
-        }
-        else
-        {
-            output.push(character === '\n' ? '\n' : ' ');
-        }
+        return { kind: 'keyword', keyword: typeName, ref: null, typeName: typeName };
     }
 
-    return output.join('');
+    if(typeName.includes('.'))
+    {
+        const head = typeName.slice(0, typeName.indexOf('.'));
+        if(!scope.has(head))
+        {
+            errors.push({ message: `Unknown type '${typeName}'.`, offset: declaration.typeStart });
+            return { kind: 'unknown', keyword: UNKNOWN, ref: null, typeName: typeName };
+        }
+
+        return { kind: 'opaque', keyword: 'Object', ref: null, typeName: typeName };
+    }
+
+    if(typeName === declaration.name)
+    {
+        return { kind: 'self', keyword: null, ref: null, typeName: typeName };
+    }
+
+    const target = scope.get(typeName);
+    if(!target)
+    {
+        errors.push({ message: `Unknown type '${typeName}'.`, offset: declaration.typeStart });
+        return { kind: 'unknown', keyword: UNKNOWN, ref: null, typeName: typeName };
+    }
+
+    return { kind: 'nominal', keyword: target.keyword, ref: typeName, typeName: typeName };
 }
 
 /**
- * @description Strips one layer of redundant parentheses, such as ((x)) to (x).
- * @param {string} source the expression text.
- * @returns {string|null} the inner text, or null when the outer parens do not wrap everything.
+ * @description Resolves a function parameter type name against the scope, mirroring declaration resolution.
+ * @param {string|null} typeName the parameter type name, or null for untyped parameters.
+ * @param {Map} scope declared variable names to {keyword, readonly, kind, typeName, ref} entries.
+ * @param {Array} errors the error list to append to.
+ * @param {number} offset the offset of the type name for error reporting.
+ * @returns {Object} the {keyword, readonly, kind, typeName, ref} parameter entry.
  */
-function unwrapParens(source)
+function resolveParamType(typeName, scope, errors, offset)
 {
-    if(source[0] !== '(')
+    if(!typeName)
     {
-        return null;
+        return { keyword: UNKNOWN, readonly: false, kind: 'keyword', typeName: UNKNOWN, ref: null };
     }
 
-    let depth = 0;
-    for(let index = 0; index < source.length; index++)
+    if(typeKeywords.includes(typeName))
     {
-        if(source[index] === '(')
+        return { keyword: typeName, readonly: false, kind: 'keyword', typeName: typeName, ref: null };
+    }
+
+    if(typeName.includes('.'))
+    {
+        const head = typeName.slice(0, typeName.indexOf('.'));
+        if(!scope.has(head))
         {
-            depth++;
+            errors.push({ message: `Unknown type '${typeName}'.`, offset: offset });
+            return { keyword: UNKNOWN, readonly: false, kind: 'unknown', typeName: typeName, ref: null };
         }
-        else if(source[index] === ')')
+
+        return { keyword: 'Object', readonly: false, kind: 'opaque', typeName: typeName, ref: null };
+    }
+
+    const target = scope.get(typeName);
+    if(!target)
+    {
+        errors.push({ message: `Unknown type '${typeName}'.`, offset: offset });
+        return { keyword: UNKNOWN, readonly: false, kind: 'unknown', typeName: typeName, ref: null };
+    }
+
+    return { keyword: target.keyword || 'Object', readonly: false, kind: 'nominal', typeName: typeName, ref: typeName };
+}
+
+/**
+ * @description Extends a scope with the typed parameters of the functions enclosing the offset, innermost last.
+ * @param {Map} baseScope the scope to extend.
+ * @param {Array} typedFunctions the {bodyStart, bodyEnd, params} records of functions with typed parameters.
+ * @param {number} offset the offset whose enclosing functions supply parameters.
+ * @returns {Map} the scope with enclosing typed parameters shadowing outer bindings.
+ */
+function scopeWithParams(baseScope, typedFunctions, offset)
+{
+    const enclosing = typedFunctions.filter(typedFunction => offset >= typedFunction.bodyStart && offset < typedFunction.bodyEnd);
+    if(enclosing.length === 0)
+    {
+        return baseScope;
+    }
+
+    enclosing.sort((left, right) => left.bodyStart - right.bodyStart);
+    const scope = new Map(baseScope);
+    for(const typedFunction of enclosing)
+    {
+        for(const param of typedFunction.params)
         {
-            depth--;
-            if(depth === 0)
+            scope.set(param.name, param.entry);
+        }
+    }
+
+    return scope;
+}
+
+/**
+ * @description Tells whether the name is a typed parameter of a function enclosing the offset.
+ * @param {Array} typedFunctions the {bodyStart, bodyEnd, params} records of functions with typed parameters.
+ * @param {number} nameStart the offset of the name.
+ * @param {string} name the name to test.
+ * @returns {boolean} true when a typed parameter shadows the name at that offset.
+ */
+function isTypedParamAt(typedFunctions, nameStart, name)
+{
+    for(const typedFunction of typedFunctions)
+    {
+        if(nameStart >= typedFunction.bodyStart && nameStart < typedFunction.bodyEnd)
+        {
+            for(const param of typedFunction.params)
             {
-                return index === source.length - 1 ? source.slice(1, -1) : null;
+                if(param.name === name)
+                {
+                    return true;
+                }
             }
-        }
-    }
-
-    return null;
-}
-
-/**
- * @description Tells a ternary question mark apart from ?? and ?. at the given index.
- * @param {string} source the masked expression text.
- * @param {number} index the index of the question mark.
- * @returns {boolean} true when the mark starts a ternary.
- */
-function isTernaryQuestion(source, index)
-{
-    return source[index + 1] !== '?' && source[index + 1] !== '.' && source[index - 1] !== '?';
-}
-
-/**
- * @description Finds the colon that matches a ternary question mark.
- * @param {string} source the masked expression text.
- * @param {number} questionIndex the index of the ternary question mark.
- * @returns {number} the colon index, or -1 when there is none.
- */
-function findTernaryColon(source, questionIndex)
-{
-    let nested = 0;
-    let depth = 0;
-    for(let index = questionIndex + 1; index < source.length; index++)
-    {
-        const character = source[index];
-        if(character === '(' || character === '[' || character === '{')
-        {
-            depth++;
-        }
-        else if(character === ')' || character === ']' || character === '}')
-        {
-            depth--;
-        }
-        else if(character === '?' && depth === 0 && isTernaryQuestion(source, index))
-        {
-            nested++;
-        }
-        else if(character === ':' && depth === 0)
-        {
-            if(nested === 0)
-            {
-                return index;
-            }
-
-            nested--;
-        }
-    }
-
-    return -1;
-}
-
-/**
- * @description Splits a top-level ternary into its consequent and alternate branches.
- * @param {string} source the masked expression text.
- * @returns {Object|null} {consequent, alternate}, or null when there is no top-level ternary.
- */
-function splitTernary(source)
-{
-    let depth = 0;
-    for(let index = 0; index < source.length; index++)
-    {
-        const character = source[index];
-        if(character === '(' || character === '[' || character === '{')
-        {
-            depth++;
-        }
-        else if(character === ')' || character === ']' || character === '}')
-        {
-            depth--;
-        }
-        else if(character === '?' && depth === 0 && isTernaryQuestion(source, index))
-        {
-            const colon = findTernaryColon(source, index);
-            if(colon === -1)
-            {
-                return null;
-            }
-
-            return { consequent: source.slice(index + 1, colon), alternate: source.slice(colon + 1) };
-        }
-    }
-
-    return null;
-}
-
-/**
- * @description Builds an operator match record; the length comes from the operator text.
- * @param {string} kind one of unknown, boolean, number, plus, arithmetic.
- * @param {string} operator the operator text.
- * @param {number} precedence the precedence rank; lower splits first.
- * @param {number} index the match index.
- * @returns {Object} the operator match record.
- */
-function makeOperator(kind, operator, precedence, index)
-{
-    return { kind: kind, operator: operator, precedence: precedence, index: index, length: operator.length };
-}
-
-/**
- * @description Tells whether the character can be part of an identifier.
- * @param {string|undefined} character the character to test.
- * @returns {boolean} true for word characters and $.
- */
-function isWordChar(character)
-{
-    return character !== undefined && (/[\w$]/).test(character);
-}
-
-/**
- * @description Tells whether a top-level + or - is binary rather than unary.
- * @param {string} source the masked expression text.
- * @param {number} index the index of the + or -.
- * @returns {boolean} true when the operator is binary.
- */
-function isBinaryPlusMinus(source, index)
-{
-    let cursor = index - 1;
-    while(cursor >= 0 && (/\s/).test(source[cursor]))
-    {
-        cursor--;
-    }
-
-    if(cursor < 0)
-    {
-        return false;
-    }
-
-    return (/[\w"$')\]\uE000]/).test(source[cursor]);
-}
-
-/**
- * @description Matches a binary operator at the given index of masked, depth-zero text.
- * @param {string} source the masked expression text.
- * @param {number} index the index to match at.
- * @returns {Object|null} the operator match record, or null.
- */
-function matchOperator(source, index)
-{
-    const character = source[index];
-    const two = source.slice(index, index + 2);
-    const three = source.slice(index, index + maxOperatorWidth);
-    if(three === '===' || three === '!==')
-    {
-        return makeOperator('boolean', three, precedenceComparison, index);
-    }
-
-    if(three === '>>>')
-    {
-        return makeOperator('number', '>>>', precedenceShift, index);
-    }
-
-    if(two === '??' || two === '||')
-    {
-        return makeOperator('unknown', two, precedenceCoalesce, index);
-    }
-
-    if(two === '&&')
-    {
-        return makeOperator('unknown', '&&', precedenceAnd, index);
-    }
-
-    if(two === '!=')
-    {
-        return makeOperator('boolean', '!=', precedenceComparison, index);
-    }
-
-    if(two === '==' && source[index + 2] !== '=')
-    {
-        return makeOperator('boolean', '==', precedenceComparison, index);
-    }
-
-    if(two === '<=' || two === '>=')
-    {
-        return makeOperator('boolean', two, precedenceComparison, index);
-    }
-
-    if(two === '<<' || two === '>>')
-    {
-        return makeOperator('number', two, precedenceShift, index);
-    }
-
-    if(two === '**')
-    {
-        return makeOperator('arithmetic', '**', precedenceMultiplicative, index);
-    }
-
-    if(character === 'i' && (/^instanceof(?![\w$])/).test(source.slice(index)) && !isWordChar(source[index - 1]))
-    {
-        return makeOperator('boolean', 'instanceof', precedenceComparison, index);
-    }
-
-    if(character === 'i' && (/^in(?![\w$])/).test(source.slice(index)) && !isWordChar(source[index - 1]))
-    {
-        return makeOperator('boolean', 'in', precedenceComparison, index);
-    }
-
-    if(character === '<')
-    {
-        return makeOperator('boolean', '<', precedenceComparison, index);
-    }
-
-    if(character === '>' && source[index - 1] !== '=')
-    {
-        return makeOperator('boolean', '>', precedenceComparison, index);
-    }
-
-    if(character === '*' || character === '/' || character === '%')
-    {
-        return makeOperator('arithmetic', character, precedenceMultiplicative, index);
-    }
-
-    if(character === '|' && source[index + 1] !== '|')
-    {
-        return makeOperator('number', '|', precedenceBitwiseOr, index);
-    }
-
-    if(character === '&' && source[index + 1] !== '&')
-    {
-        return makeOperator('number', '&', precedenceBitwiseAnd, index);
-    }
-
-    if(character === '^')
-    {
-        return makeOperator('number', '^', precedenceBitwiseXor, index);
-    }
-
-    if((character === '+' || character === '-') && isBinaryPlusMinus(source, index))
-    {
-        return makeOperator(character === '+' ? 'plus' : 'arithmetic', character, precedenceAdditive, index);
-    }
-
-    return null;
-}
-
-/**
- * @description Tells whether a found operator beats the current best split candidate.
- * @param {Object} found the new operator match record.
- * @param {Object|null} best the current best match record.
- * @returns {boolean} true when the new match should win.
- */
-function isBetterSplit(found, best)
-{
-    if(!best)
-    {
-        return true;
-    }
-
-    if(found.precedence !== best.precedence)
-    {
-        return found.precedence < best.precedence;
-    }
-
-    return found.index > best.index;
-}
-
-/**
- * @description Finds the lowest-precedence top-level binary operator to split on.
- * @param {string} source the masked expression text.
- * @returns {Object|null} {kind, operator, left, right}, or null when there is no binary operator.
- */
-function findSplit(source)
-{
-    let depth = 0;
-    let best = null;
-    let index = 0;
-    while(index < source.length)
-    {
-        const character = source[index];
-        if(character === '(' || character === '[' || character === '{')
-        {
-            depth++;
-        }
-        else if(character === ')' || character === ']' || character === '}')
-        {
-            depth--;
-        }
-        else if(depth === 0)
-        {
-            const found = matchOperator(source, index);
-            if(found && isBetterSplit(found, best))
-            {
-                best = found;
-            }
-
-            if(found)
-            {
-                index += found.length;
-                continue;
-            }
-        }
-
-        index++;
-    }
-
-    if(!best)
-    {
-        return null;
-    }
-
-    return {
-        kind: best.kind,
-        operator: best.operator,
-        left: source.slice(0, best.index),
-        right: source.slice(best.index + best.length)
-    };
-}
-
-/**
- * @description Tells whether the expression contains a top-level arrow, making it a function.
- * @param {string} source the masked expression text.
- * @returns {boolean} true when a depth-zero => is present.
- */
-function hasTopLevelArrow(source)
-{
-    let depth = 0;
-    for(let index = 0; index < source.length - 1; index++)
-    {
-        const character = source[index];
-        if(character === '(' || character === '[' || character === '{')
-        {
-            depth++;
-        }
-        else if(character === ')' || character === ']' || character === '}')
-        {
-            depth--;
-        }
-        else if(character === '=' && source[index + 1] === '>' && depth === 0)
-        {
-            return true;
         }
     }
 
@@ -505,188 +189,128 @@ function hasTopLevelArrow(source)
 }
 
 /**
- * @description Infers the type of a single atomic expression: unary operators, literals, and names.
- * @param {string} source the masked, trimmed expression text with no top-level binary operator.
- * @param {Map} scope declared variable names to {type, readonly} entries.
- * @returns {string} an LGD type keyword, Null, or Unknown.
+ * @description Tells whether an inferred type can be assigned to a resolved declared type.
+ * Unknown and Null are always assignable; Object stays a top type for keywords.
+ * Nominal types accept only the same nominal name; opaque and self-defined types
+ * accept references and reference-kind values but never primitive literals.
+ * @param {Object} resolved the {kind, keyword, ref, typeName} declared type descriptor.
+ * @param {string} inferred the inferred nominal name, keyword, Null, or Unknown.
+ * @param {Map} scope declared variable names to {keyword, readonly, kind} entries.
+ * @param {Map} externalsByName cross-file export names to {keyword, kind} entries.
+ * @returns {boolean} true when the assignment is allowed.
  */
-function inferAtomic(source, scope)
+function isAssignableTo(resolved, inferred, scope, externalsByName)
 {
-    if((/^typeof(?=[\s(])/).test(source))
+    if(inferred === UNKNOWN || inferred === NULL || resolved.kind === 'unknown')
     {
-        return 'String';
+        return true;
     }
 
-    if((/^void\b/).test(source))
+    const entry = scope.get(inferred) || externalsByName.get(inferred) || null;
+    if(resolved.kind === 'keyword')
     {
-        return NULL;
+        if(resolved.keyword === 'Object')
+        {
+            return true;
+        }
+
+        return (entry ? entry.keyword : inferred) === resolved.keyword;
     }
 
-    if((/^delete\b/).test(source))
+    if(resolved.kind === 'opaque' || resolved.kind === 'self')
     {
-        return 'Boolean';
+        if(entry)
+        {
+            return entry.kind !== 'keyword' || referenceKinds.includes(entry.keyword);
+        }
+
+        return referenceKinds.includes(inferred);
     }
 
-    if(source[0] === '!')
+    if(inferred === resolved.ref)
     {
-        return 'Boolean';
+        return true;
     }
 
-    if(source[0] === '\uE000' || source[source.length - 1] === '\uE000' || (/^[+~-]/).test(source))
+    return Boolean(entry && entry.kind === 'nominal' && entry.ref === resolved.ref);
+}
+
+/**
+ * @description Computes the keyword a declaration contributes to the scope for later use.
+ * @param {Object} resolved the {kind, keyword, ref, typeName} declared type descriptor.
+ * @param {string} inferred the inferred nominal name, keyword, Null, or Unknown.
+ * @param {Map} scope declared variable names to {keyword, readonly, kind} entries.
+ * @param {Map} externalsByName cross-file export names to {keyword, kind} entries.
+ * @returns {string} the keyword, or Unknown when the type name was unknown.
+ */
+function effectiveKeyword(resolved, inferred, scope, externalsByName)
+{
+    if(resolved.kind === 'keyword' || resolved.kind === 'nominal' || resolved.kind === 'opaque')
     {
-        return 'Number';
+        return resolved.keyword;
     }
 
-    if((/^(?:\d+\.?\d*|\.\d+)(?:[Ee][+-]?\d+)?$/).test(source) || (/^0[Xx][\dA-Fa-f]+$/).test(source))
+    if(resolved.kind === 'self')
     {
-        return 'Number';
-    }
+        const entry = scope.get(inferred) || externalsByName.get(inferred) || null;
+        if(entry)
+        {
+            return entry.keyword;
+        }
 
-    if((/^\d+n$/).test(source))
-    {
-        return 'BigInt';
-    }
-
-    if(source === 'true' || source === 'false')
-    {
-        return 'Boolean';
-    }
-
-    if(source === 'null' || source === 'undefined')
-    {
-        return NULL;
-    }
-
-    const first = source[0];
-    const last = source[source.length - 1];
-    const isQuoteMark = first === "'" || first === '"' || first === '`';
-    if(isQuoteMark && first === last)
-    {
-        return 'String';
-    }
-
-    if(first === '[' && last === ']')
-    {
-        return 'Array';
-    }
-
-    if(first === '{' && last === '}')
-    {
-        return 'Object';
-    }
-
-    if((/^new\b/).test(source))
-    {
-        return 'Object';
-    }
-
-    if((/^Symbol\s*\(/).test(source))
-    {
-        return 'Symbol';
-    }
-
-    if((/^(?:async\s+)?function\b/).test(source) || (/^class\b/).test(source) || hasTopLevelArrow(source))
-    {
-        return 'Function';
-    }
-
-    if((/^[$A-Z_a-z][\w$]*$/).test(source))
-    {
-        const entry = scope.get(source);
-        return entry ? entry.type : UNKNOWN;
+        return referenceKinds.includes(inferred) ? inferred : 'Object';
     }
 
     return UNKNOWN;
 }
 
 /**
- * @description Infers the LGD type keyword of an expression, or Unknown when it cannot be known.
- * @param {string} text the masked expression text.
- * @param {Map} scope declared variable names to {type, readonly} entries.
- * @returns {string} an LGD type keyword, Null, or Unknown.
+ * @description Renders an inferred type for error messages: keyword-kind names show
+ * their keyword (Cannot assign Number to String), nominal names show the name itself.
+ * @param {string} inferred the inferred nominal name, keyword, Null, or Unknown.
+ * @param {Map} scope declared variable names to {keyword, readonly, kind} entries.
+ * @param {Map} externalsByName cross-file export names to {keyword, kind} entries.
+ * @returns {string} the display text.
  */
-function inferExpression(text, scope)
+function displayInferred(inferred, scope, externalsByName)
 {
-    const normalized = text.trim().replace(/\+\+|--/g, '\uE000');
-    if(normalized === '')
+    const entry = scope.get(inferred) || externalsByName.get(inferred);
+    if(entry && entry.kind === 'keyword')
     {
-        return UNKNOWN;
+        return entry.keyword;
     }
 
-    if((/^\/[^*/]/).test(normalized))
-    {
-        return UNKNOWN;
-    }
-
-    const unwrapped = unwrapParens(normalized);
-    if(unwrapped !== null)
-    {
-        return inferExpression(unwrapped, scope);
-    }
-
-    const ternary = splitTernary(normalized);
-    if(ternary)
-    {
-        const consequent = inferExpression(ternary.consequent, scope);
-        const alternate = inferExpression(ternary.alternate, scope);
-        return consequent !== UNKNOWN && consequent === alternate ? consequent : UNKNOWN;
-    }
-
-    const split = findSplit(normalized);
-    if(split)
-    {
-        if(split.kind === 'unknown')
-        {
-            return UNKNOWN;
-        }
-
-        if(split.kind === 'boolean')
-        {
-            return 'Boolean';
-        }
-
-        if(split.kind === 'number')
-        {
-            return 'Number';
-        }
-
-        const leftType = inferExpression(split.left, scope);
-        const rightType = inferExpression(split.right, scope);
-        if(split.operator === '+')
-        {
-            if(leftType === 'Number' && rightType === 'Number')
-            {
-                return 'Number';
-            }
-
-            return leftType === 'String' || rightType === 'String' ? 'String' : UNKNOWN;
-        }
-
-        return leftType === 'Number' && rightType === 'Number' ? 'Number' : UNKNOWN;
-    }
-
-    return inferAtomic(normalized, scope);
+    return inferred;
 }
 
 /**
- * @description Tells whether an inferred type can be assigned to a declared type.
- * @param {string} declaredKeyword the declared LGD type keyword.
- * @param {string} inferredKeyword the inferred LGD type keyword, Null, or Unknown.
- * @returns {boolean} true when the assignment is allowed.
+ * @description Finds require('spec') calls that resolve to a known cross-file export.
+ * @param {string} content the unmasked source text; offsets map 1:1 to the masked text.
+ * @param {Map} externals require specs to {exportName, keyword} entries.
+ * @returns {Map} require call start offsets to {end, exportName} records.
  */
-function isAssignable(declaredKeyword, inferredKeyword)
+function collectRequires(content, externals)
 {
-    if(inferredKeyword === UNKNOWN || inferredKeyword === NULL)
+    const found = new Map();
+    if(externals.size === 0)
     {
-        return true;
+        return found;
     }
 
-    if(declaredKeyword === 'Object')
+    requireCallPattern.lastIndex = 0;
+    let match = requireCallPattern.exec(content);
+    while(match)
     {
-        return true;
+        const info = externals.get(match.groups.spec);
+        if(info && !found.has(match.index))
+        {
+            found.set(match.index, { end: match.index + match[0].length, exportName: info.exportName });
+        }
+
+        match = requireCallPattern.exec(content);
     }
 
-    return declaredKeyword === inferredKeyword;
+    return found;
 }
 
 /**
@@ -736,7 +360,7 @@ function splitParams(paramsText)
 {
     return paramsText
         .split(',')
-        .map(part => part.trim().split('=')[0].trim().replace(/^\.{3}/, ''))
+        .map(part => part.trim().split('=')[0].trim().replace(/^\.{3}/, '').split(/\s+/).pop())
         .filter(name => (/^[$A-Z_a-z][\w$]*$/).test(name));
 }
 
@@ -773,7 +397,7 @@ function functionParams(initializerText)
 function collectFunctionParams(declarations, masked)
 {
     return declarations
-        .filter(declaration => declaration.typeKeyword === 'Function')
+        .filter(declaration => declaration.typeName === 'Function')
         .map(declaration => ({
             start: declaration.initializerStart,
             end: declaration.initializerEnd,
@@ -896,6 +520,80 @@ function findValueEnd(masked, offset)
 }
 
 /**
+ * @description Finds the {paramStart, paramEnd} group enclosing a parameter default assignment.
+ * @param {Array} typedFunctions the {bodyStart, bodyEnd, paramStart, paramEnd, params} records.
+ * @param {number} nameStart the offset of the assigned name.
+ * @returns {Object|null} the enclosing group, or null when the offset is not in a parameter list.
+ */
+function paramGroupAt(typedFunctions, nameStart)
+{
+    for(const typedFunction of typedFunctions)
+    {
+        if(nameStart >= typedFunction.paramStart && nameStart < typedFunction.paramEnd)
+        {
+            return typedFunction;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * @description Finds where a parameter default value ends: the first top-level comma, semicolon,
+ * or the closing paren of the parameter group.
+ * @param {string} masked the masked source text.
+ * @param {number} valueStart the offset where the default value starts.
+ * @param {number} groupEnd the offset just past the parameter group's closing paren.
+ * @returns {number} the end offset of the default value.
+ */
+function findDefaultEnd(masked, valueStart, groupEnd)
+{
+    let depth = 0;
+    let stringMode = null;
+    for(let index = valueStart; index < groupEnd; index++)
+    {
+        const character = masked[index];
+        if(stringMode)
+        {
+            if(character === '\\')
+            {
+                index++;
+            }
+            else if(character === stringMode)
+            {
+                stringMode = null;
+            }
+
+            continue;
+        }
+
+        if(character === '"' || character === "'" || character === '`')
+        {
+            stringMode = character;
+        }
+        else if(character === '(' || character === '[' || character === '{')
+        {
+            depth++;
+        }
+        else if(character === ')' || character === ']' || character === '}')
+        {
+            if(depth === 0)
+            {
+                return index;
+            }
+
+            depth--;
+        }
+        else if((character === ',' || character === ';') && depth === 0)
+        {
+            return index;
+        }
+    }
+
+    return groupEnd;
+}
+
+/**
  * @description Tells whether an assignment match should be skipped as a non-assignment.
  * @param {Object} scan the {masked, declarations, functions, classBodies} scan context.
  * @param {number} nameStart the offset of the assigned name.
@@ -914,7 +612,7 @@ function isSkippedAssignment(scan, nameStart, name)
         return true;
     }
 
-    if(isShadowedByParam(scan.functions, nameStart, name))
+    if(isShadowedByParam(scan.functions, nameStart, name) && !isTypedParamAt(scan.typedFunctions, nameStart, name))
     {
         return true;
     }
@@ -924,15 +622,25 @@ function isSkippedAssignment(scan, nameStart, name)
 
 /**
  * @description Checks plain assignments to declared variables after their declaration.
- * @param {string} masked the masked source text; offsets map 1:1 to the original.
- * @param {Array} declarations the parsed declarations in document order.
- * @param {Map} scope declared variable names to {type, readonly} entries.
- * @param {Array} errors the error list to append to.
+ * @param {Object} context the assignment-check context: masked, declarations, scope,
+ * errors, externalsByName, requireAt, and typedFunctions (the {bodyStart, bodyEnd,
+ * params} records of functions with typed parameters).
  * @returns {void}
  */
-function checkAssignments(masked, declarations, scope, errors)
+function checkAssignments(context)
 {
-    const names = Array.from(scope.keys());
+    const { masked, declarations, scope, errors, externalsByName, requireAt, typedFunctions = [] } = context;
+
+    const nameSet = new Set(scope.keys());
+    for(const typedFunction of typedFunctions)
+    {
+        for(const param of typedFunction.params)
+        {
+            nameSet.add(param.name);
+        }
+    }
+
+    const names = Array.from(nameSet);
     if(names.length === 0)
     {
         return;
@@ -946,6 +654,7 @@ function checkAssignments(masked, declarations, scope, errors)
         masked: masked,
         declarations: declarations,
         functions: collectFunctionParams(declarations, masked),
+        typedFunctions: typedFunctions,
         classBodies: findClassBodies(masked)
     };
 
@@ -960,21 +669,32 @@ function checkAssignments(masked, declarations, scope, errors)
         }
 
         const valueStart = skipWhitespace(masked, pattern.lastIndex);
-        const valueText = masked.slice(valueStart, findValueEnd(masked, valueStart)).trim();
+        const group = paramGroupAt(typedFunctions, nameStart);
+        const valueEnd = group
+            ? Math.min(findValueEnd(masked, valueStart), findDefaultEnd(masked, valueStart, group.paramEnd))
+            : findValueEnd(masked, valueStart);
+        const valueText = masked.slice(valueStart, valueEnd).trim();
         if(valueText === '')
         {
             continue;
         }
 
-        const entry = scope.get(name);
-        const inferred = inferExpression(valueText, scope);
+        const extendedScope = scopeWithParams(scope, typedFunctions, nameStart);
+        const entry = extendedScope.get(name);
+        const required = requireAt.get(valueStart);
+        const inferred = required ? required.exportName : inferExpression(valueText, extendedScope, externalsByName);
         if(entry.readonly)
         {
             errors.push({ message: `Cannot assign to readonly variable '${name}'.`, offset: nameStart });
         }
-        else if(!isAssignable(entry.type, inferred))
+        else
         {
-            errors.push({ message: `Cannot assign ${inferred} to ${entry.type}.`, offset: valueStart });
+            const resolved = { kind: entry.kind, keyword: entry.keyword, ref: entry.ref, typeName: entry.typeName };
+            if(!isAssignableTo(resolved, inferred, extendedScope, externalsByName))
+            {
+                const declared = resolved.kind === 'keyword' ? resolved.keyword : resolved.typeName;
+                errors.push({ message: `Cannot assign ${displayInferred(inferred, extendedScope, externalsByName)} to ${declared}.`, offset: valueStart });
+            }
         }
     }
 }
@@ -983,32 +703,89 @@ function checkAssignments(masked, declarations, scope, errors)
  * @description Checks declarations for type mismatches and readonly violations.
  * @param {string} content the LGD source text.
  * @param {Array} declarations the parsed declarations in document order.
+ * @param {Map} externals require specs to {exportName, keyword} entries for cross-file typing.
  * @returns {Array} errors as {message, offset} pairs; the caller attaches line numbers.
  */
-function checkTypes(content, declarations)
+function checkTypes(content, declarations, externals = new Map())
 {
     const errors = [];
     const scope = new Map();
     const masked = maskCode(content);
+    const externalsByName = new Map();
+    for(const info of externals.values())
+    {
+        if(!externalsByName.has(info.exportName))
+        {
+            externalsByName.set(info.exportName, { keyword: info.keyword, kind: 'external' });
+        }
+    }
+
+    const requireAt = collectRequires(content, externals);
+    const typedFunctions = [];
 
     for(const declaration of declarations)
     {
+        const extendedScope = scopeWithParams(scope, typedFunctions, declaration.headStart);
+        const resolved = resolveDeclaredType(declaration, extendedScope, errors);
         const initializer = content.slice(declaration.initializerStart, declaration.initializerEnd);
+        let inferred = UNKNOWN;
+        let valueOffset = declaration.initializerStart;
         if(initializer.trim() !== '')
         {
-            const maskedInitializer = masked.slice(declaration.initializerStart, declaration.initializerEnd).trim();
-            const inferred = inferExpression(maskedInitializer, scope);
-            if(!isAssignable(declaration.typeKeyword, inferred))
+            valueOffset = declaration.initializerStart + (initializer.length - initializer.trimStart().length);
+            const valueEnd = declaration.initializerEnd - (initializer.length - initializer.trimEnd().length);
+            const required = requireAt.get(valueOffset);
+            if(required && required.end === valueEnd)
             {
-                const valueOffset = declaration.initializerStart + (initializer.length - initializer.trimStart().length);
-                errors.push({ message: `Cannot assign ${inferred} to ${declaration.typeKeyword}.`, offset: valueOffset });
+                inferred = required.exportName;
+            }
+            else
+            {
+                const maskedInitializer = masked.slice(declaration.initializerStart, declaration.initializerEnd).trim();
+                inferred = inferExpression(maskedInitializer, extendedScope, externalsByName);
+            }
+
+            if(!isAssignableTo(resolved, inferred, extendedScope, externalsByName))
+            {
+                const declared = resolved.kind === 'keyword' ? resolved.keyword : resolved.typeName;
+                errors.push({ message: `Cannot assign ${displayInferred(inferred, extendedScope, externalsByName)} to ${declared}.`, offset: valueOffset });
             }
         }
 
-        scope.set(declaration.name, { type: declaration.typeKeyword, readonly: declaration.readonly });
+        if(declaration.typedParams && declaration.typedParams.hasTypes)
+        {
+            const params = [];
+            for(const param of declaration.typedParams.params)
+            {
+                if(!param.name)
+                {
+                    continue;
+                }
+
+                const typeOffset = param.typeStart === -1 ? declaration.initializerStart : declaration.initializerStart + param.typeStart;
+                params.push({ name: param.name, entry: resolveParamType(param.typeName, extendedScope, errors, typeOffset) });
+            }
+
+            typedFunctions.push({
+                bodyStart: declaration.initializerStart,
+                bodyEnd: declaration.initializerEnd,
+                paramStart: declaration.initializerStart + declaration.typedParams.start,
+                paramEnd: declaration.initializerStart + declaration.typedParams.end,
+                params: params
+            });
+        }
+
+        scope.set(declaration.name, {
+            keyword: effectiveKeyword(resolved, inferred, scope, externalsByName),
+            readonly: declaration.readonly,
+            kind: resolved.kind,
+            typeName: resolved.typeName,
+            ref: resolved.ref
+        });
     }
 
-    checkAssignments(masked, declarations, scope, errors);
+    checkAssignments({ masked: masked, declarations: declarations, scope: scope, errors: errors,
+        externalsByName: externalsByName, requireAt: requireAt, typedFunctions: typedFunctions });
     return errors;
 }
 

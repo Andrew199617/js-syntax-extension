@@ -4,6 +4,7 @@ const path = require('path');
 const typescript = require('typescript');
 
 const LgdCompiler = require('../../../src/Compilers/LgdCompiler');
+const { parseTypedParams } = require('../../../src/Compilers/LgdTypedParams');
 const LgdTransform = require('../../../src/Parsers/LgdTransform');
 
 /** @description Directory holding the real-world LGD examples that vet the compiler. */
@@ -51,7 +52,7 @@ describe('LGD compiler.', () =>
     test('Calculator.lgd compiles to the verified JavaScript output.', async () =>
     {
         const result = await checkExample('js', (compiler, source) => compiler.compileToJs(source));
-        const names = result.allDeclarations.map(declaration => `${declaration.name}:${declaration.typeKeyword}`);
+        const names = result.allDeclarations.map(declaration => `${declaration.name}:${declaration.typeName}`);
         expect(names).toEqual([
             'calculatorName:String',
             'total:Number',
@@ -410,3 +411,176 @@ describe('JavaScript backend.', () =>
     });
 });
 
+describe('LGD typed function parameters.', () =>
+{
+    function compileJs(source)
+    {
+        return LgdCompiler.create().compileToJs(source);
+    }
+
+    function paramsOf(source)
+    {
+        const result = compileJs(source);
+        expect(result.errors).toEqual([]);
+        return result.allDeclarations[0].typedParams;
+    }
+
+    test('Parses typed arrow parameters with names, types, defaults, and rest.', () =>
+    {
+        const typed = paramsOf('Function f = (Number value, String label = "x", ...rest) => {};');
+        expect(typed.hasTypes).toBe(true);
+        expect(typed.params.map(parameter => [ parameter.name, parameter.typeName, parameter.rest, parameter.defaultText ])).toEqual([
+            [ 'value', 'Number', false, null ],
+            [ 'label', 'String', false, '"x"' ],
+            [ 'rest', null, true, null ]
+        ]);
+    });
+
+    test('Parses dotted and nominal parameter types.', () =>
+    {
+        const result = compileJs('Function f = (vscode.Command command, GoToNextParagraph goNext) => {};');
+        const typed = result.allDeclarations[0].typedParams;
+        expect(typed.hasTypes).toBe(true);
+        expect(typed.params.map(parameter => parameter.typeName)).toEqual([ 'vscode.Command', 'GoToNextParagraph' ]);
+    });
+
+    test('Leaves untyped parameters alone and reports hasTypes false.', () =>
+    {
+        const typed = paramsOf('Function f = (value, other = 1) => {};');
+        expect(typed.hasTypes).toBe(false);
+        expect(typed.params.map(parameter => parameter.name)).toEqual([ 'value', 'other' ]);
+    });
+
+    test('Returns null for non-function initializers and bare arrows.', () =>
+    {
+        expect(parseTypedParams('makeAdder(5);')).not.toBeNull();
+        expect(parseTypedParams('makeAdder(5);').hasTypes).toBe(false);
+        expect(parseTypedParams('42')).toBeNull();
+        expect(parseTypedParams('value => value')).toBeNull();
+    });
+
+    test('Parses async arrows and function expressions.', () =>
+    {
+        expect(paramsOf('Function f = async (Number value) => {};').params[0].typeName).toBe('Number');
+        expect(paramsOf('Function f = function run(Number value) {};').params[0].typeName).toBe('Number');
+    });
+
+    test('Accepts parameter uses that match the declared type.', () =>
+    {
+        const source = [
+            'Number total = 0;',
+            'Function add = (Number value) => {',
+            '    Number next = total + value;',
+            '    total = next;',
+            '    return next;',
+            '};'
+        ].join('\n');
+        expect(compileJs(source).errors).toEqual([]);
+    });
+
+    test('Rejects a body assignment that mismatches the parameter type.', () =>
+    {
+        const source = [
+            'Function record = (Number value) => {',
+            '    String label = value;',
+            '};'
+        ].join('\n');
+        const result = compileJs(source);
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe('Cannot assign Number to String.');
+    });
+
+    test('Checks assignments to the parameter itself.', () =>
+    {
+        expect(compileJs('Function f = (Number value) => {\n    value = 5;\n};').errors).toEqual([]);
+        const bad = compileJs('Function f = (Number value) => {\n    value = "x";\n};');
+        expect(bad.errors.length).toBe(1);
+        expect(bad.errors[0].message).toBe('Cannot assign String to Number.');
+    });
+
+    test('Checks parameter default values against the parameter type.', () =>
+    {
+        expect(compileJs('Function f = (Number value = 5) => {};').errors).toEqual([]);
+        const bad = compileJs('Function f = (Number value = "x") => {};');
+        expect(bad.errors.length).toBe(1);
+        expect(bad.errors[0].message).toBe('Cannot assign String to Number.');
+    });
+
+    test('Lets a typed parameter shadow an outer variable.', () =>
+    {
+        const source = [
+            'Number value = 1;',
+            'Function f = (String value) => {',
+            '    Number n = value;',
+            '};'
+        ].join('\n');
+        const result = compileJs(source);
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe('Cannot assign String to Number.');
+    });
+
+    test('Scopes nested function parameters to the innermost function.', () =>
+    {
+        const source = [
+            'Function outer = (Number a) => {',
+            '    Function inner = (String a) => {',
+            '        Number n = a;',
+            '    };',
+            '};'
+        ].join('\n');
+        const result = compileJs(source);
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe('Cannot assign String to Number.');
+    });
+
+    test('Sees outer parameters from nested function bodies.', () =>
+    {
+        const source = [
+            'Function outer = (Number a) => {',
+            '    Function inner = () => {',
+            '        Number n = a;',
+            '    };',
+            '};'
+        ].join('\n');
+        expect(compileJs(source).errors).toEqual([]);
+    });
+
+    test('Rejects unknown parameter type names.', () =>
+    {
+        const result = compileJs('Function f = (Numer value) => {};');
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe("Unknown type 'Numer'.");
+    });
+
+    test('Accepts nominal parameter types for declared names.', () =>
+    {
+        const source = [
+            'readonly GoToNextParagraph GoToNextParagraph = { create() {} };',
+            'Function run = (GoToNextParagraph target) => {',
+            '    GoToNextParagraph same = target;',
+            '};'
+        ].join('\n');
+        expect(compileJs(source).errors).toEqual([]);
+    });
+
+    test('JavaScript backend strips parameter types and adds @param tags.', () =>
+    {
+        const result = compileJs('/** Records a total. */\nFunction record = (Number value) => {\n};');
+        expect(result.errors).toEqual([]);
+        expect(result.code).toBe('/** Records a total.\n * @param {number} value\n * @type {Function}\n */\nlet record = (value) => {\n};');
+    });
+
+    test('TypeScript backend annotates parameters.', () =>
+    {
+        const result = LgdCompiler.create().compileToTs('Function record = (Number value, String label = "x") => {};');
+        expect(result.errors).toEqual([]);
+        expect(result.code).toBe('let record: Function = (value: number, label: string = "x") => {};');
+    });
+
+    test('C# backend types the lambda parameters and the delegate.', () =>
+    {
+        const result = LgdCompiler.create().compileToCSharp('Function record = (Number value) => {\n};');
+        expect(result.errors).toEqual([]);
+        expect(result.code).toContain('Action<double> record = (double value) => {');
+    });
+});

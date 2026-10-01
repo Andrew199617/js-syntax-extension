@@ -47,13 +47,43 @@ const JsBackend = {
     },
 
     /**
-     * @description Compiled initializers need no rewriting for JavaScript.
+     * @description Strips LGD types from the parameter list: (Number value) becomes (value).
+     * @param {Object} typedParams the {start, end, params, hasTypes} parameter group.
+     * @param {string} compiledInitializer the recursively compiled initializer text.
+     * @returns {string} the initializer with untyped parameters.
+     */
+    stripParamTypes(typedParams, compiledInitializer)
+    {
+        const params = typedParams.params.map(parameter =>
+        {
+            if(!parameter.name)
+            {
+                return parameter.raw;
+            }
+
+            const rest = parameter.rest ? '...' : '';
+            const defaultText = parameter.defaultText === null ? '' : ` = ${parameter.defaultText}`;
+            return `${rest}${parameter.name}${defaultText}`;
+        });
+
+        return `${compiledInitializer.slice(0, typedParams.start)
+        }(${params.join(', ')})${
+            compiledInitializer.slice(typedParams.end)}`;
+    },
+
+    /**
+     * @description Rewrites a compiled initializer for JavaScript, stripping LGD parameter types.
      * @param {LgdDeclarationType} declaration the parsed typed declaration.
      * @param {string} compiledInitializer the recursively compiled initializer text.
-     * @returns {string} the initializer unchanged.
+     * @returns {string} the initializer with plain JavaScript parameters.
      */
     rewriteInitializer(declaration, compiledInitializer)
     {
+        if(declaration.typedParams && declaration.typedParams.hasTypes)
+        {
+            return this.stripParamTypes(declaration.typedParams, compiledInitializer);
+        }
+
         return compiledInitializer;
     },
 
@@ -64,10 +94,17 @@ const JsBackend = {
      */
     mergeJsdoc(declaration)
     {
-        const tsType = typeMaps.tsTypeMap[declaration.typeKeyword];
+        const tsType = typeMaps.tsTypeMap[declaration.typeName] || declaration.typeName;
+        const params = this.paramTags(declaration);
         if(!declaration.jsdoc)
         {
-            return `${declaration.indent}/** @type {${tsType}} */`;
+            if(params.length === 0)
+            {
+                return `${declaration.indent}/** @type {${tsType}} */`;
+            }
+
+            const newline = this.newline;
+            return `${declaration.indent}/**${newline}${declaration.indent}${params.join(newline + declaration.indent)}${newline}${declaration.indent} * @type {${tsType}}${newline}${declaration.indent} */`;
         }
 
         if((/@type\b/).test(declaration.jsdoc))
@@ -77,7 +114,30 @@ const JsBackend = {
 
         const inner = declaration.jsdoc.slice(0, -jsdocCloseLength).trimEnd();
         const newline = this.newline;
-        return `${inner}${newline}${declaration.indent} * @type {${tsType}}${newline}${declaration.indent} */`;
+        const hasParamTags = params.length > 0 && !(/@param\b/).test(declaration.jsdoc);
+        const paramLines = hasParamTags
+            ? `${newline}${declaration.indent}${params.join(newline + declaration.indent)}`
+            : '';
+
+        return `${inner}${paramLines}${newline}${declaration.indent} * @type {${tsType}}${newline}${declaration.indent} */`;
+    },
+
+    /**
+     * @description Builds @param JSDoc lines for the typed parameters of a function declaration.
+     * @param {LgdDeclarationType} declaration the parsed typed declaration.
+     * @returns {Array} the @param lines, or an empty array when there are none.
+     */
+    paramTags(declaration)
+    {
+        const typedParams = declaration.typedParams;
+        if(!typedParams || !typedParams.hasTypes)
+        {
+            return [];
+        }
+
+        return typedParams.params
+            .filter(parameter => parameter.name && parameter.typeName)
+            .map(parameter => ` * @param {${typeMaps.tsTypeMap[parameter.typeName] || parameter.typeName}} ${parameter.name}`);
     }
 };
 
