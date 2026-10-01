@@ -1,2 +1,8 @@
 # Normalize text to LF in Git and keep CRLF in every working tree.
 * text=auto eol=crlf
+
+# Present LGD on GitHub: highlight .lgd as TypeScript and collapse generated outputs.
+*.lgd linguist-language=TypeScript
+*.lgd.js linguist-generated=true
+*.lgd.ts linguist-generated=true
+*.lgd.cs linguist-generated=true
