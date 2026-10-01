@@ -20,6 +20,7 @@ const LgdSourceMap = {
      * @description Maps an LGD source offset to the corresponding compiled output offset.
      * Verbatim segments map 1:1; offsets inside a rewritten declaration head map to the
      * variable name span in the output, so hovering the head still resolves the variable.
+     * The name end offset maps to the output name end, keeping symbol ranges intact.
      * @param {number} offset the source offset.
      * @returns {number} the output offset.
      */
@@ -39,9 +40,9 @@ const LgdSourceMap = {
                     return segment.outStart + Math.min(offset - segment.srcStart, segment.outEnd - segment.outStart);
                 }
 
-                if(offset >= segment.nameSrcStart && offset < segment.nameSrcEnd)
+                if(offset >= segment.nameSrcStart && offset <= segment.nameSrcEnd)
                 {
-                    return segment.nameOutStart + (offset - segment.nameSrcStart);
+                    return segment.nameOutStart + Math.min(offset - segment.nameSrcStart, segment.nameOutEnd - segment.nameOutStart);
                 }
 
                 return segment.nameOutStart;
@@ -54,6 +55,7 @@ const LgdSourceMap = {
 
     /**
      * @description Maps a compiled output offset back to the LGD source offset.
+     * The output name end offset maps back to the source name end, keeping symbol ranges intact.
      * @param {number} offset the output offset.
      * @returns {number} the source offset.
      */
@@ -73,9 +75,9 @@ const LgdSourceMap = {
                     return segment.srcStart + Math.min(offset - segment.outStart, segment.srcEnd - segment.srcStart);
                 }
 
-                if(offset >= segment.nameOutStart && offset < segment.nameOutEnd)
+                if(offset >= segment.nameOutStart && offset <= segment.nameOutEnd)
                 {
-                    return segment.nameSrcStart + (offset - segment.nameOutStart);
+                    return segment.nameSrcStart + Math.min(offset - segment.nameOutStart, segment.nameSrcEnd - segment.nameSrcStart);
                 }
 
                 return segment.nameSrcStart;
