@@ -17,10 +17,22 @@ const StatusBarMessageTypes = require('./Logging/StatusBarMessageTypes');
 const FileIO = require('./Logging/FileIO');
 const Document = require('./Core/Document');
 const RefactorProvider = require('./Refactor/RefactorProvider');
+const LgdLanguageService = require('./Lgd/LgdLanguageService');
+const LgdHoverProvider = require('./Lgd/LgdHoverProvider');
+const LgdDefinitionProvider = require('./Lgd/LgdDefinitionProvider');
+const LgdReferenceProvider = require('./Lgd/LgdReferenceProvider');
+const LgdCompiler = require('./Compilers/LgdCompiler');
+const LgdTransform = require('./Parsers/LgdTransform');
 const InvertIf = require('./Refactor/InvertIf');
 
 // JavaScript source extension supported by the commands.
 const JS_EXT = '.js';
+
+// LGD source extension, from the transform facade.
+const LGD_EXT = LgdTransform.LGD_EXT;
+
+// Document selector for LGD language features.
+const LGD_DOCUMENT_SELECTOR = { schema: 'file', language: 'lgd' };
 
 // Command identifier for compiling the active file.
 const COMPILE_COMMAND = 'lgd.generateTypings';
@@ -43,6 +55,53 @@ function clearPendingSaves()
     clearTimeout(saveTimer);
     saveTimer = null;
     pendingSaves.clear();
+}
+
+/**
+ * @description Compiles an LGD document to JavaScript next to the source file.
+ * @param {object} document the saved LGD document.
+ * @returns {Promise<void>}
+ */
+async function compileLgdDocument(document)
+{
+    const result = LgdCompiler.create().compileToJs(document.getText());
+    const parsedPath = path.parse(document.fileName);
+    const jsPath = path.join(parsedPath.dir, `${parsedPath.name}.js`);
+    await FileIO.writeFileContents(jsPath, result.code);
+    if(result.errors.length > 0)
+    {
+        StatusBarMessage.show(`LGD: Compiled with ${result.errors.length} error(s).`, StatusBarMessageTypes.ERROR);
+    }
+
+    return result;
+}
+
+/**
+ * @description Reports an LGD language service failure to the output channel.
+ * @param {Error} error the failure.
+ * @returns {void}
+ */
+function reportLgdError(error)
+{
+    console.error(error);
+}
+
+/**
+ * @description Runs an LGD language service task and reports failures instead of crashing.
+ * The returned promise never rejects, so event handlers can safely ignore it.
+ * @param {Function} action the async task to run.
+ * @returns {Promise<void>}
+ */
+async function runLgdTask(action)
+{
+    try
+    {
+        await action();
+    }
+    catch(error)
+    {
+        reportLgdError(error);
+    }
 }
 
 async function compileSavedDocuments()
@@ -99,13 +158,46 @@ async function compileFile(uri, report)
     report.add(compilation.compilationContext);
 }
 
+/**
+ * @description Compiles one LGD file to JavaScript and records it in the compile-all report.
+ * @param {object} uri the LGD file uri.
+ * @param {object} report the compilation report.
+ * @returns {Promise<void>}
+ */
+async function compileLgdFile(uri, report)
+{
+    try
+    {
+        const text = await fs.promises.readFile(uri.fsPath, 'utf8');
+        const result = await compileLgdDocument({ fileName: uri.fsPath, getText: () => text });
+        const failed = result.errors.length > 0;
+        report.add({
+            errorOccurred: failed,
+            compiled: !failed,
+            document: { fileName: uri.fsPath },
+            logger: { log: [] },
+            diagnostics: result.errors.map(error => ({
+                severity: vscode.DiagnosticSeverity.Error,
+                range: { start: { line: error.line - 1, character: error.offset - (text.lastIndexOf('\n', error.offset - 1) + 1) } },
+                message: `LGD: ${error.message}`
+            }))
+        });
+    }
+    catch(error)
+    {
+        report.reportError(error);
+    }
+}
+
 async function compileAllFiles()
 {
     const report = CompilationReport.create('Compile all', true);
     try
     {
-        const uris = await vscode.workspace.findFiles('**/*.js', '**/node_modules/**');
-        const compilations = uris.map(uri => compileFile(uri, report));
+        const jsUris = await vscode.workspace.findFiles('**/*.js', '**/node_modules/**');
+        const lgdUris = await vscode.workspace.findFiles('**/*.lgd', '**/node_modules/**');
+        const compilations = jsUris.map(uri => compileFile(uri, report));
+        compilations.push(...lgdUris.map(uri => compileLgdFile(uri, report)));
         const results = await Promise.allSettled(compilations);
         for(const result of results)
         {
@@ -184,6 +276,47 @@ function activate(context)
     RefactorProvider.create(context);
     InvertIf.create().register(context);
 
+    lgd.languageService = LgdLanguageService.create(lgd.lgdDiagnosticCollection, reportLgdError);
+
+    const lgdHoverProvider = vscode.languages.registerHoverProvider(
+        LGD_DOCUMENT_SELECTOR,
+        LgdHoverProvider.create(lgd.languageService)
+    );
+
+    const lgdDefinitionProvider = vscode.languages.registerDefinitionProvider(
+        LGD_DOCUMENT_SELECTOR,
+        LgdDefinitionProvider.create(lgd.languageService)
+    );
+
+    const lgdReferenceProvider = vscode.languages.registerReferenceProvider(
+        LGD_DOCUMENT_SELECTOR,
+        LgdReferenceProvider.create(lgd.languageService)
+    );
+
+    context.subscriptions.push(lgdHoverProvider);
+    context.subscriptions.push(lgdDefinitionProvider);
+    context.subscriptions.push(lgdReferenceProvider);
+
+    // The open event fires before activation when it triggers it, so pick up
+    // any LGD documents that are already visible.
+    for(const openDocument of vscode.workspace.textDocuments)
+    {
+        if(openDocument.languageId === 'lgd')
+        {
+            runLgdTask(() => lgd.languageService.openDocument(openDocument));
+        }
+    }
+
+    const didOpenLgdDocument = vscode.workspace.onDidOpenTextDocument(document =>
+    {
+        if(document.languageId === 'lgd')
+        {
+            runLgdTask(() => lgd.languageService.openDocument(document));
+        }
+    });
+
+    context.subscriptions.push(didOpenLgdDocument);
+
     if(lgd.configuration.autoComplete.enabled)
     {
         lgd.completionItemProvider = CompletionItemProvider.create();
@@ -211,6 +344,13 @@ function activate(context)
         if(activeEditor)
         {
             const document = activeEditor.document;
+            if(document.fileName.endsWith(LGD_EXT))
+            {
+                await compileLgdDocument(document);
+                vscode.window.showInformationMessage('LGD: Compiled .lgd file into .js file.');
+                return;
+            }
+
             await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();
 
             if(!document.fileName.endsWith(JS_EXT))
@@ -249,12 +389,40 @@ function activate(context)
         await GenerateTypings.create(document, lgd.lgdDiagnosticCollection).executeGenerateTypings();
     });
 
+    // recompile LGD documents as they are typed
+    const didChangeLgdEvent = vscode.workspace.onDidChangeTextDocument(TextChangedEvent =>
+    {
+        const document = TextChangedEvent.document;
+        if(document.languageId !== 'lgd' || TextChangedEvent.contentChanges.length === 0)
+        {
+            return;
+        }
+
+        runLgdTask(() => lgd.languageService.updateDocument(document));
+    });
+
+    // compile LGD to JavaScript on save, mirroring the .js to .d.ts flow
+    const didSaveLgdEvent = vscode.workspace.onDidSaveTextDocument(document =>
+    {
+        if(document.languageId !== 'lgd' || !lgd.configuration.generateTypings)
+        {
+            return;
+        }
+
+        runLgdTask(() => compileLgdDocument(document));
+    });
+
     // dismiss errors on file close
     const didCloseEvent = vscode.workspace.onDidCloseTextDocument(doc =>
     {
         if(doc.fileName.endsWith(JS_EXT))
         {
             lgd.lgdDiagnosticCollection.delete(doc.uri);
+        }
+
+        if(doc.languageId === 'lgd' || doc.fileName.endsWith(LGD_EXT))
+        {
+            lgd.languageService.closeDocument(doc);
         }
     });
 
@@ -311,7 +479,9 @@ function activate(context)
     context.subscriptions.push(compileCommand);
     context.subscriptions.push(compileAllCommand);
     context.subscriptions.push(didSaveEvent);
+    context.subscriptions.push(didSaveLgdEvent);
     context.subscriptions.push(didChangeEvent);
+    context.subscriptions.push(didChangeLgdEvent);
     context.subscriptions.push(didCloseEvent);
     context.subscriptions.push(onDidRenameFiles);
     context.subscriptions.push(configurationChanged);

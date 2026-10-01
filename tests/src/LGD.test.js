@@ -80,12 +80,17 @@ jest.mock('vscode', () => ({
         executeCommand: jest.fn()
     },
     languages: {
-        createDiagnosticCollection: jest.fn(() => ({ set: jest.fn(), dispose: jest.fn() })),
-        registerCodeActionsProvider: jest.fn(() => ({ dispose: jest.fn() }))
+        createDiagnosticCollection: jest.fn(() => ({ set: jest.fn(), delete: jest.fn(), dispose: jest.fn() })),
+        registerCodeActionsProvider: jest.fn(() => ({ dispose: jest.fn() })),
+        registerHoverProvider: jest.fn(() => ({ dispose: jest.fn() })),
+        registerDefinitionProvider: jest.fn(() => ({ dispose: jest.fn() })),
+        registerReferenceProvider: jest.fn(() => ({ dispose: jest.fn() }))
     },
     workspace: {
         rootPath: 'workspace',
+        textDocuments: [],
         findFiles: jest.fn(),
+        onDidOpenTextDocument: jest.fn(),
         onDidSaveTextDocument: jest.fn(),
         onDidChangeTextDocument: jest.fn(),
         onDidCloseTextDocument: jest.fn(),
@@ -97,7 +102,8 @@ jest.mock('vscode', () => ({
         setStatusBarMessage: jest.fn(() => ({ dispose: jest.fn() })),
         createStatusBarItem: jest.fn(() => ({ show: jest.fn(), hide: jest.fn() })),
         showErrorMessage: jest.fn(),
-        showWarningMessage: jest.fn()
+        showWarningMessage: jest.fn(),
+        showInformationMessage: jest.fn()
     },
     DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2 },
     StatusBarAlignment: { Left: 1 },
@@ -125,7 +131,7 @@ beforeEach(() =>
     FileIO.writeFileContents.mockReset();
     FileIO.writeFileContents.mockResolvedValue();
     extension.activate({ subscriptions: [] });
-    vscode.workspace.findFiles.mockResolvedValue([ { fsPath: 'first.js' }, { fsPath: 'second.js' } ]);
+    vscode.workspace.findFiles.mockImplementation(pattern => Promise.resolve(pattern.includes('.lgd') ? [] : [ { fsPath: 'first.js' }, { fsPath: 'second.js' } ]));
 });
 
 afterEach(() =>
