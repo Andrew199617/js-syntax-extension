@@ -648,6 +648,15 @@ describe('LGD typed function parameters.', () =>
         expect(result.code).toContain('match(line) {');
     });
 
+    test('Extracts members preceded by JSDoc blocks.', () =>
+    {
+        const compiler = LgdCompiler.create();
+        expect(compiler.parseMemberChunk('/** Initializes. */\ncreate() {')).toEqual({ name: 'create', kind: 'method' });
+        expect(compiler.parseMemberChunk('// Line comment.\ncount: 0,')).toEqual({ name: 'count', kind: 'property' });
+        expect(compiler.parseMemberChunk('/** Only a comment. */')).toBeNull();
+        expect(compiler.parseMemberChunk('...rest')).toBeNull();
+    });
+
     test('Checks method parameter defaults against their declared type.', () =>
     {
         expect(compileJs('Object o = { m(Number offset = 0) { return offset; } };').errors).toEqual([]);

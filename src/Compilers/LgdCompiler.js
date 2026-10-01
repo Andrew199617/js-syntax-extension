@@ -435,24 +435,25 @@ const LgdCompiler = {
      */
     parseMemberChunk(chunk)
     {
-        if(chunk === '' || chunk.startsWith('...') || chunk[0] === '[')
+        const text = chunk.replace(/^(?:\s|\/\*[\S\s]*?\*\/|\/\/[^\n]*)+/, '');
+        if(text === '' || text.startsWith('...') || text[0] === '[')
         {
             return null;
         }
 
-        const methodMatch = (/^(?:async\s+)?(?:get\s+|set\s+)?(?<name>[$A-Z_a-z][\w$]*|'[^\n']*'|"[^\n"]*")\s*\(/).exec(chunk);
+        const methodMatch = (/^(?:async\s+)?(?:get\s+|set\s+)?(?<name>[$A-Z_a-z][\w$]*|'[^\n']*'|"[^\n"]*")\s*\(/).exec(text);
         if(methodMatch)
         {
             return { name: this.unquoteName(methodMatch.groups.name), kind: 'method' };
         }
 
-        const propertyMatch = (/^(?<name>[$A-Z_a-z][\w$]*|'[^\n']*'|"[^\n"]*")\s*:/).exec(chunk);
+        const propertyMatch = (/^(?<name>[$A-Z_a-z][\w$]*|'[^\n']*'|"[^\n"]*")\s*:/).exec(text);
         if(propertyMatch)
         {
             return { name: this.unquoteName(propertyMatch.groups.name), kind: 'property' };
         }
 
-        const shorthandMatch = (/^(?<name>[$A-Z_a-z][\w$]*)$/).exec(chunk);
+        const shorthandMatch = (/^(?<name>[$A-Z_a-z][\w$]*)$/).exec(text);
         if(shorthandMatch)
         {
             return { name: shorthandMatch.groups.name, kind: 'property' };
