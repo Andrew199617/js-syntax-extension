@@ -25,6 +25,7 @@ let hasRun = false;
 let history = [];
 
 /** Records a total in the history.
+ * @param {number} value
  * @type {Function}
  */
 let record = (value) => {
@@ -32,6 +33,7 @@ let record = (value) => {
 };
 
 /** Adds a value to the running total.
+ * @param {number} value
  * @type {Function}
  */
 export let add = (value) => {
@@ -44,6 +46,7 @@ export let add = (value) => {
 };
 
 /** Multiplies the running total by a factor.
+ * @param {number} factor
  * @type {Function}
  */
 export let multiply = (factor) => {

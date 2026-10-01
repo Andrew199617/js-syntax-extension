@@ -17,12 +17,12 @@ Boolean hasRun = false;
 Array history = [];
 
 /** Records a total in the history. */
-Function record = (value) => {
+Function record = (Number value) => {
     history.push(value);
 };
 
 /** Adds a value to the running total. */
-export Function add = (value) => {
+export Function add = (Number value) => {
     Number next = total + value;
     total = next;
     hasRun = true;
@@ -31,7 +31,7 @@ export Function add = (value) => {
 };
 
 /** Multiplies the running total by a factor. */
-export Function multiply = (factor) => {
+export Function multiply = (Number factor) => {
     Number next = total * factor;
     total = next;
     hasRun = true;

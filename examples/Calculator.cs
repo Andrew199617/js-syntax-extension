@@ -23,12 +23,12 @@ bool hasRun = false;
 List<dynamic> history = new List<dynamic> { };
 
 /// <summary>Records a total in the history.</summary>
-Action<dynamic> record = (value) => {
+Action<double> record = (double value) => {
     history.Add(value);
 };
 
 /// <summary>Adds a value to the running total.</summary>
-Func<dynamic, dynamic> add = (value) => {
+Func<double, dynamic> add = (double value) => {
     double next = total + value;
     total = next;
     hasRun = true;
@@ -37,7 +37,7 @@ Func<dynamic, dynamic> add = (value) => {
 };
 
 /// <summary>Multiplies the running total by a factor.</summary>
-Func<dynamic, dynamic> multiply = (factor) => {
+Func<double, dynamic> multiply = (double factor) => {
     double next = total * factor;
     total = next;
     hasRun = true;

@@ -17,12 +17,12 @@ let hasRun: boolean = false;
 let history: any[] = [];
 
 /** Records a total in the history. */
-let record: Function = (value) => {
+let record: Function = (value: number) => {
     history.push(value);
 };
 
 /** Adds a value to the running total. */
-export let add: Function = (value) => {
+export let add: Function = (value: number) => {
     let next: number = total + value;
     total = next;
     hasRun = true;
@@ -31,7 +31,7 @@ export let add: Function = (value) => {
 };
 
 /** Multiplies the running total by a factor. */
-export let multiply: Function = (factor) => {
+export let multiply: Function = (factor: number) => {
     let next: number = total * factor;
     total = next;
     hasRun = true;
