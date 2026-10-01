@@ -652,6 +652,7 @@ describe('LGD typed function parameters.', () =>
         expect(result.errors).toEqual([]);
         expect(result.code).toBe('let record: Function = (value: number, label: string = "x") => {};');
     });
+
     test('JavaScript backend strips object method parameter types.', () =>
     {
         const source = 'Object o = { create(String name, Number count = 1) { return name; }, async run() { return 1; } };';
