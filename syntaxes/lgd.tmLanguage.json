@@ -1,0 +1,48 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"fileTypes": [
+		"lgd"
+	],
+	"name": "LGD",
+	"patterns": [
+		{
+			"include": "#typed-declaration"
+		},
+		{
+			"include": "#typed-keyword"
+		},
+		{
+			"include": "source.js"
+		}
+	],
+	"repository": {
+		"typed-declaration": {
+			"comment": "A full typed declaration head: [export] [readonly] Type name.",
+			"match": "^([ \\t]*)((export)[ \\t]+)?((readonly)[ \\t]+)?(Number|String|Boolean|BigInt|Symbol|Object|Array|Function)([ \\t]+)([$_a-zA-Z][\\w$]*)",
+			"captures": {
+				"3": {
+					"name": "keyword.control.export.lgd"
+				},
+				"5": {
+					"name": "storage.modifier.readonly.lgd"
+				},
+				"6": {
+					"name": "storage.type.lgd"
+				},
+				"8": {
+					"name": "variable.other.definition.lgd"
+				}
+			}
+		},
+		"typed-keyword": {
+			"captures": {
+				"1": {
+					"name": "storage.type.lgd"
+				}
+			},
+			"comment": "A line starting with a type keyword that is not a full declaration: malformed, or a call like Number(\"5\").",
+			"match": "^[ \\t]*(?:export[ \\t]+)?(?:readonly[ \\t]+)?(Number|String|Boolean|BigInt|Symbol|Object|Array|Function)\\b(?![ \\t]*\\()"
+		}
+	},
+	"scopeName": "source.lgd"
+}

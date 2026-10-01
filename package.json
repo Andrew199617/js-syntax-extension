@@ -43,7 +43,8 @@
         "onLanguage:javascript",
         "onLanguage:javascriptreact",
         "onLanguage:typescript",
-        "onLanguage:typescriptreact"
+        "onLanguage:typescriptreact",
+        "onLanguage:lgd"
     ],
     "main": "./dist/extension.js",
     "contributes": {
@@ -166,6 +167,24 @@
                     "source.js"
                 ],
                 "path": "./syntaxes/functioncall.tmLanguage.json"
+            },
+            {
+                "language": "lgd",
+                "scopeName": "source.lgd",
+                "path": "./syntaxes/lgd.tmLanguage.json"
+            }
+        ],
+        "languages": [
+            {
+                "id": "lgd",
+                "aliases": [
+                    "LGD",
+                    "lgd"
+                ],
+                "extensions": [
+                    ".lgd"
+                ],
+                "configuration": "./language-configuration.json"
             }
         ]
     },
