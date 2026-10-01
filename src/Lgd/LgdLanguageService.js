@@ -1,4 +1,6 @@
 const vscode = require('vscode');
+const path = require('path');
+const fs = require('fs');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
 
@@ -43,7 +45,7 @@ const LgdLanguageService = {
         const key = document.uri.toString();
         if(!this.states.has(key))
         {
-            this.states.set(key, { document: document, jsDocument: null, map: null, errors: [] });
+            this.states.set(key, { document: document, jsDocument: null, map: null, errors: [], declarations: [] });
         }
 
         return this.updateDocument(document);
@@ -125,16 +127,30 @@ const LgdLanguageService = {
     },
 
     /**
+     * @description Applies a compilation result to a document state.
+     * @param {Object} state the document state.
+     * @param {Object} result the {mappings, errors, allDeclarations} compilation result.
+     * @returns {void}
+     */
+    applyCompilation(state, result)
+    {
+        state.map = LgdSourceMap.create(result.mappings);
+        state.errors = result.errors;
+        state.declarations = result.allDeclarations;
+    },
+
+    /**
      * @description Recompiles one LGD document and refreshes its JavaScript mirror and diagnostics.
      * @param {Object} state the document state.
      * @returns {Promise<Object>} the document state.
      */
+
     async recompile(state)
     {
         const content = state.document.getText();
-        const result = this.compiler.compileToJs(content);
-        state.map = LgdSourceMap.create(result.mappings);
-        state.errors = result.errors;
+        const externals = await this.collectExternalTypes(state.document);
+        const result = this.compiler.compileToJs(content, externals);
+        this.applyCompilation(state, result);
         await this.syncMirror(state, result.code);
         this.publishDiagnostics(state);
         return state;
@@ -183,16 +199,194 @@ const LgdLanguageService = {
         {
             const position = state.document.positionAt(Math.min(error.offset, text.length));
             const lineRange = state.document.lineAt(position.line).range;
+            const severity = error.severity === 'warning' ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error;
             const diagnostic = new vscode.Diagnostic(
                 new vscode.Range(position, lineRange.end),
                 `LGD: ${error.message}`,
-                vscode.DiagnosticSeverity.Error
+                severity
             );
             diagnostic.source = 'LGD';
             return diagnostic;
         });
 
         this.diagnosticCollection.set(state.document.uri, diagnostics);
+    },
+
+    /**
+     * @description Maps a require spec to the sibling .lgd source it was compiled from.
+     * Compiled output is required with its dotted name (./Foo.lgd.js), so the source
+     * is the same path without the trailing .js; a bare ./Foo also maps to ./Foo.lgd.
+     * @param {string} fromDir the directory of the requiring document.
+     * @param {string} spec the require spec as written.
+     * @returns {string|null} the absolute .lgd source path, or null for bare imports.
+     */
+    resolveLgdSourcePath(fromDir, spec)
+    {
+        if(!spec.startsWith('.'))
+        {
+            return null;
+        }
+
+        const candidate = path.resolve(fromDir, spec);
+        if(candidate.endsWith('.lgd.js'))
+        {
+            return candidate.slice(0, -'.js'.length);
+        }
+
+        if(candidate.endsWith('.lgd'))
+        {
+            return candidate;
+        }
+
+        return `${candidate}.lgd`;
+    },
+
+    /**
+     * @description Reads a sibling .lgd file and finds the declaration it exports.
+     * Unreadable files and files without a plain `module.exports = Name` export yield null.
+     * @param {string} sourcePath the absolute .lgd source path.
+     * @returns {Object|null} the {name, typeName, keyword, members} export, or null.
+     */
+    async readExportDeclaration(sourcePath)
+    {
+        let targetText;
+        try
+        {
+            targetText = await fs.readFile(sourcePath, 'utf8');
+        }
+        catch
+        {
+            return null;
+        }
+
+        const exportMatch = (/module\.exports\s*=\s*(?<name>[$A-Z_a-z][\w$]*)/).exec(targetText);
+        if(!exportMatch)
+        {
+            return null;
+        }
+
+        const parsed = this.compiler.parse(targetText);
+        const declaration = parsed.allDeclarations.find(candidate => candidate.name === exportMatch[1]);
+        if(!declaration)
+        {
+            return null;
+        }
+
+        const keywords = [ 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object', 'Array', 'Function' ];
+        return {
+            name: declaration.name,
+            typeName: declaration.typeName,
+            keyword: keywords.includes(declaration.typeName) ? declaration.typeName : 'Object',
+            members: declaration.members || []
+        };
+    },
+
+    /**
+     * @description Builds the cross-file type map for a document's relative requires.
+     * @param {TextDocument} document the LGD document.
+     * @returns {Map} require specs to {exportName, keyword} entries.
+     */
+    async collectExternalTypes(document)
+    {
+        const externals = new Map();
+        const fromDir = path.dirname(document.uri.fsPath);
+        const pattern = /\brequire\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\)/g;
+        let match = pattern.exec(document.getText());
+        while(match)
+        {
+            const spec = match.groups.spec;
+            if(!externals.has(spec))
+            {
+                const sourcePath = this.resolveLgdSourcePath(fromDir, spec);
+                const exported = sourcePath ? await this.readExportDeclaration(sourcePath) : null;
+                if(exported)
+                {
+                    externals.set(spec, { exportName: exported.name, keyword: exported.keyword });
+                }
+            }
+
+            match = pattern.exec(document.getText());
+        }
+
+        return externals;
+    },
+
+    /**
+     * @description Follows a require initializer to the exported declaration of a sibling .lgd file.
+     * @param {TextDocument} document the LGD document holding the declaration.
+     * @param {Object} declaration the parsed declaration whose initializer may be a require call.
+     * @returns {Object|null} the {name, typeName, keyword, members} export, or null.
+     */
+    async resolveRequireTarget(document, declaration)
+    {
+        const initializer = document.getText().slice(declaration.initializerStart, declaration.initializerEnd).trim();
+        const match = (/^require\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\)$/).exec(initializer);
+        if(!match)
+        {
+            return null;
+        }
+
+        const sourcePath = this.resolveLgdSourcePath(path.dirname(document.uri.fsPath), match.groups.spec);
+        if(!sourcePath)
+        {
+            return null;
+        }
+
+        const exported = await this.readExportDeclaration(sourcePath);
+        return exported;
+    },
+
+    /**
+     * @description Describes a declared name for hover and completions: its type and members.
+     * Require initializers are followed into the sibling .lgd file they load.
+     * @param {Uri} uri the LGD document uri.
+     * @param {string} name the hovered or completed name.
+     * @returns {Promise<Object|null>} the {name, typeName, readonly, members, params} summary, or null.
+     */
+    async getTypeSummary(uri, name)
+    {
+        const state = this.getState(uri);
+        if(!state || !state.declarations)
+        {
+            return null;
+        }
+
+        const declaration = state.declarations.find(candidate => candidate.name === name);
+        if(!declaration)
+        {
+            return null;
+        }
+
+        let members = declaration.members || [];
+        if(members.length === 0)
+        {
+            const target = await this.resolveRequireTarget(state.document, declaration);
+            if(target)
+            {
+                members = target.members;
+            }
+        }
+
+        const params = this.describeTypedParams(declaration.typedParams);
+
+        return { name: declaration.name, typeName: declaration.typeName, readonly: declaration.readonly, members: members, params: params };
+    },
+
+    /**
+     * @description Describes the typed parameters of a declaration for hover and completions.
+     * @param {Object|undefined} typedParams the parsed {hasTypes, params} parameter info.
+     * @returns {Array} the {name, typeName} parameter summaries, or an empty array.
+     */
+    describeTypedParams(typedParams)
+    {
+        if(!typedParams || !typedParams.hasTypes)
+        {
+            return [];
+        }
+
+        return typedParams.params
+            .filter(parameter => parameter.name)
+            .map(parameter => ({ name: parameter.name, typeName: parameter.typeName }));
     },
 
     /**

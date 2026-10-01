@@ -196,3 +196,100 @@ describe('LgdReferenceProvider', () =>
         expect(references[1].range.start).toEqual(expect.objectContaining({ line: USAGE_LINE, character: 0 }));
     });
 });
+
+describe('LgdHoverProvider typed function parameters', () =>
+{
+    /** @description LGD source declaring a typed function. */
+    const TYPED_TEXT = 'Function record = (Number value) => {};';
+
+    /** @description Character inside the 'record' name in the typed function declaration. */
+    const RECORD_NAME_CHARACTER = 12;
+
+    /** @description LGD source declaring an untyped function. */
+    const UNTYPED_TEXT = 'Function run = () => {};';
+
+    /** @description Character inside the 'run' name in the untyped function declaration. */
+    const RUN_NAME_CHARACTER = 11;
+
+    /** @description Mirror character where the compiled 'run' name starts. */
+    const MIRROR_RUN_START = 4;
+
+    /** @description Mirror character where the compiled 'run' name ends. */
+    const MIRROR_RUN_END = 7;
+
+    /**
+     * @description Opens the typed-function document in a fresh language service.
+     * @returns {Promise<object>} the service and document.
+     */
+    async function openTypedDocument()
+    {
+        const diagnosticCollection = { set: () => undefined, delete: () => undefined };
+        const service = LgdLanguageService.create(diagnosticCollection, () => undefined);
+        const document = makeTextDocument(LGD_URI, TYPED_TEXT);
+        await service.openDocument(document);
+
+        return { service: service, document: document };
+    }
+
+    test('getTypeSummary includes the typed parameter signature', async () =>
+    {
+        const { service } = await openTypedDocument();
+
+        const summary = await service.getTypeSummary(LGD_URI, 'record');
+
+        expect(summary).toEqual({
+            name: 'record',
+            typeName: 'Function',
+            readonly: false,
+            members: [],
+            params: [{ name: 'value', typeName: 'Number' }]
+        });
+    });
+
+    test('getTypeSummary reports no params for untyped functions', async () =>
+    {
+        const diagnosticCollection = { set: () => undefined, delete: () => undefined };
+        const service = LgdLanguageService.create(diagnosticCollection, () => undefined);
+        const document = makeTextDocument(LGD_URI, UNTYPED_TEXT);
+        await service.openDocument(document);
+
+        const summary = await service.getTypeSummary(LGD_URI, 'run');
+
+        expect(summary.params).toEqual([]);
+    });
+
+    test('renders the typed signature as LGD hover markdown', async () =>
+    {
+        const { service, document } = await openTypedDocument();
+        const provider = LgdHoverProvider.create(service);
+
+        const hover = await provider.provideHover(document, new vscode.Position(0, RECORD_NAME_CHARACTER));
+
+        expect(hover).not.toBeNull();
+        expect(hover.contents).toBe([ '```lgd', 'record: (Number value) => Function', '```' ].join('\n'));
+        expect(hover.range.start).toEqual(expect.objectContaining({ line: 0, character: 9 }));
+        expect(hover.range.end).toEqual(expect.objectContaining({ line: 0, character: 15 }));
+    });
+
+    test('still delegates untyped functions to the TypeScript mirror', async () =>
+    {
+        const diagnosticCollection = { set: () => undefined, delete: () => undefined };
+        const service = LgdLanguageService.create(diagnosticCollection, () => undefined);
+        const document = makeTextDocument(LGD_URI, UNTYPED_TEXT);
+        const state = await service.openDocument(document);
+        const provider = LgdHoverProvider.create(service);
+        const jsRange = new vscode.Range(new vscode.Position(1, MIRROR_RUN_START), new vscode.Position(1, MIRROR_RUN_END));
+        vscode.commands.executeCommand.mockResolvedValue([
+            { contents: [{ language: 'typescript', value: 'let run: Function' }], range: jsRange }
+        ]);
+
+        const hover = await provider.provideHover(document, new vscode.Position(0, RUN_NAME_CHARACTER));
+
+        expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+            'vscode.executeHoverProvider',
+            state.jsDocument.uri,
+            expect.anything()
+        );
+        expect(hover.contents).toEqual([{ language: 'typescript', value: 'let run: Function' }]);
+    });
+});

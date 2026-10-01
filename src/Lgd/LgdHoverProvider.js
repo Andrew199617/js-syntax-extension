@@ -21,8 +21,21 @@ const LgdHoverProvider = {
     },
 
     /**
+     * @description Formats one typed parameter as 'Type name' for hover signatures.
+     * @param {Object} parameter the {name, typeName} parameter.
+     * @returns {string} the formatted parameter.
+     */
+    formatTypedParameter(parameter)
+    {
+        return parameter.typeName ? `${parameter.typeName} ${parameter.name}` : parameter.name;
+    },
+
+    /**
      * @description Provides hover information for a position in an LGD document.
-     * A rejected promise is left to VS Code, which treats a failed provider as no result.
+     * Declared names with known members get an LGD type summary (TypeScript cannot
+     * expand nominal types like GoToNextParagraph); everything else falls back to the
+     * TypeScript hover on the compiled mirror. A rejected promise is left to VS Code,
+     * which treats a failed provider as no result.
      * @param {TextDocument} document the LGD document.
      * @param {Position} position the hovered position.
      * @returns {Promise<Hover|null>} the hover, or null when unavailable.
@@ -30,7 +43,22 @@ const LgdHoverProvider = {
     async provideHover(document, position)
     {
         const state = this.languageService.getState(document.uri);
-        if(!state || !state.jsDocument)
+        if(!state)
+        {
+            return null;
+        }
+
+        const wordRange = document.getWordRangeAtPosition(position);
+        if(wordRange)
+        {
+            const summary = await this.languageService.getTypeSummary(document.uri, document.getText(wordRange));
+            if(summary && (summary.members.length > 0 || summary.params.length > 0))
+            {
+                return new vscode.Hover(this.renderTypeSummary(summary), wordRange);
+            }
+        }
+
+        if(!state.jsDocument)
         {
             return null;
         }
@@ -50,6 +78,27 @@ const LgdHoverProvider = {
         const hover = hovers[0];
         const range = hover.range ? this.languageService.toLgdRange(document.uri, hover.range) : null;
         return new vscode.Hover(hover.contents, range);
+    },
+
+    /**
+     * @description Renders a TypeScript-style type summary for a declared nominal type or function signature.
+     * @param {Object} summary the {name, typeName, readonly, members, params} type summary.
+     * @returns {string} the markdown hover content.
+     */
+    renderTypeSummary(summary)
+    {
+        const modifier = summary.readonly ? 'readonly ' : '';
+        if(summary.params.length > 0)
+        {
+            const params = summary.params
+                .map(this.formatTypedParameter)
+                .join(', ');
+
+            return [ '```lgd', `${modifier}${summary.name}: (${params}) => ${summary.typeName}`, '```' ].join('\n');
+        }
+
+        const lines = summary.members.map(member => `    ${member.name}${member.kind === 'method' ? '()' : ''},`);
+        return [ '```lgd', `${modifier}${summary.name}: ${summary.typeName} {`, ...lines, '}', '```' ].join('\n');
     }
 };
 

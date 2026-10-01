@@ -90,8 +90,25 @@ function makeTextDocument(uriKey, text)
 {
     let currentText = text;
     const document = {
-        uri: { toString: () => uriKey },
-        getText: () => currentText,
+        uri: {
+            toString: () => uriKey,
+            fsPath: uriKey.startsWith('file://') ? uriKey.slice('file://'.length) : uriKey
+        },
+
+        /**
+         * @description Returns the document text, or the text inside a range.
+         * @param {object} [range] the range to slice.
+         * @returns {string} the text.
+         */
+        getText: range =>
+        {
+            if(!range)
+            {
+                return currentText;
+            }
+
+            return currentText.slice(document.offsetAt(range.start), document.offsetAt(range.end));
+        },
 
         /**
          * @description Replaces the document text.
@@ -154,6 +171,45 @@ function makeTextDocument(uriKey, text)
             const lines = currentText.split('\n');
 
             return { range: makeRange(makePosition(line, 0), makePosition(line, lines[line].length)) };
+        },
+
+        /**
+         * @description Returns the word range at a position, using word characters.
+         * @param {object} position the position.
+         * @returns {object|undefined} the word range, or undefined when not on a word.
+         */
+        getWordRangeAtPosition: position =>
+        {
+            const lines = currentText.split('\n');
+            const line = lines[position.line];
+            if(line === undefined)
+            {
+                return;
+            }
+
+            function isWord(character)
+            {
+                return (/\w/).test(character);
+            }
+
+            if(!isWord(line[position.character]))
+            {
+                return;
+            }
+
+            let start = position.character;
+            while(start > 0 && isWord(line[start - 1]))
+            {
+                start -= 1;
+            }
+
+            let end = position.character;
+            while(end < line.length && isWord(line[end]))
+            {
+                end += 1;
+            }
+
+            return makeRange(makePosition(position.line, start), makePosition(position.line, end));
         }
     };
 
@@ -176,7 +232,7 @@ function createFakeVscode(jestApi)
         Hover: makeHover,
         Diagnostic: makeDiagnostic,
         WorkspaceEdit: makeWorkspaceEdit,
-        DiagnosticSeverity: { Error: 0 },
+        DiagnosticSeverity: { Error: 0, Warning: 1 },
 
         /** @description Clears the opened mirror documents. */
         __reset: () => registry.clear(),
