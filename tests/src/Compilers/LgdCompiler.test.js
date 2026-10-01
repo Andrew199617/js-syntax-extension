@@ -552,6 +552,31 @@ describe('LGD typed function parameters.', () =>
         expect(result.errors[0].message).toBe("Unknown type 'Numer'.");
     });
 
+    test('Accepts dotted parameter types rooted at a required module.', () =>
+    {
+        const source = [
+            'const vscode = require(\'vscode\');',
+            'Function f = (vscode.TextDocument document) => {}; '
+        ].join('\n');
+        expect(compileJs(source).errors).toEqual([]);
+    });
+
+    test('Accepts dotted parameter types rooted at a destructured require.', () =>
+    {
+        const source = [
+            'const { Oloo } = require(\'@mavega/oloo\');',
+            'Function f = (Oloo.Factory factory) => {}; '
+        ].join('\n');
+        expect(compileJs(source).errors).toEqual([]);
+    });
+
+    test('Rejects dotted parameter types with an unrequired head.', () =>
+    {
+        const result = compileJs('Function f = (vscode.TextDocument document) => {};');
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe("Unknown type 'vscode.TextDocument'.");
+    });
+
     test('Accepts nominal parameter types for declared names.', () =>
     {
         const source = [

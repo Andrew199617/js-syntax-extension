@@ -314,6 +314,44 @@ function collectRequires(content, externals)
 }
 
 /**
+ * @description Collects the local names bound to require() calls. checkTypes seeds
+ * the scope with these as opaque entries, so dotted types rooted at a required
+ * module (vscode.TextDocument) resolve as opaque external types even though the
+ * binding itself is an untyped declaration.
+ * @param {string} content the LGD source text.
+ * @returns {Set<string>} the required local names.
+ */
+function collectRequiredNames(content)
+{
+    const names = new Set();
+    const requireBindingPattern = (/(?:^|[\n;{}])\s*(?:const|let|var)\s+(?:{(?<destructured>[^}]*)}|(?<name>[$A-Z_a-z][\w$]*))\s*=\s*require\s*\(/g);
+    let match = requireBindingPattern.exec(content);
+    while(match)
+    {
+        if(match.groups.name)
+        {
+            names.add(match.groups.name);
+        }
+        else
+        {
+            for(const part of match.groups.destructured.split(','))
+            {
+                const alias = part.includes(':') ? part.slice(part.indexOf(':') + 1) : part;
+                const trimmed = alias.trim();
+                if((/^[$A-Z_a-z][\w$]*$/).test(trimmed))
+                {
+                    names.add(trimmed);
+                }
+            }
+        }
+
+        match = requireBindingPattern.exec(content);
+    }
+
+    return names;
+}
+
+/**
  * @description Tells whether the offset lies inside a declaration head, before its initializer.
  * @param {Array} declarations the parsed declarations in document order.
  * @param {number} offset the offset to test.
@@ -721,6 +759,15 @@ function checkTypes(content, declarations, externals = new Map())
     }
 
     const requireAt = collectRequires(content, externals);
+    for(const requiredName of collectRequiredNames(content))
+    {
+        if(!scope.has(requiredName))
+        {
+            scope.set(requiredName, { keyword: 'Object', readonly: false, kind: 'opaque',
+                typeName: requiredName, ref: null });
+        }
+    }
+
     const typedFunctions = [];
 
     for(const declaration of declarations)
