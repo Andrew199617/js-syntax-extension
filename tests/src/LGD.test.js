@@ -426,6 +426,19 @@ describe('LGD compile on save', () =>
         expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 error(s)');
     });
 
+    test('saving LGD with a type error leaves the previous .js output untouched', async () =>
+    {
+        vscode.window.createStatusBarItem.mockClear();
+
+        saveLgdDocument(path.join('workspace', 'typed.lgd'), 'Number total = "many";');
+        await nextTurn();
+        await nextTurn();
+
+        expect(FileIO.writeFileContents).not.toHaveBeenCalled();
+        expect(vscode.window.createStatusBarItem).toHaveBeenCalledTimes(1);
+        expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 error(s)');
+    });
+
     test('saving valid LGD writes the compiled .js next to the source', async () =>
     {
         vscode.window.createStatusBarItem.mockClear();

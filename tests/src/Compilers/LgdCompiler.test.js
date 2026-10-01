@@ -252,3 +252,161 @@ describe('LGD source mappings.', () =>
         expect(map.toSource(map.toOutput(returnOffset))).toBe(returnOffset);
     });
 });
+
+describe('LGD type checking.', () =>
+{
+    function check(source)
+    {
+        return LgdCompiler.create().compileToJs(source);
+    }
+
+    function expectTypeError(source, message, offset)
+    {
+        const result = check(source);
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe(message);
+        expect(result.errors[0].offset).toBe(offset);
+    }
+
+    test('Accepts matching literal initializers for every type keyword.', () =>
+    {
+        const source = [
+            'Number count = 42;',
+            'String label = "ready";',
+            'Boolean active = true;',
+            'BigInt big = 10n;',
+            'Symbol key = Symbol("key");',
+            'Object options = {};',
+            'Array items = [];',
+            'Function run = () => {};'
+        ].join('\n');
+        expect(check(source).errors).toEqual([]);
+    });
+
+    test('Rejects a mismatched literal initializer with the value offset.', () =>
+    {
+        expectTypeError('Number myNum = "hello";', 'Cannot assign String to Number.', 'Number myNum = '.length);
+    });
+
+    test('Rejects mismatched literals for the other keywords.', () =>
+    {
+        expectTypeError('Boolean flag = 1;', 'Cannot assign Number to Boolean.', 'Boolean flag = '.length);
+        expectTypeError('Array items = {};', 'Cannot assign Object to Array.', 'Array items = '.length);
+        expectTypeError('String label = 7;', 'Cannot assign Number to String.', 'String label = '.length);
+    });
+
+    test('Infers operators: arithmetic, comparison, string concat, ternary.', () =>
+    {
+        expect(check('Number total = 1 + 2 * 3;').errors).toEqual([]);
+        expect(check('Boolean done = count === 1;').errors).toEqual([]);
+        expect(check('String label = "a" + "b";').errors).toEqual([]);
+        expect(check('String state = ready ? "yes" : "no";').errors).toEqual([]);
+        expectTypeError('Number total = "a" + "b";', 'Cannot assign String to Number.', 'Number total = '.length);
+    });
+
+    test('Treats calls, member access, and unknown names as Unknown.', () =>
+    {
+        expect(check('Number total = compute();').errors).toEqual([]);
+        expect(check('Number total = state.count;').errors).toEqual([]);
+        expect(check('Number total = missing;').errors).toEqual([]);
+    });
+
+    test('Resolves declared names and allows null and Object as a top type.', () =>
+    {
+        expect(check('Number a = 1;\nNumber b = a;').errors).toEqual([]);
+        expect(check('Number total = null;').errors).toEqual([]);
+        expect(check('Object anything = 42;').errors).toEqual([]);
+        expectTypeError('Number a = 1;\nString label = a;', 'Cannot assign Number to String.', 'Number a = 1;\nString label = '.length);
+    });
+
+    test('Checks assignments after the declaration.', () =>
+    {
+        expect(check('Number total = 0;\ntotal = 1;').errors).toEqual([]);
+        expectTypeError('Number total = 0;\ntotal = "many";', 'Cannot assign String to Number.', 'Number total = 0;\ntotal = '.length);
+    });
+
+    test('Rejects assignments to readonly variables.', () =>
+    {
+        const result = check('readonly Number total = 0;\ntotal = 1;');
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe('Cannot assign to readonly variable \'total\'.');
+    });
+
+    test('Ignores lookalikes: strings, member writes, comparisons, shadowing declarations.', () =>
+    {
+        const source = [
+            'Number total = 0;',
+            'log("total = oops");',
+            'state.total = "oops";',
+            'if(total == 1) {}',
+            'Function read = () => { const total = "shadow"; return total; };'
+        ].join('\n');
+        expect(check(source).errors).toEqual([]);
+    });
+
+    test('Ignores assignments to shadowing function parameters.', () =>
+    {
+        const source = 'Number total = 1;\nFunction set = (total) => { total = "s"; return total; };';
+        expect(check(source).errors).toEqual([]);
+    });
+
+    test('Ignores class field declarations with colliding names.', () =>
+    {
+        expect(check('String label = "a";\nclass Widget { label = 5; }').errors).toEqual([]);
+    });
+});
+
+describe('JavaScript backend.', () =>
+{
+    function compile(source)
+    {
+        return LgdCompiler.create().compileToJs(source);
+    }
+
+    test('Emits the right @type tag for all eight keywords.', () =>
+    {
+        const cases = [
+            [ 'Number n = 1;', 'number' ],
+            [ 'String s = "a";', 'string' ],
+            [ 'Boolean b = true;', 'boolean' ],
+            [ 'BigInt i = 1n;', 'bigint' ],
+            [ 'Symbol y = Symbol();', 'symbol' ],
+            [ 'Object o = {};', 'Object' ],
+            [ 'Array a = [];', 'any[]' ],
+            [ 'Function f = () => {};', 'Function' ]
+        ];
+        for(const [ source, tsType ] of cases)
+        {
+            const result = compile(source);
+            expect(result.errors).toEqual([]);
+            expect(result.code.split('\n')[0]).toBe(`/** @type {${tsType}} */`);
+        }
+    });
+
+    test('Mutable declarations become let, readonly become const.', () =>
+    {
+        expect(compile('Number n = 1;').code).toBe('/** @type {number} */\nlet n = 1;');
+        expect(compile('readonly Number n = 1;').code).toBe('/** @type {number} */\nconst n = 1;');
+    });
+
+    test('Exported declarations keep their export keyword.', () =>
+    {
+        expect(compile('export Number n = 1;').code).toBe('/** @type {number} */\nexport let n = 1;');
+        expect(compile('export readonly Number n = 1;').code).toBe('/** @type {number} */\nexport const n = 1;');
+    });
+
+    test('Merges a JSDoc block without an @type tag.', () =>
+    {
+        const result = compile('/** Adds one. */\nNumber n = 1;');
+        expect(result.errors).toEqual([]);
+        expect(result.code).toBe('/** Adds one.\n * @type {number}\n */\nlet n = 1;');
+    });
+
+    test('Preserves CRLF line endings in the emitted head.', () =>
+    {
+        const result = compile('Number n = 1;\r\nString s = "a";\r\n');
+        expect(result.errors).toEqual([]);
+        expect(result.code).toBe('/** @type {number} */\r\nlet n = 1;\r\n/** @type {string} */\r\nlet s = "a";\r\n');
+    });
+});
+
