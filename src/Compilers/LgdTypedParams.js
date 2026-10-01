@@ -484,6 +484,42 @@ function findMethodBodyRange(chunkText, fromIndex)
  * @returns {Array} the method parameter groups with types: {name, start, end, params,
  * hasTypes, bodyStart, bodyEnd}; offsets are relative to initializerText.
  */
+/**
+ * @description Skips leading whitespace and comments, returning the offset of the first code character.
+ * Object members often carry JSDoc blocks; the method name and parameter list follow them.
+ * @param {string} text the text to scan.
+ * @param {number} index the offset to start from.
+ * @returns {number} the first offset at or after the start that is not whitespace or a comment.
+ */
+function skipTrivia(text, index)
+{
+    while(index < text.length)
+    {
+        const character = text[index];
+        const next = index + 1 < text.length ? text[index + 1] : '';
+        if((/\s/).test(character))
+        {
+            index++;
+        }
+        else if(character === '/' && next === '/')
+        {
+            const newline = text.indexOf('\n', index);
+            index = newline === -1 ? text.length : newline + 1;
+        }
+        else if(character === '/' && next === '*')
+        {
+            const close = text.indexOf('*/', index + 2);
+            index = close === -1 ? text.length : close + 2;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return index;
+}
+
 function parseObjectMethodParams(initializerText)
 {
     const leading = initializerText.length - initializerText.trimStart().length;
@@ -496,25 +532,27 @@ function parseObjectMethodParams(initializerText)
     const groups = [];
     for(const chunk of splitTopLevelChunks(text))
     {
-        const name = readMethodName(chunk.text);
+        const triviaLength = skipTrivia(chunk.text, 0);
+        const memberText = chunk.text.slice(triviaLength);
+        const name = readMethodName(memberText);
         if(!name)
         {
             continue;
         }
 
-        const parsed = parseTypedParams(chunk.text);
+        const parsed = parseTypedParams(memberText);
         if(!parsed || !parsed.hasTypes)
         {
             continue;
         }
 
-        const body = findMethodBodyRange(chunk.text, parsed.end);
+        const body = findMethodBodyRange(memberText, parsed.end);
         if(!body)
         {
             continue;
         }
 
-        const chunkOffset = leading + chunk.start;
+        const chunkOffset = leading + chunk.start + triviaLength;
         for(const parameter of parsed.params)
         {
             if(parameter.typeStart !== -1)

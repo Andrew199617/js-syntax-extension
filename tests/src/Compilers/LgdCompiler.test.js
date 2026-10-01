@@ -610,6 +610,23 @@ describe('LGD typed function parameters.', () =>
         expect(compileJs(source).errors).toEqual([]);
     });
 
+    test('Finds typed methods preceded by JSDoc blocks.', () =>
+    {
+        const source = [
+            'Object o = {',
+            '  /** Adds one. */',
+            '  add(Number value) { return value; }',
+            '};'
+        ].join('\n');
+        const result = compileJs(source);
+        expect(result.errors).toEqual([]);
+        expect(result.code).toContain('add(value) { return value; }');
+
+        const mismatched = compileJs(source.replace('Number value', 'Number value = \'x\''));
+        expect(mismatched.errors.length).toBe(1);
+        expect(mismatched.errors[0].message).toBe('Cannot assign String to Number.');
+    });
+
     test('Checks method parameter defaults against their declared type.', () =>
     {
         expect(compileJs('Object o = { m(Number offset = 0) { return offset; } };').errors).toEqual([]);
