@@ -21,6 +21,7 @@ const LgdLanguageService = require('./Lgd/LgdLanguageService');
 const LgdHoverProvider = require('./Lgd/LgdHoverProvider');
 const LgdDefinitionProvider = require('./Lgd/LgdDefinitionProvider');
 const LgdReferenceProvider = require('./Lgd/LgdReferenceProvider');
+const LgdCompletionProvider = require('./Lgd/LgdCompletionProvider');
 const LgdCompiler = require('./Compilers/LgdCompiler');
 const LgdTransform = require('./Parsers/LgdTransform');
 const InvertIf = require('./Refactor/InvertIf');
@@ -297,9 +298,16 @@ function activate(context)
         LgdReferenceProvider.create(lgd.languageService)
     );
 
+    const lgdCompletionProvider = vscode.languages.registerCompletionItemProvider(
+        LGD_DOCUMENT_SELECTOR,
+        LgdCompletionProvider.create(lgd.languageService),
+        '.'
+    );
+
     context.subscriptions.push(lgdHoverProvider);
     context.subscriptions.push(lgdDefinitionProvider);
     context.subscriptions.push(lgdReferenceProvider);
+    context.subscriptions.push(lgdCompletionProvider);
 
     // The open event fires before activation when it triggers it, so pick up
     // any LGD documents that are already visible.

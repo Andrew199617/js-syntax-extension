@@ -43,6 +43,17 @@ function makeHover(contents, range)
 }
 
 /**
+ * @description Makes a fake vscode CompletionItem.
+ * @param {string} label the item label.
+ * @param {number} kind the item kind.
+ * @returns {object} the completion item.
+ */
+function makeCompletionItem(label, kind)
+{
+    return { label: label, kind: kind };
+}
+
+/**
  * @description Makes a fake vscode Diagnostic.
  * @param {object} range the range.
  * @param {string} message the message.
@@ -230,6 +241,8 @@ function createFakeVscode(jestApi)
         Range: makeRange,
         Location: makeLocation,
         Hover: makeHover,
+        CompletionItem: makeCompletionItem,
+        CompletionItemKind: { Method: 1, Property: 9 },
         Diagnostic: makeDiagnostic,
         WorkspaceEdit: makeWorkspaceEdit,
         DiagnosticSeverity: { Error: 0, Warning: 1 },

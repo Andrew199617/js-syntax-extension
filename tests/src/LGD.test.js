@@ -83,6 +83,7 @@ jest.mock('vscode', () => ({
         createDiagnosticCollection: jest.fn(() => ({ set: jest.fn(), delete: jest.fn(), dispose: jest.fn() })),
         registerCodeActionsProvider: jest.fn(() => ({ dispose: jest.fn() })),
         registerHoverProvider: jest.fn(() => ({ dispose: jest.fn() })),
+        registerCompletionItemProvider: jest.fn(() => ({ dispose: jest.fn() })),
         registerDefinitionProvider: jest.fn(() => ({ dispose: jest.fn() })),
         registerReferenceProvider: jest.fn(() => ({ dispose: jest.fn() }))
     },

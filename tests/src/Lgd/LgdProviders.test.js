@@ -4,6 +4,7 @@ const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
 const LgdHoverProvider = require('../../../src/Lgd/LgdHoverProvider');
 const LgdDefinitionProvider = require('../../../src/Lgd/LgdDefinitionProvider');
 const LgdReferenceProvider = require('../../../src/Lgd/LgdReferenceProvider');
+const LgdCompletionProvider = require('../../../src/Lgd/LgdCompletionProvider');
 
 /** @description Uri of the LGD document used across provider tests. */
 const LGD_URI = 'file:///workspace/examples/Calculator.lgd';
@@ -291,5 +292,77 @@ describe('LgdHoverProvider typed function parameters', () =>
             expect.anything()
         );
         expect(hover.contents).toEqual([{ language: 'typescript', value: 'let run: Function' }]);
+    });
+});
+
+describe('LgdCompletionProvider', () =>
+{
+    /** @description LGD source declaring an object literal and a member access. */
+    const OBJECT_TEXT = 'Object config = { host: "x", connect() {} };\nconfig.';
+
+    /** @description Line holding the member access. */
+    const ACCESS_LINE = 1;
+
+    /** @description Character just past the dot in 'config.'. */
+    const AFTER_DOT_CHARACTER = 7;
+
+    /** @description Character just past the dot in 'value.'. */
+    const VALUE_DOT_CHARACTER = 6;
+
+    /**
+     * @description Opens the object-literal document in a fresh language service.
+     * @returns {Promise<object>} the service and document.
+     */
+    async function openObjectDocument(source)
+    {
+        const diagnosticCollection = { set: () => undefined, delete: () => undefined };
+        const service = LgdLanguageService.create(diagnosticCollection, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+
+        return { service: service, document: document };
+    }
+
+    test('returns member completions after object dot', async () =>
+    {
+        const { service, document } = await openObjectDocument(OBJECT_TEXT);
+        const provider = LgdCompletionProvider.create(service);
+
+        const items = await provider.provideCompletionItems(document, new vscode.Position(ACCESS_LINE, AFTER_DOT_CHARACTER));
+
+        expect(items).toEqual([
+            { label: 'host', kind: vscode.CompletionItemKind.Property },
+            { label: 'connect', kind: vscode.CompletionItemKind.Method }
+        ]);
+    });
+
+    test('resolves the object when member text is partially typed', async () =>
+    {
+        const { service, document } = await openObjectDocument(`${OBJECT_TEXT}co`);
+        const provider = LgdCompletionProvider.create(service);
+
+        const items = await provider.provideCompletionItems(document, new vscode.Position(ACCESS_LINE, AFTER_DOT_CHARACTER + 2));
+
+        expect(items.map(item => item.label)).toEqual([ 'host', 'connect' ]);
+    });
+
+    test('returns null when the cursor is not after a member access', async () =>
+    {
+        const { service, document } = await openObjectDocument(OBJECT_TEXT);
+        const provider = LgdCompletionProvider.create(service);
+
+        const items = await provider.provideCompletionItems(document, new vscode.Position(0, 2));
+
+        expect(items).toBeNull();
+    });
+
+    test('returns null when the object has no known members', async () =>
+    {
+        const { service, document } = await openObjectDocument('Number value = 0;\nvalue.');
+        const provider = LgdCompletionProvider.create(service);
+
+        const items = await provider.provideCompletionItems(document, new vscode.Position(ACCESS_LINE, VALUE_DOT_CHARACTER));
+
+        expect(items).toBeNull();
     });
 });
