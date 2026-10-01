@@ -141,9 +141,24 @@ function resolveParamType(typeName, scope, errors, offset)
  * @param {number} offset the offset whose enclosing functions supply parameters.
  * @returns {Map} the scope with enclosing typed parameters shadowing outer bindings.
  */
+/**
+ * @description Tells whether an offset lies within a typed function's parameter scope:
+ * its body or its parameter list. Object method parameter defaults sit in the
+ * parameter list, before the body starts, so both ranges count as enclosing.
+ * @param {Object} typedFunction the {bodyStart, bodyEnd, paramStart, paramEnd} record.
+ * @param {number} offset the offset to test.
+ * @returns {boolean} true when the offset is in the body or the parameter list.
+ */
+function functionEnclosesOffset(typedFunction, offset)
+{
+    const inBody = offset >= typedFunction.bodyStart && offset < typedFunction.bodyEnd;
+    const inParams = offset >= typedFunction.paramStart && offset < typedFunction.paramEnd;
+    return inBody || inParams;
+}
+
 function scopeWithParams(baseScope, typedFunctions, offset)
 {
-    const enclosing = typedFunctions.filter(typedFunction => offset >= typedFunction.bodyStart && offset < typedFunction.bodyEnd);
+    const enclosing = typedFunctions.filter(typedFunction => functionEnclosesOffset(typedFunction, offset));
     if(enclosing.length === 0)
     {
         return baseScope;
@@ -173,7 +188,7 @@ function isTypedParamAt(typedFunctions, nameStart, name)
 {
     for(const typedFunction of typedFunctions)
     {
-        if(nameStart >= typedFunction.bodyStart && nameStart < typedFunction.bodyEnd)
+        if(functionEnclosesOffset(typedFunction, nameStart))
         {
             for(const param of typedFunction.params)
             {
@@ -719,6 +734,11 @@ function checkAssignments(context)
 
         const extendedScope = scopeWithParams(scope, typedFunctions, nameStart);
         const entry = extendedScope.get(name);
+        if(!entry)
+        {
+            continue;
+        }
+
         const required = requireAt.get(valueStart);
         const inferred = required ? required.exportName : inferExpression(valueText, extendedScope, externalsByName);
         if(entry.readonly)
