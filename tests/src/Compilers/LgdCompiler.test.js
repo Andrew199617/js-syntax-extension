@@ -355,6 +355,57 @@ describe('LGD type checking.', () =>
     {
         expect(check('String label = "a";\nclass Widget { label = 5; }').errors).toEqual([]);
     });
+
+    test('Resolves an assignment to the nearest preceding declaration when a name is redeclared.', () =>
+    {
+        const source = [
+            'Object widget = {',
+            '    findNext: function() {',
+            '        Number index = 0;',
+            '        index = 1;',
+            '    },',
+            '    findPrevious: function() {',
+            '        readonly Number index = 2;',
+            '    }',
+            '};'
+        ].join('\n');
+        expect(check(source).errors).toEqual([]);
+    });
+
+    test('Ignores an unrelated block when resolving the visible declaration.', () =>
+    {
+        const source = [
+            'Object widget = {',
+            '    run: function() {',
+            '        Number index = 0;',
+            '        {',
+            '            Number other = index;',
+            '        }',
+            '        readonly Number index2 = 1;',
+            '        index = 2;',
+            '    }',
+            '};'
+        ].join('\n');
+        expect(check(source).errors).toEqual([]);
+    });
+
+    test('Rejects an assignment to a readonly local shadowed by a later mutable declaration.', () =>
+    {
+        const source = [
+            'Object widget = {',
+            '    run: function() {',
+            '        readonly Number index = 0;',
+            '        index = 1;',
+            '    },',
+            '    walk: function() {',
+            '        Number index = 2;',
+            '    }',
+            '};'
+        ].join('\n');
+        const result = check(source);
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0].message).toBe('Cannot assign to readonly variable \'index\'.');
+    });
 });
 
 describe('JavaScript backend.', () =>

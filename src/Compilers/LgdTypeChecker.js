@@ -674,6 +674,68 @@ function isSkippedAssignment(scan, nameStart, name)
 }
 
 /**
+ * @description Resolves the binding an assignment writes to. The scope map is flat and later
+ * declarations overwrite earlier ones, so the nearest preceding declaration wins, matching
+ * block scoping; a typed parameter still shadows an outer declaration, but a local declared
+ * inside the parameter's function shadows the parameter.
+ * @param {Object} context the resolution context: declarations (parsed declarations in document
+ * order), declarationEntry (each declaration to its scope entry), typedFunctions (the
+ * {bodyStart, bodyEnd, params} records of functions with typed parameters), and extendedScope
+ * (the scope with enclosing typed parameters overlaid).
+ * @param {string} name the assigned name.
+ * @param {number} nameStart the offset of the assigned name.
+ * @returns {Object|undefined} the scope entry for the visible binding, if any.
+ */
+function resolveAssignmentEntry(context, name, nameStart)
+{
+    const { declarations, declarationEntry, typedFunctions, extendedScope } = context;
+    let paramEntry;
+    let paramBodyStart = -1;
+    for(const typedFunction of typedFunctions)
+    {
+        if(!functionEnclosesOffset(typedFunction, nameStart))
+        {
+            continue;
+        }
+
+        for(const param of typedFunction.params)
+        {
+            if(param.name === name && typedFunction.bodyStart > paramBodyStart)
+            {
+                paramEntry = param.entry;
+                paramBodyStart = typedFunction.bodyStart;
+            }
+        }
+    }
+
+    let nearest = null;
+    for(const declaration of declarations)
+    {
+        if(declaration.name !== name || declaration.headStart >= nameStart)
+        {
+            continue;
+        }
+
+        if(!nearest || declaration.headStart > nearest.headStart)
+        {
+            nearest = declaration;
+        }
+    }
+
+    if(nearest && (!paramEntry || nearest.headStart > paramBodyStart))
+    {
+        return declarationEntry.get(nearest);
+    }
+
+    if(paramEntry)
+    {
+        return paramEntry;
+    }
+
+    return extendedScope.get(name);
+}
+
+/**
  * @description Checks plain assignments to declared variables after their declaration.
  * @param {Object} context the assignment-check context: masked, declarations, scope,
  * errors, externalsByName, requireAt, and typedFunctions (the {bodyStart, bodyEnd,
@@ -682,7 +744,8 @@ function isSkippedAssignment(scan, nameStart, name)
  */
 function checkAssignments(context)
 {
-    const { masked, declarations, scope, errors, externalsByName, requireAt, typedFunctions = [] } = context;
+    const { masked, declarations, scope, errors, externalsByName, requireAt, typedFunctions = [],
+        declarationEntry = new Map() } = context;
 
     const nameSet = new Set(scope.keys());
     for(const typedFunction of typedFunctions)
@@ -733,7 +796,8 @@ function checkAssignments(context)
         }
 
         const extendedScope = scopeWithParams(scope, typedFunctions, nameStart);
-        const entry = extendedScope.get(name);
+        const entry = resolveAssignmentEntry({ declarations: declarations, declarationEntry: declarationEntry,
+            typedFunctions: typedFunctions, extendedScope: extendedScope }, name, nameStart);
         if(!entry)
         {
             continue;
@@ -803,6 +867,7 @@ function checkTypes(content, declarations, externals = new Map())
 {
     const errors = [];
     const scope = new Map();
+    const declarationEntry = new Map();
     const masked = maskCode(content);
     const externalsByName = new Map();
     for(const info of externals.values())
@@ -883,17 +948,20 @@ function checkTypes(content, declarations, externals = new Map())
             }));
         }
 
-        scope.set(declaration.name, {
+        const entry = {
             keyword: effectiveKeyword(resolved, inferred, scope, externalsByName),
             readonly: declaration.readonly,
             kind: resolved.kind,
             typeName: resolved.typeName,
             ref: resolved.ref
-        });
+        };
+        scope.set(declaration.name, entry);
+        declarationEntry.set(declaration, entry);
     }
 
     checkAssignments({ masked: masked, declarations: declarations, scope: scope, errors: errors,
-        externalsByName: externalsByName, requireAt: requireAt, typedFunctions: typedFunctions });
+        externalsByName: externalsByName, requireAt: requireAt, typedFunctions: typedFunctions,
+        declarationEntry: declarationEntry });
     return errors;
 }
 
