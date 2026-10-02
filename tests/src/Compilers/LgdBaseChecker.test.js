@@ -37,7 +37,8 @@ describe('LGD base constructor verification.', () =>
     ])('Rejects known parameter-count mismatches for base(%s).', (argumentsText, message) =>
     {
         const source = classSource('Number amount', argumentsText);
-        expect(checkSource(source)).toEqual([{ offset: source.indexOf('base(') + 'base('.length, message: message }]);
+        const start = source.indexOf('base(') + 'base('.length;
+        expect(checkSource(source)).toEqual([{ offset: start, endOffset: start + argumentsText.length, message: message }]);
     });
 
     test('Reports a literal mismatch at the exact argument offset.', () =>
@@ -47,6 +48,7 @@ describe('LGD base constructor verification.', () =>
         const invalid = classSource('Number amount, String label', '1, false');
         expect(checkSource(invalid)).toEqual([{
             offset: invalid.indexOf('false'),
+            endOffset: invalid.indexOf('false') + 'false'.length,
             message: "Base 'Parent' argument 2 must be String, but received Boolean."
         }]);
     });

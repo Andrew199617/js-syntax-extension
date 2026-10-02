@@ -183,7 +183,7 @@ const LgdCompiler = {
 
         for(const baseError of LgdBaseChecker.check(content, found, externals))
         {
-            errors.push(this.createError(content, baseError.offset, baseError.message));
+            errors.push(this.createError(content, baseError.offset, baseError.message, baseError.endOffset));
         }
 
         const declarations = this.buildTree(found);
@@ -643,12 +643,19 @@ const LgdCompiler = {
      * @param {string} content the LGD source text.
      * @param {number} offset the error offset.
      * @param {string} message the error message.
+     * @param {number|null} endOffset the optional exclusive source end offset.
      * @returns {Object} the error.
      */
-    createError(content, offset, message)
+    createError(content, offset, message, endOffset = null)
     {
         const line = content.slice(0, offset).split('\n').length;
-        return { message: message, line: line, offset: offset };
+        const error = { message: message, line: line, offset: offset };
+        if(Number.isInteger(endOffset))
+        {
+            error.endOffset = endOffset;
+        }
+
+        return error;
     }
 };
 

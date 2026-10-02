@@ -117,6 +117,35 @@ describe('LgdLanguageService', () =>
         expect(setCalls[0].diagnostics[0].range.start.line).toBe(0);
     });
 
+    test.each([
+        [ '42, "Title"', '42' ],
+        [ '42 /* explanation */, "Title"', '42' ],
+        [ '"command"', '"command"' ],
+        [ '', '' ],
+        [ '\r\n        "command"\r\n    ', '\r\n        "command"\r\n    ' ]
+    ])('base diagnostics preserve exact argument ranges inside parentheses with CRLF: %s', async (argumentsText, highlighted) =>
+    {
+        const { service, setCalls } = createService();
+        const source = [
+            'class Parent { Parent(String command, String title) {} }',
+            'class Child : Parent {',
+            `    Child() : base(${argumentsText}) {}`,
+            '}'
+        ].join('\r\n');
+        const document = makeTextDocument(LGD_URI, source);
+        const state = await service.openDocument(document);
+        const start = source.indexOf('base(') + 'base('.length;
+        const end = start + highlighted.length;
+
+        expect(state.errors).toHaveLength(1);
+        expect(state.errors[0].offset).toBe(start);
+        expect(state.errors[0].endOffset).toBe(end);
+        expect(setCalls[0].diagnostics).toHaveLength(1);
+        const diagnostic = setCalls[0].diagnostics[0];
+        expect(diagnostic.range).toEqual(new vscode.Range(document.positionAt(start), document.positionAt(end)));
+        expect(document.getText(diagnostic.range)).toBe(highlighted);
+    });
+
     test('closeDocument drops the state and clears diagnostics', async () =>
     {
         const { service, deleted } = createService();

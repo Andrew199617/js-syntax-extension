@@ -357,7 +357,8 @@ function baseArguments(content, derived)
     const source = content.slice(start, constructor.baseArgumentsEnd);
     return splitTopLevelChunks(`(${source})`).filter(chunk => valueStart(chunk.text) < chunk.text.length).map(chunk => ({
         text: chunk.text,
-        offset: start + chunk.start - 1 + valueStart(chunk.text)
+        offset: start + chunk.start - 1 + valueStart(chunk.text),
+        endOffset: start + chunk.start - 1 + maskCode(chunk.text).trimEnd().length
     }));
 }
 
@@ -395,7 +396,9 @@ function checkArguments(context)
         }
 
         const offset = derived.constructorMember?.baseArgumentsStart;
-        errors.push({ offset: Number.isInteger(offset) && offset >= 0 ? offset : derived.baseStart,
+        const explicitBaseCall = Number.isInteger(offset) && offset >= 0;
+        errors.push({ offset: explicitBaseCall ? offset : derived.baseStart,
+            endOffset: explicitBaseCall ? derived.constructorMember.baseArgumentsEnd : derived.baseEnd,
             message: `Base '${derived.baseName}' expects ${expected} argument(s), but received ${args.length}.` });
     }
 
@@ -412,7 +415,7 @@ function checkArguments(context)
         if(isTypeMismatch(parameter.typeName, inferred, scope))
         {
             const actual = scope.get(inferred)?.typeName || inferred;
-            errors.push({ offset: args[index].offset,
+            errors.push({ offset: args[index].offset, endOffset: args[index].endOffset,
                 message: `Base '${derived.baseName}' argument ${index + 1} must be ${parameter.typeName}, but received ${actual}.` });
         }
     }
