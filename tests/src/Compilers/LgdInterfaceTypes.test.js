@@ -7,7 +7,7 @@ function diagnostics(moduleName, source)
     const typescript = require(moduleName);
 
     const filename = '/tmp/lgd-interface-types.js';
-    const options = { allowJs: true, checkJs: true, noEmit: true, strict: true, skipLibCheck: true, types: [] };
+    const options = { allowJs: true, checkJs: true, noEmit: true, strict: true, skipLibCheck: true, types: [], target: typescript.ScriptTarget.ES2020 };
     const host = typescript.createCompilerHost(options);
     const getSourceFile = host.getSourceFile.bind(host);
     host.getSourceFile = (name, languageVersion) =>
@@ -87,6 +87,25 @@ describe('editor-only interface type evidence', () =>
         expect(result.code).toContain('@typedef {{name: string}} IBoth');
         expect(diagnostics('typescript-test-5-9', result.code)).toEqual([]);
         expect(diagnostics('typescript-test-5-9', result.code.replace('@param {IBoth}', '@param {IRead}'))).toEqual([expect.stringContaining('read-only property')]);
+    });
+
+    test.each([ 'oloo', 'class' ])('documents omitted abstract override annotations in %s output', javascriptObjectModel =>
+    {
+        const source = [
+            'abstract class Base { abstract Number run(Number count); }',
+            'class Child : Base { override run(count) { return count; } }'
+        ].join('\n');
+        const result = LgdCompiler.create().compileToJs(source, new Map(), { javascriptObjectModel: javascriptObjectModel });
+        expect(result.errors).toEqual([]);
+        expect(result.code).toContain('@param {number} count');
+        expect(result.code).toContain('@returns {number}');
+        const prefix = 'const Oloo = { assign: Object.assign };\n';
+        expect(diagnostics('typescript-test-5-9', prefix + result.code)).toEqual([]);
+        const receiver = javascriptObjectModel === 'class' ? 'Child.create()' : 'Child';
+        expect(diagnostics('typescript-test-5-9', `${prefix}${result.code}\n${receiver}.run("wrong");`)).toEqual([expect.stringContaining("not assignable to parameter of type 'number'")]);
+        const map = LgdSourceMap.create(result.mappings);
+        const returnStart = source.indexOf('return count');
+        expect(result.code.slice(map.toOutput(returnStart), map.toOutput(returnStart) + 'return count'.length)).toBe('return count');
     });
 
     test('keeps equal interface names in their own lexical scopes', () =>

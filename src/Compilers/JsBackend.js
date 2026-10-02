@@ -90,14 +90,51 @@ const JsBackend = {
                     text: ''
                 });
             }
+        }
 
-            if(group.methodStart !== undefined)
-            {
-                edits.push(this.methodJsdocEdit(declaration, group, map));
-            }
+        for(const group of this.methodDocumentationGroups(declaration))
+        {
+            edits.push(this.methodJsdocEdit(declaration, group, map));
         }
 
         return LgdSourceMap.applyEdits(compiledInitializer, segments, edits);
+    },
+
+    /** @description Merges inherited type evidence into documentation without inventing physical type spans. */
+    methodDocumentationGroups(declaration)
+    {
+        const groups = new Map();
+        for(const group of lgdTypedParams.typedParamGroups(declaration))
+        {
+            if(group.methodStart !== undefined)
+            {
+                groups.set(group.methodStart, group);
+            }
+        }
+
+        for(const contract of declaration.inheritedMethodContracts || [])
+        {
+            const inherited = {
+                ...contract,
+                returnTypeName: contract.opaqueReturn ? '*' : contract.returnTypeName,
+                params: contract.params.map(parameter => ({ ...parameter, typeName: parameter.opaqueType ? '*' : parameter.typeName }))
+            };
+            const physical = groups.get(inherited.methodStart);
+            if(!physical)
+            {
+                groups.set(inherited.methodStart, inherited);
+                continue;
+            }
+
+            const params = physical.params.map((parameter, index) => ({
+                ...parameter, typeName: parameter.typeName || inherited.params[index]?.typeName
+            }));
+
+            groups.set(inherited.methodStart, { ...inherited, ...physical, params: params,
+                returnTypeName: physical.returnTypeName || inherited.returnTypeName });
+        }
+
+        return [...groups.values()];
     },
 
     /**
