@@ -5,6 +5,7 @@ const GenerateTypings = require('../../src/GenerateTypings');
 const FileIO = require('../../src/Logging/FileIO');
 const StatusBarMessage = require('../../src/Logging/StatusBarMessage');
 const extension = require('../../src/LGD');
+const LgdCompiler = require('../../src/Compilers/LgdCompiler');
 
 let previousLgd;
 
@@ -22,6 +23,12 @@ function deferred()
 function nextTurn()
 {
     return new Promise(resolve => setImmediate(resolve));
+}
+
+function compileCurrent()
+{
+    const registration = vscode.commands.registerCommand.mock.calls.find(([name]) => name === 'lgd.generateTypings');
+    return registration[1]();
 }
 
 function compileAll()
@@ -129,6 +136,7 @@ beforeEach(() =>
 {
     previousLgd = globalThis.lgd;
     vscode.workspace.rootPath = 'workspace';
+    vscode.window.activeTextEditor = undefined;
     fs.exists.mockReset();
     fs.promises.readFile.mockReset();
     FileIO.rename.mockReset();
@@ -415,6 +423,101 @@ test.each([
     expect(vscode.languages[registration].mock.calls[0][0]).toEqual({ scheme: 'file', language: 'lgd' });
 });
 
+describe('manual LGD compilation', () =>
+{
+    test.each([ 'Number = ;', 'Number total = "many";' ])('does not announce success when compilation fails for %s', async source =>
+    {
+        vscode.window.activeTextEditor = {
+            document: { fileName: path.join('workspace', 'broken.lgd'), getText: () => source }
+        };
+
+        await compileCurrent();
+
+        expect(FileIO.writeFileContents).not.toHaveBeenCalled();
+        expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+        expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('.js output not updated');
+    });
+
+    test('uses the saved source snapshot while reading sibling exports', async () =>
+    {
+        const siblingRead = deferred();
+        fs.promises.readFile.mockReturnValueOnce(siblingRead.promise);
+        let source = "Number value = require('./Counter.js');";
+        vscode.window.activeTextEditor = {
+            document: { fileName: path.join('workspace', 'consumer.lgd'), getText: () => source }
+        };
+
+        const compilation = compileCurrent();
+        source = 'String value = "edited";';
+        siblingRead.resolve('Number Counter = 1;\nmodule.exports = Counter;');
+        await compilation;
+
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(
+            path.join('workspace', 'consumer.js'),
+            "/** @type {number} */\nlet value = require('./Counter.js');"
+        );
+    });
+
+    test('announces success only after the output write finishes', async () =>
+    {
+        const outputWrite = deferred();
+        FileIO.writeFileContents.mockReturnValueOnce(outputWrite.promise);
+        vscode.window.activeTextEditor = {
+            document: { fileName: path.join('workspace', 'working.lgd'), getText: () => 'Number count = 1;' }
+        };
+
+        const compilation = compileCurrent();
+        await nextTurn();
+        expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+        outputWrite.resolve();
+        await compilation;
+
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(
+            path.join('workspace', 'working.js'),
+            '/** @type {number} */\nlet count = 1;'
+        );
+        expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('LGD: Compiled .lgd file into .js file.');
+    });
+});
+
+describe('LGD compile-all results', () =>
+{
+    beforeEach(() =>
+    {
+        lgd.configuration.createDebugLog = false;
+        vscode.workspace.findFiles.mockImplementation(pattern => Promise.resolve(pattern.includes('.lgd')
+            ? [{ fsPath: path.join('workspace', 'consumer.lgd') }]
+            : []));
+    });
+
+    test('preserves output when a sibling LGD export has an incompatible type', async () =>
+    {
+        fs.promises.readFile.mockImplementation(filename => Promise.resolve(filename.endsWith('consumer.lgd')
+            ? "String value = require('./Counter.js');"
+            : 'Number Counter = 1;\nmodule.exports = Counter;'));
+
+        await compileAll();
+
+        expect(FileIO.writeFileContents).not.toHaveBeenCalled();
+        expect(getOutput()).toContain('0 compiled, 0 skipped, 1 failed; 1 errors, 0 warnings');
+        expect(getOutput()).toContain('Cannot assign Counter to String.');
+    });
+
+    test('writes warning-only results and counts their warnings separately', async () =>
+    {
+        fs.promises.readFile.mockResolvedValue('Number value = 1;');
+        jest.spyOn(LgdCompiler, 'compileToJs').mockReturnValue({
+            code: 'let value = 1;',
+            errors: [{ severity: 'warning', message: 'A compiler warning.', line: 1, offset: 0 }]
+        });
+
+        await compileAll();
+
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'consumer.js'), 'let value = 1;');
+        expect(getOutput()).toContain('1 compiled, 0 skipped, 0 failed; 0 errors, 1 warnings');
+    });
+});
+
 describe('LGD compile on save', () =>
 {
     function saveLgdDocument(fileName, source)
@@ -452,6 +555,64 @@ describe('LGD compile on save', () =>
         expect(FileIO.writeFileContents).not.toHaveBeenCalled();
         expect(vscode.window.createStatusBarItem).toHaveBeenCalledTimes(1);
         expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 error(s)');
+    });
+
+    test.each([
+        [ 'String', false ],
+        [ 'Number', true ]
+    ])('checks sibling exports when saving a %s import', async (typeName, shouldWrite) =>
+    {
+        fs.promises.readFile.mockResolvedValue('Number Counter = 1;\nmodule.exports = Counter;');
+
+        saveLgdDocument(path.join('workspace', 'consumer.lgd'), `${typeName} value = require('./Counter.js');`);
+        await nextTurn();
+        await nextTurn();
+
+        expect(fs.promises.readFile).toHaveBeenCalledWith(path.resolve('workspace', 'Counter.lgd'), 'utf8');
+        expect(FileIO.writeFileContents).toHaveBeenCalledTimes(shouldWrite ? 1 : 0);
+        if(shouldWrite)
+        {
+            expect(FileIO.writeFileContents).toHaveBeenCalledWith(
+                path.join('workspace', 'consumer.js'),
+                "/** @type {number} */\nlet value = require('./Counter.js');"
+            );
+        }
+        else
+        {
+            expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('.js output not updated');
+        }
+    });
+
+    test('saving a mix of errors and warnings blocks output and counts only errors', async () =>
+    {
+        jest.spyOn(LgdCompiler, 'compileToJs').mockReturnValue({
+            code: 'invalid output',
+            errors: [
+                { severity: 'warning', message: 'A compiler warning.', line: 1, offset: 0 },
+                { message: 'A compiler error.', line: 1, offset: 0 }
+            ]
+        });
+
+        saveLgdDocument(path.join('workspace', 'broken.lgd'), 'Number value = "many";');
+        await nextTurn();
+        await nextTurn();
+
+        expect(FileIO.writeFileContents).not.toHaveBeenCalled();
+        expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 error(s)');
+    });
+
+    test('saving warning-only LGD still updates the output', async () =>
+    {
+        jest.spyOn(LgdCompiler, 'compileToJs').mockReturnValue({
+            code: 'let value = 1;',
+            errors: [{ severity: 'warning', message: 'A compiler warning.', line: 1, offset: 0 }]
+        });
+
+        saveLgdDocument(path.join('workspace', 'working.lgd'), 'Number value = 1;');
+        await nextTurn();
+        await nextTurn();
+
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'working.js'), 'let value = 1;');
     });
 
     test('saving valid LGD writes the compiled .js next to the source', async () =>

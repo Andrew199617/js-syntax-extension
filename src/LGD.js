@@ -60,22 +60,36 @@ function clearPendingSaves()
 }
 
 /**
+ * @description Returns blocking LGD errors, excluding compiler warnings.
+ * @param {LgdCompileResultType} result the compiler result.
+ * @returns {Array} the blocking diagnostics.
+ */
+function getLgdErrors(result)
+{
+    return result.errors.filter(error => error.severity !== 'warning');
+}
+
+/**
  * @description Compiles an LGD document to JavaScript next to the source file.
  * When the compiler reports errors the previous output is left untouched, so a
  * broken save never overwrites working JavaScript with invalid code.
  * @param {object} document the saved LGD document.
- * @returns {Promise<void>}
+ * @returns {Promise<LgdCompileResultType>} the compiler result.
  */
 async function compileLgdDocument(document)
 {
-    const result = LgdCompiler.create().compileToJs(document.getText());
-    if(result.errors.length > 0)
+    const uri = document.uri || { fsPath: document.fileName };
+    const snapshot = Document.create(document.fileName, document.getText(), uri);
+    const externals = await lgd.languageService.collectExternalTypes(snapshot);
+    const result = LgdCompiler.create().compileToJs(snapshot.getText(), externals);
+    const errors = getLgdErrors(result);
+    if(errors.length > 0)
     {
-        StatusBarMessage.show(`LGD: ${result.errors.length} error(s), .js output not updated.`, StatusBarMessageTypes.ERROR);
+        StatusBarMessage.show(`LGD: ${errors.length} error(s), .js output not updated.`, StatusBarMessageTypes.ERROR);
         return result;
     }
 
-    const parsedPath = path.parse(document.fileName);
+    const parsedPath = path.parse(snapshot.fileName);
     const jsPath = path.join(parsedPath.dir, `${parsedPath.name}.js`);
     await FileIO.writeFileContents(jsPath, result.code);
 
@@ -176,14 +190,14 @@ async function compileLgdFile(uri, report)
     {
         const text = await fs.promises.readFile(uri.fsPath, 'utf8');
         const result = await compileLgdDocument({ fileName: uri.fsPath, getText: () => text });
-        const failed = result.errors.length > 0;
+        const failed = getLgdErrors(result).length > 0;
         report.add({
             errorOccurred: failed,
             compiled: !failed,
             document: { fileName: uri.fsPath },
             logger: { log: [] },
             diagnostics: result.errors.map(error => ({
-                severity: vscode.DiagnosticSeverity.Error,
+                severity: error.severity === 'warning' ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error,
                 range: { start: { line: error.line - 1, character: error.offset - (text.lastIndexOf('\n', error.offset - 1) + 1) } },
                 message: `LGD: ${error.message}`
             }))
@@ -366,8 +380,12 @@ function activate(context)
             const document = activeEditor.document;
             if(document.fileName.endsWith(LGD_EXT))
             {
-                await compileLgdDocument(document);
-                vscode.window.showInformationMessage('LGD: Compiled .lgd file into .js file.');
+                const result = await compileLgdDocument(document);
+                if(getLgdErrors(result).length === 0)
+                {
+                    vscode.window.showInformationMessage('LGD: Compiled .lgd file into .js file.');
+                }
+
                 return;
             }
 
