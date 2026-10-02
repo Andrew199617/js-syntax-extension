@@ -2,6 +2,7 @@ const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
 const LgdTypeChecker = require('./LgdTypeChecker');
+const LgdClassSyntax = require('./LgdClassSyntax');
 const { parseTypedParams, parseObjectMethodParams, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
 const { maskCode } = require('./LgdInfer');
 
@@ -103,8 +104,9 @@ const LgdCompiler = {
      */
     parse(content, externals = new Map())
     {
-        const found = [];
-        const errors = [];
+        const classes = LgdClassSyntax.parse(content, this);
+        const found = classes.declarations;
+        const errors = classes.errors;
         const masked = maskCode(content, true);
         const failedHeadStarts = [];
         declarationHeadPattern.lastIndex = 0;
@@ -170,6 +172,7 @@ const LgdCompiler = {
             headMatch = declarationHeadPattern.exec(masked);
         }
 
+        found.sort((first, second) => first.headStart - second.headStart);
         this.collectMalformedErrors(masked, found, failedHeadStarts, errors);
 
         for(const typeError of LgdTypeChecker.checkTypes(content, found, externals))
@@ -293,6 +296,19 @@ const LgdCompiler = {
                 verbatim: true
             });
             output += gap;
+
+            if(declaration.kind === 'class')
+            {
+                const lowered = LgdClassSyntax.emit(content, backend, declaration, this);
+                for(const segment of lowered.segments)
+                {
+                    segments.push(this.shiftSegment(segment, output.length));
+                }
+
+                output += lowered.code;
+                cursor = declaration.end;
+                continue;
+            }
 
             const head = backend.emitHead(declaration);
             segments.push({

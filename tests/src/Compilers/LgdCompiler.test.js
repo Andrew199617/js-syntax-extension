@@ -351,9 +351,11 @@ describe('LGD type checking.', () =>
         expect(check(source).errors).toEqual([]);
     });
 
-    test('Ignores class field declarations with colliding names.', () =>
+    test('Reports unsupported LGD fields without confusing them with outer variables.', () =>
     {
-        expect(check('String label = "a";\nclass Widget { label = 5; }').errors).toEqual([]);
+        const errors = check('String label = "a";\nclass Widget { label = 5; }').errors;
+        expect(errors).toHaveLength(1);
+        expect(errors[0].message).toContain('Fields, static, and private members are not supported');
     });
 });
 
