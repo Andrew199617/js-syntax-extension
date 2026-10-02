@@ -3,6 +3,7 @@ const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
 const LgdTypeChecker = require('./LgdTypeChecker');
 const LgdClassSyntax = require('./LgdClassSyntax');
+const LgdBaseChecker = require('./LgdBaseChecker');
 const { parseTypedParams, parseObjectMethodParams, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
 const { maskCode } = require('./LgdInfer');
 
@@ -178,6 +179,11 @@ const LgdCompiler = {
         for(const typeError of LgdTypeChecker.checkTypes(content, found, externals))
         {
             errors.push(this.createError(content, typeError.offset, typeError.message));
+        }
+
+        for(const baseError of LgdBaseChecker.check(content, found, externals))
+        {
+            errors.push(this.createError(content, baseError.offset, baseError.message));
         }
 
         const declarations = this.buildTree(found);
