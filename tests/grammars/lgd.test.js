@@ -130,6 +130,30 @@ describe('LGD TextMate grammar.', () =>
         assertScope(tokens, 'total', nameScope);
     });
 
+    test('Highlights class names and colon-style bases as types while ordinary methods remain functions.', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'export class GoToAssignment : BaseCommand {',
+            '    GoToAssignment() : base("command", "title") {}',
+            '    async executeCommand() {',
+            '        Number total = 1;',
+            '    }',
+            '}'
+        ].join('\n'));
+        assertScope(tokens, 'GoToAssignment', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'BaseCommand', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'export', exportScope);
+        assertScope(tokens, 'executeCommand', 'entity.name.function.js');
+        assertScope(tokens, 'Number', typeScope);
+        assertScope(tokens, 'total', nameScope);
+    });
+
+    test('Does not highlight class-looking comments or strings as class declarations.', () =>
+    {
+        const tokens = tokenize(grammar, '// class Example : Base {}\nconst example = `class Fake : Base {}`;');
+        assert.ok(tokens.every(token => !token.scopes.includes('entity.name.type.class.lgd')));
+    });
+
     test('Highlights readonly, export, and string declarations.', () =>
     {
         const tokens = tokenize(grammar, 'export readonly String name = "Andrew";');

@@ -6,6 +6,9 @@
 	"name": "LGD",
 	"patterns": [
 		{
+			"include": "#class-declaration"
+		},
+		{
 			"include": "#typed-declaration"
 		},
 		{
@@ -19,6 +22,9 @@
 		"L:source.lgd -comment -string": {
 			"comment": "Apply LGD declaration rules inside nested JavaScript blocks, excluding comments and strings.",
 			"patterns": [
+				{
+					"include": "#class-declaration"
+				},
 				{
 					"include": "#typed-declaration"
 				},
@@ -55,6 +61,37 @@
 			},
 			"comment": "A line starting with a type keyword that is not a full declaration: malformed, or a call like Number(\"5\").",
 			"match": "^[ \\t]*(?:export[ \\t]+)?(?:readonly[ \\t]+)?(Number|String|Boolean|BigInt|Symbol|Object|Array|Function)\\b(?![ \\t]*\\()"
+		},
+		"class-declaration": {
+			"name": "meta.class.lgd",
+			"comment": "LGD class names and colon-style bases use theme class scopes; semantic tokens distinguish same-name constructors from methods.",
+			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?(class)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
+			"beginCaptures": {
+				"2": {
+					"name": "keyword.control.export.lgd"
+				},
+				"3": {
+					"name": "storage.type.class.lgd"
+				},
+				"4": {
+					"name": "entity.name.type.class.lgd"
+				},
+				"5": {
+					"name": "punctuation.separator.inheritance.lgd"
+				},
+				"6": {
+					"name": "entity.name.type.class.lgd"
+				}
+			},
+			"end": "(?<=\\})",
+			"patterns": [
+				{
+					"include": "source.js#comment"
+				},
+				{
+					"include": "source.js#class-or-interface-body"
+				}
+			]
 		}
 	},
 	"scopeName": "source.lgd"

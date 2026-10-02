@@ -39,6 +39,33 @@
 
 # Features
 
+## LGD classes with OLOO instances
+
+In `.lgd` files, use `class`, a colon for inheritance, and the class name for its constructor:
+
+```lgd
+const { Oloo } = require('@mavega/oloo');
+readonly Object BaseCommand = require('./BaseCommand');
+
+class GoToAssignment : BaseCommand {
+    GoToAssignment() : base("lgd.goToAssignment", "Go To Assignment") {
+        this.enabled = true;
+    }
+
+    async executeCommand() {
+        // Command implementation
+    }
+}
+
+const command = GoToAssignment.create();
+```
+
+These declarations compile to OLOO objects, preserving the `.create()` API. Constructor assignments initialize each instance; ordinary methods, async methods, getters and setters stay on the linked objects. Derived classes use the existing `Oloo` binding to call `Oloo.assign(BaseCommand.create(...), GoToAssignment)`. Existing OLOO base objects continue to work, including `Oloo.base(this, "methodName")` dispatch.
+
+Use typed parameters such as `String title` and `Number offset = 0` in constructors and methods. A missing constructor or base initializer calls the base's `.create()` with no arguments. Known base signatures are checked for argument counts and types; unresolved values remain conservative. Class names, base names and same-name constructors use your theme's class/type highlighting; ordinary methods keep method highlighting.
+
+The constructor must use the class name. The `constructor` keyword, an explicit `create()` member, fields, static members and private members are not supported in LGD class declarations. Put instance initialization in the constructor. JavaScript files keep their existing class behavior.
+
 ## Invert if into a guard clause
 
 Place the cursor on an `if` condition and choose **Invert If Statement**, or run the LGD invert-if command. The action lifts the body out of the conditional and uses an early `return`, a loop `continue`, or an existing exit:
