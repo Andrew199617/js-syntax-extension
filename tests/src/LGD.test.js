@@ -404,6 +404,17 @@ describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
     });
 });
 
+test.each([
+    'registerHoverProvider',
+    'registerDefinitionProvider',
+    'registerReferenceProvider',
+    'registerCompletionItemProvider',
+    'registerDocumentSemanticTokensProvider'
+])('registers %s for file-backed LGD documents', registration =>
+{
+    expect(vscode.languages[registration].mock.calls[0][0]).toEqual({ scheme: 'file', language: 'lgd' });
+});
+
 describe('LGD compile on save', () =>
 {
     function saveLgdDocument(fileName, source)

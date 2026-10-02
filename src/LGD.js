@@ -34,7 +34,7 @@ const JS_EXT = '.js';
 const LGD_EXT = LgdTransform.LGD_EXT;
 
 // Document selector for LGD language features.
-const LGD_DOCUMENT_SELECTOR = { schema: 'file', language: 'lgd' };
+const LGD_DOCUMENT_SELECTOR = { scheme: 'file', language: 'lgd' };
 
 // Command identifier for compiling the active file.
 const COMPILE_COMMAND = 'lgd.generateTypings';
