@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const LgdExportCache = require('./LgdExportCache');
+const { getContractMetadata, getTypedMembers, getInterfaceMembers } = require('./LgdContractEditor');
 const createLgdDiagnostics = require('./LgdDiagnostics');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
@@ -21,13 +22,15 @@ const LgdLanguageService = {
      * @description Creates a language service instance.
      * @param {DiagnosticCollection} diagnosticCollection the collection for LGD compiler diagnostics.
      * @param {Function} onError reports a failed background recompile.
+     * @param {Function} getOutputOptions reads the current compiler output settings.
      * @returns {LgdLanguageServiceType}
      */
-    create(diagnosticCollection, onError)
+    create(diagnosticCollection, onError, getOutputOptions = () => ({}))
     {
         const service = Object.create(LgdLanguageService);
         service.diagnosticCollection = diagnosticCollection;
         service.onError = onError;
+        service.getOutputOptions = getOutputOptions;
         service.compiler = LgdCompiler.create();
 
         /** @description Open LGD documents by uri string: { document, jsDocument, map, errors }. */
@@ -175,7 +178,7 @@ const LgdLanguageService = {
             return null;
         }
 
-        const result = this.compiler.compileToJs(content, externals);
+        const result = this.compiler.compileToJs(content, externals, this.getOutputOptions(state.document));
         const newline = this.compiler.detectNewline(content);
 
         // Keep the in-memory mirror safe while giving tsserver its real module-resolution directory.
@@ -347,6 +350,7 @@ const LgdLanguageService = {
                         entry.constructorParams = exported.constructorParams;
                         entry.methodSignatures = exported.methodSignatures;
                         entry.methodsKnown = exported.methodsKnown;
+                        Object.assign(entry, getContractMetadata(exported));
                     }
 
                     externals.set(spec, entry);
@@ -408,6 +412,7 @@ const LgdLanguageService = {
             return imported
                 ? {
                     name: name, typeName: imported.keyword, kind: imported.kind, baseName: imported.baseName,
+                    abstract: imported.abstract, interfaceNames: imported.interfaceNames,
                     readonly: true, members: imported.members || [], params: [],
                     constructorParams: imported.constructorParams || []
                 }
@@ -433,9 +438,11 @@ const LgdLanguageService = {
             members: members,
             params: this.describeTypedParams(declaration.typedParams)
         };
-        if(declaration.kind === 'class' || required?.kind === 'class')
+        if(declaration.kind === 'class' || declaration.kind === 'interface' || required?.kind === 'class' || required?.kind === 'interface')
         {
-            summary.kind = 'class';
+            summary.kind = required?.kind || declaration.kind;
+            summary.abstract = declaration.abstract || required?.abstract;
+            summary.interfaceNames = declaration.interfaceNames || required?.interfaceNames || [];
             summary.baseName = declaration.baseName || required?.baseName;
             summary.constructorParams = getConstructorParams(declaration) || required?.constructorParams || [];
         }
@@ -499,6 +506,11 @@ const LgdLanguageService = {
      */
     getDeclaredMembers(declaration, context, visited = new Set())
     {
+        if(declaration.kind === 'interface')
+        {
+            return getInterfaceMembers(declaration, context);
+        }
+
         if(visited.has(declaration))
         {
             return [];
@@ -519,7 +531,7 @@ const LgdLanguageService = {
 
         if(!declaration.baseName && !required && declaration.kind !== 'class')
         {
-            const nominal = context.declarations.find(candidate => candidate.kind === 'class' && candidate.name === declaration.typeName);
+            const nominal = context.declarations.find(candidate => candidate.name === declaration.typeName && (candidate.kind === 'class' || candidate.kind === 'interface'));
             if(nominal)
             {
                 inherited = this.getDeclaredMembers(nominal, context, resolving);
@@ -571,7 +583,8 @@ const LgdLanguageService = {
      */
     getObjectMembers(declaration)
     {
-        const members = [...declaration.members || []];
+        const members = getTypedMembers(declaration);
+
         const seen = new Set(members.map(member => member.name));
         for(const extra of this.extractConstructorMembers(declaration))
         {

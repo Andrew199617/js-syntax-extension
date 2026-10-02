@@ -84,7 +84,7 @@
 		"class-declaration": {
 			"name": "meta.class.lgd",
 			"comment": "LGD class names and colon-style bases use theme class scopes; semantic tokens distinguish same-name constructors from methods.",
-			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?(class)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
+			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?(?:(abstract)[ \\t]+)?(class|interface)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
 			"beginCaptures": {
 				"2": {
 					"name": "keyword.control.lgd"
@@ -93,12 +93,15 @@
 					"name": "keyword.control.lgd"
 				},
 				"4": {
-					"name": "entity.name.type.class.lgd"
+					"name": "keyword.control.lgd"
 				},
 				"5": {
-					"name": "punctuation.separator.inheritance.lgd"
+					"name": "entity.name.type.class.lgd"
 				},
 				"6": {
+					"name": "punctuation.separator.inheritance.lgd"
+				},
+				"7": {
 					"name": "entity.name.type.class.lgd"
 				}
 			},
@@ -138,7 +141,7 @@
 		},
 		"method-modifier": {
 			"comment": "Compile-only virtual and override modifiers; leave the signature to native method and LGD type rules.",
-			"match": "\\b(virtual|override)\\b(?=[ \\t]+(?:async[ \\t]+)?(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
+			"match": "\\b(abstract|virtual|override)\\b(?=[ \\t]+(?:async[ \\t]+)?(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
 			"captures": {
 				"1": {
 					"name": "keyword.control.lgd"

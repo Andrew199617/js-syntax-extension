@@ -2,6 +2,7 @@ const fs = require('fs');
 const { maskCode } = require('../Compilers/LgdInfer');
 const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
 const LgdOverrideChecker = require('../Compilers/LgdOverrideChecker');
+const LgdContractChecker = require('../Compilers/LgdContractChecker');
 
 /** @description Loads an unchanged source from cache, reading only changed on-disk files. */
 async function readSourceEntry(service, sourcePath)
@@ -113,7 +114,10 @@ function exportSignature(service, exported)
 
     return JSON.stringify({
         name: exported.name, typeName: exported.typeName, keyword: exported.keyword,
-        kind: exported.kind, baseName: exported.baseName, constructorParams: constructors,
+        kind: exported.kind, baseName: exported.baseName, abstract: exported.abstract,
+        contractKind: exported.contractKind, interfaceNames: exported.interfaceNames,
+        contractSignatures: exported.contractSignatures, contractsKnown: exported.contractsKnown,
+        constructorParams: constructors,
         members: exported.members, methodSignatures: methods, methodsKnown: exported.methodsKnown
     });
 }
@@ -266,14 +270,17 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
     }
 
     const document = { uri: { fsPath: sourcePath }, getText: () => targetText };
-    const externals = declaration.baseName ? await service.collectExternalTypes(document, resolving) : new Map();
+    const hasHeritage = declaration.baseName || declaration.heritage?.length > 0;
+    const externals = hasHeritage ? await service.collectExternalTypes(document, resolving) : new Map();
     if(service.exportCache.get(sourcePath) !== cached)
     {
         return service.readExportDeclaration(sourcePath, visited);
     }
 
     const context = { declarations: parsed.allDeclarations, externals: externals, sourceText: targetText };
+    LgdContractChecker.classify(targetText, parsed.allDeclarations, externals);
     const methods = LgdOverrideChecker.describeMethods(targetText, parsed.allDeclarations, declaration, externals);
+    const contracts = LgdContractChecker.describeContracts(targetText, parsed.allDeclarations, declaration, externals);
     const keywords = [ 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object', 'Array', 'Function' ];
     const exported = {
         name: declaration.name,
@@ -284,6 +291,7 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
         constructorParams: getConstructorParams(declaration),
         methodSignatures: methods.methodSignatures,
         methodsKnown: methods.methodsKnown,
+        ...contracts,
         members: service.getDeclaredMembers(declaration, context),
         sourcePath: sourcePath,
         sourceText: targetText,
@@ -293,7 +301,7 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
     cached.signature = service.exportSignature(exported);
 
     // An incomplete/cyclic ancestry depends on the active resolution path, so only cache its parse.
-    if(methods.methodsKnown || exported.keyword !== 'Object')
+    if(methods.methodsKnown && contracts.contractsKnown || exported.keyword !== 'Object')
     {
         cached.exported = exported;
     }

@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const { parse } = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const { maskCode } = require('../Compilers/LgdInfer');
+const { collectScopes, collectBindings, visibleBindings } = require('../Compilers/LgdBaseChecker');
 
 /**
  * @description Tests whether the cursor is on an LGD type erased from the JavaScript mirror.
@@ -19,12 +20,37 @@ function isTypeReference(state, offset, name)
             return true;
         }
 
+        for(const heritage of declaration.heritage || [])
+        {
+            if(heritage.name === name && offset >= heritage.start && offset < heritage.end)
+            {
+                return true;
+            }
+        }
+
+        for(const member of declaration.classMembers || [])
+        {
+            const propertyStart = declaration.initializerStart + member.propertyTypeStart;
+            const propertyEnd = declaration.initializerStart + member.propertyTypeEnd;
+            if(member.propertyTypeName === name && offset >= propertyStart && offset < propertyEnd)
+            {
+                return true;
+            }
+        }
+
         const groups = [ declaration.typedParams, ...declaration.methodTypedParams || [] ];
         for(const group of groups)
         {
             if(!group)
             {
                 continue;
+            }
+
+            const returnStart = declaration.initializerStart + group.returnTypeStart;
+            const returnEnd = declaration.initializerStart + group.returnTypeEnd;
+            if(group.returnTypeName === name && offset >= returnStart && offset < returnEnd)
+            {
+                return true;
             }
 
             for(const parameter of group.params)
@@ -146,6 +172,18 @@ async function resolveImportedDefinition(languageService, state, position)
     if(sourceCode.slice(offset, offset + name.length) !== name)
     {
         return null;
+    }
+
+    const scopes = collectScopes(sourceCode);
+    const bindings = collectBindings({ content: document.getText(), masked: sourceCode,
+        declarations: state.declarations, scopes: scopes, externals: state.externals || new Map() });
+    const erased = visibleBindings(bindings, offset).get(name);
+    if(erased?.kind === 'interface' && (isTypeReference(state, offset, name) || offset === erased.nameStart))
+    {
+        const text = erased.sourceText || document.getText();
+        const range = new vscode.Range(positionAt(text, erased.nameStart), positionAt(text, erased.nameEnd));
+        const uri = erased.sourcePath ? vscode.Uri.file(erased.sourcePath) : document.uri;
+        return new vscode.Location(uri, range);
     }
 
     const declaration = findRequireDeclaration(state, offset, name);

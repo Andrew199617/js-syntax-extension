@@ -111,18 +111,18 @@ const LgdSemanticTokensProvider = {
         for(const declaration of declarations)
         {
             const prefix = source.slice(declaration.headStart, declaration.typeStart);
-            for(const match of prefix.matchAll(/\b(?:export|readonly)\b/g))
+            for(const match of prefix.matchAll(/\b(?:export|readonly|abstract)\b/g))
             {
                 const start = declaration.headStart + match.index;
                 spans.push({ start: start, end: start + match[0].length, tokenType: 'keyword' });
             }
 
-            if(declaration.kind !== 'class')
+            if(declaration.kind !== 'class' && declaration.kind !== 'interface')
             {
                 continue;
             }
 
-            spans.push({ start: declaration.typeStart, end: declaration.typeStart + 'class'.length, tokenType: 'keyword' });
+            spans.push({ start: declaration.typeStart, end: declaration.typeStart + declaration.kind.length, tokenType: 'keyword' });
             for(const member of declaration.classMembers)
             {
                 for(const modifier of member.modifierSpans || [])
@@ -249,12 +249,20 @@ const LgdSemanticTokensProvider = {
         for(const declaration of declarations)
         {
             this.collectParamTypeSpans(declaration, spans);
-            if(declaration.kind === 'class')
+            if(declaration.kind === 'class' || declaration.kind === 'interface')
             {
                 spans.push({ start: declaration.nameStart, end: declaration.nameEnd });
-                if(declaration.baseName)
+                for(const heritage of declaration.heritage || [])
                 {
-                    spans.push({ start: declaration.baseStart, end: declaration.baseEnd });
+                    spans.push({ start: heritage.start, end: heritage.end });
+                }
+
+                for(const member of declaration.classMembers || [])
+                {
+                    if(member.propertyTypeName)
+                    {
+                        spans.push({ start: declaration.initializerStart + member.propertyTypeStart, end: declaration.initializerStart + member.propertyTypeEnd });
+                    }
                 }
 
                 if(declaration.constructorMember)

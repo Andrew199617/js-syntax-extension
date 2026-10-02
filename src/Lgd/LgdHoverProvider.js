@@ -70,7 +70,7 @@ const LgdHoverProvider = {
             }
 
             const summary = await this.languageService.getTypeSummary(document.uri, document.getText(wordRange));
-            if(summary && (summary.kind === 'class' || summary.members.length > 0 || summary.params.length > 0))
+            if(summary && (summary.kind === 'class' || summary.kind === 'interface' || summary.members.length > 0 || summary.params.length > 0))
             {
                 return new vscode.Hover(this.renderTypeSummary(summary), wordRange);
             }
@@ -203,11 +203,14 @@ const LgdHoverProvider = {
      */
     renderTypeSummary(summary)
     {
-        if(summary.kind === 'class')
+        if(summary.kind === 'class' || summary.kind === 'interface')
         {
-            const base = summary.baseName ? ` : ${summary.baseName}` : '';
+            const heritage = [ summary.baseName, ...summary.interfaceNames || [] ].filter(Boolean);
+            const base = heritage.length > 0 ? ` : ${heritage.join(', ')}` : '';
+            const modifier = summary.abstract && summary.kind === 'class' ? 'abstract ' : '';
             const constructorParams = (summary.constructorParams || []).map(this.formatTypedParameter).join(', ');
-            const lines = summary.members.map(member =>
+            const visibleMembers = summary.members.filter(member => !summary.abstract || member.name !== 'create');
+            const lines = visibleMembers.map(member =>
             {
                 if(member.name === 'create')
                 {
@@ -218,7 +221,7 @@ const LgdHoverProvider = {
                 return `    ${member.name}${member.kind === 'method' ? '()' : type},`;
             });
 
-            return [ '```lgd', `class ${summary.name}${base} {`, ...lines, '}', '```' ].join('\n');
+            return [ '```lgd', `${modifier}${summary.kind} ${summary.name}${base} {`, ...lines, '}', '```' ].join('\n');
         }
 
         const modifier = summary.readonly ? 'readonly ' : '';
