@@ -155,15 +155,25 @@ describe('LGD diagnostic quick fixes', () =>
         expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
     });
 
-    test('adds override before the method return type without changing its body', async () =>
+    test.each([
+        [ 'Number run()', 'override Number run()', 'virtual Number run()', 'Add override keyword' ],
+        [ 'virtual Number run()', 'override Number run()', 'virtual Number run()', 'Replace virtual with override' ],
+        [ 'async Number run()', 'override async Number run()', 'virtual async Number run()', 'Add override keyword' ]
+    ])('repairs the override contract for %s without changing its body', async (method, fixedMethod, baseMethod, title) =>
     {
-        const fixture = await openFixture('class Parent { virtual Number run() { return 1; } }\nclass Child : Parent { Number run() { return 2; } }');
+        const fixture = await openFixture(`class Parent { ${baseMethod} { return 1; } }\nclass Child : Parent { ${method} { return 2; } }`);
         const [action] = await actionsFor(fixture, 'lgd.override.required');
-        expect(action.title).toBe('Add override keyword');
+        expect(action.title).toBe(title);
         expect(action.isPreferred).toBe(true);
         await applyAction(fixture, action);
-        expect(fixture.document.getText()).toContain('override Number run() { return 2; }');
+        expect(fixture.document.getText()).toContain(`${fixedMethod} { return 2; }`);
         expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
+
+    test('does not change a base contract for a child that has not explicitly declared override', async () =>
+    {
+        const fixture = await openFixture('class Parent { run() {} }\nclass Child : Parent { run() {} }');
+        expect(await actionsFor(fixture, 'lgd.override.nonVirtual')).toEqual([]);
     });
 
     test('declines missing arguments, unrelated ranges, other action kinds, and canceled requests', async () =>

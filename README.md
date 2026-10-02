@@ -43,8 +43,8 @@
 
 In a `.lgd` file, place the cursor on a diagnostic and open Quick Fix with `Ctrl+.` (`Cmd+.` on macOS):
 
-- **Add override keyword** declares an override of a known inherited virtual method.
-- **Make Base.method virtual** updates the known LGD class declaration, including a base imported from another `.lgd` file.
+- **Add override keyword** declares an override of a known inherited virtual method. If the child already uses `virtual`, **Replace virtual with override** repairs the modifier without changing its method body.
+- **Make Base.method virtual** updates the known LGD class declaration for a child explicitly marked `override`, including a base imported from another `.lgd` file.
 - **Remove extra arguments from base call** removes an extra primitive-literal suffix when the base constructor's parameter count is known.
 
 Argument removal is an explicit choice. Calls, property reads, spreads, and comments in the removed suffix are preserved by leaving the diagnostic for you to resolve. Missing arguments are never filled with guessed values. Fixes check that the source and imported contracts are still current, support Undo, and refresh Problems after application.

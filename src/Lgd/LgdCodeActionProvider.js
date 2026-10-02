@@ -153,7 +153,8 @@ const LgdCodeActionProvider = {
         if(fix.kind === 'makeBaseVirtual')
         {
             const declaration = state.declarations.find(candidate => candidate.headStart === fix.declarationStart);
-            if(!declaration)
+            const member = declaration?.classMembers?.find(candidate => candidate.name === fix.methodName);
+            if(!member?.override)
             {
                 return null;
             }
@@ -180,8 +181,22 @@ const LgdCodeActionProvider = {
 
         if(fix.kind === 'addOverride')
         {
-            return { title: 'Add override keyword', target: source, snapshots: snapshots,
-                offset: fix.offset, endOffset: fix.endOffset, newText: 'override ' };
+            const replaceVirtual = source.text.slice(fix.offset, fix.endOffset) === 'virtual';
+            if(fix.offset !== fix.endOffset && !replaceVirtual)
+            {
+                return null;
+            }
+
+            let title = 'Add override keyword';
+            let newText = 'override ';
+            if(replaceVirtual)
+            {
+                title = 'Replace virtual with override';
+                newText = 'override';
+            }
+
+            return { title: title, target: source, snapshots: snapshots,
+                offset: fix.offset, endOffset: fix.endOffset, newText: newText };
         }
 
         if(fix.kind === 'removeExtraBaseArguments' && this.onlyDiscardableLiterals(source.text.slice(fix.offset, fix.endOffset)))

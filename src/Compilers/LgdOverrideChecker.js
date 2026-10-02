@@ -371,7 +371,7 @@ function check(content, declarations, externals = new Map())
             {
                 addError(errors, member, `Method '${member.name}' overrides an inherited virtual method and requires the override keyword.`, {
                     code: 'lgd.override.required',
-                    quickFix: { kind: 'addOverride', offset: member.start, endOffset: member.start }
+                    quickFix: { kind: 'addOverride', offset: member.virtualStart ?? member.start, endOffset: member.virtualEnd ?? member.start }
                 });
             }
             else
