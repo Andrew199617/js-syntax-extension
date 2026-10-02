@@ -66,6 +66,8 @@ Use typed parameters such as `String title` and `Number offset = 0` in construct
 
 Declare overridable class methods with `virtual`, and use `override` when replacing an inherited virtual method. Replacing a known non-virtual method or omitting `override` is an error. Existing OLOO base methods can opt in with a JSDoc `@virtual` tag. Known parameter and explicit return-type mismatches are reported across local and imported bases. Modifiers are compile-time checks and do not change OLOO method dispatch.
 
+Call an inherited method with `base.method(arguments)` inside an LGD class method. The compiler uses the defining class's linked parent and preserves the current instance, arguments, return values, and `await`. This also works inside nested arrow callbacks. Constructor `: base(...)` continues to allocate through the base factory. Computed or optional base access, detached method references, getter access, and ordinary nested function callbacks are diagnosed instead of guessing their receiver.
+
 The constructor must use the class name. The `constructor` keyword, an explicit `create()` member, fields, static members and private members are not supported in LGD class declarations. Put instance initialization in the constructor. JavaScript files keep their existing class behavior.
 
 ## Explicit LGD method return types

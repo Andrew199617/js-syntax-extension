@@ -20,7 +20,7 @@ class GoToAssignment : BaseCommand {
     }
 
     override async executeCommand() {
-        return Oloo.base(this, "executeCommand");
+        return base.executeCommand();
     }
 }
 

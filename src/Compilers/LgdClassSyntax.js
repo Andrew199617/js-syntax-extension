@@ -1,5 +1,6 @@
 const { maskCode } = require('./LgdInfer');
 const { parseTypedParams, parseMethodHead } = require('./LgdTypedParams');
+const LgdBaseCalls = require('./LgdBaseCalls');
 
 /** @description Reads LGD class declarations and lowers them to prototype objects with create factories. */
 const LgdClassSyntax = {
@@ -444,6 +445,13 @@ const LgdClassSyntax = {
 
         this.appendSource(output, context, cursor, declaration.initializerEnd);
         this.appendGenerated(output, ';', declaration.end);
+        if(declaration.baseCalls?.length > 0)
+        {
+            output.code = LgdBaseCalls.rewrite(declaration, output.code, output.segments);
+            const helper = `${newline}${declaration.indent}const ${declaration.baseOwnerName} = () => Object.getPrototypeOf(${declaration.name});`;
+            this.appendGenerated(output, helper, declaration.end);
+        }
+
         output.code = backend.rewriteInitializer(declaration, output.code, output.segments);
         return output;
     },
