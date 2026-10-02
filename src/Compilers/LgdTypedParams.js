@@ -318,6 +318,14 @@ function splitParamChunks(inner, baseOffset)
         {
             stringMode = character;
         }
+        else if(character === '/' && isRegexStart(inner, index))
+        {
+            const regexEnd = skipRegexLiteral(inner, index);
+            if(regexEnd !== -1)
+            {
+                index = regexEnd - 1;
+            }
+        }
         else if(character === '(' || character === '[' || character === '{')
         {
             depth++;

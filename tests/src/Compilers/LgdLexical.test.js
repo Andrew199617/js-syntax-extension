@@ -57,4 +57,15 @@ describe('LGD lexical boundaries.', () =>
         expect(masked).toContain('\r\n');
         expect(masked).not.toContain('label = 1');
     });
+
+    test.each([
+        [ 'Function match = (Object pattern = /[(]/, String text = "(") => pattern.test(text);', 'match()' ],
+        [ 'Object matcher = { match(Object pattern = /[(]/, String text = "(") { return pattern.test(text); } };', 'matcher.match()' ]
+    ])('Preserves regex defaults while stripping every following parameter: %s.', (source, expression) =>
+    {
+        const result = LgdCompiler.create().compileToJs(source);
+        expect(result.errors).toEqual([]);
+        expect(result.code).not.toContain('String text');
+        expect(virtualMachine.runInNewContext(`${result.code}\n${expression};`)).toBe(true);
+    });
 });
