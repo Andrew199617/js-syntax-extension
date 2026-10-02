@@ -266,9 +266,10 @@ const LgdCompiler = {
             errors.push(diagnostic);
         }
 
+        const inheritedReturnSignatures = LgdContractChecker.bodySignatures(content, found, externals);
         const declarations = this.buildTree(found);
         const hasBaseCalls = LgdBaseCalls.hasCalls(content, found);
-        if(hasBaseCalls || LgdReturnChecker.signatures(found).length > 0 || LgdStandaloneReturnChecker.hasCandidates(content))
+        if(hasBaseCalls || LgdReturnChecker.signatures(found, inheritedReturnSignatures).length > 0 || LgdStandaloneReturnChecker.hasCandidates(content))
         {
             const emitted = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
             const standaloneErrors = LgdStandaloneReturnChecker.check(emitted);
@@ -285,7 +286,7 @@ const LgdCompiler = {
                 }
             }
 
-            for(const returnError of LgdReturnChecker.check(content, found, emitted))
+            for(const returnError of LgdReturnChecker.check(content, found, emitted, inheritedReturnSignatures))
             {
                 errors.push(this.createError(content, returnError.offset, returnError.message, returnError.endOffset));
             }

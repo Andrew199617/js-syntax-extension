@@ -8,17 +8,19 @@ const { tsTypeMap } = require('./LgdTypeMaps');
 /** @description Checks explicit named return contracts against the mapped JavaScript function bodies. */
 const LgdReturnChecker = {
     /** @description Collects annotated method signatures independently of parameter annotations. */
-    signatures(declarations)
+    signatures(declarations, inherited = [])
     {
-        return declarations.flatMap(declaration => (declaration.methodTypedParams || [])
+        const explicit = declarations.flatMap(declaration => (declaration.methodTypedParams || [])
             .filter(group => group.returnTypeName && !group.abstract)
             .map(group => ({ declaration: declaration, group: group })));
+
+        return [ ...explicit, ...inherited ];
     },
 
     /** @description Validates explicit return annotations using syntax-aware function boundaries. */
-    check(content, declarations, emitted)
+    check(content, declarations, emitted, inherited = [])
     {
-        const signatures = this.signatures(declarations);
+        const signatures = this.signatures(declarations, inherited);
         if(signatures.length === 0)
         {
             return [];
@@ -26,7 +28,7 @@ const LgdReturnChecker = {
 
         const map = LgdSourceMap.create(emitted.segments);
         const errors = [];
-        const context = { content: content, declarations: declarations, code: emitted.code, map: map, errors: errors };
+        const context = { content: content, declarations: declarations, code: emitted.code, map: map, errors: errors, signatures: signatures };
         const byBody = new Map(signatures.map(signature => [
             map.toOutput(signature.declaration.initializerStart + signature.group.bodyStart), signature
         ]));
@@ -60,8 +62,8 @@ const LgdReturnChecker = {
     checkFunction(path, signature, context)
     {
         const group = signature.group;
-        const typeStart = signature.declaration.initializerStart + group.returnTypeStart;
-        const typeEnd = signature.declaration.initializerStart + group.returnTypeEnd;
+        const typeStart = group.inherited ? group.reportStart : signature.declaration.initializerStart + group.returnTypeStart;
+        const typeEnd = group.inherited ? group.reportEnd : signature.declaration.initializerStart + group.returnTypeEnd;
         function report(message)
         {
             context.errors.push({ offset: typeStart, endOffset: typeEnd, message: message });
@@ -79,7 +81,7 @@ const LgdReturnChecker = {
         const builtin = Object.hasOwn(tsTypeMap, declared) || declared === 'void';
         const nominal = context.declarations.some(declaration => declaration.name === declared);
         const external = declared.includes('.') && binding;
-        const knownType = builtin || nominal || external;
+        const knownType = builtin || nominal || external || group.opaqueReturn;
         if(!knownType)
         {
             report(`Unknown return type '${declared}'.`);
@@ -96,7 +98,7 @@ const LgdReturnChecker = {
                 const types = argument.node ? this.expressionTypes(argument, signature, context) : ['undefined'];
                 for(const type of new Set(types))
                 {
-                    if(!this.compatible(declared, type))
+                    if(!this.compatible(declared, type, group.opaqueReturn))
                     {
                         const node = argument.node || returned.node;
                         context.errors.push({
@@ -116,7 +118,7 @@ const LgdReturnChecker = {
     },
 
     /** @description Checks known returned values without inventing types for unknown calls or members. */
-    compatible(declared, inferred)
+    compatible(declared, inferred, opaque = false)
     {
         if(inferred === UNKNOWN)
         {
@@ -136,6 +138,13 @@ const LgdReturnChecker = {
         if(declared === 'Object')
         {
             return true;
+        }
+
+        if(opaque)
+        {
+            const reference = [ 'Object', 'Array', 'Function' ].includes(inferred);
+            const named = !Object.hasOwn(tsTypeMap, inferred) && inferred !== 'void';
+            return reference || named;
         }
 
         if(declared.includes('.'))
@@ -276,7 +285,7 @@ const LgdReturnChecker = {
             return owner.name;
         }
 
-        const method = (owner.methodTypedParams || []).find(group => group.name === callee.property.name && group.returnTypeName);
+        const method = context.signatures.find(candidate => candidate.declaration === owner && candidate.group.name === callee.property.name)?.group;
         if(!method)
         {
             return UNKNOWN;
@@ -315,6 +324,25 @@ const LgdReturnChecker = {
         const declared = this.bindingType(binding, signature, context);
         if(declared)
         {
+            const parameter = signature.group.params.find(candidate => candidate.name === binding.identifier.name);
+            const inheritedParameter = signature.group.inherited && binding.kind === 'param' && parameter?.typeStart === -1;
+            if(inheritedParameter && !visited.has(binding))
+            {
+                const next = new Set(visited);
+                next.add(binding);
+                const assignedTypes = binding.constantViolations.flatMap(violation =>
+                {
+                    if(violation.isAssignmentExpression() && violation.node.operator === '=')
+                    {
+                        return this.expressionTypes(violation.get('right'), signature, context, next);
+                    }
+
+                    return [UNKNOWN];
+                });
+
+                return [ declared, ...assignedTypes ];
+            }
+
             return [declared];
         }
 

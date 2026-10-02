@@ -203,6 +203,78 @@ describe('LGD interface and abstract contracts', () =>
         expect(LgdCompiler.create().parse(missingAccessor).errors.some(error => error.message.includes('must preserve its inherited accessors'))).toBe(true);
     });
 
+    test('checks inherited abstract method return bodies when annotations are omitted', () =>
+    {
+        const prefix = 'abstract class Base { abstract Number run(Number count); }\nclass Child : Base {';
+        const valid = `${prefix} override run(renamed) { return renamed + 1; } }`;
+        expect(LgdCompiler.create().compileToJs(valid).errors).toEqual([]);
+        const invalid = `${prefix} override run(count) { return "wrong"; } }`;
+        const errors = LgdCompiler.create().compileToJs(invalid).errors;
+        expect(errors).toMatchObject([{ message: 'Cannot return String from a Number method.' }]);
+        expect(invalid.slice(errors[0].offset, errors[0].endOffset)).toBe('"wrong"');
+        const missing = `${prefix} override run(count) {} }`;
+        const missingErrors = LgdCompiler.create().parse(missing).errors;
+        expect(missingErrors).toMatchObject([{ message: "Method 'run' must return Number on every normal path." }]);
+        expect(missing.slice(missingErrors[0].offset, missingErrors[0].endOffset)).toBe('run');
+        expect(LgdCompiler.create().compileToJs(invalid, new Map(), { javascriptObjectModel: 'class' }).errors).toMatchObject(errors);
+    });
+
+    test('checks unannotated getter bodies implementing inherited abstract properties', () =>
+    {
+        const prefix = 'abstract class Base { abstract String Name { get; } }\nclass Child : Base {';
+        expect(LgdCompiler.create().compileToJs(`${prefix} override get Name() { return "ok"; } }`).errors).toEqual([]);
+        const invalid = `${prefix} override get Name() { return 1; } }`;
+        const errors = LgdCompiler.create().parse(invalid).errors;
+        expect(errors).toMatchObject([{ message: 'Cannot return Number from a String method.' }]);
+        expect(invalid.slice(errors[0].offset, errors[0].endOffset)).toBe('1');
+        const missing = `${prefix} override get Name() {} }`;
+        const missingErrors = LgdCompiler.create().parse(missing).errors;
+        expect(missingErrors[0].message).toContain('must return String');
+        expect(missing.slice(missingErrors[0].offset, missingErrors[0].endOffset)).toBe('Name');
+    });
+
+    test('keeps inherited body contracts separate from physical annotations and lexical return scopes', () =>
+    {
+        const source = 'abstract class Base { abstract Number run(Number count); }\nclass Child : Base { override run(count) { function nested() { return "ok"; } return count; } }';
+        const parsed = LgdCompiler.create().parse(source);
+        expect(parsed.errors).toEqual([]);
+        expect(parsed.allDeclarations[1].methodTypedParams).toEqual([]);
+        expect(parsed.allDeclarations[1].inheritedMethodContracts).toMatchObject([{ inherited: true, returnTypeName: 'Number', returnTypeStart: -1, returnTypeEnd: -1 }]);
+        const shadowed = source.replace('function nested() { return "ok"; } return count;', '{ const count = "wrong"; return count; }');
+        expect(LgdCompiler.create().parse(shadowed).errors[0].message).toBe('Cannot return String from a Number method.');
+        const reassigned = source.replace('function nested() { return "ok"; } return count;', 'count = "wrong"; return count;');
+        expect(LgdCompiler.create().parse(reassigned).errors[0].message).toBe('Cannot return String from a Number method.');
+        const validAssignment = source.replace('function nested() { return "ok"; } return count;', 'count = count + 1; return count;');
+        expect(LgdCompiler.create().parse(validAssignment).errors).toEqual([]);
+    });
+
+    test('validates omitted abstract return contracts through cross-file export aliases', () =>
+    {
+        const baseSource = 'abstract class Base { abstract Number run(Number count); abstract String Name { get; } }';
+        const externals = new Map([[ './base', exported(baseSource, 'Base') ]]);
+        const prefix = 'const Parent = require("./base");\nclass Child : Parent {';
+        const valid = `${prefix} override run(count) { return count; } override get Name() { return "ok"; } }`;
+        expect(LgdCompiler.create().parse(valid, externals).errors).toEqual([]);
+        const invalid = valid.replace('return count;', 'return "wrong";').replace('return "ok";', 'return 1;');
+        expect(LgdCompiler.create().parse(invalid, externals).errors.map(error => error.message)).toEqual([
+            'Cannot return String from a Number method.', 'Cannot return Number from a String method.'
+        ]);
+    });
+
+    test('leaves ordinary virtual overrides and opaque inherited annotation identities conservative', () =>
+    {
+        const ordinary = 'class Base { virtual Number run(Number count) { return count; } }\nclass Child : Base { override run(count) { return "unchanged"; } }';
+        expect(LgdCompiler.create().parse(ordinary).errors).toEqual([]);
+        const opaqueBase = 'const ns = require("package");\nabstract class Base { abstract ns.Result run(ns.Result value); }';
+        const externals = new Map([[ './base', exported(opaqueBase, 'Base') ]]);
+        const source = 'const Base = require("./base");\nclass Child : Base { override run(value) { return value; } }';
+        expect(LgdCompiler.create().parse(source, externals).errors).toEqual([]);
+        const nominalBase = 'class Result {}\nabstract class Base { abstract Result run(Result value); }';
+        const nominalExternals = new Map([[ './base', exported(nominalBase, 'Base') ]]);
+        const localShadow = 'class Result {}\nconst Parent = require("./base");\nclass Child : Parent { override run(value) { return {}; } }';
+        expect(LgdCompiler.create().parse(localShadow, nominalExternals).errors).toEqual([]);
+    });
+
     test('reports unknown erased return and property contract types on their exact type names', () =>
     {
         const source = 'interface I { Missing run(); Other Name { get; } }';

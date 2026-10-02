@@ -17,7 +17,8 @@ function createContext(content, declarations, externals)
         declarations: declarations,
         externals: externals,
         bindings: bindings,
-        tables: new Map()
+        tables: new Map(),
+        externalSignatures: new Set()
     };
 }
 
@@ -176,6 +177,14 @@ function contractTable(declaration, context, visiting = new Set())
 {
     if(Array.isArray(declaration.contractSignatures))
     {
+        if(!context.declarations.includes(declaration))
+        {
+            for(const signature of declaration.contractSignatures)
+            {
+                context.externalSignatures.add(signature);
+            }
+        }
+
         return { contractSignatures: declaration.contractSignatures, contractsKnown: declaration.contractsKnown === true, cycle: false };
     }
 
@@ -285,7 +294,7 @@ function typeIdentity(typeName, signature, declaration, context)
         return typeName;
     }
 
-    if(typeName.includes('.'))
+    if(typeName.includes('.') || context.externalSignatures.has(signature))
     {
         return null;
     }
@@ -307,6 +316,85 @@ function differentTypes(expected, actual, evidence)
     const expectedIdentity = typeIdentity(expected, contract, declaration, context);
     const actualIdentity = typeIdentity(actual, implementation, declaration, context);
     return Boolean(expectedIdentity && actualIdentity && expectedIdentity !== actualIdentity);
+}
+
+/**
+ * @description Exposes inherited abstract return contracts separately from physical source annotations.
+ * @param {string} content the LGD document.
+ * @param {Array} declarations all parsed declarations after heritage classification.
+ * @param {Map} externals relative exports with effective contract signatures.
+ * @returns {Array} semantic body signatures with real method and parameter source ranges.
+ */
+function bodySignatures(content, declarations, externals = new Map())
+{
+    const context = createContext(content, declarations, externals);
+    const signatures = [];
+    for(const declaration of declarations)
+    {
+        declaration.inheritedMethodContracts = [];
+        if(declaration.kind !== 'class')
+        {
+            continue;
+        }
+
+        const contracts = contractTable(declaration, context).contractSignatures.filter(contract => contract.originKind === 'class');
+        if(contracts.length === 0)
+        {
+            continue;
+        }
+
+        const effective = describeMethods(content, declarations, declaration, externals);
+        const methods = new Map(effective.methodSignatures.map(member => [ member.name, member ]));
+        for(const member of declaration.classMembers || [])
+        {
+            if(member.abstract || member.isConstructor || !member.override || member.returnTypeName || member.accessorKind === 'set')
+            {
+                continue;
+            }
+
+            const required = contracts.find(contract => contract.name === member.name && contract.kind === member.kind);
+            const implemented = methods.get(member.name);
+            const returnTypeName = member.accessorKind === 'get' ? required?.propertyTypeName : required?.returnTypeName;
+            if(!returnTypeName || !implemented)
+            {
+                continue;
+            }
+
+            const base = declaration.initializerStart;
+            const params = member.params.map((parameter, index) =>
+            {
+                const typeName = parameter.typeName || implemented.params[index]?.typeName || required.params[index]?.typeName || null;
+                const inheritedType = parameter.typeStart === -1 && typeName;
+                const opaqueType = Boolean(inheritedType && !builtinTypes.has(typeName) && !typeIdentity(typeName, required, declaration, context));
+                return { ...parameter, typeName: typeName, opaqueType: opaqueType };
+            });
+
+            const group = {
+                name: member.name,
+                methodStart: member.start - base,
+                start: member.paramStart - base,
+                end: member.paramEnd - base,
+                bodyStart: member.bodyStart - base,
+                bodyEnd: member.bodyEnd - base,
+                params: params,
+                hasTypes: false,
+                returnTypeName: returnTypeName,
+                returnTypeStart: -1,
+                returnTypeEnd: -1,
+                async: member.async,
+                generator: member.generator,
+                accessor: member.accessor,
+                inherited: true,
+                opaqueReturn: !builtinTypes.has(returnTypeName) && !typeIdentity(returnTypeName, required, declaration, context),
+                reportStart: member.nameStart,
+                reportEnd: member.nameEnd
+            };
+            declaration.inheritedMethodContracts.push(group);
+            signatures.push({ declaration: declaration, group: group });
+        }
+    }
+
+    return signatures;
 }
 
 /** @description Recognizes required signature arguments. */
@@ -629,4 +717,4 @@ function check(content, declarations, externals = new Map())
     return errors;
 }
 
-module.exports = { classify: classify, check: check, describeContracts: describeContracts };
+module.exports = { classify: classify, check: check, describeContracts: describeContracts, bodySignatures: bodySignatures };
