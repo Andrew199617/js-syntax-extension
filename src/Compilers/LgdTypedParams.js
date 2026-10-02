@@ -761,6 +761,7 @@ function parseObjectMethodParams(initializerText)
 
         groups.push({
             name: name,
+            methodStart: chunkOffset,
             start: chunkOffset + parsed.start,
             end: chunkOffset + parsed.end,
             params: parsed.params,

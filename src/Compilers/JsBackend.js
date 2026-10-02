@@ -1,5 +1,6 @@
 const typeMaps = require('./LgdTypeMaps');
 const lgdTypedParams = require('./LgdTypedParams');
+const LgdSourceMap = require('./LgdSourceMap');
 
 /** @description Length of the JSDoc closing marker, stripped before merging the synthetic type tag. */
 const jsdocCloseLength = 2;
@@ -48,46 +49,117 @@ const JsBackend = {
     },
 
     /**
-     * @description Strips LGD types from the parameter list: (Number value) becomes (value).
-     * @param {Object} typedParams the {start, end, params, hasTypes} parameter group.
-     * @param {string} compiledInitializer the recursively compiled initializer text.
-     * @returns {string} the initializer with untyped parameters.
-     */
-    stripParamTypes(typedParams, compiledInitializer)
-    {
-        const params = typedParams.params.map(parameter =>
-        {
-            if(!parameter.name)
-            {
-                return parameter.raw;
-            }
-
-            const rest = parameter.rest ? '...' : '';
-            const defaultText = parameter.defaultText === null ? '' : ` = ${parameter.defaultText}`;
-            return `${rest}${parameter.name}${defaultText}`;
-        });
-
-        return `${compiledInitializer.slice(0, typedParams.start)
-        }(${params.join(', ')})${
-            compiledInitializer.slice(typedParams.end)}`;
-    },
-
-    /**
-     * @description Rewrites a compiled initializer for JavaScript, stripping LGD parameter types.
+     * @description Removes parameter type prefixes and documents typed object methods,
+     * updating the output mappings so hovers still point at the same source symbols.
      * @param {LgdDeclarationType} declaration the parsed typed declaration.
      * @param {string} compiledInitializer the recursively compiled initializer text.
-     * @param {Array} segments the emit segments mapping source offsets to output offsets.
-     * @returns {string} the initializer with plain JavaScript parameters.
+     * @param {Array} segments the source-to-output mappings, updated in place.
+     * @returns {string} the JavaScript initializer with untyped parameters.
      */
     rewriteInitializer(declaration, compiledInitializer, segments = [])
     {
-        let code = compiledInitializer;
-        for(const group of lgdTypedParams.typedParamGroupsForOutput(declaration, segments))
+        const map = LgdSourceMap.create(segments);
+        const edits = [];
+        for(const group of lgdTypedParams.typedParamGroups(declaration))
         {
-            code = this.stripParamTypes(group, code);
+            for(const parameter of group.params)
+            {
+                if(!parameter.typeName)
+                {
+                    continue;
+                }
+
+                let end = parameter.typeEnd;
+                while((/\s/).test(declaration.initializerText[end] || '') && end < declaration.initializerText.length)
+                {
+                    end++;
+                }
+
+                edits.push({
+                    start: map.toOutput(declaration.initializerStart + parameter.typeStart),
+                    end: map.toOutput(declaration.initializerStart + end),
+                    text: ''
+                });
+            }
+
+            if(group.methodStart !== undefined)
+            {
+                edits.push(this.methodJsdocEdit(declaration, group, map));
+            }
         }
 
-        return code;
+        return LgdSourceMap.applyEdits(compiledInitializer, segments, edits);
+    },
+
+    /**
+     * @description Builds a mapped JSDoc insertion or replacement for a typed object method.
+     * @param {Object} declaration the enclosing declaration.
+     * @param {Object} group the typed method parameter group.
+     * @param {Object} map the source-to-output map of the initializer.
+     * @returns {Object} the {start, end, text} output edit.
+     */
+    methodJsdocEdit(declaration, group, map)
+    {
+        const before = declaration.initializerText.slice(0, group.methodStart);
+        const docblock = (/\/\*\*(?:(?!\*\/)[\S\s])*\*\/\s*$/).exec(before);
+        const lineStart = before.lastIndexOf('\n') + 1;
+        const linePrefix = before.slice(lineStart);
+        const indent = (/^[\t ]*$/).test(linePrefix) ? linePrefix : declaration.indent;
+        const start = docblock ? docblock.index : group.methodStart;
+        const jsdoc = docblock ? docblock[0].trimEnd() : '/** */';
+        const comment = this.mergeMethodParams(jsdoc, group.params, indent);
+        return {
+            start: map.toOutput(declaration.initializerStart + start),
+            end: map.toOutput(declaration.initializerStart + group.methodStart),
+            text: `${comment}${this.newline}${indent}`
+        };
+    },
+
+    /**
+     * @description Adds method parameter types while preserving existing descriptions and tags.
+     * @param {string} jsdoc the existing method docblock, or an empty docblock.
+     * @param {Array} parameters the parsed method parameters.
+     * @param {string} indent the indentation of the method.
+     * @returns {string} the complete typed docblock.
+     */
+    mergeMethodParams(jsdoc, parameters, indent)
+    {
+        const seen = new Set();
+        const tagPattern = /@param(?:[\t ]+{[^\n\r}]*})?(?<spacing>[\t ]+)(?<name>\[[^\n\r\]]+]|[$A-Z_a-z][\w$]*)/g;
+        const typed = jsdoc.replace(tagPattern, (tag, ...captures) =>
+        {
+            const groups = captures[captures.length - 1];
+            const name = groups.name.replace(/^\[/, '').replace(/(?:=.*)?]$/, '');
+            const parameter = parameters.find(candidate => candidate.name === name && candidate.typeName);
+            if(!parameter)
+            {
+                return tag;
+            }
+
+            seen.add(name);
+            return `@param {${this.parameterJsdocType(parameter)}}${groups.spacing}${groups.name}`;
+        });
+
+        const missing = parameters.filter(parameter => parameter.typeName && !seen.has(parameter.name));
+        if(missing.length === 0)
+        {
+            return typed;
+        }
+
+        const tags = missing.map(parameter => ` * @param {${this.parameterJsdocType(parameter)}} ${parameter.name}`);
+        const prefix = typed.slice(0, -jsdocCloseLength).trimEnd();
+        return `${prefix}${this.newline}${indent}${tags.join(this.newline + indent)}${this.newline}${indent} */`;
+    },
+
+    /**
+     * @description Converts an LGD parameter type to its JSDoc type, including rest parameters.
+     * @param {Object} parameter the parsed typed parameter.
+     * @returns {string} the JSDoc type.
+     */
+    parameterJsdocType(parameter)
+    {
+        const type = typeMaps.tsTypeMap[parameter.typeName] || parameter.typeName;
+        return parameter.rest ? `...${type}` : type;
     },
 
     /**

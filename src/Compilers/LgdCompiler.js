@@ -311,12 +311,13 @@ const LgdCompiler = {
                 end: declaration.initializerEnd,
                 declarations: declaration.children
             });
+            const initializer = backend.rewriteInitializer(declaration, inner.code, inner.segments);
             for(const innerSegment of inner.segments)
             {
                 segments.push(this.shiftSegment(innerSegment, output.length));
             }
 
-            output += backend.rewriteInitializer(declaration, inner.code, inner.segments);
+            output += initializer;
             output += ';';
             segments.push({
                 srcStart: declaration.end - 1,
