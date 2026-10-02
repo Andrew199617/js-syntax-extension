@@ -124,13 +124,6 @@
                 }
             }
         },
-        "iconThemes": [
-            {
-                "id": "lgd-file-icons",
-                "label": "LGD File Icons",
-                "path": "./icons/lgd-icon-theme.json"
-            }
-        ],
         "grammars": [
             {
                 "scopeName": "source.lgd.jsdoc-import",
