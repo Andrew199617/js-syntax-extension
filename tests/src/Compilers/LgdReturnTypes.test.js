@@ -64,6 +64,25 @@ describe('LGD explicit named return types.', () =>
         expect(compile(method).errors).toEqual([]);
     });
 
+    test.each([
+        'Number double() { return 2 * 2; }',
+        'Number double(Number amount) { return amount * 2; }',
+        'Number double(Number amount) { return amount + 2; }'
+    ])('Infers arithmetic return expressions without an external binding map: %s.', method =>
+    {
+        const result = compile(method);
+        expect(result.errors).toEqual([]);
+        expect(virtualMachine.runInNewContext(`${result.code}\nCounter.double(2);`)).toBe(2 * 2);
+    });
+
+    test.each([
+        [ 'String double(Number amount) { return amount * 2; }', 'Cannot return Number' ],
+        [ 'Number label(String value) { return value + "!"; }', 'Cannot return String' ]
+    ])('Still rejects incompatible operator-derived returns: %s.', (method, message) =>
+    {
+        expect(compile(method).errors[0].message).toContain(message);
+    });
+
     test('Excludes nested returns and honors actual lexical binding shadowing.', () =>
     {
         expect(compile('Number count() { const nested = () => { return 1; }; nested(); }').errors[0].message).toContain('must return Number');

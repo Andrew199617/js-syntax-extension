@@ -214,7 +214,7 @@ const LgdReturnChecker = {
         }
 
         const expression = context.code.slice(node.start, node.end);
-        const inferred = inferExpression(maskCode(expression, true), scope);
+        const inferred = inferExpression(maskCode(expression, true), scope, new Map());
         return [scope.has(inferred) ? scope.get(inferred).keyword : inferred];
     },
 
