@@ -1,0 +1,65 @@
+const { Oloo } = require('@mavega/oloo');
+
+interface IReadable {
+    String read();
+    String name { get; }
+}
+
+interface IWritable {
+    void write(String content);
+    String name { get; set; }
+}
+
+interface IStore : IReadable, IWritable {
+    Number size();
+}
+
+abstract class StoreBase {
+    StoreBase(String name) {
+        /** @type {String} */
+        this.storeName = name;
+    }
+
+    abstract Number size();
+
+    virtual String describe() {
+        return this.storeName;
+    }
+
+    String getName() {
+        return this.storeName;
+    }
+}
+
+class MemoryStore : StoreBase, IStore {
+    MemoryStore(String name) : base(name) {
+        /** @type {Object} */
+        this.entries = {};
+    }
+
+    override Number size() {
+        return Object.keys(this.entries).length;
+    }
+
+    override String describe() {
+        return base.describe() + " (memory)";
+    }
+
+    String read() {
+        return this.storeName;
+    }
+
+    void write(String content) {
+        this.entries[content] = true;
+    }
+
+    get String name() {
+        return this.storeName;
+    }
+
+    set name(String value) {
+        this.storeName = value;
+    }
+}
+
+module.exports = MemoryStore;
