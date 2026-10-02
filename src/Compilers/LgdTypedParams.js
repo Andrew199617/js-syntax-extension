@@ -286,7 +286,7 @@ function findParamGroupEnd(text, openIndex)
 }
 
 /**
- * @description Splits parameter text on top-level commas, tracking brackets and strings.
+ * @description Splits parameter text on top-level commas, tracking brackets, strings, and comments.
  * @param {string} inner the text between the parameter parens.
  * @param {number} baseOffset the offset of inner within the initializer text.
  * @returns {Array} the {text, start} chunks in order.
@@ -300,6 +300,7 @@ function splitParamChunks(inner, baseOffset)
     for(let index = 0; index < inner.length; index++)
     {
         const character = inner[index];
+        const next = index + 1 < inner.length ? inner[index + 1] : '';
         if(stringMode)
         {
             if(character === '\\')
@@ -317,6 +318,16 @@ function splitParamChunks(inner, baseOffset)
         if(character === "'" || character === '"' || character === '`')
         {
             stringMode = character;
+        }
+        else if(character === '/' && next === '/')
+        {
+            const newline = inner.indexOf('\n', index);
+            index = newline === -1 ? inner.length : newline;
+        }
+        else if(character === '/' && next === '*')
+        {
+            const close = inner.indexOf('*/', index + 2);
+            index = close === -1 ? inner.length : close + 1;
         }
         else if(character === '/' && isRegexStart(inner, index))
         {
@@ -346,6 +357,42 @@ function splitParamChunks(inner, baseOffset)
 }
 
 /**
+ * @description Skips leading whitespace and comments, returning the offset of the first code character.
+ * Object members often carry JSDoc blocks; the method name and parameter list follow them.
+ * @param {string} text the text to scan.
+ * @param {number} index the offset to start from.
+ * @returns {number} the first offset at or after the start that is not whitespace or a comment.
+ */
+function skipTrivia(text, index)
+{
+    while(index < text.length)
+    {
+        const character = text[index];
+        const next = index + 1 < text.length ? text[index + 1] : '';
+        if((/\s/).test(character))
+        {
+            index++;
+        }
+        else if(character === '/' && next === '/')
+        {
+            const newline = text.indexOf('\n', index);
+            index = newline === -1 ? text.length : newline + 1;
+        }
+        else if(character === '/' && next === '*')
+        {
+            const close = text.indexOf('*/', index + 2);
+            index = close === -1 ? text.length : close + 2;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return index;
+}
+
+/**
  * @description Reads one parameter chunk into a parameter record.
  * Unparseable chunks (destructuring, bare expressions) keep their raw text but no name.
  * @param {Object} chunk the {text, start} chunk.
@@ -361,18 +408,44 @@ function parseParamChunk(chunk)
         return unparsed;
     }
 
-    const match = (/^(?<rest>\.{3})?(?:(?<typeName>(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*)\s+)?(?<name>[$A-Z_a-z][\w$]*)(?:\s*=(?<default>[\S\s]*))?$/).exec(text);
-    if(!match)
+    let index = skipTrivia(text, 0);
+    const rest = text.startsWith('...', index);
+    if(rest)
+    {
+        index = skipTrivia(text, index + '...'.length);
+    }
+
+    const typeStart = index;
+    const typeMatch = (/^(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*/).exec(text.slice(index));
+    let typeName = null;
+    if(typeMatch)
+    {
+        const typeEnd = index + typeMatch[0].length;
+        const nameStart = skipTrivia(text, typeEnd);
+        if(nameStart > typeEnd && (/^[$A-Z_a-z]/).test(text.slice(nameStart)))
+        {
+            typeName = typeMatch[0];
+            index = nameStart;
+        }
+    }
+
+    const nameMatch = (/^[$A-Z_a-z][\w$]*/).exec(text.slice(index));
+    if(!nameMatch)
     {
         return unparsed;
     }
 
-    const typeName = match.groups.typeName || null;
+    index = skipTrivia(text, index + nameMatch[0].length);
+    if(index < text.length && text[index] !== '=')
+    {
+        return unparsed;
+    }
+
     const parameter = {
-        name: match.groups.name,
+        name: nameMatch[0],
         typeName: typeName,
-        rest: Boolean(match.groups.rest),
-        defaultText: match.groups.default === undefined ? null : match.groups.default.trim(),
+        rest: rest,
+        defaultText: index < text.length ? text.slice(index + 1).trim() : null,
         raw: text,
         typeStart: -1,
         typeEnd: -1
@@ -381,7 +454,7 @@ function parseParamChunk(chunk)
     if(typeName)
     {
         const leading = chunk.text.length - chunk.text.trimStart().length;
-        parameter.typeStart = chunk.start + leading + text.indexOf(typeName);
+        parameter.typeStart = chunk.start + leading + typeStart;
         parameter.typeEnd = parameter.typeStart + typeName.length;
     }
 
@@ -689,41 +762,6 @@ function findMethodBodyRange(chunkText, fromIndex)
  * @returns {Array} the method parameter groups with types: {name, start, end, params,
  * hasTypes, bodyStart, bodyEnd}; offsets are relative to initializerText.
  */
-/**
- * @description Skips leading whitespace and comments, returning the offset of the first code character.
- * Object members often carry JSDoc blocks; the method name and parameter list follow them.
- * @param {string} text the text to scan.
- * @param {number} index the offset to start from.
- * @returns {number} the first offset at or after the start that is not whitespace or a comment.
- */
-function skipTrivia(text, index)
-{
-    while(index < text.length)
-    {
-        const character = text[index];
-        const next = index + 1 < text.length ? text[index + 1] : '';
-        if((/\s/).test(character))
-        {
-            index++;
-        }
-        else if(character === '/' && next === '/')
-        {
-            const newline = text.indexOf('\n', index);
-            index = newline === -1 ? text.length : newline + 1;
-        }
-        else if(character === '/' && next === '*')
-        {
-            const close = text.indexOf('*/', index + 2);
-            index = close === -1 ? text.length : close + 2;
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    return index;
-}
 
 function parseObjectMethodParams(initializerText)
 {
