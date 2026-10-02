@@ -252,8 +252,12 @@ const LgdCodeActionProvider = {
                     return true;
                 }
 
-                const signedLiteral = element.type === 'UnaryExpression' && [ '+', '-' ].includes(element.operator);
-                return signedLiteral && [ 'NumericLiteral', 'BigIntLiteral' ].includes(element.argument.type);
+                if(element.type !== 'UnaryExpression' || ![ '+', '-' ].includes(element.operator))
+                {
+                    return false;
+                }
+
+                return element.argument.type === 'NumericLiteral' || element.operator === '-' && element.argument.type === 'BigIntLiteral';
             });
         }
         catch

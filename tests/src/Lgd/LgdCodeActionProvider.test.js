@@ -123,7 +123,7 @@ describe('LGD diagnostic quick fixes', () =>
         expect(fixture.document.getText()).toBe(screenshotSource.replace('base("too", "many", "args")', 'base()').replace('    void run()', '    virtual void run()'));
     });
 
-    test.each([ 'sideEffect()', 'object.value', '...values', '"value" /* keep this comment */', '/* keep */ "value"', '`literal`' ])('does not offer argument removal for effectful or comment-bearing suffix %s', async argument =>
+    test.each([ 'sideEffect()', 'object.value', '...values', '"value" /* keep this comment */', '/* keep */ "value"', '`literal`', '+1n' ])('does not offer argument removal for effectful or comment-bearing suffix %s', async argument =>
     {
         const fixture = await openFixture(`class Parent { Parent() {} }\nclass Child : Parent { Child() : base(${argument}) {} }`);
         const diagnostic = fixture.diagnostics.get(fixture.document.uri.toString()).find(candidate => candidate.code === 'lgd.base.argumentCount');
@@ -135,6 +135,15 @@ describe('LGD diagnostic quick fixes', () =>
         {
             expect(argument).toBe('...values');
         }
+    });
+
+    test('offers explicit removal for signed numeric literals and negative BigInt literals', async () =>
+    {
+        const fixture = await openFixture('class Parent { Parent() {} }\nclass Child : Parent { Child() : base(-1, +2, -3n) {} }');
+        const [action] = await actionsFor(fixture, 'lgd.base.argumentCount');
+        await applyAction(fixture, action);
+        expect(fixture.document.getText()).toContain('base()');
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
     });
 
     test('removes only the extra literal suffix and preserves a required argument and surrounding comments', async () =>
