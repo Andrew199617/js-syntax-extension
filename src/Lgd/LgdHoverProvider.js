@@ -11,6 +11,9 @@ const LgdHoverProvider = {
     /** @description Length of the `this.` receiver prefix checked before a hovered word. */
     THIS_DOT_LENGTH: 5,
 
+    /** @description Length of the `base.` receiver prefix checked before a hovered word. */
+    BASE_DOT_LENGTH: 5,
+
     /**
      * @description Creates a hover provider bound to the LGD language service.
      * @param {LgdLanguageServiceType} languageService the LGD language service.
@@ -58,6 +61,12 @@ const LgdHoverProvider = {
             if(memberHover)
             {
                 return memberHover;
+            }
+
+            const baseHover = this.provideBaseMemberHover(document, position, wordRange);
+            if(baseHover)
+            {
+                return baseHover;
             }
 
             const summary = await this.languageService.getTypeSummary(document.uri, document.getText(wordRange));
@@ -120,6 +129,54 @@ const LgdHoverProvider = {
         }
 
         return new vscode.Hover(this.renderPropertySummary(detail), wordRange);
+    },
+
+    /**
+     * @description Provides hover for a `base.` access by resolving the member through
+     * the enclosing class's base declaration or its imported base type.
+     * @param {TextDocument} document the LGD document.
+     * @param {Position} position the hovered position.
+     * @param {Range} wordRange the range of the hovered member name.
+     * @returns {Hover|null} the hover, or null when the word is not a base. member access.
+     */
+    provideBaseMemberHover(document, position, wordRange)
+    {
+        if(wordRange.start.character < this.BASE_DOT_LENGTH)
+        {
+            return null;
+        }
+
+        const receiverRange = new vscode.Range(
+            new vscode.Position(wordRange.start.line, wordRange.start.character - this.BASE_DOT_LENGTH),
+            wordRange.start
+        );
+        if(document.getText(receiverRange) !== 'base.')
+        {
+            return null;
+        }
+
+        const detail = this.languageService.getBaseMemberDetail(document, position, document.getText(wordRange));
+        if(!detail)
+        {
+            return null;
+        }
+
+        if(detail.kind === 'method')
+        {
+            return new vscode.Hover(this.renderMethodSummary(detail), wordRange);
+        }
+
+        return new vscode.Hover(this.renderPropertySummary(detail), wordRange);
+    },
+
+    /**
+     * @description Renders an LGD-style summary for one base-class method.
+     * @param {Object} detail the {name} member detail.
+     * @returns {string} the markdown hover content.
+     */
+    renderMethodSummary(detail)
+    {
+        return [ '```lgd', `(method) ${detail.name}()`, '```' ].join('\n');
     },
 
     /**

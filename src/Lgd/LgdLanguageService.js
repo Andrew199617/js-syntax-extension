@@ -632,6 +632,37 @@ const LgdLanguageService = {
     },
 
     /**
+     * @description Finds the detail for one base-class member at a `base.` access: the
+     * member declared on the enclosing class's base, resolved locally or through imports.
+     * @param {TextDocument} document the LGD document.
+     * @param {Position} position the cursor position inside the member access.
+     * @param {string} name the accessed member name.
+     * @returns {Object|null} the {name, kind, typeName} member, or null.
+     */
+    getBaseMemberDetail(document, position, name)
+    {
+        const state = this.getState(document.uri);
+        if(!state || !state.declarations)
+        {
+            return null;
+        }
+
+        const declaration = this.findEnclosingObjectDeclaration(state.declarations, document.offsetAt(position));
+        if(!declaration || declaration.kind !== 'class' || !declaration.baseName)
+        {
+            return null;
+        }
+
+        const context = this.getMemberContext(state);
+        const localBase = context.declarations.find(candidate => candidate.name === declaration.baseName);
+        const members = localBase
+            ? this.getDeclaredMembers(localBase, context)
+            : this.findImportedType(declaration.baseName, context)?.members || [];
+
+        return members.find(member => member.name === name) || null;
+    },
+
+    /**
      * @description Finds the innermost object literal or class declaration containing an offset,
      * so `this` inside a nested literal resolves to that literal.
      * @param {Array} declarations the flat parsed declarations.
