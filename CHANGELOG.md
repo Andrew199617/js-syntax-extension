@@ -4,6 +4,14 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.12
+
+- Add typed LGD interfaces, abstract classes, inherited contracts, property accessor contracts and cross-file diagnostics.
+- Preserve interface editor types with comment-only typedefs while erasing runtime interfaces and abstract members.
+- Keep OLOO as the default and add an explicit native JavaScript class output option with typed `create()` factories.
+- Reject unsupported output languages and preserve the last working JavaScript when compilation fails.
+- Add interface/abstract highlighting, hover summaries and erased-type navigation.
+
 # 2.7.11
 
 - Fix generated array types when elements contain commas inside strings, template literals, function parameters, or calls.

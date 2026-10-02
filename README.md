@@ -80,6 +80,54 @@ Call an inherited method with `base.method(arguments)` inside an LGD class metho
 
 The constructor must use the class name. The `constructor` keyword, an explicit `create()` member, fields, static members and private members are not supported in LGD class declarations. Put instance initialization in the constructor. JavaScript files keep their existing class behavior.
 
+## LGD interfaces and abstract classes
+
+Declare method contracts with typed parameters and a return type. Interfaces can inherit multiple interfaces; classes can name one base first, followed by interfaces:
+
+```lgd
+const { Oloo } = require('@mavega/oloo');
+
+interface IRunner {
+    Number run(Number count);
+}
+
+abstract class RunnerBase : IRunner {
+    abstract Number run(Number count);
+    String describe() { return "runner"; }
+}
+
+class Runner : RunnerBase {
+    override Number run(Number count) { return count + 1; }
+}
+
+const runner = Runner.create();
+```
+
+A concrete class must supply compatible implementations, including inherited implementations. Abstract classes may defer missing members. Abstract methods require an abstract class and have no body; implementing an inherited abstract member requires `override`. Interface inheritance, parameter counts, rest/default parameters, explicit types, return types, and property accessors are checked across relative `.lgd` imports. Abstract classes and interfaces cannot be instantiated directly. Interfaces have no runtime value.
+
+Property contracts use `String name { get; set; }`, with either or both accessors. In an abstract class, write `abstract String name { get; set; }`. Implement them with existing LGD accessors, such as `get String name() { return this._name; }` and `set name(String value) { this._name = value; }`; add `override` when implementing an inherited abstract property. Instance initialization remains in the class-name constructor.
+
+JavaScript output erases interface declarations, interface-only require bindings, and abstract member declarations. Editor-only JSDoc typedefs retain interface shapes. Abstract classes retain their concrete constructor and methods. Errors appear in Problems and prevent a save from replacing the last working `.js` file. These are editor/compiler checks; externally supplied JavaScript values remain dynamic, and emitted code does not install runtime abstract/interface guards.
+
+This initial contract syntax does not include overloaded methods, generic interfaces, static interface members, access modifiers, or field declarations. Use explicitly typed method/property contracts. Opaque external annotation identities remain conservative.
+
+## LGD output choices
+
+The target language and the JavaScript object model are separate settings:
+
+```json
+"lgd.options": {
+    "outputTarget": "javascript",
+    "javascriptObjectModel": "oloo"
+}
+```
+
+`outputTarget` currently supports only `javascript`. C# and C++ output are not implemented. Unsupported target values produce a diagnostic and preserve the previous output.
+
+`javascriptObjectModel` supports `oloo` (the default) and `class`. Both preserve the source's `Name.create(...)` caller API. Native class output emits real JavaScript classes and requires class bases; known OLOO object bases and `Oloo.base` calls are diagnosed. Use `base.method(...)` for class inheritance calls.
+
+Choose native classes deliberately: methods live on `.prototype`, instances use native class construction, and a base constructor's virtual method calls dispatch to the derived implementation during construction. OLOO keeps its existing base-factory lifecycle and object-level method API. Changing the setting refreshes open LGD mirrors; save the source to update its adjacent JavaScript file.
+
 ## Explicit LGD method return types
 
 Class and object methods can declare their return type before the method name:
