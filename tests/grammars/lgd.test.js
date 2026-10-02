@@ -139,6 +139,66 @@ describe('LGD TextMate grammar.', () =>
         assertScope(tokens, 'name', nameScope);
     });
 
+    test('Highlights typed locals inside nested function blocks.', () =>
+    {
+        const source = [
+            'function findNextChar(document, position, char, offset = 0) {',
+            '    if(position.character + 1 + offset > 0) {',
+            '        readonly String textLine = document.lineAt(position.line).text;',
+            '        Number closeBracketIndex = textLine.indexOf(char, position.character + 1 - offset);',
+            '    }',
+            '}'
+        ].join('\n');
+        const tokens = tokenize(grammar, source);
+        assertScope(tokens, 'readonly', readonlyScope);
+        assertScope(tokens, 'String', typeScope);
+        assertScope(tokens, 'textLine', nameScope);
+        assertScope(tokens, 'Number', typeScope);
+        assertScope(tokens, 'closeBracketIndex', nameScope);
+        assertPartialScope(tokens, '1', 'constant.numeric');
+    });
+
+    test('Highlights typed locals inside object methods with typed parameters.', () =>
+    {
+        const source = [
+            'readonly Object GoToNextMethod = {',
+            '    getMethodJavaScript(String line, Number i, Array lines) {',
+            '        readonly Array jsPatterns = [];',
+            '        Boolean tabIndented = line.startsWith(" ");',
+            '        readonly Boolean notIndented = line.length > 0;',
+            '    }',
+            '};'
+        ].join('\n');
+        const tokens = tokenize(grammar, source);
+        assertScope(tokens, 'Array', typeScope);
+        assertScope(tokens, 'jsPatterns', nameScope);
+        assertScope(tokens, 'Boolean', typeScope);
+        assertScope(tokens, 'tabIndented', nameScope);
+        assertScope(tokens, 'notIndented', nameScope);
+        const readonlyDeclarationCount = 3;
+        assert.strictEqual(tokens.filter(token => token.scopes.includes(readonlyScope)).length, readonlyDeclarationCount);
+    });
+
+    test('Nested comments and template text are not typed declarations.', () =>
+    {
+        const source = [
+            'function showExamples() {',
+            '    /*',
+            '    readonly String commentName = "example";',
+            '    Number commentTotal = 0;',
+            '    */',
+            '    const example = `',
+            '    readonly String templateName = "example";',
+            '    Number templateTotal = 0;',
+            '    `;',
+            '}'
+        ].join('\n');
+        const tokens = tokenize(grammar, source);
+        const declarationScopes = [ readonlyScope, typeScope, nameScope ];
+        const assignedScopes = tokens.flatMap(token => token.scopes);
+        assert.ok(declarationScopes.every(scope => !assignedScopes.includes(scope)));
+    });
+
     test('Constructor calls are not declarations.', () =>
     {
         const tokens = tokenize(grammar, 'Number("5");');

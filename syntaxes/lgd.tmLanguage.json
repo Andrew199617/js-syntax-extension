@@ -15,6 +15,19 @@
 			"include": "source.js"
 		}
 	],
+	"injections": {
+		"L:source.lgd -comment -string": {
+			"comment": "Apply LGD declaration rules inside nested JavaScript blocks, excluding comments and strings.",
+			"patterns": [
+				{
+					"include": "#typed-declaration"
+				},
+				{
+					"include": "#typed-keyword"
+				}
+			]
+		}
+	},
 	"repository": {
 		"typed-declaration": {
 			"comment": "A full typed declaration head: [export] [readonly] Type name.",
