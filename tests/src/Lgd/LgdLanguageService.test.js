@@ -70,6 +70,7 @@ describe('LgdLanguageService', () =>
         expect(vscode.workspace.openTextDocument).toHaveBeenCalledTimes(1);
         expect(state.jsDocument.getText()).toContain('let value = 0;');
         expect(state.map).toBeTruthy();
+        expect(state.jsDocument.getText()).toContain('//# lgd-source="/workspace/examples/Calculator.lgd"');
     });
 
     test('positions roundtrip between LGD source and compiled output', async () =>

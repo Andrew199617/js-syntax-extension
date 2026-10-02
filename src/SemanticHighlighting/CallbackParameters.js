@@ -1,3 +1,5 @@
+const path = require('path');
+
 // TypeScript's 2020 semantic encoding; verified on TS 5.0, 5.9 and 6.0.
 // Keep this independent of a bundled TypeScript: the server supplies its own instance.
 const encoding = Object.freeze({
@@ -9,6 +11,90 @@ const encoding = Object.freeze({
     firstSupportedMajor: 5,
     lastSupportedMajor: 6
 });
+
+/**
+ * @description Reads the original file path attached only to an LGD in-memory mirror.
+ * @param {Object} source the containing TypeScript source file.
+ * @returns {string|null} the original absolute source path when present.
+ */
+function lgdSourcePath(source)
+{
+    if(!source || !source.fileName.startsWith('^/untitled/'))
+    {
+        return null;
+    }
+
+    const marker = (/(?:^|\r?\n)\/\/# lgd-source=(?<sourcePath>"[^\n\r]*")\s*$/).exec(source.text);
+    if(!marker)
+    {
+        return null;
+    }
+
+    try
+    {
+        const fileName = JSON.parse(marker.groups.sourcePath);
+        return path.isAbsolute(fileName) ? fileName : null;
+    }
+    catch
+    {
+        return null;
+    }
+}
+
+/**
+ * @description Resolves LGD mirror imports from their original source directory and project settings.
+ * @param {Object} info the TypeScript plugin context.
+ * @param {Object} typescript the TypeScript implementation supplied by the server.
+ */
+function installLgdModuleResolution(info, typescript)
+{
+    const host = info.languageServiceHost;
+    if(!host)
+    {
+        return;
+    }
+
+    const original = host.resolveModuleNameLiterals;
+    host.resolveModuleNameLiterals = (...args) =>
+    {
+        const [ literals, containingFile, redirectedReference, options, source ] = args;
+        const originalPath = lgdSourcePath(source);
+        if(!originalPath && original)
+        {
+            return original.apply(host, args);
+        }
+
+        let settings = options;
+        if(originalPath)
+        {
+            const directory = path.dirname(originalPath);
+            const configurations = [ 'tsconfig.json', 'jsconfig.json' ]
+                .map(name => typescript.findConfigFile(directory, typescript.sys.fileExists, name))
+                .filter(Boolean)
+                .sort((first, second) => path.dirname(second).length - path.dirname(first).length);
+            const configuration = configurations[0];
+            if(configuration)
+            {
+                const parsed = typescript.readConfigFile(configuration, typescript.sys.readFile);
+                if(!parsed.error)
+                {
+                    const project = typescript.parseJsonConfigFileContent(parsed.config, typescript.sys, path.dirname(configuration));
+                    settings = { ...options, ...project.options };
+                }
+            }
+        }
+
+        return literals.map(literal => typescript.resolveModuleName(
+            literal.text,
+            originalPath || containingFile,
+            settings,
+            typescript.sys,
+            undefined,
+            redirectedReference,
+            typescript.getModeForUsageLocation(source, literal, settings)
+        ));
+    };
+}
 
 function init(modules)
 {
@@ -126,6 +212,8 @@ function init(modules)
             {
                 return service;
             }
+
+            installLgdModuleResolution(info, typescript);
 
             const proxy = Object.create(null);
             for(const key of Object.keys(service))

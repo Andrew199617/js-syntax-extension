@@ -156,7 +156,13 @@ const LgdLanguageService = {
         }
 
         const result = this.compiler.compileToJs(content, externals);
-        await this.syncMirror(state, result.code);
+        const newline = this.compiler.detectNewline(content);
+
+        // Keep the in-memory mirror safe while giving tsserver its real module-resolution directory.
+        const sourceContext = state.document.uri.scheme === 'file'
+            ? `${newline}//# lgd-source=${JSON.stringify(state.document.uri.fsPath)}${newline}`
+            : '';
+        await this.syncMirror(state, result.code + sourceContext);
         if(this.getState(state.document.uri) !== state)
         {
             return null;

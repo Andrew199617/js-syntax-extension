@@ -169,6 +169,15 @@ const JsBackend = {
      */
     mergeJsdoc(declaration)
     {
+        // A broad Object annotation hides a module's exported namespace from TypeScript.
+        // Explicit JSDoc remains authoritative, and ordinary Object values retain their type.
+        const requireInitializer = /^\s*require\(\s*(?<quote>["'])(?:(?!\k<quote>)[^\\]|\\.)*\k<quote>\s*\)\s*$/;
+        const isModuleImport = declaration.typeName === 'Object' && requireInitializer.test(declaration.initializerText);
+        if(isModuleImport)
+        {
+            return declaration.jsdoc || '';
+        }
+
         const tsType = typeMaps.tsTypeMap[declaration.typeName] || declaration.typeName;
         const params = this.paramTags(declaration);
         if(!declaration.jsdoc)

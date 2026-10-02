@@ -201,3 +201,24 @@ describe('LGD typed method hover regressions.', () =>
         }
     });
 });
+
+describe('LGD module namespace inference.', () =>
+{
+    test('Leaves broad Object require imports inferable without changing ordinary Objects.', () =>
+    {
+        const source = [
+            "readonly Object vscode = require('vscode');",
+            '/** @description Loaded dependency. */',
+            'Object dependency = require("dependency");',
+            '/** @type {CustomShape} */',
+            'Object explicit = require("dependency");',
+            'Object record = {};'
+        ].join('\n');
+        const result = LgdCompiler.create().compileToJs(source);
+        expect(result.code).toContain("const vscode = require('vscode');");
+        expect(result.code).toContain('/** @description Loaded dependency. */\nlet dependency =');
+        expect(result.code).toContain('/** @type {CustomShape} */\nlet explicit =');
+        expect(result.code).toContain('/** @type {Object} */\nlet record = {};');
+        expect(result.code.match(/@type {Object}/g)).toHaveLength(1);
+    });
+});
