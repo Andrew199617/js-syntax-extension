@@ -128,6 +128,12 @@ const LgdSemanticTokensProvider = {
         let commentMatch = commentPattern.exec(text);
         while(commentMatch)
         {
+            if(this.languageService.isInsideStringOrComment(text, commentMatch.index))
+            {
+                commentMatch = commentPattern.exec(text);
+                continue;
+            }
+
             const comment = commentMatch[0];
             const tagPattern = /@(?:type|param|returns|typedef)\b[^\n{]*{(?<type>(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*)}/g;
             let tagMatch = tagPattern.exec(comment);

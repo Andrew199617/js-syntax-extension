@@ -96,3 +96,17 @@ describe('LgdSemanticTokensProvider', () =>
         expect(LgdSemanticTokensProvider.legend.tokenTypes).toContain('class');
     });
 });
+
+test('semantic JSDoc types exclude comment-looking text inside strings and line comments', () =>
+{
+    const service = LgdLanguageService.create({}, () => undefined);
+    const provider = LgdSemanticTokensProvider.create(service);
+    const source = [
+        'const text = "/** @type {FakeType} */";',
+        '// /** @type {CommentedType} */',
+        '/** @type {ActualType} */',
+        'Object settings = {};'
+    ].join('\n');
+
+    expect(provider.collectTypeSpans(source, []).map(span => source.slice(span.start, span.end))).toEqual(['ActualType']);
+});
