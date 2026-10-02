@@ -39,6 +39,9 @@ const PLAIN_WORD_LINE = 6;
 /** @description Character inside the second 'title' on the plain-word line. */
 const PLAIN_WORD_CHARACTER = 20;
 
+/** @description Character within enabled on the compact boolean constructor fixture. */
+const BOOLEAN_ASSIGNMENT_CHARACTER = 31;
+
 /**
  * @description Opens the OLOO fixture in a fresh language service.
  * @returns {Promise<object>} the service and document.
@@ -166,5 +169,49 @@ describe('LGD create() member extraction regressions', () =>
         const source = '{ create() { this.settings = { label: "[", /* separator , */ enabled: true, nested: { ignored: 1 }, shorthand }; return this; } }';
 
         expect(service.extractCreateMembers(source)[0].properties).toEqual([ 'label', 'enabled', 'nested', 'shorthand' ]);
+    });
+});
+
+describe('LGD constructor boolean property inference', () =>
+{
+    test('infers true and false literals for class and OLOO instance properties', async () =>
+    {
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const source = [
+            'class DemoCommand {',
+            '    DemoCommand() { this.enabled = true; this.disabled = false; }',
+            '}',
+            'Object PlainCommand = { create() { this.enabled = false; return this; } };'
+        ].join('\n');
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const provider = LgdHoverProvider.create(service);
+
+        const hover = await provider.provideHover(document, new vscode.Position(1, BOOLEAN_ASSIGNMENT_CHARACTER));
+
+        expect(hover.contents).toContain('(property) enabled: Boolean');
+        expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+        const classSummary = await service.getTypeSummary(document.uri, 'DemoCommand');
+        expect(classSummary.members.filter(member => member.kind === 'property').map(member => member.typeName)).toEqual([ 'Boolean', 'Boolean' ]);
+        const objectSummary = await service.getTypeSummary(document.uri, 'PlainCommand');
+        expect(objectSummary.members.find(member => member.name === 'enabled').typeName).toBe('Boolean');
+    });
+
+    test('preserves declared types and refuses boolean prefixes or nonliteral values', () =>
+    {
+        const service = LgdLanguageService.create({}, () => undefined);
+        const body = [
+            '/** @type {Flag} */ this.documented = true;',
+            'this.parameter = flag;',
+            'this.prefix = trueValue;',
+            'this.call = falseValue();',
+            'this.conditional = true ? 1 : 0;',
+            'this.commented = false /* literal */;',
+            'this.final = true'
+        ].join('\n');
+
+        const members = service.extractAssignedMembers(body, false, [{ name: 'flag', typeName: 'Boolean' }]);
+
+        expect(members.map(member => member.typeName)).toEqual([ 'Flag', 'Boolean', null, null, null, 'Boolean', 'Boolean' ]);
     });
 });

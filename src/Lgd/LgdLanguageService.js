@@ -780,7 +780,7 @@ const LgdLanguageService = {
                 members.push({
                     name: property,
                     kind: 'property',
-                    typeName: this.findAssignmentTypeName(body, match.index) || parameter?.typeName || null,
+                    typeName: this.findAssignmentTypeName(body, match.index) || parameter?.typeName || this.inferAssignedBooleanType(code, valueIndex),
                     properties: this.findAssignedLiteralProperties(body, match.index + match[0].length)
                 });
             }
@@ -789,6 +789,17 @@ const LgdLanguageService = {
         }
 
         return members;
+    },
+
+    /**
+     * @description Infers a Boolean only when the complete assignment value is a boolean literal.
+     * @param {string} code the masked constructor body.
+     * @param {number} valueIndex the index just after the assignment operator.
+     * @returns {string|null} Boolean for a true or false literal, otherwise null.
+     */
+    inferAssignedBooleanType(code, valueIndex)
+    {
+        return (/^\s*(?:true|false)\s*(?:;|$)/).test(code.slice(valueIndex)) ? 'Boolean' : null;
     },
 
     /**
