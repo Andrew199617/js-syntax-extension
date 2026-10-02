@@ -153,9 +153,31 @@ describe('LGD TextMate grammar.', () =>
         const tokens = tokenize(grammar, 'class Counter {\n    Number count() { return 1; }\n    async void reset() {}\n}');
         assertScope(tokens, 'Number', typeScope);
         assertScope(tokens, 'void', typeScope);
-        assertScope(tokens, 'count', 'entity.name.function.lgd');
-        assertScope(tokens, 'reset', 'entity.name.function.lgd');
+        assertScope(tokens, 'count', 'entity.name.function.js');
+        assertScope(tokens, 'reset', 'entity.name.function.js');
         assertNoScope(tokens, 'count', nameScope);
+    });
+
+    test('Keeps constructor and ordinary method parameter names native while types have an immediate fallback.', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'class Counter {',
+            '    Counter(String title, Number offset = 0) {}',
+            '    async void reset(String label, Number delta = 0) {}',
+            '}'
+        ].join('\n'));
+        for(const type of [ 'String', 'Number' ])
+        {
+            const occurrences = tokens.filter(token => token.text === type);
+            assert.strictEqual(occurrences.length, 2);
+            assert.ok(occurrences.every(token => token.scopes.includes(typeScope)));
+        }
+
+        for(const name of [ 'title', 'offset', 'label', 'delta' ])
+        {
+            assertScope(tokens, name, 'variable.parameter.js');
+            assertNoScope(tokens, name, typeScope);
+        }
     });
 
     test('Does not highlight class-looking comments or strings as class declarations.', () =>
