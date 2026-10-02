@@ -118,6 +118,12 @@ const LgdSemanticTokensProvider = {
 
         for(const group of groups)
         {
+            if(group.returnTypeName)
+            {
+                const start = declaration.initializerStart + group.returnTypeStart;
+                spans.push({ start: start, end: declaration.initializerStart + group.returnTypeEnd });
+            }
+
             for(const parameter of group.params || [])
             {
                 if(parameter.typeStart !== -1 && parameter.typeName)

@@ -1,5 +1,5 @@
 const { maskCode } = require('./LgdInfer');
-const { parseTypedParams } = require('./LgdTypedParams');
+const { parseTypedParams, parseMethodHead } = require('./LgdTypedParams');
 
 /** @description Reads LGD class declarations and lowers them to prototype objects with create factories. */
 const LgdClassSyntax = {
@@ -180,25 +180,25 @@ const LgdClassSyntax = {
     /** @description Parses a method signature, optional base initializer, and balanced body. */
     parseMember(content, masked, start, declaration)
     {
-        const head = (/^(?:(?<modifier>async|get|set)\s+)?(?<generator>\*\s*)?(?<name>[$A-Z_a-z][\w$]*)\s*\(/).exec(masked.slice(start));
+        const head = parseMethodHead(masked.slice(start));
         if(!head)
         {
             return { error: 'Expected a named LGD method or class-name constructor. Fields, static, and private members are not supported.', offset: start };
         }
 
-        const paramStart = start + head[0].length - 1;
+        const paramStart = start + head.paramStart;
         const paramClose = this.findClose(masked, paramStart);
         if(paramClose === -1 || paramClose >= declaration.initializerEnd)
         {
             return { error: 'Unclosed LGD method parameters.', offset: paramStart };
         }
 
-        const name = head.groups.name;
+        const name = head.name;
         const nameEnd = masked.slice(0, paramStart).trimEnd().length;
         const isConstructor = name === declaration.name;
-        if(isConstructor && (head.groups.modifier || head.groups.generator))
+        if(isConstructor && (head.modifier || head.generator || head.returnTypeName))
         {
-            return { error: 'An LGD constructor cannot be async, a generator, or an accessor.', offset: start };
+            return { error: 'An LGD constructor cannot have a return type or be async, a generator, or an accessor.', offset: start };
         }
 
         let cursor = this.skipSpace(masked, paramClose + 1);
@@ -248,7 +248,7 @@ const LgdClassSyntax = {
 
         return { member: {
             name: name,
-            kind: head.groups.modifier === 'get' || head.groups.modifier === 'set' ? 'property' : 'method',
+            kind: head.modifier === 'get' || head.modifier === 'set' ? 'property' : 'method',
             start: start,
             nameStart: nameEnd - name.length,
             nameEnd: nameEnd,
@@ -259,14 +259,20 @@ const LgdClassSyntax = {
             bodyEnd: close + 1,
             baseArgumentsStart: baseArgumentsStart,
             baseArgumentsEnd: baseArgumentsEnd,
-            isConstructor: isConstructor
+            isConstructor: isConstructor,
+            returnTypeName: head.returnTypeName,
+            returnTypeStart: head.returnTypeName ? start + head.returnTypeStart - declaration.initializerStart : -1,
+            returnTypeEnd: head.returnTypeName ? start + head.returnTypeEnd - declaration.initializerStart : -1,
+            async: head.async,
+            generator: head.generator,
+            accessor: head.modifier === 'get' || head.modifier === 'set'
         } };
     },
 
     /** @description Exposes typed method groups using the existing backend and semantic-token contract. */
     addTypedParams(declaration, member)
     {
-        if(!member.params.some(parameter => parameter.typeName))
+        if(!member.returnTypeName && !member.params.some(parameter => parameter.typeName))
         {
             return;
         }
@@ -278,7 +284,13 @@ const LgdClassSyntax = {
             start: member.paramStart - base,
             end: member.paramEnd - base,
             params: member.params,
-            hasTypes: true,
+            hasTypes: member.params.some(parameter => parameter.typeName),
+            returnTypeName: member.returnTypeName,
+            returnTypeStart: member.returnTypeStart,
+            returnTypeEnd: member.returnTypeEnd,
+            async: member.async,
+            generator: member.generator,
+            accessor: member.accessor,
             bodyStart: member.bodyStart - base,
             bodyEnd: member.bodyEnd - base
         });

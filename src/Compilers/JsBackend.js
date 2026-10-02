@@ -82,6 +82,15 @@ const JsBackend = {
                 });
             }
 
+            if(group.returnTypeName)
+            {
+                edits.push({
+                    start: map.toOutput(declaration.initializerStart + group.returnTypeStart),
+                    end: map.toOutput(declaration.initializerStart + group.returnTypeEnd),
+                    text: ''
+                });
+            }
+
             if(group.methodStart !== undefined)
             {
                 edits.push(this.methodJsdocEdit(declaration, group, map));
@@ -107,12 +116,33 @@ const JsBackend = {
         const indent = (/^[\t ]*$/).test(linePrefix) ? linePrefix : declaration.indent;
         const start = docblock ? docblock.index : group.methodStart;
         const jsdoc = docblock ? docblock[0].trimEnd() : '/** */';
-        const comment = this.mergeMethodParams(jsdoc, group.params, indent);
+        const parameters = this.mergeMethodParams(jsdoc, group.params, indent);
+        const comment = this.mergeMethodReturn(parameters, group, indent);
         return {
             start: map.toOutput(declaration.initializerStart + start),
             end: map.toOutput(declaration.initializerStart + group.methodStart),
             text: `${comment}${this.newline}${indent}`
         };
+    },
+
+    /** @description Adds or updates the exact declared return contract on a method. */
+    mergeMethodReturn(jsdoc, group, indent)
+    {
+        if(!group.returnTypeName)
+        {
+            return jsdoc;
+        }
+
+        const declared = group.returnTypeName === 'void' ? 'undefined' : typeMaps.tsTypeMap[group.returnTypeName] || group.returnTypeName;
+        const type = group.async ? `Promise<${declared}>` : declared;
+        const tag = /@returns?(?:[\t ]+{[^\n\r}]*})?/;
+        if(tag.test(jsdoc))
+        {
+            return jsdoc.replace(tag, `@returns {${type}}`);
+        }
+
+        const prefix = jsdoc.slice(0, -jsdocCloseLength).trimEnd();
+        return `${prefix}${this.newline}${indent} * @returns {${type}}${this.newline}${indent} */`;
     },
 
     /**

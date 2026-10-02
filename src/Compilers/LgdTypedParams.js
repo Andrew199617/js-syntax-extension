@@ -1,3 +1,5 @@
+const { skipTrivia, parseMethodHead } = require('./LgdMethodSignature');
+
 /*
  * Typed parameter parsing for LGD function initializers.
  *
@@ -357,42 +359,6 @@ function splitParamChunks(inner, baseOffset)
 }
 
 /**
- * @description Skips leading whitespace and comments, returning the offset of the first code character.
- * Object members often carry JSDoc blocks; the method name and parameter list follow them.
- * @param {string} text the text to scan.
- * @param {number} index the offset to start from.
- * @returns {number} the first offset at or after the start that is not whitespace or a comment.
- */
-function skipTrivia(text, index)
-{
-    while(index < text.length)
-    {
-        const character = text[index];
-        const next = index + 1 < text.length ? text[index + 1] : '';
-        if((/\s/).test(character))
-        {
-            index++;
-        }
-        else if(character === '/' && next === '/')
-        {
-            const newline = text.indexOf('\n', index);
-            index = newline === -1 ? text.length : newline + 1;
-        }
-        else if(character === '/' && next === '*')
-        {
-            const close = text.indexOf('*/', index + 2);
-            index = close === -1 ? text.length : close + 2;
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    return index;
-}
-
-/**
  * @description Reads one parameter chunk into a parameter record.
  * Unparseable chunks (destructuring, bare expressions) keep their raw text but no name.
  * @param {Object} chunk the {text, start} chunk.
@@ -703,17 +669,6 @@ function findBraceGroupEnd(text, openIndex)
 }
 
 /**
- * @description Reads the method name heading a member chunk, if it looks like a method definition.
- * @param {string} chunkText the raw member chunk text.
- * @returns {string|null} the method name, or null for properties, getters, and shorthand.
- */
-function readMethodName(chunkText)
-{
-    const match = (/^(?:async\s+)?\*?\s*(?<name>[$A-Z_a-z][\w$]*)\s*\(/).exec(chunkText.trimStart());
-    return match ? match.groups.name : null;
-}
-
-/**
  * @description Finds the body range of a method chunk starting after its parameter list.
  * @param {string} chunkText the raw member chunk text.
  * @param {number} fromIndex the offset just past the parameter group.
@@ -777,19 +732,19 @@ function parseObjectMethodParams(initializerText)
     {
         const triviaLength = skipTrivia(chunk.text, 0);
         const memberText = chunk.text.slice(triviaLength);
-        const name = readMethodName(memberText);
-        if(!name)
+        const head = parseMethodHead(memberText);
+        if(!head)
         {
             continue;
         }
 
-        const parsed = parseTypedParams(memberText);
-        if(!parsed || !parsed.hasTypes)
+        const parsed = parseTypedParams(memberText.slice(head.paramStart));
+        if(!parsed || !parsed.hasTypes && !head.returnTypeName)
         {
             continue;
         }
 
-        const body = findMethodBodyRange(memberText, parsed.end);
+        const body = findMethodBodyRange(memberText, head.paramStart + parsed.end);
         if(!body)
         {
             continue;
@@ -800,16 +755,22 @@ function parseObjectMethodParams(initializerText)
         {
             if(parameter.typeStart !== -1)
             {
-                parameter.typeStart += chunkOffset;
-                parameter.typeEnd += chunkOffset;
+                parameter.typeStart += chunkOffset + head.paramStart;
+                parameter.typeEnd += chunkOffset + head.paramStart;
             }
         }
 
         groups.push({
-            name: name,
+            name: head.name,
             methodStart: chunkOffset,
-            start: chunkOffset + parsed.start,
-            end: chunkOffset + parsed.end,
+            start: chunkOffset + head.paramStart + parsed.start,
+            end: chunkOffset + head.paramStart + parsed.end,
+            returnTypeName: head.returnTypeName,
+            returnTypeStart: head.returnTypeName ? chunkOffset + head.returnTypeStart : -1,
+            returnTypeEnd: head.returnTypeName ? chunkOffset + head.returnTypeEnd : -1,
+            async: head.async,
+            generator: head.generator,
+            accessor: head.modifier === 'get' || head.modifier === 'set',
             params: parsed.params,
             hasTypes: parsed.hasTypes,
             bodyStart: chunkOffset + body.start,
@@ -830,7 +791,7 @@ function parseObjectMethodParams(initializerText)
  */
 function typedParamGroups(declaration)
 {
-    const groups = (declaration.methodTypedParams || []).filter(group => group.hasTypes);
+    const groups = (declaration.methodTypedParams || []).filter(group => group.hasTypes || group.returnTypeName);
     if(declaration.typedParams && declaration.typedParams.hasTypes)
     {
         groups.push(declaration.typedParams);
@@ -886,7 +847,14 @@ function typedParamGroupsForOutput(declaration, segments)
             return group;
         }
 
-        return { ...group, start: start, end: end };
+        const mapped = { ...group, start: start, end: end };
+        if(group.returnTypeName)
+        {
+            mapped.returnTypeStart = mapSourceOffset(segments, declaration.initializerStart + group.returnTypeStart);
+            mapped.returnTypeEnd = mapSourceOffset(segments, declaration.initializerStart + group.returnTypeEnd);
+        }
+
+        return mapped;
     });
 }
 
@@ -894,6 +862,7 @@ module.exports = {
     isRegexStart: isRegexStart,
     skipRegexLiteral: skipRegexLiteral,
     parseTypedParams: parseTypedParams,
+    parseMethodHead: parseMethodHead,
     parseObjectMethodParams: parseObjectMethodParams,
     splitTopLevelChunks: splitTopLevelChunks,
     typedParamGroups: typedParamGroups,

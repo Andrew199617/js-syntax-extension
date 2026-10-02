@@ -90,6 +90,16 @@ describe('LgdSemanticTokensProvider', () =>
         expect(texts).toContain('vscode.Command');
     });
 
+    test('reports declared return types even when a method has no typed parameters', async () =>
+    {
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, 'class Counter { Number count() { return 1; } void reset() {} }');
+        await service.openDocument(document);
+        const provider = LgdSemanticTokensProvider.create(service);
+        const tokens = provider.provideDocumentSemanticTokens(document);
+        expect(tokens.pushed.map(token => tokenText(document, token))).toEqual([ 'Counter', 'Number', 'void' ]);
+    });
+
     test('returns null when the document is not open.', () =>
     {
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);

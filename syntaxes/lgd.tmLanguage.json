@@ -9,6 +9,9 @@
 			"include": "#class-declaration"
 		},
 		{
+			"include": "#typed-method"
+		},
+		{
 			"include": "#typed-declaration"
 		},
 		{
@@ -24,6 +27,9 @@
 			"patterns": [
 				{
 					"include": "#class-declaration"
+				},
+				{
+					"include": "#typed-method"
 				},
 				{
 					"include": "#typed-declaration"
@@ -92,6 +98,21 @@
 					"include": "source.js#class-or-interface-body"
 				}
 			]
+		},
+		"typed-method": {
+			"comment": "Optional return-first LGD method signatures, including void and dotted types.",
+			"match": "[ \\t]*\\b(?:(async)[ \\t]+)?(void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)[ \\t]+([$_a-zA-Z][\\w$]*)(?=[ \\t]*\\()",
+			"captures": {
+				"1": {
+					"name": "storage.modifier.async.lgd"
+				},
+				"2": {
+					"name": "storage.type.lgd"
+				},
+				"3": {
+					"name": "entity.name.function.lgd"
+				}
+			}
 		}
 	},
 	"scopeName": "source.lgd"

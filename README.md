@@ -66,6 +66,23 @@ Use typed parameters such as `String title` and `Number offset = 0` in construct
 
 The constructor must use the class name. The `constructor` keyword, an explicit `create()` member, fields, static members and private members are not supported in LGD class declarations. Put instance initialization in the constructor. JavaScript files keep their existing class behavior.
 
+## Explicit LGD method return types
+
+Class and object methods can declare their return type before the method name:
+
+```lgd
+class Counter {
+    Counter() { this.total = 0; }
+    Number count() { return this.total; }
+    void reset() { this.total = 0; }
+    async Number loadCount() { return 2; }
+}
+```
+
+`void` means `undefined`: falling through, `return;`, and `return undefined;` are allowed, while known returned values and `null` are rejected. Non-void methods must return a compatible value on every normal completion path; throwing is also allowed. Async methods declare their resolved value type, so `async Number` returns a `Promise<number>` and `async void` returns a `Promise<undefined>`.
+
+Constructors keep their implicit instance result through `.create()`. Existing methods without return annotations remain supported. Annotations on accessors and generators are currently rejected; arrow and standalone function return syntax is not introduced by this feature. Checks remain conservative when an expression's type cannot be determined. Generated JavaScript removes the type syntax and documents the return contract without inserting return statements.
+
 ## Invert if into a guard clause
 
 Place the cursor on an `if` condition and choose **Invert If Statement**, or run the LGD invert-if command. The action lifts the body out of the conditional and uses an early `return`, a loop `continue`, or an existing exit:

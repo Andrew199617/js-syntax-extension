@@ -148,6 +148,16 @@ describe('LGD TextMate grammar.', () =>
         assertScope(tokens, 'total', nameScope);
     });
 
+    test('Highlights explicit return types separately from named methods.', () =>
+    {
+        const tokens = tokenize(grammar, 'class Counter {\n    Number count() { return 1; }\n    async void reset() {}\n}');
+        assertScope(tokens, 'Number', typeScope);
+        assertScope(tokens, 'void', typeScope);
+        assertScope(tokens, 'count', 'entity.name.function.lgd');
+        assertScope(tokens, 'reset', 'entity.name.function.lgd');
+        assertNoScope(tokens, 'count', nameScope);
+    });
+
     test('Does not highlight class-looking comments or strings as class declarations.', () =>
     {
         const tokens = tokenize(grammar, '// class Example : Base {}\nconst example = `class Fake : Base {}`;');

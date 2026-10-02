@@ -70,9 +70,17 @@ const TsBackend = {
             return `${parameter.name}${tsType ? `: ${tsType}` : ''}${defaultText}`;
         });
 
-        return `${compiledInitializer.slice(0, typedParams.start)
-        }(${params.join(', ')})${
-            compiledInitializer.slice(typedParams.end)}`;
+        let prefix = compiledInitializer.slice(0, typedParams.start);
+        let returnAnnotation = '';
+        if(group.returnTypeName)
+        {
+            const declared = group.returnTypeName === 'void' ? 'undefined' : typeMaps.tsTypeMap[group.returnTypeName] || group.returnTypeName;
+            const type = group.async ? `Promise<${declared}>` : declared;
+            returnAnnotation = `: ${type}`;
+            prefix = prefix.slice(0, group.returnTypeStart) + prefix.slice(group.returnTypeEnd);
+        }
+
+        return `${prefix}(${params.join(', ')})${returnAnnotation}${compiledInitializer.slice(typedParams.end)}`;
     },
 
     /**

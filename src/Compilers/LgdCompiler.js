@@ -4,7 +4,8 @@ const CSharpBackend = require('./CSharpBackend');
 const LgdTypeChecker = require('./LgdTypeChecker');
 const LgdClassSyntax = require('./LgdClassSyntax');
 const LgdBaseChecker = require('./LgdBaseChecker');
-const { parseTypedParams, parseObjectMethodParams, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
+const LgdReturnChecker = require('./LgdReturnChecker');
+const { parseTypedParams, parseObjectMethodParams, parseMethodHead, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
 const { maskCode } = require('./LgdInfer');
 
 /** @description Matches a declaration type name: Number, a declared name (GoToNextParagraph), or a dotted type (vscode.Command); the final segment must be capitalized. */
@@ -187,6 +188,15 @@ const LgdCompiler = {
         }
 
         const declarations = this.buildTree(found);
+        if(LgdReturnChecker.signatures(found).length > 0)
+        {
+            const emitted = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
+            for(const returnError of LgdReturnChecker.check(content, found, emitted))
+            {
+                errors.push(this.createError(content, returnError.offset, returnError.message, returnError.endOffset));
+            }
+        }
+
         return { declarations: declarations, allDeclarations: found, errors: errors };
     },
 
@@ -464,6 +474,12 @@ const LgdCompiler = {
         if(text === '' || text.startsWith('...') || text[0] === '[')
         {
             return null;
+        }
+
+        const typedMethod = parseMethodHead(text);
+        if(typedMethod && typedMethod.returnTypeName)
+        {
+            return { name: typedMethod.name, kind: 'method' };
         }
 
         const methodMatch = (/^(?:async\s+)?(?:get\s+|set\s+)?(?<name>[$A-Z_a-z][\w$]*|'[^\n']*'|"[^\n"]*")\s*\(/).exec(text);
