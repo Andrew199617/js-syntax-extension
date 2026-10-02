@@ -107,6 +107,20 @@ describe('LGD this. member hover.', () =>
         expect(text).toContain('command,');
     });
 
+    test('this member hover takes precedence over an unrelated top-level name', async () =>
+    {
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const source = `Object command = { unrelated: 1 };\n${LGD_TEXT}`;
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const provider = LgdHoverProvider.create(service);
+
+        const hover = await provider.provideHover(document, new vscode.Position(THIS_COMMAND_LINE + 1, THIS_COMMAND_CHARACTER));
+
+        expect(hover.contents).toContain('(property) command: vscode.Command');
+        expect(hover.contents).not.toContain('unrelated');
+    });
+
     test('provideHover ignores words that are not a this. member access.', async () =>
     {
         const { service, document } = await openOlooDocument();

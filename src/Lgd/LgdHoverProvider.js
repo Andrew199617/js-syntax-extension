@@ -54,16 +54,16 @@ const LgdHoverProvider = {
         const wordRange = document.getWordRangeAtPosition(position);
         if(wordRange)
         {
-            const summary = await this.languageService.getTypeSummary(document.uri, document.getText(wordRange));
-            if(summary && (summary.members.length > 0 || summary.params.length > 0))
-            {
-                return new vscode.Hover(this.renderTypeSummary(summary), wordRange);
-            }
-
             const memberHover = this.provideThisMemberHover(document, position, wordRange);
             if(memberHover)
             {
                 return memberHover;
+            }
+
+            const summary = await this.languageService.getTypeSummary(document.uri, document.getText(wordRange));
+            if(summary && (summary.members.length > 0 || summary.params.length > 0))
+            {
+                return new vscode.Hover(this.renderTypeSummary(summary), wordRange);
             }
         }
 
