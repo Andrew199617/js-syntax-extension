@@ -503,7 +503,8 @@ function hasTopLevelArrow(source)
         }
         else if(character === '=' && source[index + 1] === '>' && depth === 0)
         {
-            return true;
+            const parameters = source.slice(0, index).trim().replace(/^async\s+/, '');
+            return unwrapParens(parameters) !== null || (/^[$A-Z_a-z][\w$]*$/).test(parameters);
         }
     }
 
@@ -539,10 +540,11 @@ function inferAtomic(source, scope)
         return 'Boolean';
     }
 
-    if(source[0] === '\uE000' || source[source.length - 1] === '\uE000' || (/^[+~-]/).test(source))
+    if(source[0] === '+')
     {
         return 'Number';
     }
+
 
     if((/^(?:\d+\.?\d*|\.\d+)(?:[Ee][+-]?\d+)?$/).test(source) || (/^0[Xx][\dA-Fa-f]+$/).test(source))
     {
@@ -584,7 +586,7 @@ function inferAtomic(source, scope)
 
     if((/^new\b/).test(source))
     {
-        return 'Object';
+        return UNKNOWN;
     }
 
     if((/^Symbol\s*\(/).test(source))
@@ -653,6 +655,11 @@ function inferExpression(text, scope, externalsByName)
         return inferExpression(unwrapped, scope, externalsByName);
     }
 
+    if(hasTopLevelArrow(normalized))
+    {
+        return 'Function';
+    }
+
     const ternary = splitTernary(normalized);
     if(ternary)
     {
@@ -681,13 +688,23 @@ function inferExpression(text, scope, externalsByName)
             return 'Boolean';
         }
 
-        if(split.kind === 'number')
+        const leftType = keywordOf(inferExpression(split.left, scope, externalsByName), scope, externalsByName);
+        const rightType = keywordOf(inferExpression(split.right, scope, externalsByName), scope, externalsByName);
+        if(split.operator === '>>>')
         {
             return 'Number';
         }
 
-        const leftType = keywordOf(inferExpression(split.left, scope, externalsByName), scope, externalsByName);
-        const rightType = keywordOf(inferExpression(split.right, scope, externalsByName), scope, externalsByName);
+        if(leftType === 'BigInt' && rightType === 'BigInt')
+        {
+            return 'BigInt';
+        }
+
+        if(split.kind === 'number')
+        {
+            return leftType === UNKNOWN || rightType === UNKNOWN ? UNKNOWN : 'Number';
+        }
+
         if(split.operator === '+')
         {
             if(leftType === 'Number' && rightType === 'Number')
@@ -699,6 +716,19 @@ function inferExpression(text, scope, externalsByName)
         }
 
         return leftType === 'Number' && rightType === 'Number' ? 'Number' : UNKNOWN;
+    }
+
+    if(normalized[0] === '\uE000' || normalized[normalized.length - 1] === '\uE000' || (/^[~-]/).test(normalized))
+    {
+        const operand = normalized.replace(/^[~\uE000-]|\uE000$/g, '').trim();
+        const inferred = inferExpression(operand, scope, externalsByName);
+        const keyword = keywordOf(inferred, scope, externalsByName);
+        if(keyword === 'BigInt')
+        {
+            return keyword;
+        }
+
+        return [ 'Number', 'String', 'Boolean', NULL ].includes(keyword) ? 'Number' : UNKNOWN;
     }
 
     return inferAtomic(normalized, scope);
