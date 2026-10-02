@@ -118,10 +118,13 @@ const JsBackend = {
         const jsdoc = docblock ? docblock[0].trimEnd() : '/** */';
         const parameters = this.mergeMethodParams(jsdoc, group.params, indent);
         const comment = this.mergeMethodReturn(parameters, group, indent);
+        const prefix = declaration.initializerText.slice(0, start);
+        const currentLine = prefix.slice(prefix.lastIndexOf('\n') + 1);
+        const newlinePrefix = (/^[\t ]*$/).test(currentLine) ? '' : this.newline;
         return {
             start: map.toOutput(declaration.initializerStart + start),
             end: map.toOutput(declaration.initializerStart + group.methodStart),
-            text: `${comment}${this.newline}${indent}`
+            text: `${newlinePrefix}${comment}${this.newline}${indent}`
         };
     },
 
