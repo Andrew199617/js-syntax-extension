@@ -2,7 +2,7 @@ const { maskCode } = require('./LgdInfer');
 const { parseTypedParams, parseMethodHead } = require('./LgdTypedParams');
 const LgdBaseCalls = require('./LgdBaseCalls');
 
-/** @description Reads LGD class declarations and lowers them to prototype objects with create factories. */
+/** @description Reads LGD classes and interfaces and lowers runtime classes to prototype objects with create factories. */
 const LgdClassSyntax = {
     /** @description Finds balanced parentheses or braces in already-masked source. */
     findClose(masked, start)
@@ -45,7 +45,7 @@ const LgdClassSyntax = {
     parse(content, compiler)
     {
         const masked = maskCode(content);
-        const pattern = /^(?<indent>[\t ]*)(?<exportKeyword>export[\t ]+)?class[\t ]+(?<name>[$A-Z_a-z][\w$]*)\b/gm;
+        const pattern = /^(?<indent>[\t ]*)(?<exportKeyword>export[\t ]+)?(?<abstractKeyword>abstract[\t ]+)?(?<declarationKind>class|interface)[\t ]+(?<name>[$A-Z_a-z][\w$]*)\b/gm;
         const declarations = [];
         const errors = [];
         let match = pattern.exec(masked);
@@ -71,45 +71,62 @@ const LgdClassSyntax = {
         return { declarations: declarations, errors: errors };
     },
 
-    /** @description Parses one named class and its optional colon-style base. */
+    /** @description Parses one named class or interface and its colon-style heritage list. */
     parseDeclaration(content, masked, match, compiler)
     {
         const name = match.groups.name;
         const nameEnd = match.index + match[0].length;
         const nameStart = nameEnd - name.length;
         let cursor = this.skipSpace(masked, nameEnd);
-        let baseName = null;
-        let baseStart = null;
-        if(masked[cursor] === ':')
+        const kind = match.groups.declarationKind;
+        const abstract = Boolean(match.groups.abstractKeyword);
+        const abstractStart = abstract ? match.index + match.groups.indent.length + (match.groups.exportKeyword || '').length : null;
+        if(kind === 'interface' && abstract)
         {
-            cursor = this.skipSpace(masked, cursor + 1);
-            const base = (/^(?<name>[$A-Z_a-z][\w$]*(?:\.[$A-Z_a-z][\w$]*)*)/).exec(masked.slice(cursor));
-            if(!base)
-            {
-                return { error: 'Expected a base object name after ":".', offset: cursor };
-            }
-
-            baseName = base.groups.name;
-            baseStart = cursor;
-            cursor = this.skipSpace(masked, cursor + baseName.length);
+            return { error: 'An LGD interface is already abstract; do not add the abstract declaration modifier.', offset: abstractStart };
         }
 
+        const heritage = [];
+        if(masked[cursor] === ':')
+        {
+            do
+            {
+                cursor = this.skipSpace(masked, cursor + 1);
+                const inherited = (/^(?<name>[$A-Z_a-z][\w$]*(?:\.[$A-Z_a-z][\w$]*)*)/).exec(masked.slice(cursor));
+                if(!inherited)
+                {
+                    return { error: 'Expected a base object or interface name in the heritage list.', offset: cursor };
+                }
+
+                const inheritedName = inherited.groups.name;
+                heritage.push({ name: inheritedName, start: cursor, end: cursor + inheritedName.length });
+                cursor = this.skipSpace(masked, cursor + inheritedName.length);
+            }
+            while(masked[cursor] === ',');
+        }
+
+        const base = heritage[0];
+        const baseName = base ? base.name : null;
+        const baseStart = base ? base.start : null;
         if(masked[cursor] !== '{')
         {
-            return { error: 'Expected "{" in LGD class declaration. Inheritance uses ": BaseName".', offset: cursor };
+            return { error: 'Expected "{" in LGD declaration. Inheritance uses ": BaseName, InterfaceName".', offset: cursor };
         }
 
         const bodyEnd = this.findClose(masked, cursor);
         if(bodyEnd === -1)
         {
-            return { error: 'Unclosed LGD class body.', offset: cursor };
+            return { error: 'Unclosed LGD class or interface body.', offset: cursor };
         }
 
         const jsdoc = compiler.findPrecedingJsdoc(content, match.index);
         const declaration = {
-            kind: 'class',
+            kind: kind,
+            abstract: abstract,
+            abstractStart: abstractStart,
+            abstractEnd: abstractStart === null ? null : abstractStart + 'abstract'.length,
             typeName: 'Object',
-            typeStart: match.index + match.groups.indent.length + (match.groups.exportKeyword || '').length,
+            typeStart: match.index + match.groups.indent.length + (match.groups.exportKeyword || '').length + (match.groups.abstractKeyword || '').length,
             typeEnd: nameStart - 1,
             name: name,
             nameStart: nameStart,
@@ -124,21 +141,22 @@ const LgdClassSyntax = {
             initializerEnd: bodyEnd + 1,
             initializerText: content.slice(cursor, bodyEnd + 1),
             end: bodyEnd + 1,
+            heritage: heritage,
             baseName: baseName,
             baseStart: baseStart,
             baseEnd: baseName ? baseStart + baseName.length : null,
             constructorMember: null,
             classMembers: [],
-            members: [{ name: 'create', kind: 'method' }],
+            members: kind === 'interface' ? [] : [{ name: 'create', kind: 'method' }],
             methodTypedParams: [],
             children: []
         };
-        const errors = this.parseMembers(content, masked, declaration);
+        const errors = this.parseMembers(content, masked, declaration, compiler);
         return { declaration: declaration, errors: errors };
     },
 
     /** @description Reads named methods and accessors, rejecting unsupported class member syntax. */
-    parseMembers(content, masked, declaration)
+    parseMembers(content, masked, declaration, compiler)
     {
         const errors = [];
         let cursor = this.skipSpace(masked, declaration.initializerStart + 1);
@@ -152,6 +170,8 @@ const LgdClassSyntax = {
             }
 
             const member = parsed.member;
+            const jsdoc = member.abstract ? compiler.findPrecedingJsdoc(content, member.start) : null;
+            member.erasureStart = jsdoc && jsdoc.start > declaration.initializerStart ? jsdoc.start : member.start;
             declaration.classMembers.push(member);
             if(member.isConstructor)
             {
@@ -187,10 +207,22 @@ const LgdClassSyntax = {
             return modifiers;
         }
 
+        const property = this.parsePropertyContract(masked, start, declaration, modifiers);
+        if(property)
+        {
+            return property;
+        }
+
         const head = parseMethodHead(modifiers.head);
         if(!head)
         {
             return { error: 'Expected a named LGD method or class-name constructor. Fields, static, and private members are not supported.', offset: start };
+        }
+
+        const contract = declaration.kind === 'interface' || modifiers.abstractStart !== null;
+        if(modifiers.abstractStart !== null && declaration.kind !== 'interface' && !declaration.abstract)
+        {
+            return { error: 'Abstract members require an abstract LGD class.', offset: modifiers.abstractStart };
         }
 
         const paramStart = start + head.paramStart;
@@ -203,14 +235,42 @@ const LgdClassSyntax = {
         const name = head.name;
         const nameEnd = masked.slice(0, paramStart).trimEnd().length;
         const isConstructor = name === declaration.name;
+        if(declaration.kind === 'interface' && (isConstructor || name === 'constructor' || name === 'create'))
+        {
+            return { error: 'LGD interfaces cannot declare constructors or create factories.', offset: start + head.nameStart };
+        }
+
         if(isConstructor && (head.modifier || head.generator || head.returnTypeName || modifiers.spans.length > 0))
         {
             return { error: 'An LGD constructor cannot have a return type or be virtual, override, async, a generator, or an accessor.', offset: start };
         }
 
-        if(modifiers.spans.length > 0 && (head.modifier === 'get' || head.modifier === 'set'))
+        if(modifiers.virtualStart !== null && (head.modifier === 'get' || head.modifier === 'set'))
         {
-            return { error: 'LGD virtual and override modifiers apply to methods, not accessors.', offset: start };
+            return { error: 'The LGD virtual modifier applies to methods, not accessors.', offset: start };
+        }
+
+        if(contract && (head.async || head.generator || head.modifier === 'get' || head.modifier === 'set'))
+        {
+            return { error: 'Contract methods cannot be async, generators, or accessor methods; use a typed property contract for accessors.', offset: start };
+        }
+
+        const parameters = parseTypedParams(content.slice(paramStart, paramClose + 1));
+        const parsedParams = parameters ? parameters.params : [];
+        const params = parsedParams.filter(parameter => parameter.raw !== '' && (!contract || maskCode(parameter.raw).trim() !== ''));
+        const emptyParameter = parsedParams.some(parameter => maskCode(parameter.raw).trim() === '') && masked.slice(paramStart + 1, paramClose).trim() !== '';
+        if(contract && (!head.returnTypeName || emptyParameter || params.some(parameter => !parameter.name || !parameter.typeName)))
+        {
+            return { error: 'Interface and abstract methods require explicit return and parameter types.', offset: start };
+        }
+
+        for(const parameter of params)
+        {
+            if(parameter.typeStart !== -1)
+            {
+                parameter.typeStart += paramStart - declaration.initializerStart;
+                parameter.typeEnd += paramStart - declaration.initializerStart;
+            }
         }
 
         let cursor = this.skipSpace(masked, paramClose + 1);
@@ -236,26 +296,30 @@ const LgdClassSyntax = {
             cursor = this.skipSpace(masked, baseClose + 1);
         }
 
-        if(masked[cursor] !== '{')
+        let bodyEnd;
+        if(contract)
         {
-            return { error: 'Expected an LGD method body.', offset: cursor };
-        }
-
-        const close = this.findClose(masked, cursor);
-        if(close === -1 || close >= declaration.initializerEnd - 1)
-        {
-            return { error: 'Unclosed LGD method body.', offset: cursor };
-        }
-
-        const parameters = parseTypedParams(content.slice(paramStart, paramClose + 1));
-        const params = parameters ? parameters.params.filter(parameter => parameter.raw !== '') : [];
-        for(const parameter of params)
-        {
-            if(parameter.typeStart !== -1)
+            if(masked[cursor] !== ';')
             {
-                parameter.typeStart += paramStart - declaration.initializerStart;
-                parameter.typeEnd += paramStart - declaration.initializerStart;
+                return { error: 'Interface and abstract methods must end with ";" and cannot have a body.', offset: cursor };
             }
+
+            bodyEnd = cursor + 1;
+        }
+        else
+        {
+            if(masked[cursor] !== '{')
+            {
+                return { error: 'Expected an LGD method body.', offset: cursor };
+            }
+
+            const close = this.findClose(masked, cursor);
+            if(close === -1 || close >= declaration.initializerEnd - 1)
+            {
+                return { error: 'Unclosed LGD method body.', offset: cursor };
+            }
+
+            bodyEnd = close + 1;
         }
 
         return { member: {
@@ -268,7 +332,7 @@ const LgdClassSyntax = {
             paramEnd: paramClose + 1,
             params: params,
             bodyStart: cursor,
-            bodyEnd: close + 1,
+            bodyEnd: bodyEnd,
             baseArgumentsStart: baseArgumentsStart,
             baseArgumentsEnd: baseArgumentsEnd,
             isConstructor: isConstructor,
@@ -278,6 +342,12 @@ const LgdClassSyntax = {
             async: head.async,
             generator: head.generator,
             accessor: head.modifier === 'get' || head.modifier === 'set',
+            accessorKind: head.modifier === 'get' || head.modifier === 'set' ? head.modifier : null,
+            getter: head.modifier === 'get',
+            setter: head.modifier === 'set',
+            abstract: contract,
+            abstractStart: modifiers.abstractStart,
+            abstractEnd: modifiers.abstractStart === null ? null : modifiers.abstractStart + 'abstract'.length,
             virtual: modifiers.virtualStart !== null,
             override: modifiers.overrideStart !== null,
             virtualStart: modifiers.virtualStart,
@@ -288,7 +358,110 @@ const LgdClassSyntax = {
         } };
     },
 
-    /** @description Reads compile-only virtual/override modifiers while keeping every signature offset unchanged. */
+    /** @description Reads a typed signature-only property with one or both accessor contracts. */
+    parsePropertyContract(masked, start, declaration, modifiers)
+    {
+        const head = (/^\s*(?<type>[$A-Z_a-z][\w$]*(?:\.[$A-Z_a-z][\w$]*)*)\s+(?<name>[$A-Z_a-z][\w$]*)\s*{/).exec(modifiers.head);
+        if(!head)
+        {
+            return null;
+        }
+
+        const contract = declaration.kind === 'interface' || modifiers.abstractStart !== null;
+        if(!contract || declaration.kind !== 'interface' && !declaration.abstract)
+        {
+            return { error: 'Signature-only properties require an interface or an abstract member in an abstract class.', offset: start };
+        }
+
+        if(modifiers.virtualStart !== null || modifiers.overrideStart !== null || head.groups.type === 'void')
+        {
+            return { error: 'A property contract must have a value type and cannot be virtual or override.', offset: start };
+        }
+
+        const bodyStart = start + head[0].length - 1;
+        const close = this.findClose(masked, bodyStart);
+        if(close === -1 || close >= declaration.initializerEnd - 1)
+        {
+            return { error: 'Unclosed LGD property contract.', offset: bodyStart };
+        }
+
+        const accessors = {};
+        let cursor = this.skipSpace(masked, bodyStart + 1);
+        while(cursor < close)
+        {
+            const accessor = (/^(?<kind>get|set)\b/).exec(masked.slice(cursor));
+            if(!accessor)
+            {
+                return { error: 'A property contract supports only "get;" and "set;" accessors without bodies.', offset: cursor };
+            }
+
+            const accessorKind = accessor.groups.kind;
+            if(accessors[accessorKind])
+            {
+                return { error: `Duplicate '${accessorKind}' property accessor.`, offset: cursor };
+            }
+
+            accessors[accessorKind] = { start: cursor, end: cursor + accessorKind.length };
+            cursor = this.skipSpace(masked, cursor + accessorKind.length);
+            if(masked[cursor] !== ';')
+            {
+                return { error: 'Property contract accessors must end with ";" and cannot have bodies.', offset: cursor };
+            }
+
+            cursor = this.skipSpace(masked, cursor + 1);
+        }
+
+        if(!accessors.get && !accessors.set)
+        {
+            return { error: 'A property contract requires at least one get or set accessor.', offset: bodyStart };
+        }
+
+        const nameEnd = masked.slice(0, bodyStart).trimEnd().length;
+        const typeStart = start + head[0].indexOf(head.groups.type);
+        return { member: {
+            name: head.groups.name,
+            kind: 'property',
+            start: start,
+            nameStart: nameEnd - head.groups.name.length,
+            nameEnd: nameEnd,
+            paramStart: nameEnd,
+            paramEnd: nameEnd,
+            params: [],
+            bodyStart: bodyStart,
+            bodyEnd: close + 1,
+            baseArgumentsStart: null,
+            baseArgumentsEnd: null,
+            isConstructor: false,
+            returnTypeName: null,
+            returnTypeStart: -1,
+            returnTypeEnd: -1,
+            propertyTypeName: head.groups.type,
+            propertyTypeStart: typeStart - declaration.initializerStart,
+            propertyTypeEnd: typeStart + head.groups.type.length - declaration.initializerStart,
+            async: false,
+            generator: false,
+            accessor: true,
+            accessorKind: null,
+            getter: Boolean(accessors.get),
+            setter: Boolean(accessors.set),
+            getterStart: accessors.get ? accessors.get.start : null,
+            getterEnd: accessors.get ? accessors.get.end : null,
+            setterStart: accessors.set ? accessors.set.start : null,
+            setterEnd: accessors.set ? accessors.set.end : null,
+            abstract: true,
+            abstractStart: modifiers.abstractStart,
+            abstractEnd: modifiers.abstractStart === null ? null : modifiers.abstractStart + 'abstract'.length,
+            virtual: false,
+            override: false,
+            virtualStart: null,
+            virtualEnd: null,
+            overrideStart: null,
+            overrideEnd: null,
+            modifierSpans: modifiers.spans
+        } };
+    },
+
+    /** @description Reads compile-only abstract/virtual/override modifiers while keeping every signature offset unchanged. */
     readMethodModifiers(masked, start)
     {
         let cursor = start;
@@ -296,8 +469,9 @@ const LgdClassSyntax = {
         const spans = [];
         let virtualStart = null;
         let overrideStart = null;
+        let abstractStart = null;
         const seen = new Set();
-        let match = (/^(?<modifier>async|virtual|override)\b/).exec(masked.slice(cursor));
+        let match = (/^(?<modifier>async|virtual|override|abstract)\b/).exec(masked.slice(cursor));
         while(match)
         {
             const modifier = match.groups.modifier;
@@ -316,12 +490,18 @@ const LgdClassSyntax = {
             seen.add(modifier);
             if(modifier !== 'async')
             {
-                if(virtualStart !== null || overrideStart !== null)
+                const virtualConflict = modifier === 'virtual' && (overrideStart !== null || abstractStart !== null);
+                const otherConflict = virtualStart !== null && (modifier === 'override' || modifier === 'abstract');
+                if(virtualConflict || otherConflict)
                 {
-                    return { error: 'An LGD method cannot be both virtual and override.', offset: cursor };
+                    return { error: 'An LGD member cannot combine virtual with abstract or override.', offset: cursor };
                 }
 
-                if(modifier === 'virtual')
+                if(modifier === 'abstract')
+                {
+                    abstractStart = cursor;
+                }
+                else if(modifier === 'virtual')
                 {
                     virtualStart = cursor;
                 }
@@ -335,10 +515,10 @@ const LgdClassSyntax = {
             }
 
             cursor = after;
-            match = (/^(?<modifier>async|virtual|override)\b/).exec(masked.slice(cursor));
+            match = (/^(?<modifier>async|virtual|override|abstract)\b/).exec(masked.slice(cursor));
         }
 
-        return { head: head, spans: spans, virtualStart: virtualStart, overrideStart: overrideStart };
+        return { head: head, spans: spans, virtualStart: virtualStart, overrideStart: overrideStart, abstractStart: abstractStart };
     },
 
     /** @description Exposes typed method groups using the existing backend and semantic-token contract. */
@@ -363,6 +543,7 @@ const LgdClassSyntax = {
             async: member.async,
             generator: member.generator,
             accessor: member.accessor,
+            abstract: member.abstract,
             bodyStart: member.bodyStart - base,
             bodyEnd: member.bodyEnd - base
         });
