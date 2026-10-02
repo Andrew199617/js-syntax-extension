@@ -7,6 +7,7 @@ const LgdBaseChecker = require('./LgdBaseChecker');
 const LgdOverrideChecker = require('./LgdOverrideChecker');
 const LgdReturnChecker = require('./LgdReturnChecker');
 const LgdReturnDocChecker = require('./LgdReturnDocChecker');
+const LgdStandaloneReturnChecker = require('./LgdStandaloneReturnChecker');
 const LgdBaseCalls = require('./LgdBaseCalls');
 const { parseTypedParams, parseObjectMethodParams, parseMethodHead, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
 const { maskCode } = require('./LgdInfer');
@@ -204,9 +205,15 @@ const LgdCompiler = {
 
         const declarations = this.buildTree(found);
         const hasBaseCalls = LgdBaseCalls.hasCalls(content, found);
-        if(hasBaseCalls || LgdReturnChecker.signatures(found).length > 0)
+        if(hasBaseCalls || LgdReturnChecker.signatures(found).length > 0 || LgdStandaloneReturnChecker.hasCandidates(content))
         {
             const emitted = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
+            const standaloneErrors = LgdStandaloneReturnChecker.check(emitted);
+            for(const standaloneError of standaloneErrors)
+            {
+                errors.push(this.createError(content, standaloneError.offset, standaloneError.message, standaloneError.endOffset));
+            }
+
             if(hasBaseCalls)
             {
                 for(const baseCallError of LgdBaseCalls.analyze(content, found, emitted, externals))

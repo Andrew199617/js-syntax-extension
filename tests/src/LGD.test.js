@@ -452,7 +452,7 @@ describe('LGD imported-file invalidation', () =>
 
 describe('manual LGD compilation', () =>
 {
-    test.each([ 'Number = ;', 'Number total = "many";' ])('does not announce success when compilation fails for %s', async source =>
+    test.each([ 'Number = ;', 'Number total = "many";', 'void log() {}', 'Number read() { return 1; }' ])('does not announce success when compilation fails for %s', async source =>
     {
         vscode.window.activeTextEditor = {
             document: { fileName: path.join('workspace', 'broken.lgd'), getText: () => source }
@@ -558,11 +558,11 @@ describe('LGD compile on save', () =>
         });
     }
 
-    test('saving LGD with errors leaves the previous .js output untouched', async () =>
+    test.each([ 'Number = ;', 'void log() {}' ])('saving LGD with errors leaves the previous .js output untouched: %s', async source =>
     {
         vscode.window.createStatusBarItem.mockClear();
 
-        saveLgdDocument(path.join('workspace', 'broken.lgd'), 'Number = ;');
+        saveLgdDocument(path.join('workspace', 'broken.lgd'), source);
         await nextTurn();
         await nextTurn();
 
