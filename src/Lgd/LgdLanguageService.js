@@ -150,6 +150,7 @@ const LgdLanguageService = {
     async recompile(state)
     {
         const content = state.document.getText();
+        const version = state.document.version;
         const externals = await this.collectExternalTypes(state.document);
         if(this.getState(state.document.uri) !== state)
         {
@@ -170,6 +171,7 @@ const LgdLanguageService = {
         }
 
         this.applyCompilation(state, result);
+        state.compiledVersion = version;
         state.externals = externals;
         this.publishDiagnostics(state);
         return state;

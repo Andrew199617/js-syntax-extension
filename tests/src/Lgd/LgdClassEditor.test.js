@@ -121,7 +121,7 @@ describe('LGD class editor integration', () =>
     test('marks class names, base names and constructors as types while leaving methods to the grammar', async () =>
     {
         const { service, document } = await openClassDocument();
-        const tokens = LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
         const names = tokens.pushed.map(token => document.getText(token.range));
 
         expect(names.filter(name => name === 'BaseCommand')).toEqual([ 'BaseCommand', 'BaseCommand', 'BaseCommand' ]);

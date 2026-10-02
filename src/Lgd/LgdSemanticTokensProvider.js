@@ -1,6 +1,6 @@
 const vscode = require('vscode');
 
-/** @import { SemanticTokens, TextDocument } from 'vscode' */
+/** @import { CancellationToken, SemanticTokens, TextDocument } from 'vscode' */
 
 /**
  * @description Provides semantic tokens for LGD documents, coloring type references
@@ -29,18 +29,46 @@ const LgdSemanticTokensProvider = {
     /**
      * @description Provides the semantic type tokens for an LGD document.
      * @param {TextDocument} document the LGD document.
-     * @returns {SemanticTokens|null} the built tokens, or null when the document is not open.
+     * @param {CancellationToken} [token] cancellation for this semantic-token request.
+     * @returns {Promise<SemanticTokens|null>} current tokens, or null for a closed, canceled, or stale request.
      */
-    provideDocumentSemanticTokens(document)
+    async provideDocumentSemanticTokens(document, token = null)
     {
         const state = this.languageService.getState(document.uri);
-        if(!state || !state.declarations)
+        if(!state || token && token.isCancellationRequested)
+        {
+            return null;
+        }
+
+        const version = document.version;
+        const source = document.getText();
+        const key = document.uri.toString();
+        let pending;
+        do
+        {
+            pending = this.languageService.pendingUpdates.get(key);
+            if(pending)
+            {
+                await pending;
+            }
+
+            const canceled = token && token.isCancellationRequested;
+            const changed = document.version !== version || document.getText() !== source;
+            const closed = this.languageService.getState(document.uri) !== state || state.document !== document;
+            if(canceled || changed || closed)
+            {
+                return null;
+            }
+        }
+        while(this.languageService.pendingUpdates.get(key) !== pending);
+
+        if(!state.map || state.compiledVersion !== version)
         {
             return null;
         }
 
         const builder = new vscode.SemanticTokensBuilder(this.legend);
-        const spans = this.collectTypeSpans(document.getText(), state.declarations);
+        const spans = this.collectTypeSpans(source, state.declarations);
         for(const span of spans)
         {
             builder.push(

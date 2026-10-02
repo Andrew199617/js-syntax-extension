@@ -67,7 +67,7 @@ describe('LgdSemanticTokensProvider', () =>
         const { service, document } = await openTypedDocument();
         const provider = LgdSemanticTokensProvider.create(service);
 
-        const tokens = provider.provideDocumentSemanticTokens(document);
+        const tokens = await provider.provideDocumentSemanticTokens(document);
 
         expect(tokens).not.toBeNull();
         const texts = tokens.pushed.map(token => tokenText(document, token));
@@ -84,7 +84,7 @@ describe('LgdSemanticTokensProvider', () =>
         const { service, document } = await openTypedDocument();
         const provider = LgdSemanticTokensProvider.create(service);
 
-        const tokens = provider.provideDocumentSemanticTokens(document);
+        const tokens = await provider.provideDocumentSemanticTokens(document);
 
         const texts = tokens.pushed.map(token => tokenText(document, token));
         expect(texts).toContain('vscode.Command');
@@ -96,17 +96,98 @@ describe('LgdSemanticTokensProvider', () =>
         const document = makeTextDocument(LGD_URI, 'class Counter { Number count() { return 1; } void reset() {} }');
         await service.openDocument(document);
         const provider = LgdSemanticTokensProvider.create(service);
-        const tokens = provider.provideDocumentSemanticTokens(document);
+        const tokens = await provider.provideDocumentSemanticTokens(document);
         expect(tokens.pushed.map(token => tokenText(document, token))).toEqual([ 'Counter', 'Number', 'void' ]);
     });
 
-    test('returns null when the document is not open.', () =>
+    test('returns null when the document is not open.', async () =>
     {
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
         const provider = LgdSemanticTokensProvider.create(service);
         const document = makeTextDocument(LGD_URI, LGD_TEXT);
 
-        expect(provider.provideDocumentSemanticTokens(document)).toBeNull();
+        expect(await provider.provideDocumentSemanticTokens(document)).toBeNull();
+    });
+
+    test('waits for the first compilation and retains constructor tokens when base arguments are invalid', async () =>
+    {
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const source = 'class Base { Base(String title) {} }\nclass Derived : Base { Derived() : base(42) {} async void reset() {} }';
+        const document = makeTextDocument(LGD_URI, source);
+        document.version = 1;
+        let release;
+        const gate = new Promise(resolve =>
+        {
+            release = resolve;
+        });
+        vscode.workspace.openTextDocument.mockImplementationOnce(async options =>
+        {
+            await gate;
+            return makeTextDocument('untitled:delayed-mirror', options.content);
+        });
+
+        const opening = service.openDocument(document);
+        const requested = LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        expect(service.getState(document.uri).declarations).toEqual([]);
+        release();
+        const tokens = await requested;
+        const state = await opening;
+        expect(state.errors).toHaveLength(1);
+        expect(source.slice(state.errors[0].offset, state.errors[0].endOffset)).toBe('42');
+        const names = tokens.pushed.map(token => tokenText(document, token));
+        expect(names.filter(name => name === 'Derived')).toHaveLength(2);
+        expect(names).toContain('void');
+    });
+
+    test.each([ 'canceled', 'changed', 'closed' ])('discards a %s semantic request while compilation is pending', async reason =>
+    {
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, 'class Original { Original() {} }');
+        document.version = 1;
+        let release;
+        const gate = new Promise(resolve =>
+        {
+            release = resolve;
+        });
+        service.collectExternalTypes = async () =>
+        {
+            await gate;
+            return new Map();
+        };
+
+        const cancellation = { isCancellationRequested: false };
+        const opening = service.openDocument(document);
+        const requested = LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document, cancellation);
+        if(reason === 'canceled')
+        {
+            cancellation.isCancellationRequested = true;
+        }
+        else if(reason === 'changed')
+        {
+            document.version++;
+            document.setText('class Updated {}');
+        }
+        else
+        {
+            service.closeDocument(document);
+        }
+
+        release();
+        expect(await requested).toBeNull();
+        await opening;
+    });
+
+    test('does not reuse old tokens after a newer mirror update fails', async () =>
+    {
+        const { service, document } = await openTypedDocument();
+        document.version = 1;
+        await service.updateDocument(document);
+        document.version++;
+        document.setText('class Updated { Updated() {} }');
+        vscode.workspace.applyEdit.mockResolvedValueOnce(false);
+        await expect(service.updateDocument(document)).rejects.toThrow();
+        const provider = LgdSemanticTokensProvider.create(service);
+        expect(await provider.provideDocumentSemanticTokens(document)).toBeNull();
     });
 
     test('exposes class in the legend.', () =>
