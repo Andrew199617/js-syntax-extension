@@ -55,13 +55,14 @@ describe('LGD class syntax lowering.', () =>
             '        return instance;',
             '    },',
             '    get commandName() { return this.command.command; },',
+            '    /** @virtual */',
             '    executeCommand() { return this.commandName; }',
             '};',
             'class GoToAssignment : BaseCommand {',
             '    GoToAssignment() : base("lgd.goToAssignment", "Go To Assignment") {',
             '        this.ready = Boolean(this.commandName);',
             '    }',
-            '    async executeCommand() { return Oloo.base(this, "executeCommand") + "!"; }',
+            '    override async executeCommand() { return Oloo.base(this, "executeCommand") + "!"; }',
             '}',
             'module.exports = { BaseCommand, GoToAssignment };'
         ].join('\n'));
@@ -117,13 +118,13 @@ describe('LGD class syntax lowering.', () =>
         const Leaf = execute([
             'class Base {',
             '    Base() { this.visited = []; }',
-            '    visit() { this.visited.push("base"); return this; }',
+            '    virtual visit() { this.visited.push("base"); return this; }',
             '}',
             'class Middle : Base {',
-            '    visit() { this.visited.push("middle"); return Oloo.base(this, "visit"); }',
+            '    override visit() { this.visited.push("middle"); return Oloo.base(this, "visit"); }',
             '}',
             'class Leaf : Middle {',
-            '    visit() { this.visited.push("leaf"); return Oloo.base(this, Leaf.visit); }',
+            '    override visit() { this.visited.push("leaf"); return Oloo.base(this, Leaf.visit); }',
             '}',
             'module.exports = Leaf;'
         ].join('\n'));
@@ -221,5 +222,61 @@ describe('LGD class syntax lowering.', () =>
         expect(result.errors).toEqual([]);
         expect(result.allDeclarations.map(declaration => declaration.name)).toEqual(['Existing']);
         expect(result.code).toContain('create() { return Object.create(Existing); }');
+    });
+
+    test('Erases virtual and override modifiers while preserving typed signatures, comments and source maps.', async () =>
+    {
+        const source = [
+            'class Base {',
+            '    virtual async String describe(String label) { return label; }',
+            '}',
+            'class Derived : Base {',
+            '    async override/* keep this comment */ String describe(String label) {',
+            '        return label + " override";',
+            '    }',
+            '}',
+            'module.exports = Derived;'
+        ].join('\r\n');
+        const result = compile(source);
+        expect(result.errors).toEqual([]);
+        expect(result.code).not.toContain('virtual async');
+        expect(result.code).not.toContain('async override');
+        expect(result.code).toContain('/* keep this comment */');
+        expect(result.code).toContain('" override"');
+        expect(result.code).toContain('@returns {Promise<string>}');
+        const baseMethod = result.declarations[0].classMembers[0];
+        const derivedMethod = result.declarations[1].classMembers[0];
+        expect(baseMethod.virtual).toBe(true);
+        expect(derivedMethod.override).toBe(true);
+        expect(derivedMethod.async).toBe(true);
+        expect(source.slice(baseMethod.virtualStart, baseMethod.virtualEnd)).toBe('virtual');
+        expect(source.slice(derivedMethod.overrideStart, derivedMethod.overrideEnd)).toBe('override');
+        const map = LgdSourceMap.create(result.mappings);
+        for(const member of [ baseMethod, derivedMethod ])
+        {
+            expect(result.code.slice(map.toOutput(member.nameStart), map.toOutput(member.nameEnd))).toBe('describe');
+            expect(map.toSource(map.toOutput(member.nameStart))).toBe(member.nameStart);
+        }
+
+        const Derived = execute(source);
+        expect(await Derived.create().describe('value')).toBe('value override');
+    });
+
+    test('Rejects contradictory, duplicate and constructor/accessor method modifiers.', () =>
+    {
+        const invalid = [
+            'virtual override run() {}',
+            'override virtual run() {}',
+            'virtual virtual run() {}',
+            'override override run() {}',
+            'async async run() {}',
+            'virtual Example() {}',
+            'override Example() {}',
+            'virtual get label() { return "value"; }'
+        ];
+        for(const member of invalid)
+        {
+            expect(compile(`class Example { ${member} }`).errors.length).toBeGreaterThan(0);
+        }
     });
 });

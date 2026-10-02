@@ -180,7 +180,13 @@ const LgdClassSyntax = {
     /** @description Parses a method signature, optional base initializer, and balanced body. */
     parseMember(content, masked, start, declaration)
     {
-        const head = parseMethodHead(masked.slice(start));
+        const modifiers = this.readMethodModifiers(masked, start);
+        if(modifiers.error)
+        {
+            return modifiers;
+        }
+
+        const head = parseMethodHead(modifiers.head);
         if(!head)
         {
             return { error: 'Expected a named LGD method or class-name constructor. Fields, static, and private members are not supported.', offset: start };
@@ -196,9 +202,14 @@ const LgdClassSyntax = {
         const name = head.name;
         const nameEnd = masked.slice(0, paramStart).trimEnd().length;
         const isConstructor = name === declaration.name;
-        if(isConstructor && (head.modifier || head.generator || head.returnTypeName))
+        if(isConstructor && (head.modifier || head.generator || head.returnTypeName || modifiers.spans.length > 0))
         {
-            return { error: 'An LGD constructor cannot have a return type or be async, a generator, or an accessor.', offset: start };
+            return { error: 'An LGD constructor cannot have a return type or be virtual, override, async, a generator, or an accessor.', offset: start };
+        }
+
+        if(modifiers.spans.length > 0 && (head.modifier === 'get' || head.modifier === 'set'))
+        {
+            return { error: 'LGD virtual and override modifiers apply to methods, not accessors.', offset: start };
         }
 
         let cursor = this.skipSpace(masked, paramClose + 1);
@@ -265,8 +276,68 @@ const LgdClassSyntax = {
             returnTypeEnd: head.returnTypeName ? start + head.returnTypeEnd - declaration.initializerStart : -1,
             async: head.async,
             generator: head.generator,
-            accessor: head.modifier === 'get' || head.modifier === 'set'
+            accessor: head.modifier === 'get' || head.modifier === 'set',
+            virtual: modifiers.virtualStart !== null,
+            override: modifiers.overrideStart !== null,
+            virtualStart: modifiers.virtualStart,
+            virtualEnd: modifiers.virtualStart === null ? null : modifiers.virtualStart + 'virtual'.length,
+            overrideStart: modifiers.overrideStart,
+            overrideEnd: modifiers.overrideStart === null ? null : modifiers.overrideStart + 'override'.length,
+            modifierSpans: modifiers.spans
         } };
+    },
+
+    /** @description Reads compile-only virtual/override modifiers while keeping every signature offset unchanged. */
+    readMethodModifiers(masked, start)
+    {
+        let cursor = start;
+        let head = masked.slice(start);
+        const spans = [];
+        let virtualStart = null;
+        let overrideStart = null;
+        const seen = new Set();
+        let match = (/^(?<modifier>async|virtual|override)\b/).exec(masked.slice(cursor));
+        while(match)
+        {
+            const modifier = match.groups.modifier;
+            const end = cursor + modifier.length;
+            const after = this.skipSpace(masked, end);
+            if(masked[after] === '(')
+            {
+                break;
+            }
+
+            if(seen.has(modifier))
+            {
+                return { error: `Duplicate '${modifier}' method modifier.`, offset: cursor };
+            }
+
+            seen.add(modifier);
+            if(modifier !== 'async')
+            {
+                if(virtualStart !== null || overrideStart !== null)
+                {
+                    return { error: 'An LGD method cannot be both virtual and override.', offset: cursor };
+                }
+
+                if(modifier === 'virtual')
+                {
+                    virtualStart = cursor;
+                }
+                else
+                {
+                    overrideStart = cursor;
+                }
+
+                spans.push({ start: cursor, end: end });
+                head = `${head.slice(0, cursor - start)}${' '.repeat(modifier.length)}${head.slice(end - start)}`;
+            }
+
+            cursor = after;
+            match = (/^(?<modifier>async|virtual|override)\b/).exec(masked.slice(cursor));
+        }
+
+        return { head: head, spans: spans, virtualStart: virtualStart, overrideStart: overrideStart };
     },
 
     /** @description Exposes typed method groups using the existing backend and semantic-token contract. */
@@ -358,7 +429,7 @@ const LgdClassSyntax = {
             }
             else
             {
-                this.appendSource(output, context, member.start, member.bodyEnd);
+                this.emitMethod(output, context, member);
             }
 
             this.appendGenerated(output, ',', member.bodyEnd);
@@ -375,6 +446,20 @@ const LgdClassSyntax = {
         this.appendGenerated(output, ';', declaration.end);
         output.code = backend.rewriteInitializer(declaration, output.code, output.segments);
         return output;
+    },
+
+    /** @description Erases compile-only method modifiers while preserving comments, executable code and mappings. */
+    emitMethod(output, context, member)
+    {
+        let cursor = member.start;
+        for(const span of member.modifierSpans)
+        {
+            this.appendSource(output, context, cursor, span.start);
+            this.appendGenerated(output, '', span.start, { end: span.end });
+            cursor = span.end;
+        }
+
+        this.appendSource(output, context, cursor, member.bodyEnd);
     },
 
     /** @description Builds create() around base construction and runs the constructor body on its fresh instance. */
