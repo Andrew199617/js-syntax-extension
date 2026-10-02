@@ -204,6 +204,22 @@ describe('LGD source mappings.', () =>
 {
     const LgdSourceMap = require('../../../src/Compilers/LgdSourceMap');
 
+    test('TypeScript parameter rewrites preserve mappings for nested locals and following expressions.', () =>
+    {
+        const source = [
+            'Function callback = (Number count) => {',
+            '    Number total = count;',
+            '    return total;',
+            '};'
+        ].join('\n');
+        const result = LgdCompiler.create().compileToTs(source);
+        expect(result.errors).toEqual([]);
+        const map = LgdSourceMap.create(result.mappings);
+        const offset = source.lastIndexOf('total');
+        expect(result.code.slice(map.toOutput(offset), map.toOutput(offset + 'total'.length))).toBe('total');
+        expect(map.toSource(map.toOutput(offset))).toBe(offset);
+    });
+
     test('Declaration names map to the emitted JavaScript name span.', () =>
     {
         const source = '/** The total. */\nNumber total = 0;\n';
@@ -351,9 +367,11 @@ describe('LGD type checking.', () =>
         expect(check(source).errors).toEqual([]);
     });
 
-    test('Ignores class field declarations with colliding names.', () =>
+    test('Reports unsupported LGD fields without confusing them with outer variables.', () =>
     {
-        expect(check('String label = "a";\nclass Widget { label = 5; }').errors).toEqual([]);
+        const errors = check('String label = "a";\nclass Widget { label = 5; }').errors;
+        expect(errors).toHaveLength(1);
+        expect(errors[0].message).toContain('Fields, static, and private members are not supported');
     });
 });
 

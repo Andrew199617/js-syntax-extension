@@ -1,8 +1,11 @@
 const vscode = require('vscode');
 const path = require('path');
-const fs = require('fs');
+const LgdExportCache = require('./LgdExportCache');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
+const { maskCode } = require('../Compilers/LgdInfer');
+const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
+const { parseTypedParams, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('../Compilers/LgdTypedParams');
 
 /** @import { DiagnosticCollection, Position, Range, TextDocument, Uri } from 'vscode' */
 
@@ -31,6 +34,12 @@ const LgdLanguageService = {
 
         /** @description Settled recompile promises by uri string, serializing updates per document. */
         service.pendingUpdates = new Map();
+        service.openStatesByPath = new Map();
+        service.exportCache = new Map();
+        service.sourceVersions = new Map();
+        service.dependencies = new Map();
+        service.dependents = new Map();
+        service.pendingDependencyUpdates = Promise.resolve();
 
         return service;
     },
@@ -48,6 +57,7 @@ const LgdLanguageService = {
             this.states.set(key, { document: document, jsDocument: null, map: null, errors: [], declarations: [] });
         }
 
+        this.openStatesByPath.set(document.uri.fsPath, this.states.get(key));
         return this.updateDocument(document);
     },
 
@@ -55,13 +65,14 @@ const LgdLanguageService = {
      * @description Recompiles an LGD document after it changed, serialized per document.
      * The returned promise rejects when the recompile fails; the stored chain always settles.
      * @param {TextDocument} document the LGD document.
+     * @param {boolean} refreshDependents whether its changed exports should recheck consumers.
      * @returns {Promise<Object|null>} the document state.
      */
-    updateDocument(document)
+    updateDocument(document, refreshDependents = true)
     {
         const key = document.uri.toString();
         const pending = this.pendingUpdates.get(key) || Promise.resolve();
-        const next = this.applyUpdate(document, key, pending);
+        const next = this.applyUpdate(document, this.states.get(key), { pending: pending, refreshDependents: refreshDependents });
         this.pendingUpdates.set(key, this.trackSettled(next));
         return next;
     },
@@ -69,21 +80,27 @@ const LgdLanguageService = {
     /**
      * @description Waits for the previous update, then recompiles the document.
      * @param {TextDocument} document the LGD document.
-     * @param {string} key the document uri string.
-     * @param {Promise<void>} pending the previous update.
+     * @param {Object|undefined} state the document state captured before queuing.
+     * @param {Object} update the previous promise and dependent-refresh choice.
      * @returns {Promise<Object|null>} the document state.
      */
-    async applyUpdate(document, key, pending)
+    async applyUpdate(document, state, update)
     {
-        await pending;
-        const state = this.states.get(key);
-        if(!state)
+        await update.pending;
+        if(!state || this.getState(document.uri) !== state)
         {
             return null;
         }
 
         state.document = document;
-        return this.recompile(state);
+        const previousSignature = this.exportCache.get(document.uri.fsPath)?.signature;
+        const result = await this.recompile(state);
+        if(result && update.refreshDependents)
+        {
+            this.queueDependencyRefresh(document.uri.fsPath, previousSignature);
+        }
+
+        return result;
     },
 
     /**
@@ -112,8 +129,10 @@ const LgdLanguageService = {
     {
         const key = document.uri.toString();
         this.states.delete(key);
+        this.openStatesByPath.delete(document.uri.fsPath);
         this.pendingUpdates.delete(key);
         this.diagnosticCollection.delete(document.uri);
+        this.invalidateFile(document.uri.fsPath);
     },
 
     /**
@@ -148,18 +167,43 @@ const LgdLanguageService = {
     async recompile(state)
     {
         const content = state.document.getText();
+        const version = state.document.version;
         const externals = await this.collectExternalTypes(state.document);
+        if(this.getState(state.document.uri) !== state)
+        {
+            return null;
+        }
+
         const result = this.compiler.compileToJs(content, externals);
+        const newline = this.compiler.detectNewline(content);
+
+        // Keep the in-memory mirror safe while giving tsserver its real module-resolution directory.
+        const sourceContext = state.document.uri.scheme === 'file'
+            ? `${newline}//# lgd-source=${JSON.stringify(state.document.uri.fsPath)}${newline}`
+            : '';
+        await this.syncMirror(state, result.code + sourceContext);
+        if(this.getState(state.document.uri) !== state)
+        {
+            return null;
+        }
+
         this.applyCompilation(state, result);
-        await this.syncMirror(state, result.code);
+        const cached = this.exportCache.get(state.document.uri.fsPath);
+        if(!cached || cached.sourceText !== content)
+        {
+            this.exportCache.set(state.document.uri.fsPath, { sourceText: content, parsed: result });
+        }
+
+        state.compiledVersion = version;
+        state.externals = externals;
         this.publishDiagnostics(state);
         return state;
     },
 
     /**
      * @description Creates the JavaScript mirror on first compile, or refreshes its content.
-     * The mirror document is assigned on the stored state after the await, never on a
-     * reference captured before it, so concurrent readers cannot see a stale document.
+     * Only the same open-document state may receive the result after awaiting creation;
+     * closing and reopening a source must never attach an earlier mirror to the new state.
      * @param {Object} state the document state.
      * @param {string} code the compiled JavaScript.
      * @returns {Promise<void>}
@@ -174,16 +218,21 @@ const LgdLanguageService = {
                 state.jsDocument.positionAt(state.jsDocument.getText().length)
             );
             edit.replace(state.jsDocument.uri, fullRange, code);
-            await vscode.workspace.applyEdit(edit);
+            const applied = await vscode.workspace.applyEdit(edit);
+            if(!applied)
+            {
+                throw new Error('LGD: Could not update the JavaScript mirror.');
+            }
+
             return;
         }
 
         const created = await vscode.workspace.openTextDocument({ language: 'javascript', content: code });
         const key = state.document.uri.toString();
         const current = this.states.get(key);
-        if(current)
+        if(current === state)
         {
-            current.jsDocument = created;
+            state.jsDocument = created;
         }
     },
 
@@ -199,9 +248,12 @@ const LgdLanguageService = {
         {
             const position = state.document.positionAt(Math.min(error.offset, text.length));
             const lineRange = state.document.lineAt(position.line).range;
+            const end = Number.isInteger(error.endOffset)
+                ? state.document.positionAt(Math.min(Math.max(error.offset, error.endOffset), text.length))
+                : lineRange.end;
             const severity = error.severity === 'warning' ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error;
             const diagnostic = new vscode.Diagnostic(
-                new vscode.Range(position, lineRange.end),
+                new vscode.Range(position, end),
                 `LGD: ${error.message}`,
                 severity
             );
@@ -247,73 +299,78 @@ const LgdLanguageService = {
         return `${candidate}.lgd`;
     },
 
-    /**
-     * @description Reads a sibling .lgd file and finds the declaration it exports.
-     * Unreadable files and files without a plain `module.exports = Name` export yield null.
-     * @param {string} sourcePath the absolute .lgd source path.
-     * @returns {Object|null} the {name, typeName, keyword, members} export, or null.
-     */
-    async readExportDeclaration(sourcePath)
-    {
-        let targetText;
-        try
-        {
-            targetText = await fs.promises.readFile(sourcePath, 'utf8');
-        }
-        catch
-        {
-            return null;
-        }
+    readSourceEntry(sourcePath) { return LgdExportCache.readSourceEntry(this, sourcePath); },
 
-        const exportMatch = (/module\.exports\s*=\s*(?<name>[$A-Z_a-z][\w$]*)/).exec(targetText);
-        if(!exportMatch)
-        {
-            return null;
-        }
+    replaceDependencies(sourcePath, dependencies) { return LgdExportCache.replaceDependencies(this, sourcePath, dependencies); },
 
-        const parsed = this.compiler.parse(targetText);
-        const declaration = parsed.allDeclarations.find(candidate => candidate.name === exportMatch[1]);
-        if(!declaration)
-        {
-            return null;
-        }
+    exportSignature(exported) { return LgdExportCache.exportSignature(this, exported); },
 
-        const keywords = [ 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object', 'Array', 'Function' ];
-        return {
-            name: declaration.name,
-            typeName: declaration.typeName,
-            keyword: keywords.includes(declaration.typeName) ? declaration.typeName : 'Object',
-            members: declaration.members || []
-        };
-    },
+    invalidateFile(sourcePath) { return LgdExportCache.invalidateFile(this, sourcePath); },
+
+    queueDependencyRefresh(sourcePath, previousSignature) { return LgdExportCache.queueDependencyRefresh(this, sourcePath, previousSignature); },
+
+    invalidateDependentExports(sourcePath) { return LgdExportCache.invalidateDependentExports(this, sourcePath); },
+
+    refreshDependents(sourcePath, previousSignature) { return LgdExportCache.refreshDependents(this, sourcePath, previousSignature); },
+
+    readExportDeclaration(sourcePath, visited = new Set()) { return LgdExportCache.readExportDeclaration(this, sourcePath, visited); },
 
     /**
      * @description Builds the cross-file type map for a document's relative requires.
      * @param {TextDocument} document the LGD document.
-     * @returns {Map} require specs to {exportName, keyword} entries.
+     * @param {Set} visited the source paths already being resolved.
+     * @returns {Map} require specs to exported types, members and known constructor signatures.
      */
-    async collectExternalTypes(document)
+    async collectExternalTypes(document, visited = new Set())
     {
         const externals = new Map();
+        const dependencies = new Set();
         const fromDir = path.dirname(document.uri.fsPath);
+        const resolving = new Set(visited);
+        resolving.add(document.uri.fsPath);
+        const text = document.getText();
+        const code = maskCode(text, true);
         const pattern = /\brequire\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\)/g;
-        let match = pattern.exec(document.getText());
+        let match = pattern.exec(text);
         while(match)
         {
+            if(!code.startsWith('require', match.index))
+            {
+                match = pattern.exec(text);
+                continue;
+            }
+
             const spec = match.groups.spec;
             if(!externals.has(spec))
             {
                 const sourcePath = this.resolveLgdSourcePath(fromDir, spec);
-                const exported = sourcePath ? await this.readExportDeclaration(sourcePath) : null;
+                if(sourcePath)
+                {
+                    dependencies.add(sourcePath);
+                }
+
+                const exported = sourcePath ? await this.readExportDeclaration(sourcePath, resolving) : null;
                 if(exported)
                 {
-                    externals.set(spec, { exportName: exported.name, keyword: exported.keyword });
+                    const entry = { exportName: exported.name, keyword: exported.keyword };
+                    if(exported.keyword === 'Object')
+                    {
+                        entry.kind = exported.kind;
+                        entry.baseName = exported.baseName;
+                        entry.members = exported.members;
+                        entry.constructorParams = exported.constructorParams;
+                        entry.methodSignatures = exported.methodSignatures;
+                        entry.methodsKnown = exported.methodsKnown;
+                    }
+
+                    externals.set(spec, entry);
                 }
             }
 
-            match = pattern.exec(document.getText());
+            match = pattern.exec(text);
         }
 
+        this.replaceDependencies(document.uri.fsPath, dependencies);
         return externals;
     },
 
@@ -357,30 +414,148 @@ const LgdLanguageService = {
             return null;
         }
 
+        const context = this.getMemberContext(state);
         const declaration = state.declarations.find(candidate => candidate.name === name);
         if(!declaration)
         {
-            return null;
+            const imported = this.findImportedType(name, context);
+            return imported
+                ? {
+                    name: name, typeName: imported.keyword, kind: imported.kind, baseName: imported.baseName,
+                    readonly: true, members: imported.members || [], params: [],
+                    constructorParams: imported.constructorParams || []
+                }
+                : null;
         }
 
-        let members = this.getObjectMembers(declaration);
-        if(members.length === 0)
+        let required = this.getRequiredType(declaration.initializerText || '', context.externals);
+        let members = this.getDeclaredMembers(declaration, context);
+        if(required || members.length === 0)
         {
             const target = await this.resolveRequireTarget(state.document, declaration);
             if(target)
             {
                 members = target.members;
+                required = target;
             }
         }
 
-        const params = this.describeTypedParams(declaration.typedParams);
+        const summary = {
+            name: declaration.name,
+            typeName: declaration.typeName,
+            readonly: declaration.readonly,
+            members: members,
+            params: this.describeTypedParams(declaration.typedParams)
+        };
+        if(declaration.kind === 'class' || required?.kind === 'class')
+        {
+            summary.kind = 'class';
+            summary.baseName = declaration.baseName || required?.baseName;
+            summary.constructorParams = getConstructorParams(declaration) || required?.constructorParams || [];
+        }
 
-        return { name: declaration.name, typeName: declaration.typeName, readonly: declaration.readonly, members: members, params: params };
+        return summary;
     },
 
     /**
-     * @description Lists the members visible through `this` at the cursor: the own members
-     * of the enclosing object literal plus the properties its create() method assigns.
+     * @description Collects the source and resolved imports used to describe inherited members.
+     * @param {Object} state the open document state.
+     * @returns {Object} the declaration and import context.
+     */
+    getMemberContext(state)
+    {
+        return {
+            declarations: state.declarations,
+            externals: state.externals || new Map(),
+            sourceText: state.document.getText()
+        };
+    },
+
+    /**
+     * @description Finds the exported type for a plain require initializer.
+     * @param {string} initializer the declaration initializer.
+     * @param {Map} externals the resolved relative imports.
+     * @returns {Object|null} the exported type, or null.
+     */
+    getRequiredType(initializer, externals)
+    {
+        const match = (/^\s*require\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\)\s*$/).exec(initializer);
+        return match ? externals.get(match.groups.spec) || null : null;
+    },
+
+    /**
+     * @description Resolves an ordinary JavaScript require binding used as an LGD base.
+     * @param {string} name the local binding name.
+     * @param {Object} context the source and resolved imports.
+     * @returns {Object|null} the exported type, or null.
+     */
+    findImportedType(name, context)
+    {
+        const code = maskCode(context.sourceText, true);
+        const pattern = /\b(?<keyword>const|let|var)\s+(?<name>[$A-Z_a-z][\w$]*)\s*=\s*(?<initializer>require\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\))/g;
+        for(const match of context.sourceText.matchAll(pattern))
+        {
+            if(match.groups.name === name && code.startsWith(match.groups.keyword, match.index))
+            {
+                return context.externals.get(match.groups.spec) || null;
+            }
+        }
+
+        return null;
+    },
+
+    /**
+     * @description Combines own and inherited object members, keeping overrides and stopping cycles.
+     * @param {Object} declaration the object or LGD class declaration.
+     * @param {Object} context the source declarations and resolved imports.
+     * @param {Set} visited the declarations already being described.
+     * @returns {Array} the visible deduplicated members.
+     */
+    getDeclaredMembers(declaration, context, visited = new Set())
+    {
+        if(visited.has(declaration))
+        {
+            return [];
+        }
+
+        const resolving = new Set(visited);
+        resolving.add(declaration);
+        const members = this.getObjectMembers(declaration);
+        const required = this.getRequiredType(declaration.initializerText || '', context.externals);
+        let inherited = required?.members || [];
+        if(declaration.baseName)
+        {
+            const base = context.declarations.find(candidate => candidate.name === declaration.baseName);
+            inherited = base
+                ? this.getDeclaredMembers(base, context, resolving)
+                : this.findImportedType(declaration.baseName, context)?.members || [];
+        }
+
+        if(!declaration.baseName && !required && declaration.kind !== 'class')
+        {
+            const nominal = context.declarations.find(candidate => candidate.kind === 'class' && candidate.name === declaration.typeName);
+            if(nominal)
+            {
+                inherited = this.getDeclaredMembers(nominal, context, resolving);
+            }
+        }
+
+        const seen = new Set(members.map(member => member.name));
+        for(const member of inherited)
+        {
+            if(!seen.has(member.name))
+            {
+                seen.add(member.name);
+                members.push(member);
+            }
+        }
+
+        return members;
+    },
+
+    /**
+     * @description Lists the members visible through `this` at the cursor: the own and inherited
+     * members plus the properties assigned in its constructor or create() method.
      * @param {TextDocument} document the LGD document.
      * @param {Position} position the cursor position just past `this.`.
      * @returns {Array} the {name, kind} members, or an empty array outside an object literal.
@@ -399,12 +574,12 @@ const LgdLanguageService = {
             return [];
         }
 
-        return this.getObjectMembers(declaration);
+        return this.getDeclaredMembers(declaration, this.getMemberContext(state));
     },
 
     /**
-     * @description Lists every member visible on an object literal declaration: its own
-     * literal members plus the properties its create() method assigns to the instance.
+     * @description Lists the own members of an object or class declaration, including
+     * properties assigned to the instance by its constructor or create() method.
      * @param {Object} declaration the object literal declaration.
      * @returns {Array} the deduplicated {name, kind} members.
      */
@@ -412,7 +587,7 @@ const LgdLanguageService = {
     {
         const members = [...declaration.members || []];
         const seen = new Set(members.map(member => member.name));
-        for(const extra of this.extractCreateMembers(declaration.initializerText || ''))
+        for(const extra of this.extractConstructorMembers(declaration))
         {
             if(!seen.has(extra.name))
             {
@@ -426,7 +601,7 @@ const LgdLanguageService = {
 
     /**
      * @description Finds the detail for one instance property at a `this.` access: the
-     * create()-assigned member with its declared type and literal shape.
+     * constructor-assigned member with its declared type and literal shape.
      * @param {TextDocument} document the LGD document.
      * @param {Position} position the cursor position inside the member access.
      * @param {string} name the accessed member name.
@@ -446,13 +621,49 @@ const LgdLanguageService = {
             return null;
         }
 
-        const createMembers = this.extractCreateMembers(declaration.initializerText || '');
-        const found = createMembers.find(member => member.name === name);
+        const members = this.getDeclaredMembers(declaration, this.getMemberContext(state));
+        const found = members.find(member =>
+        {
+            const hasDetail = member.typeName || member.properties;
+            return member.name === name && member.kind === 'property' && hasDetail;
+        });
+
         return found || null;
     },
 
     /**
-     * @description Finds the innermost object literal declaration containing an offset,
+     * @description Finds the detail for one base-class member at a `base.` access: the
+     * member declared on the enclosing class's base, resolved locally or through imports.
+     * @param {TextDocument} document the LGD document.
+     * @param {Position} position the cursor position inside the member access.
+     * @param {string} name the accessed member name.
+     * @returns {Object|null} the {name, kind, typeName} member, or null.
+     */
+    getBaseMemberDetail(document, position, name)
+    {
+        const state = this.getState(document.uri);
+        if(!state || !state.declarations)
+        {
+            return null;
+        }
+
+        const declaration = this.findEnclosingObjectDeclaration(state.declarations, document.offsetAt(position));
+        if(!declaration || declaration.kind !== 'class' || !declaration.baseName)
+        {
+            return null;
+        }
+
+        const context = this.getMemberContext(state);
+        const localBase = context.declarations.find(candidate => candidate.name === declaration.baseName);
+        const members = localBase
+            ? this.getDeclaredMembers(localBase, context)
+            : this.findImportedType(declaration.baseName, context)?.members || [];
+
+        return members.find(member => member.name === name) || null;
+    },
+
+    /**
+     * @description Finds the innermost object literal or class declaration containing an offset,
      * so `this` inside a nested literal resolves to that literal.
      * @param {Array} declarations the flat parsed declarations.
      * @param {number} offset the cursor offset.
@@ -473,7 +684,7 @@ const LgdLanguageService = {
                 continue;
             }
 
-            if(!(declaration.initializerText || '').trimStart().startsWith('{'))
+            if(declaration.kind !== 'class' && !(declaration.initializerText || '').trimStart().startsWith('{'))
             {
                 continue;
             }
@@ -493,9 +704,10 @@ const LgdLanguageService = {
      * Each member carries the `@type {X}` JSDoc declared above its assignment when one
      * is present, plus the property names when the assigned value is an object literal.
      * @param {string} initializerText the object literal source text.
+     * @param {Array} params the known create parameters.
      * @returns {Array} the {name, kind: 'property', typeName, properties} members assigned in create().
      */
-    extractCreateMembers(initializerText)
+    extractCreateMembers(initializerText, params = [])
     {
         const body = this.findCreateBody(initializerText);
         if(!body)
@@ -503,16 +715,58 @@ const LgdLanguageService = {
             return [];
         }
 
-        const built = new Set();
-        for(const returned of body.matchAll(/\breturn\s+(?<name>[$A-Z_a-z][\w$]*)\s*;/g))
+        return this.extractAssignedMembers(body, true, params);
+    },
+
+    /**
+     * @description Finds instance properties from a class constructor or an OLOO create method.
+     * @param {Object} declaration the object or class declaration.
+     * @returns {Array} the assigned instance properties.
+     */
+    extractConstructorMembers(declaration)
+    {
+        if(declaration.kind !== 'class')
         {
-            built.add(returned.groups.name);
+            return this.extractCreateMembers(declaration.initializerText || '', getConstructorParams(declaration) || []);
+        }
+
+        const constructor = declaration.constructorMember;
+        if(!constructor)
+        {
+            return [];
+        }
+
+        const body = declaration.initializerText.slice(
+            constructor.bodyStart + 1 - declaration.initializerStart,
+            constructor.bodyEnd - 1 - declaration.initializerStart
+        );
+
+        return this.extractAssignedMembers(body, false, constructor.params);
+    },
+
+    /**
+     * @description Reads this assignments and optional OLOO builder assignments from a constructor body.
+     * @param {string} body the constructor body without braces.
+     * @param {boolean} includeReturned whether returned local objects are also instance builders.
+     * @param {Array} params the constructor parameters, when known.
+     * @returns {Array} the property types and literal shapes.
+     */
+    extractAssignedMembers(body, includeReturned, params = [])
+    {
+        const code = maskCode(body, true);
+        const built = new Set();
+        if(includeReturned)
+        {
+            for(const returned of code.matchAll(/\breturn\s+(?<name>[$A-Z_a-z][\w$]*)\s*;/g))
+            {
+                built.add(returned.groups.name);
+            }
         }
 
         const members = [];
         const seen = new Set();
         const pattern = /\b(?<object>this|[$A-Z_a-z][\w$]*)\.(?<property>[$A-Z_a-z][\w$]*)\s*=(?![=>])/g;
-        let match = pattern.exec(body);
+        let match = pattern.exec(code);
         while(match)
         {
             const target = match.groups.object;
@@ -520,15 +774,18 @@ const LgdLanguageService = {
             if((target === 'this' || built.has(target)) && !seen.has(property))
             {
                 seen.add(property);
+                const valueIndex = match.index + match[0].length;
+                const assignedName = (/^\s*(?<name>[$A-Z_a-z][\w$]*)\s*(?:;|$)/).exec(code.slice(valueIndex));
+                const parameter = assignedName && params.find(candidate => candidate.name === assignedName.groups.name);
                 members.push({
                     name: property,
                     kind: 'property',
-                    typeName: this.findAssignmentTypeName(body, match.index),
+                    typeName: this.findAssignmentTypeName(body, match.index) || parameter?.typeName || null,
                     properties: this.findAssignedLiteralProperties(body, match.index + match[0].length)
                 });
             }
 
-            match = pattern.exec(body);
+            match = pattern.exec(code);
         }
 
         return members;
@@ -574,39 +831,7 @@ const LgdLanguageService = {
             return [];
         }
 
-        const segments = [];
-        let depth = 0;
-        let segmentStart = 0;
-        for(let position = 0; position < literal.length; position++)
-        {
-            const character = literal[position];
-            if(character === '{' || character === '(' || character === '[')
-            {
-                depth++;
-            }
-            else if(character === '}' || character === ')' || character === ']')
-            {
-                depth--;
-            }
-            else if(character === ',' && depth === 0)
-            {
-                segments.push(literal.slice(segmentStart, position));
-                segmentStart = position + 1;
-            }
-        }
-
-        segments.push(literal.slice(segmentStart));
-        const properties = [];
-        for(const segment of segments)
-        {
-            const key = segment.match(/^\s*["']?(?<name>[$A-Z_a-z][\w$]*)["']?\s*[(:{]/);
-            if(key && !properties.includes(key.groups.name))
-            {
-                properties.push(key.groups.name);
-            }
-        }
-
-        return properties;
+        return this.compiler.extractMembers(`{${literal}}`).map(member => member.name);
     },
 
     /**
@@ -617,17 +842,26 @@ const LgdLanguageService = {
      */
     findCreateBody(initializerText)
     {
-        const pattern = /(?:^|[\s,;{])(?:async\s+)?create\s*\([^)]*\)\s*{/g;
-        let match = pattern.exec(initializerText);
-        while(match)
+        for(const chunk of splitTopLevelChunks(initializerText.trim()))
         {
-            if(!this.isInsideStringOrComment(initializerText, match.index))
+            const memberText = chunk.text.replace(/^(?:\s|\/\*[\S\s]*?\*\/|\/\/[^\n]*)+/, '');
+            if(!(/^(?:async\s+)?create\s*\(/).test(memberText))
             {
-                const openIndex = match.index + match[0].lastIndexOf('{');
-                return this.extractBalancedBody(initializerText, openIndex);
+                continue;
             }
 
-            match = pattern.exec(initializerText);
+            const parameters = parseTypedParams(memberText);
+            if(!parameters)
+            {
+                continue;
+            }
+
+            const code = maskCode(memberText, true);
+            const bodyStart = parameters.end + code.slice(parameters.end).search(/\S/);
+            if(code[bodyStart] === '{')
+            {
+                return this.extractBalancedBody(memberText, bodyStart);
+            }
         }
 
         return null;
@@ -665,6 +899,19 @@ const LgdLanguageService = {
                     mode = 'block';
                     position++;
                 }
+                else if(character === '/' && isRegexStart(text, position))
+                {
+                    const regexEnd = skipRegexLiteral(text, position);
+                    if(regexEnd > index)
+                    {
+                        return true;
+                    }
+
+                    if(regexEnd !== -1)
+                    {
+                        position = regexEnd - 1;
+                    }
+                }
             }
             else if(mode === 'string')
             {
@@ -701,80 +948,30 @@ const LgdLanguageService = {
 
     /**
      * @description Extracts the body between a brace pair, skipping string literals and
-     * comments so their braces do not affect the depth count. Template literals are
-     * treated as opaque strings; `${}` interpolation inside them is not parsed.
+     * comments so their braces do not affect the depth count. Executable template
+     * interpolation expressions retain their balanced braces.
      * @param {string} text the source text.
      * @param {number} openIndex the index of the opening brace.
      * @returns {string|null} the body without the outer braces, or null when unbalanced.
      */
     extractBalancedBody(text, openIndex)
     {
+        const code = maskCode(text, true);
         let depth = 0;
-        let index = openIndex;
-        let mode = 'code';
-        let quote = '';
-        while(index < text.length)
+        for(let index = openIndex; index < code.length; index++)
         {
-            const character = text[index];
-            const next = index + 1 < text.length ? text[index + 1] : '';
-            if(mode === 'code')
+            if(code[index] === '{')
             {
-                if(character === "'" || character === '"' || character === '`')
+                depth++;
+            }
+            else if(code[index] === '}')
+            {
+                depth--;
+                if(depth === 0)
                 {
-                    mode = 'string';
-                    quote = character;
-                }
-                else if(character === '/' && next === '/')
-                {
-                    mode = 'line';
-                    index++;
-                }
-                else if(character === '/' && next === '*')
-                {
-                    mode = 'block';
-                    index++;
-                }
-                else if(character === '{')
-                {
-                    depth++;
-                }
-                else if(character === '}')
-                {
-                    depth--;
-                    if(depth === 0)
-                    {
-                        return text.slice(openIndex + 1, index);
-                    }
+                    return text.slice(openIndex + 1, index);
                 }
             }
-            else if(mode === 'string')
-            {
-                if(character === '\\')
-                {
-                    index++;
-                }
-                else if(character === quote)
-                {
-                    mode = 'code';
-                }
-            }
-            else if(mode === 'line')
-            {
-                if(character === '\n')
-                {
-                    mode = 'code';
-                }
-            }
-            else if(mode === 'block')
-            {
-                if(character === '*' && next === '/')
-                {
-                    mode = 'code';
-                    index++;
-                }
-            }
-
-            index++;
         }
 
         return null;

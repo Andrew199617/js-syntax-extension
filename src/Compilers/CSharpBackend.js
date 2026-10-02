@@ -112,6 +112,16 @@ const CSharpBackend = {
         for(const group of lgdTypedParams.typedParamGroupsForOutput(declaration, segments))
         {
             code = this.rewriteParamTypes(group, code);
+            if(group.returnTypeName)
+            {
+                let type = group.returnTypeName === 'void' ? 'void' : typeMaps.csharpTypeMap[group.returnTypeName] || group.returnTypeName;
+                if(group.async)
+                {
+                    type = type === 'void' ? 'System.Threading.Tasks.Task' : `System.Threading.Tasks.Task<${type}>`;
+                }
+
+                code = code.slice(0, group.returnTypeStart) + type + code.slice(group.returnTypeEnd);
+            }
         }
 
         return code;

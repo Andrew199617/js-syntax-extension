@@ -126,6 +126,11 @@
                 }
             }
         },
+        "configurationDefaults": {
+            "[lgd]": {
+                "editor.semanticHighlighting.enabled": true
+            }
+        },
         "grammars": [
             {
                 "scopeName": "source.lgd.jsdoc-import",

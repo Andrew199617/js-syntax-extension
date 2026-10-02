@@ -107,6 +107,20 @@ describe('LGD this. member hover.', () =>
         expect(text).toContain('command,');
     });
 
+    test('this member hover takes precedence over an unrelated top-level name', async () =>
+    {
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const source = `Object command = { unrelated: 1 };\n${LGD_TEXT}`;
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const provider = LgdHoverProvider.create(service);
+
+        const hover = await provider.provideHover(document, new vscode.Position(THIS_COMMAND_LINE + 1, THIS_COMMAND_CHARACTER));
+
+        expect(hover.contents).toContain('(property) command: vscode.Command');
+        expect(hover.contents).not.toContain('unrelated');
+    });
+
     test('provideHover ignores words that are not a this. member access.', async () =>
     {
         const { service, document } = await openOlooDocument();
@@ -116,5 +130,41 @@ describe('LGD this. member hover.', () =>
         const hover = await provider.provideHover(document, new vscode.Position(PLAIN_WORD_LINE, PLAIN_WORD_CHARACTER));
 
         expect(hover).toBeNull();
+    });
+});
+
+describe('LGD create() member extraction regressions', () =>
+{
+    test('ignores assignments and return names in comments and strings', () =>
+    {
+        const service = LgdLanguageService.create({}, () => undefined);
+        const source = [
+            '{ create() {',
+            '  // this.commented = 1;',
+            '  const sample = "this.quoted = 2; return unrelated;";',
+            '  /* return unrelated; */',
+            '  unrelated.noise = 3;',
+            '  this.actual = 4;',
+            '  return this;',
+            '} }'
+        ].join('\n');
+
+        expect(service.extractCreateMembers(source).map(member => member.name)).toEqual(['actual']);
+    });
+
+    test('reads only the object own create method and handles parameter defaults', () =>
+    {
+        const service = LgdLanguageService.create({}, () => undefined);
+        const source = '{ nested: { create() { this.wrong = 1; } }, create(Number count = Number("1")) { this.right = count; return this; } }';
+
+        expect(service.extractCreateMembers(source).map(member => member.name)).toEqual(['right']);
+    });
+
+    test('preserves literal property names around commas, brackets and comments in values', () =>
+    {
+        const service = LgdLanguageService.create({}, () => undefined);
+        const source = '{ create() { this.settings = { label: "[", /* separator , */ enabled: true, nested: { ignored: 1 }, shorthand }; return this; } }';
+
+        expect(service.extractCreateMembers(source)[0].properties).toEqual([ 'label', 'enabled', 'nested', 'shorthand' ]);
     });
 });

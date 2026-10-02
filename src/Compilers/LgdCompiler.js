@@ -2,7 +2,12 @@ const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
 const LgdTypeChecker = require('./LgdTypeChecker');
-const { parseTypedParams, parseObjectMethodParams, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
+const LgdClassSyntax = require('./LgdClassSyntax');
+const LgdBaseChecker = require('./LgdBaseChecker');
+const LgdOverrideChecker = require('./LgdOverrideChecker');
+const LgdReturnChecker = require('./LgdReturnChecker');
+const LgdBaseCalls = require('./LgdBaseCalls');
+const { parseTypedParams, parseObjectMethodParams, parseMethodHead, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
 const { maskCode } = require('./LgdInfer');
 
 /** @description Matches a declaration type name: Number, a declared name (GoToNextParagraph), or a dotted type (vscode.Command); the final segment must be capitalized. */
@@ -103,8 +108,9 @@ const LgdCompiler = {
      */
     parse(content, externals = new Map())
     {
-        const found = [];
-        const errors = [];
+        const classes = LgdClassSyntax.parse(content, this);
+        const found = classes.declarations;
+        const errors = classes.errors;
         const masked = maskCode(content, true);
         const failedHeadStarts = [];
         declarationHeadPattern.lastIndex = 0;
@@ -170,6 +176,7 @@ const LgdCompiler = {
             headMatch = declarationHeadPattern.exec(masked);
         }
 
+        found.sort((first, second) => first.headStart - second.headStart);
         this.collectMalformedErrors(masked, found, failedHeadStarts, errors);
 
         for(const typeError of LgdTypeChecker.checkTypes(content, found, externals))
@@ -177,7 +184,35 @@ const LgdCompiler = {
             errors.push(this.createError(content, typeError.offset, typeError.message));
         }
 
+        for(const baseError of LgdBaseChecker.check(content, found, externals))
+        {
+            errors.push(this.createError(content, baseError.offset, baseError.message, baseError.endOffset));
+        }
+
+        for(const overrideError of LgdOverrideChecker.check(content, found, externals))
+        {
+            errors.push(this.createError(content, overrideError.offset, overrideError.message, overrideError.endOffset));
+        }
+
         const declarations = this.buildTree(found);
+        const hasBaseCalls = LgdBaseCalls.hasCalls(content, found);
+        if(hasBaseCalls || LgdReturnChecker.signatures(found).length > 0)
+        {
+            const emitted = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
+            if(hasBaseCalls)
+            {
+                for(const baseCallError of LgdBaseCalls.analyze(content, found, emitted, externals))
+                {
+                    errors.push(this.createError(content, baseCallError.offset, baseCallError.message, baseCallError.endOffset));
+                }
+            }
+
+            for(const returnError of LgdReturnChecker.check(content, found, emitted))
+            {
+                errors.push(this.createError(content, returnError.offset, returnError.message, returnError.endOffset));
+            }
+        }
+
         return { declarations: declarations, allDeclarations: found, errors: errors };
     },
 
@@ -293,6 +328,19 @@ const LgdCompiler = {
                 verbatim: true
             });
             output += gap;
+
+            if(declaration.kind === 'class')
+            {
+                const lowered = LgdClassSyntax.emit(content, backend, declaration, this);
+                for(const segment of lowered.segments)
+                {
+                    segments.push(this.shiftSegment(segment, output.length));
+                }
+
+                output += lowered.code;
+                cursor = declaration.end;
+                continue;
+            }
 
             const head = backend.emitHead(declaration);
             segments.push({
@@ -442,6 +490,12 @@ const LgdCompiler = {
         if(text === '' || text.startsWith('...') || text[0] === '[')
         {
             return null;
+        }
+
+        const typedMethod = parseMethodHead(text);
+        if(typedMethod && typedMethod.returnTypeName)
+        {
+            return { name: typedMethod.name, kind: 'method' };
         }
 
         const methodMatch = (/^(?:async\s+)?(?:get\s+|set\s+)?(?<name>[$A-Z_a-z][\w$]*|'[^\n']*'|"[^\n"]*")\s*\(/).exec(text);
@@ -621,12 +675,19 @@ const LgdCompiler = {
      * @param {string} content the LGD source text.
      * @param {number} offset the error offset.
      * @param {string} message the error message.
+     * @param {number|null} endOffset the optional exclusive source end offset.
      * @returns {Object} the error.
      */
-    createError(content, offset, message)
+    createError(content, offset, message, endOffset = null)
     {
         const line = content.slice(0, offset).split('\n').length;
-        return { message: message, line: line, offset: offset };
+        const error = { message: message, line: line, offset: offset };
+        if(Number.isInteger(endOffset))
+        {
+            error.endOffset = endOffset;
+        }
+
+        return error;
     }
 };
 

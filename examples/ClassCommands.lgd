@@ -1,0 +1,27 @@
+const { Oloo } = require('@mavega/oloo');
+
+class BaseCommand {
+    BaseCommand(String commandName, String title) {
+        this.command = { command: commandName, title: title };
+    }
+
+    get commandName() {
+        return this.command.command;
+    }
+
+    virtual executeCommand() {
+        return this.commandName;
+    }
+}
+
+class GoToAssignment : BaseCommand {
+    GoToAssignment() : base("lgd.goToAssignment", "Go To Assignment") {
+        this.enabled = true;
+    }
+
+    override async executeCommand() {
+        return base.executeCommand();
+    }
+}
+
+module.exports = GoToAssignment;

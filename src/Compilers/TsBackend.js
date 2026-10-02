@@ -1,5 +1,6 @@
 const typeMaps = require('./LgdTypeMaps');
 const lgdTypedParams = require('./LgdTypedParams');
+const LgdSourceMap = require('./LgdSourceMap');
 
 /**
  * @description Emits TypeScript for LGD typed declarations.
@@ -48,9 +49,10 @@ const TsBackend = {
      * @description Annotates one parameter list with TypeScript types: (Number value) becomes (value: number).
      * @param {Object} group the {start, end, params, hasTypes} parameter group.
      * @param {string} compiledInitializer the recursively compiled initializer text.
+     * @param {Array} segments the source mappings, updated around the rewritten signature.
      * @returns {string} the initializer with typed parameters.
      */
-    annotateParamTypes(group, compiledInitializer)
+    annotateParamTypes(group, compiledInitializer, segments = [])
     {
         const typedParams = group;
         const params = typedParams.params.map(parameter =>
@@ -70,9 +72,18 @@ const TsBackend = {
             return `${parameter.name}${tsType ? `: ${tsType}` : ''}${defaultText}`;
         });
 
-        return `${compiledInitializer.slice(0, typedParams.start)
-        }(${params.join(', ')})${
-            compiledInitializer.slice(typedParams.end)}`;
+        const edits = [];
+        let returnAnnotation = '';
+        if(group.returnTypeName)
+        {
+            const declared = group.returnTypeName === 'void' ? 'undefined' : typeMaps.tsTypeMap[group.returnTypeName] || group.returnTypeName;
+            const type = group.async ? `Promise<${declared}>` : declared;
+            returnAnnotation = `: ${type}`;
+            edits.push({ start: group.returnTypeStart, end: group.returnTypeEnd, text: '' });
+        }
+
+        edits.push({ start: typedParams.start, end: typedParams.end, text: `(${params.join(', ')})${returnAnnotation}` });
+        return LgdSourceMap.applyEdits(compiledInitializer, segments, edits);
     },
 
     /**
@@ -87,7 +98,7 @@ const TsBackend = {
         let code = compiledInitializer;
         for(const group of lgdTypedParams.typedParamGroupsForOutput(declaration, segments))
         {
-            code = this.annotateParamTypes(group, code);
+            code = this.annotateParamTypes(group, code, segments);
         }
 
         return code;

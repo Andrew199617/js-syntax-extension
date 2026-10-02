@@ -6,6 +6,15 @@
 	"name": "LGD",
 	"patterns": [
 		{
+			"include": "#class-declaration"
+		},
+		{
+			"include": "#method-modifier"
+		},
+		{
+			"include": "#typed-method"
+		},
+		{
 			"include": "#typed-declaration"
 		},
 		{
@@ -20,10 +29,26 @@
 			"comment": "Apply LGD declaration rules inside nested JavaScript blocks, excluding comments and strings.",
 			"patterns": [
 				{
+					"include": "#class-declaration"
+				},
+				{
+					"include": "#method-modifier"
+				},
+				{
+					"include": "#typed-method"
+				},
+				{
 					"include": "#typed-declaration"
 				},
 				{
 					"include": "#typed-keyword"
+				}
+			]
+		},
+		"L:source.lgd meta.parameters.js -comment -string": {
+			"patterns": [
+				{
+					"include": "#typed-parameter"
 				}
 			]
 		}
@@ -34,10 +59,10 @@
 			"match": "^([ \\t]*)((export)[ \\t]+)?((readonly)[ \\t]+)?(Number|String|Boolean|BigInt|Symbol|Object|Array|Function)([ \\t]+)([$_a-zA-Z][\\w$]*)",
 			"captures": {
 				"3": {
-					"name": "keyword.control.export.lgd"
+					"name": "keyword.control.lgd"
 				},
 				"5": {
-					"name": "storage.modifier.readonly.lgd"
+					"name": "keyword.control.lgd"
 				},
 				"6": {
 					"name": "storage.type.lgd"
@@ -55,6 +80,70 @@
 			},
 			"comment": "A line starting with a type keyword that is not a full declaration: malformed, or a call like Number(\"5\").",
 			"match": "^[ \\t]*(?:export[ \\t]+)?(?:readonly[ \\t]+)?(Number|String|Boolean|BigInt|Symbol|Object|Array|Function)\\b(?![ \\t]*\\()"
+		},
+		"class-declaration": {
+			"name": "meta.class.lgd",
+			"comment": "LGD class names and colon-style bases use theme class scopes; semantic tokens distinguish same-name constructors from methods.",
+			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?(class)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
+			"beginCaptures": {
+				"2": {
+					"name": "keyword.control.lgd"
+				},
+				"3": {
+					"name": "keyword.control.lgd"
+				},
+				"4": {
+					"name": "entity.name.type.class.lgd"
+				},
+				"5": {
+					"name": "punctuation.separator.inheritance.lgd"
+				},
+				"6": {
+					"name": "entity.name.type.class.lgd"
+				}
+			},
+			"end": "(?<=\\})",
+			"patterns": [
+				{
+					"include": "source.js#comment"
+				},
+				{
+					"include": "source.js#class-or-interface-body"
+				}
+			]
+		},
+		"typed-method": {
+			"comment": "Color only the return prefix so native JavaScript rules still parse the method name and parameters.",
+			"match": "[ \\t]*\\b(?:(async)[ \\t]+)?(?:(void)|((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*))(?=[ \\t]+[$_a-zA-Z][\\w$]*[ \\t]*\\()",
+			"captures": {
+				"1": {
+					"name": "keyword.control.lgd"
+				},
+				"2": {
+					"name": "keyword.control.lgd"
+				},
+				"3": {
+					"name": "storage.type.lgd"
+				}
+			}
+		},
+		"typed-parameter": {
+			"comment": "Parameter type fallback before semantic tokens arrive; leave names to JavaScript parameter scopes.",
+			"match": "\\b((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)(?=[ \\t]+[$_a-zA-Z][\\w$]*\\b)",
+			"captures": {
+				"1": {
+					"name": "storage.type.lgd"
+				}
+			}
+		},
+		"method-modifier": {
+			"comment": "Compile-only virtual and override modifiers; leave the signature to native method and LGD type rules.",
+			"match": "\\b(virtual|override)\\b(?=[ \\t]+(?:async[ \\t]+)?(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
+			"captures": {
+				"1": {
+					"name": "keyword.control.lgd"
+				}
+			}
 		}
 	},
 	"scopeName": "source.lgd"

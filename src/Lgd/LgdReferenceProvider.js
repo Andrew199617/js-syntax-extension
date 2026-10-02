@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const { mapProviderLocation } = require('./LgdDefinitionResolver');
 
 /** @import { Location, Position, ReferenceContext, TextDocument } from 'vscode' */
 
@@ -56,15 +57,10 @@ const LgdReferenceProvider = {
         const results = [];
         for(const location of locations)
         {
-            if(location.uri.toString() !== state.jsDocument.uri.toString())
+            const mapped = mapProviderLocation(this.languageService, location);
+            if(mapped)
             {
-                continue;
-            }
-
-            const lgdRange = this.languageService.toLgdRange(document.uri, location.range);
-            if(lgdRange)
-            {
-                results.push(new vscode.Location(document.uri, lgdRange));
+                results.push(mapped);
             }
         }
 

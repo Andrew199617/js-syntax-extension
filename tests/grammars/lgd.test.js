@@ -17,10 +17,10 @@ const typeScope = 'storage.type.lgd';
 const nameScope = 'variable.other.definition.lgd';
 
 // Scope the LGD grammar assigns to the readonly modifier.
-const readonlyScope = 'storage.modifier.readonly.lgd';
+const readonlyScope = 'keyword.control.lgd';
 
 // Scope the LGD grammar assigns to the export modifier.
-const exportScope = 'keyword.control.export.lgd';
+const exportScope = 'keyword.control.lgd';
 
 async function createRegistry()
 {
@@ -128,6 +128,105 @@ describe('LGD TextMate grammar.', () =>
         const tokens = tokenize(grammar, 'Number total = 0;');
         assertScope(tokens, 'Number', typeScope);
         assertScope(tokens, 'total', nameScope);
+    });
+
+    test('Highlights class names and colon-style bases as types while ordinary methods remain functions.', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'export class GoToAssignment : BaseCommand {',
+            '    GoToAssignment() : base("command", "title") {}',
+            '    async executeCommand() {',
+            '        Number total = 1;',
+            '    }',
+            '}'
+        ].join('\n'));
+        assertScope(tokens, 'GoToAssignment', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'BaseCommand', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'export', exportScope);
+        assertScope(tokens, 'executeCommand', 'entity.name.function.js');
+        assertScope(tokens, 'Number', typeScope);
+        assertScope(tokens, 'total', nameScope);
+    });
+
+    test('Highlights explicit return types separately from named methods.', () =>
+    {
+        const tokens = tokenize(grammar, 'class Counter {\n    Number count() { return 1; }\n    async void reset() {}\n}');
+        assertScope(tokens, 'Number', typeScope);
+        assertScope(tokens, 'void', 'keyword.control.lgd');
+        assertScope(tokens, 'count', 'entity.name.function.js');
+        assertScope(tokens, 'reset', 'entity.name.function.js');
+        assertNoScope(tokens, 'count', nameScope);
+    });
+
+    test('Keeps constructor and ordinary method parameter names native while types have an immediate fallback.', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'class Counter {',
+            '    Counter(String title, Number offset = 0) {}',
+            '    async void reset(String label, Number delta = 0) {}',
+            '}'
+        ].join('\n'));
+        for(const type of [ 'String', 'Number' ])
+        {
+            const occurrences = tokens.filter(token => token.text === type);
+            assert.strictEqual(occurrences.length, 2);
+            assert.ok(occurrences.every(token => token.scopes.includes(typeScope)));
+        }
+
+        for(const name of [ 'title', 'offset', 'label', 'delta' ])
+        {
+            assertScope(tokens, name, 'variable.parameter.js');
+            assertNoScope(tokens, name, typeScope);
+        }
+    });
+
+    test('groups LGD declaration and modifier words as keywords while keeping types distinct', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'export readonly Number total = 1;',
+            'class Base {',
+            '    virtual async void run(String title) {}',
+            '}',
+            'class Derived : Base {',
+            '    override async void run(String title) {}',
+            '}'
+        ].join('\n'));
+        for(const word of [ 'export', 'readonly', 'class', 'virtual', 'override', 'async', 'void' ])
+        {
+            assertScope(tokens, word, 'keyword.control.lgd');
+        }
+
+        assertScope(tokens, 'Number', typeScope);
+        assertScope(tokens, 'String', typeScope);
+        assertScope(tokens, 'Base', 'entity.name.type.class.lgd');
+        assertNoScope(tokens, 'title', 'keyword.control.lgd');
+    });
+
+    test('Does not highlight class-looking comments or strings as class declarations.', () =>
+    {
+        const tokens = tokenize(grammar, '// class Example : Base {}\nconst example = `class Fake : Base {}`;');
+        assert.ok(tokens.every(token => !token.scopes.includes('entity.name.type.class.lgd')));
+    });
+
+    test('Highlights virtual and override as modifiers without changing method or parameter scopes.', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'class Base {',
+            '    virtual async void executeCommand(String label) {}',
+            '}',
+            'class Derived : Base {',
+            '    override async void executeCommand(String label) {}',
+            '    async override String describe(Number count) { return String(count); }',
+            '}'
+        ].join('\n'));
+        assertScope(tokens, 'virtual', 'keyword.control.lgd');
+        assertScope(tokens, 'override', 'keyword.control.lgd');
+        assertScope(tokens, 'void', 'keyword.control.lgd');
+        assertScope(tokens, 'String', typeScope);
+        assertScope(tokens, 'executeCommand', 'entity.name.function.js');
+        assertScope(tokens, 'describe', 'entity.name.function.js');
+        assertScope(tokens, 'label', 'variable.parameter.js');
+        assertScope(tokens, 'count', 'variable.parameter.js');
     });
 
     test('Highlights readonly, export, and string declarations.', () =>

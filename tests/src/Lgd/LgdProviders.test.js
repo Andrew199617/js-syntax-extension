@@ -162,7 +162,7 @@ describe('LgdDefinitionProvider', () =>
         expect(definitions[0].range.start.character).toBe(NAME_START_CHARACTER);
     });
 
-    test('drops definitions that point outside the mirror document', async () =>
+    test('preserves definitions that point outside the mirror document', async () =>
     {
         const { service, document } = await openLgdDocument();
         const provider = LgdDefinitionProvider.create(service);
@@ -175,7 +175,9 @@ describe('LgdDefinitionProvider', () =>
 
         const definitions = await provider.provideDefinition(document, new vscode.Position(USAGE_LINE, 1));
 
-        expect(definitions).toEqual([]);
+        expect(definitions).toHaveLength(1);
+        expect(definitions[0].uri.toString()).toBe('file:///other/lib.js');
+        expect(definitions[0].range.end.character).toBe(THROWAWAY_RANGE_END);
     });
 });
 
@@ -365,6 +367,16 @@ describe('LgdCompletionProvider', () =>
         const provider = LgdCompletionProvider.create(service);
 
         const items = await provider.provideCompletionItems(document, new vscode.Position(0, 2));
+
+        expect(items).toBeNull();
+    });
+
+    test.each([ '// config.', 'const text = "config.', 'const text = `config.' ])('does not complete object members inside non-code text: %s', async access =>
+    {
+        const { service, document } = await openObjectDocument(`Object config = { host: "x" };\n${access}`);
+        const provider = LgdCompletionProvider.create(service);
+
+        const items = await provider.provideCompletionItems(document, new vscode.Position(ACCESS_LINE, access.length));
 
         expect(items).toBeNull();
     });

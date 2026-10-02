@@ -102,6 +102,7 @@ function makeTextDocument(uriKey, text)
     let currentText = text;
     const document = {
         uri: {
+            scheme: uriKey.startsWith('file://') ? 'file' : 'untitled',
             toString: () => uriKey,
             fsPath: uriKey.startsWith('file://') ? uriKey.slice('file://'.length) : uriKey
         },

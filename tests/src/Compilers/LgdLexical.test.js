@@ -1,5 +1,6 @@
 const virtualMachine = require('vm');
 const LgdCompiler = require('../../../src/Compilers/LgdCompiler');
+const LgdSourceMap = require('../../../src/Compilers/LgdSourceMap');
 const { maskCode } = require('../../../src/Compilers/LgdInfer');
 
 describe('LGD lexical boundaries.', () =>
@@ -56,5 +57,35 @@ describe('LGD lexical boundaries.', () =>
         expect(masked.indexOf('const label')).toBe(source.indexOf('const label'));
         expect(masked).toContain('\r\n');
         expect(masked).not.toContain('label = 1');
+    });
+
+    test.each([
+        [ 'Function match = (Object pattern = /[(]/, String text = "(") => pattern.test(text);', 'match()' ],
+        [ 'Object matcher = { match(Object pattern = /[(]/, String text = "(") { return pattern.test(text); } };', 'matcher.match()' ]
+    ])('Preserves regex defaults while stripping every following parameter: %s.', (source, expression) =>
+    {
+        const result = LgdCompiler.create().compileToJs(source);
+        expect(result.errors).toEqual([]);
+        expect(result.code).not.toContain('String text');
+        expect(virtualMachine.runInNewContext(`${result.code}\n${expression};`)).toBe(true);
+    });
+
+    test.each([
+        [ 'Function run = (Number count /*, ignored */, String label = "a") => count + label;', 'run(2)' ],
+        [ 'Object runner = { run(Number count /*, ignored */, String label = "a") { return count + label; } };', 'runner.run(2)' ],
+        [ 'Function run = (/* Number */ Number/* ) , = */count // ) , [ "\n , String label /* = , */ = "a") => count + label;', 'run(2)' ],
+        [ 'Object runner = { run(/* Number */ Number/* ) , = */count // ) , [ "\n , String label /* = , */ = "a") { return count + label; } };', 'runner.run(2)' ]
+    ])('Preserves parameter comments and mappings while stripping types: %s.', (source, expression) =>
+    {
+        const result = LgdCompiler.create().compileToJs(source);
+        expect(result.errors).toEqual([]);
+        expect(virtualMachine.runInNewContext(`${result.code}\n${expression};`)).toBe('2a');
+        const map = LgdSourceMap.create(result.mappings);
+        for(const match of source.matchAll(/\/\*[\S\s]*?\*\/|\/\/[^\n]*|count|label/g))
+        {
+            const outputOffset = map.toOutput(match.index);
+            expect(result.code.slice(outputOffset, outputOffset + match[0].length)).toBe(match[0]);
+            expect(map.toSource(outputOffset)).toBe(match.index);
+        }
     });
 });

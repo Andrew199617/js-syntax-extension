@@ -3,6 +3,7 @@ const { spawn } = require('child_process');
 const fs = require('fs').promises;
 const operatingSystem = require('os');
 const path = require('path');
+const LgdCompiler = require('../../src/Compilers/LgdCompiler');
 
 // Match the extension's registered TypeScript plugin.
 const pluginName = 'lgd-callback-parameter-highlighting';
@@ -33,9 +34,17 @@ async function verifyServer(configuredProject)
 
     if(configuredProject)
     {
-        await fs.writeFile(path.join(directory, 'jsconfig.json'), '{"compilerOptions":{"checkJs":true}}');
+        await fs.writeFile(path.join(directory, 'jsconfig.json'), JSON.stringify({
+            compilerOptions: { checkJs: true, baseUrl: '.', paths: { 'geometry-alias': ['node_modules/geometry/index.d.ts'] } }
+        }));
     }
 
+    const typesDirectory = path.join(directory, 'node_modules', '@types', 'vscode');
+    await fs.mkdir(typesDirectory, { recursive: true });
+    await fs.copyFile(require.resolve('@types/vscode/index.d.ts'), path.join(typesDirectory, 'index.d.ts'));
+    const dependencyDirectory = path.join(directory, 'node_modules', 'geometry');
+    await fs.mkdir(dependencyDirectory, { recursive: true });
+    await fs.writeFile(path.join(dependencyDirectory, 'index.d.ts'), 'export class Point { readonly length: number; }');
     const file = path.join(directory, 'sample.js');
     const log = path.join(directory, 'tsserver.log');
     await fs.writeFile(file, source);
@@ -102,7 +111,7 @@ async function verifyServer(configuredProject)
 
     try
     {
-        await request('open', { file: file, fileContent: source, projectRootPath: directory });
+        await request('updateOpen', { openFiles: [{ file: file, fileContent: source, projectRootPath: directory }] });
         const project = await request('projectInfo', { file: file, needFileNameList: false });
         if(configuredProject)
         {
@@ -136,6 +145,33 @@ async function verifyServer(configuredProject)
             'readAvailableProfiles'.length,
             asyncFunctionDeclaration
         ]);
+        const lgd = [
+            "readonly Object vscode = require('vscode');",
+            `readonly Object geometry = require('${configuredProject ? 'geometry-alias' : 'geometry'}');`,
+            'Object commands = {',
+            '    previous(vscode.Position position, geometry.Point point) {',
+            '        return position.character - point.length;',
+            '    }',
+            '};'
+        ].join('\n');
+        const compiled = LgdCompiler.create().compileToJs(lgd).code;
+        const mirror = '^/untitled/ts-nul-authority/LgdModule.js';
+        const mirrorContent = `${compiled}\n//# lgd-source=${JSON.stringify(path.join(directory, 'src', 'Commands.lgd'))}\n`;
+        await request('updateOpen', { openFiles: [{ file: mirror, fileContent: mirrorContent, scriptKindName: 'JS' }] });
+        for(const [ symbol, expected ] of [
+            [ 'character -', '(property) Position.character: number' ],
+            [ 'length;', '(property) Point.length: number' ],
+            [ 'vscode =', '(alias) module "vscode"' ],
+            [ 'geometry =', 'import geometry' ]
+        ])
+        {
+            const prefix = mirrorContent.slice(0, mirrorContent.indexOf(symbol));
+            const lines = prefix.split('\n');
+            const hover = await request('quickinfo', { file: mirror, line: lines.length, offset: lines[lines.length - 1].length + 1 });
+            assert.equal(hover.success, true, JSON.stringify(hover));
+            assert.ok(hover.body.displayString.includes(expected), JSON.stringify(hover.body));
+        }
+
         const contents = await fs.readFile(log, 'utf8');
         assert.ok(contents.includes('[callback-parameters] plugin loaded'));
         assert.ok(contents.includes('[callback-parameters] semantic request intercepted'));
