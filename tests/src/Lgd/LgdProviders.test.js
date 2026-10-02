@@ -162,7 +162,7 @@ describe('LgdDefinitionProvider', () =>
         expect(definitions[0].range.start.character).toBe(NAME_START_CHARACTER);
     });
 
-    test('drops definitions that point outside the mirror document', async () =>
+    test('preserves definitions that point outside the mirror document', async () =>
     {
         const { service, document } = await openLgdDocument();
         const provider = LgdDefinitionProvider.create(service);
@@ -175,7 +175,9 @@ describe('LgdDefinitionProvider', () =>
 
         const definitions = await provider.provideDefinition(document, new vscode.Position(USAGE_LINE, 1));
 
-        expect(definitions).toEqual([]);
+        expect(definitions).toHaveLength(1);
+        expect(definitions[0].uri.toString()).toBe('file:///other/lib.js');
+        expect(definitions[0].range.end.character).toBe(THROWAWAY_RANGE_END);
     });
 });
 
