@@ -567,4 +567,10 @@ function check(content, declarations, externals = new Map())
     return errors;
 }
 
-module.exports = { check: check, getConstructorParams: getConstructorParams };
+module.exports = {
+    check: check,
+    getConstructorParams: getConstructorParams,
+    collectScopes: collectScopes,
+    collectBindings: collectBindings,
+    visibleBindings: visibleBindings
+};
