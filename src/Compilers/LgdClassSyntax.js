@@ -448,7 +448,8 @@ const LgdClassSyntax = {
         if(declaration.baseCalls?.length > 0)
         {
             output.code = LgdBaseCalls.rewrite(declaration, output.code, output.segments);
-            const helper = `${newline}${declaration.indent}const ${declaration.baseOwnerName} = () => Object.getPrototypeOf(${declaration.name});`;
+            const helper = `${newline}${declaration.indent}/** @returns {typeof ${declaration.baseName}} */`
+                + `${newline}${declaration.indent}const ${declaration.baseOwnerName} = () => Object.getPrototypeOf(${declaration.name});`;
             this.appendGenerated(output, helper, declaration.end);
         }
 

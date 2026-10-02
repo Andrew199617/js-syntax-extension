@@ -224,6 +224,49 @@ describe('Lexical LGD base method calls.', () =>
         expect(execute(source).create().run(2)).toBe(2);
     });
 
+    test('Retains the inherited method signature in the JavaScript mirror for editor hovers.', () =>
+    {
+        const source = [
+            'class Base {',
+            '    virtual Number run(Number amount) { return amount; }',
+            '}',
+            'class Derived : Base {',
+            '    override Number run(Number amount) { return base.run(amount); }',
+            '}'
+        ].join('\n');
+        const result = compile(source);
+        expect(result.errors).toEqual([]);
+        const fileName = '/lgd-base-hover.js';
+        const options = { allowJs: true, noLib: true, noEmit: true };
+        const host = typescript.createCompilerHost(options);
+        const readSource = host.getSourceFile;
+        host.getSourceFile = (name, ...args) =>
+        {
+            if(name === fileName)
+            {
+                return typescript.createSourceFile(fileName, result.code, typescript.ScriptTarget.Latest, true, typescript.ScriptKind.JS);
+            }
+
+            return readSource(name, ...args);
+        };
+
+        const program = typescript.createProgram([fileName], options, host);
+        const checker = program.getTypeChecker();
+        let signature = null;
+        function visit(node)
+        {
+            if(typescript.isPropertyAccessExpression(node) && node.name.text === 'run' && typescript.isCallExpression(node.expression))
+            {
+                signature = checker.typeToString(checker.getTypeAtLocation(node));
+            }
+
+            typescript.forEachChild(node, visit);
+        }
+
+        visit(program.getSourceFile(fileName));
+        expect(signature).toBe('(amount: number) => number');
+    });
+
     test('Checks imported known accessor contracts and leaves unrelated JavaScript base values unchanged.', () =>
     {
         const source = 'readonly Object Parent = require("./parent");\nclass Derived : Parent { read() { return base.label(); } }';
