@@ -73,10 +73,10 @@ describe('LgdSemanticTokensProvider', () =>
         const texts = tokens.pushed.map(token => tokenText(document, token));
         expect(texts).toContain('vscode.TextDocument');
         expect(texts).toContain('Number');
-        for(const token of tokens.pushed)
-        {
-            expect(token.tokenType).toBe('class');
-        }
+        const types = tokens.pushed.filter(token => token.tokenType === 'class');
+        expect(types.map(token => tokenText(document, token))).toContain('Number');
+        const lineParameter = tokens.pushed.find(token => tokenText(document, token) === 'line');
+        expect(lineParameter.tokenType).toBe('parameter');
     });
 
     test('reports a class token for the JSDoc @type tag.', async () =>
@@ -98,6 +98,50 @@ describe('LgdSemanticTokensProvider', () =>
         const provider = LgdSemanticTokensProvider.create(service);
         const tokens = await provider.provideDocumentSemanticTokens(document);
         expect(tokens.pushed.map(token => tokenText(document, token))).toEqual([ 'Counter', 'Number', 'void' ]);
+    });
+
+    test('groups void with async as keywords rather than class/type tokens', async () =>
+    {
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, 'class Command { async void execute() {} void reset() {} }');
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        expect(keywords).toEqual([ 'async', 'void', 'void' ]);
+        expect(tokens.pushed.filter(token => token.tokenType === 'class').map(token => tokenText(document, token))).toEqual(['Command']);
+    });
+
+    test('gives constructor and method parameter declarations and references the same role without leaking to properties or shadows', async () =>
+    {
+        const source = [
+            'class Command {',
+            '    Command(String commandName) {',
+            '        this.commandName = commandName;',
+            '        commandName = "next";',
+            '        this.read = () => commandName;',
+            '        this.text = "commandName"; // commandName stays a comment',
+            '        { const commandName = "local"; console.log(commandName); }',
+            '    }',
+            '    void update(String commandName) { this.commandName = commandName; }',
+            '}',
+            'Command.'
+        ].join('\n');
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const parameters = tokens.pushed.filter(token => token.tokenType === 'parameter');
+        const offsets = parameters.map(token => document.offsetAt(token.range.start));
+        const expectedOffsets = [
+            source.indexOf('commandName)'),
+            source.indexOf('= commandName;') + '= '.length,
+            source.indexOf('commandName = "next"'),
+            source.indexOf('=> commandName;') + '=> '.length,
+            source.lastIndexOf('commandName)'),
+            source.lastIndexOf('= commandName;') + '= '.length
+        ];
+        expect(offsets).toEqual(expectedOffsets);
+        expect(parameters.every(token => tokenText(document, token) === 'commandName')).toBe(true);
     });
 
     test('returns null when the document is not open.', async () =>

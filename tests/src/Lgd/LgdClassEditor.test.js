@@ -122,14 +122,14 @@ describe('LGD class editor integration', () =>
     {
         const { service, document } = await openClassDocument();
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
-        const names = tokens.pushed.map(token => document.getText(token.range));
+        const names = tokens.pushed.filter(token => token.tokenType === 'class').map(token => document.getText(token.range));
 
         expect(names.filter(name => name === 'BaseCommand')).toEqual([ 'BaseCommand', 'BaseCommand', 'BaseCommand' ]);
         expect(names.filter(name => name === 'GoToAssignment')).toHaveLength(2);
         expect(names).toContain('String');
         expect(names).toContain('vscode.TextDocument');
         expect(names).not.toContain('executeCommand');
-        expect(tokens.pushed.every(token => token.tokenType === 'class')).toBe(true);
+        expect(tokens.pushed.some(token => token.tokenType === 'parameter')).toBe(true);
     });
 
     test('does not treat returned unrelated objects as class instances', async () =>

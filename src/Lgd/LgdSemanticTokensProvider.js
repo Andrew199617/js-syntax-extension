@@ -1,18 +1,20 @@
 const vscode = require('vscode');
+const parser = require('@babel/parser');
+const traverse = require('@babel/traverse').default;
 
 /** @import { CancellationToken, SemanticTokens, TextDocument } from 'vscode' */
 
 /**
- * @description Provides semantic tokens for LGD documents, coloring type references
- * with the theme's class color. The TextMate grammar already colors the eight type
+ * @description Provides standard type, parameter, and keyword semantic roles for LGD documents.
+ * Type references use the theme's class color. The TextMate grammar already colors the eight type
  * keywords in declaration position; this provider covers the spots it cannot see:
  * typed parameter types like vscode.TextDocument and JSDoc type tags like
  * @type {vscode.Command}.
  * @type {LgdSemanticTokensProviderType}
  */
 const LgdSemanticTokensProvider = {
-    /** @description The token legend: types are reported as the standard 'class' token. */
-    legend: new vscode.SemanticTokensLegend(['class'], []),
+    /** @description Uses standard theme roles for types, parameters, and language keywords. */
+    legend: new vscode.SemanticTokensLegend([ 'class', 'parameter', 'keyword' ], []),
 
     /**
      * @description Creates a semantic tokens provider bound to the LGD language service.
@@ -68,16 +70,110 @@ const LgdSemanticTokensProvider = {
         }
 
         const builder = new vscode.SemanticTokensBuilder(this.legend);
-        const spans = this.collectTypeSpans(source, state.declarations);
+        const spans = this.collectSemanticSpans(source, state);
         for(const span of spans)
         {
             builder.push(
                 new vscode.Range(document.positionAt(span.start), document.positionAt(span.end)),
-                'class'
+                span.tokenType
             );
         }
 
         return builder.build();
+    },
+
+    /** @description Combines mapped binding roles with LGD type and return-keyword spans. */
+    collectSemanticSpans(source, state)
+    {
+        const spans = this.collectTypeSpans(source, state.declarations).map(span => ({ ...span, tokenType: 'class' }));
+        for(const declaration of state.declarations)
+        {
+            for(const group of declaration.methodTypedParams || [])
+            {
+                if(group.returnTypeName === 'void')
+                {
+                    spans.push({ start: declaration.initializerStart + group.returnTypeStart,
+                        end: declaration.initializerStart + group.returnTypeEnd, tokenType: 'keyword' });
+                }
+            }
+        }
+
+        spans.push(...this.collectBindingSpans(source, state));
+        spans.sort((first, second) => first.start - second.start || first.end - second.end);
+        return spans.filter((span, index) => index === 0 || span.start !== spans[index - 1].start || span.end !== spans[index - 1].end);
+    },
+
+    /** @description Parses the current mirror, retaining complete declarations when an unfinished trailing expression exists. */
+    parseMirror(code, state)
+    {
+        const options = { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true };
+        try
+        {
+            return parser.parse(code, options);
+        }
+        catch
+        {
+            const sourceEnd = Math.max(0, ...state.declarations.map(declaration => declaration.end));
+            const completePrefix = code.slice(0, state.map.toOutput(sourceEnd));
+            try
+            {
+                return parser.parse(completePrefix, options);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    },
+
+    /** @description Colors real parameter bindings and their reads/writes without matching properties or shadowed locals by text. */
+    collectBindingSpans(source, state)
+    {
+        if(!state.jsDocument)
+        {
+            return [];
+        }
+
+        const code = state.jsDocument.getText();
+        const tree = this.parseMirror(code, state);
+        const context = { source: source, code: code, map: state.map, spans: [] };
+        if(!tree)
+        {
+            return context.spans;
+        }
+
+        traverse(tree, {
+            /** @description Gives native async and LGD void the same standard keyword role. */
+            Function: path =>
+            {
+                if(path.node.async && code.startsWith('async', path.node.start))
+                {
+                    this.appendMappedSpan(context, path.node.start, path.node.start + 'async'.length, 'keyword');
+                }
+            },
+
+            /** @description Includes declarations, captured references, and writes to parameter bindings. */
+            Identifier: path =>
+            {
+                const binding = path.scope.getBinding(path.node.name);
+                if(binding && binding.kind === 'param' && (path.isReferencedIdentifier() || path.isBindingIdentifier()))
+                {
+                    this.appendMappedSpan(context, path.node.start, path.node.end, 'parameter');
+                }
+            }
+        });
+        return context.spans;
+    },
+
+    /** @description Maps only verbatim source identifiers, excluding synthesized lowering tokens. */
+    appendMappedSpan(context, start, end, tokenType)
+    {
+        const sourceStart = context.map.toSource(start);
+        const sourceEnd = context.map.toSource(end);
+        if(sourceEnd - sourceStart === end - start && context.source.slice(sourceStart, sourceEnd) === context.code.slice(start, end))
+        {
+            context.spans.push({ start: sourceStart, end: sourceEnd, tokenType: tokenType });
+        }
     },
 
     /**
@@ -146,7 +242,7 @@ const LgdSemanticTokensProvider = {
 
         for(const group of groups)
         {
-            if(group.returnTypeName)
+            if(group.returnTypeName && group.returnTypeName !== 'void')
             {
                 const start = declaration.initializerStart + group.returnTypeStart;
                 spans.push({ start: start, end: declaration.initializerStart + group.returnTypeEnd });
