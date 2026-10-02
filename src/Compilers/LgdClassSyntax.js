@@ -587,6 +587,12 @@ const LgdClassSyntax = {
     {
         const context = { content: content, backend: backend, declaration: declaration, compiler: compiler };
         const output = { code: '', segments: [] };
+        if(declaration.kind === 'interface')
+        {
+            this.appendGenerated(output, '', declaration.start, { end: declaration.end });
+            return output;
+        }
+
         const newline = compiler.detectNewline(content);
         const comment = declaration.jsdoc ? `${declaration.jsdoc}${newline}` : '';
         const prefix = `${comment}${declaration.indent}${declaration.exported ? 'export ' : ''}const `;
@@ -604,7 +610,15 @@ const LgdClassSyntax = {
         let cursor = declaration.initializerStart + 1;
         for(const member of declaration.classMembers)
         {
-            this.appendSource(output, context, cursor, member.start);
+            const memberStart = member.abstract ? member.erasureStart : member.start;
+            this.appendSource(output, context, cursor, memberStart);
+            if(member.abstract)
+            {
+                this.appendGenerated(output, '', memberStart, { end: member.bodyEnd });
+                cursor = member.bodyEnd;
+                continue;
+            }
+
             if(member.isConstructor)
             {
                 this.emitConstructor(output, context, member);
@@ -634,7 +648,8 @@ const LgdClassSyntax = {
             this.appendGenerated(output, helper, declaration.end);
         }
 
-        output.code = backend.rewriteInitializer(declaration, output.code, output.segments);
+        const runtimeDeclaration = { ...declaration, methodTypedParams: declaration.methodTypedParams.filter(group => !group.abstract) };
+        output.code = backend.rewriteInitializer(runtimeDeclaration, output.code, output.segments);
         return output;
     },
 

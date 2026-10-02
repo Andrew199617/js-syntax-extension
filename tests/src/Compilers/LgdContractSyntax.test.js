@@ -1,9 +1,19 @@
+const virtualMachine = require('vm');
+const { Oloo } = require('@mavega/oloo');
 const LgdClassSyntax = require('../../../src/Compilers/LgdClassSyntax');
 const LgdCompiler = require('../../../src/Compilers/LgdCompiler');
+const JsBackend = require('../../../src/Compilers/JsBackend');
+const LgdSourceMap = require('../../../src/Compilers/LgdSourceMap');
 
 function parse(source)
 {
     return LgdClassSyntax.parse(source, LgdCompiler.create());
+}
+
+function emit(source, declaration)
+{
+    const compiler = LgdCompiler.create();
+    return LgdClassSyntax.emit(source, JsBackend.create(compiler.detectNewline(source)), declaration, compiler);
 }
 
 describe('LGD interface and abstract syntax.', () =>
@@ -98,5 +108,74 @@ describe('LGD interface and abstract syntax.', () =>
     ])('Rejects malformed or executable contracts: %s.', (source, message) =>
     {
         expect(parse(source).errors.some(error => error.message.includes(message))).toBe(true);
+    });
+
+    test('Erases a whole interface and its documentation into an anchored mapping.', () =>
+    {
+        const source = '/** Task contract. */\r\nexport interface Task { void reset(); }';
+        const parsed = parse(source);
+        expect(parsed.errors).toEqual([]);
+        const output = emit(source, parsed.declarations[0]);
+        expect(output.code).toBe('');
+        expect(output.segments).toEqual([expect.objectContaining({ srcStart: 0, srcEnd: source.length, outStart: 0, outEnd: 0, verbatim: false })]);
+    });
+
+    test('OLOO erasure leaves concrete behavior, descriptors, documentation and body mappings intact.', () =>
+    {
+        const source = [
+            'abstract class Task {',
+            '    /** Erased method contract. */',
+            '    abstract Number run(String text);',
+            '    /** Erased property contract. */',
+            '    abstract String Name { get; set; }',
+            '    Task(String title) { this.title = title; }',
+            '    String describe() { return this.title; }',
+            '    get label() { return this.title; }',
+            '    set label(String value) { this.title = value; }',
+            '}'
+        ].join('\r\n');
+        const parsed = parse(source);
+        expect(parsed.errors).toEqual([]);
+        const output = emit(source, parsed.declarations[0]);
+        expect(output.code).not.toContain('abstract');
+        expect(output.code).not.toContain('run');
+        expect(output.code).not.toContain('Name');
+        expect(output.code).not.toContain('Erased');
+        expect(output.code).not.toContain('@returns {number}');
+        expect(output.code).toContain('@returns {string}');
+        expect(output.code.replace(/\r\n/g, '')).not.toContain('\n');
+        const Task = virtualMachine.runInNewContext(`${output.code}\r\nTask;`);
+        const instance = Task.create('ready');
+        expect(instance.describe()).toBe('ready');
+        instance.label = 'changed';
+        expect(instance.label).toBe('changed');
+        expect(Object.hasOwn(Task, 'run')).toBe(false);
+        expect(Object.hasOwn(Task, 'Name')).toBe(false);
+        expect(Object.getOwnPropertyDescriptor(Task, 'label').set).toEqual(expect.any(Function));
+        const map = LgdSourceMap.create(output.segments);
+        const bodyOffset = source.indexOf('this.title = title');
+        expect(map.toSource(map.toOutput(bodyOffset))).toBe(bodyOffset);
+    });
+
+    test('Preserves existing OLOO inheritance after abstract contracts are erased.', () =>
+    {
+        const source = [
+            'abstract class BaseTask {',
+            '    BaseTask(String title) { this.title = title; }',
+            '    abstract String describe();',
+            '}',
+            'class Task : BaseTask {',
+            '    Task(String title) : base(title) { this.ready = true; }',
+            '    override String describe() { return this.title; }',
+            '}'
+        ].join('\n');
+        const parsed = parse(source);
+        expect(parsed.errors).toEqual([]);
+        const code = parsed.declarations.map(declaration => emit(source, declaration).code).join('\n');
+        const Task = virtualMachine.runInNewContext(`${code}\nTask;`, { Oloo: Oloo });
+        const instance = Task.create('ready');
+        expect(instance.describe()).toBe('ready');
+        expect(instance.ready).toBe(true);
+        expect(Object.hasOwn(Object.getPrototypeOf(Task), 'describe')).toBe(false);
     });
 });
