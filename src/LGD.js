@@ -18,6 +18,7 @@ const FileIO = require('./Logging/FileIO');
 const Document = require('./Core/Document');
 const RefactorProvider = require('./Refactor/RefactorProvider');
 const LgdLanguageService = require('./Lgd/LgdLanguageService');
+const { readOutputOptions } = require('./Lgd/LgdOutputConfiguration');
 const LgdHoverProvider = require('./Lgd/LgdHoverProvider');
 const LgdDefinitionProvider = require('./Lgd/LgdDefinitionProvider');
 const LgdReferenceProvider = require('./Lgd/LgdReferenceProvider');
@@ -82,7 +83,7 @@ async function compileLgdDocument(document)
     const uri = document.uri || { fsPath: document.fileName };
     const snapshot = Document.create(document.fileName, document.getText(), uri);
     const externals = await lgd.languageService.collectExternalTypes(snapshot);
-    const result = LgdCompiler.create().compileToJs(snapshot.getText(), externals);
+    const result = LgdCompiler.create().compileToJs(snapshot.getText(), externals, readOutputOptions(snapshot));
     const errors = getLgdErrors(result);
     if(errors.length > 0)
     {
@@ -297,7 +298,7 @@ function activate(context)
     RefactorProvider.create(context);
     InvertIf.create().register(context);
 
-    lgd.languageService = LgdLanguageService.create(lgd.lgdDiagnosticCollection, reportLgdError);
+    lgd.languageService = LgdLanguageService.create(lgd.lgdDiagnosticCollection, reportLgdError, readOutputOptions);
 
     const lgdHoverProvider = vscode.languages.registerHoverProvider(
         LGD_DOCUMENT_SELECTOR,
@@ -489,9 +490,21 @@ function activate(context)
         }
     });
 
-    const configurationChanged = vscode.workspace.onDidChangeConfiguration(() =>
+    const configurationChanged = vscode.workspace.onDidChangeConfiguration(event =>
     {
         lgd.configuration = Configuration.create();
+        if(event && !event.affectsConfiguration('lgd.options'))
+        {
+            return;
+        }
+
+        for(const document of vscode.workspace.textDocuments)
+        {
+            if(document.languageId === 'lgd')
+            {
+                runLgdTask(() => lgd.languageService.updateDocument(document));
+            }
+        }
     });
 
     const onDidRenameFiles = vscode.workspace.onDidRenameFiles(fileRenameEvent =>

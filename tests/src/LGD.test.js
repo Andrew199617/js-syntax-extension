@@ -99,6 +99,7 @@ jest.mock('vscode', () => ({
     SemanticTokensBuilder: jest.fn(),
     workspace: {
         rootPath: 'workspace',
+        getConfiguration: jest.fn(() => ({ get: () => globalThis.lgd?.configuration.options || {} })),
         textDocuments: [],
         findFiles: jest.fn(),
         createFileSystemWatcher: jest.fn(() => ({
@@ -662,6 +663,36 @@ describe('LGD compile on save', () =>
 
         expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'working.js'), result.code);
         expect(result.code).toContain('The count.');
+    });
+
+    test.each([
+        'interface IRun { Number run(Number count); }\nclass Runner : IRun {}',
+        'abstract class Worker {}\nWorker.create();'
+    ])('contract errors preserve saved output for %s', async source =>
+    {
+        saveLgdDocument(path.join('workspace', 'contract.lgd'), source);
+        await nextTurn();
+        await nextTurn();
+        expect(FileIO.writeFileContents).not.toHaveBeenCalled();
+    });
+
+    test('reads source-scoped native class output options before saving', async () =>
+    {
+        lgd.configuration.options = { outputTarget: 'javascript', javascriptObjectModel: 'class' };
+        saveLgdDocument(path.join('workspace', 'native.lgd'), 'class Counter {}');
+        await nextTurn();
+        await nextTurn();
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'native.js'), expect.stringContaining('class Counter'));
+        expect(vscode.workspace.getConfiguration).toHaveBeenCalledWith('lgd', expect.objectContaining({ fsPath: path.join('workspace', 'native.lgd') }));
+    });
+
+    test('unsupported output targets preserve saved output', async () =>
+    {
+        lgd.configuration.options = { outputTarget: 'csharp' };
+        saveLgdDocument(path.join('workspace', 'unsupported.lgd'), 'class Counter {}');
+        await nextTurn();
+        await nextTurn();
+        expect(FileIO.writeFileContents).not.toHaveBeenCalled();
     });
 
     test('saving valid LGD writes the compiled .js next to the source', async () =>

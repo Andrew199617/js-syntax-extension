@@ -16,7 +16,7 @@
         "url": "https://github.com/Andrew199617/js-syntax-extension"
     },
     "description": "Extra Syntax highlighting for JS/React/Next.js files. This extension is for someone who prefers using vanilla Javascript with jsdoc over TypeScript. Generate Typings for JavaScript project in seconds. Supports React, Next.js, and vanilla JS.",
-    "version": "2.7.11",
+    "version": "2.7.12",
     "engines": {
         "node": "20.18.0",
         "vscode": "^1.44.0"
@@ -81,6 +81,7 @@
             "properties": {
                 "lgd.options": {
                     "type": "object",
+                    "scope": "resource",
                     "description": "Configuration options for LGD JS Syntax extension.",
                     "properties": {
                         "autoComplete": {
@@ -119,6 +120,23 @@
                             "type": "boolean",
                             "description": "Whether we should create interfaces for State and Props.",
                             "default": true
+                        },
+                        "outputTarget": {
+                            "type": "string",
+                            "enum": [
+                                "javascript"
+                            ],
+                            "default": "javascript",
+                            "description": "Target language for LGD output. Only JavaScript is implemented; C# and C++ are reserved for future backends."
+                        },
+                        "javascriptObjectModel": {
+                            "type": "string",
+                            "enum": [
+                                "oloo",
+                                "class"
+                            ],
+                            "default": "oloo",
+                            "description": "JavaScript object model for LGD classes. OLOO preserves prototype factories; class emits native classes while retaining create(). Native classes require class bases and do not support Oloo.base calls."
                         }
                     }
                 }

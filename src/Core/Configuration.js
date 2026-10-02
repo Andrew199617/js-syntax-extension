@@ -2,6 +2,8 @@ const vscode = require('vscode');
 
 /**
  * @typedef {Object} OptionsType
+ * @property {string} outputTarget
+ * @property {string} javascriptObjectModel
  * @property {boolean} generateTypings
  * @property {boolean} generateTypingsOnChange
  * @property {boolean} maintainHierarchy
