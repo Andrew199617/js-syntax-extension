@@ -59,10 +59,10 @@
 			"match": "^([ \\t]*)((export)[ \\t]+)?((readonly)[ \\t]+)?(Number|String|Boolean|BigInt|Symbol|Object|Array|Function)([ \\t]+)([$_a-zA-Z][\\w$]*)",
 			"captures": {
 				"3": {
-					"name": "keyword.control.export.lgd"
+					"name": "keyword.control.lgd"
 				},
 				"5": {
-					"name": "storage.modifier.readonly.lgd"
+					"name": "keyword.control.lgd"
 				},
 				"6": {
 					"name": "storage.type.lgd"
@@ -87,10 +87,10 @@
 			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?(class)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
 			"beginCaptures": {
 				"2": {
-					"name": "keyword.control.export.lgd"
+					"name": "keyword.control.lgd"
 				},
 				"3": {
-					"name": "storage.type.class.lgd"
+					"name": "keyword.control.lgd"
 				},
 				"4": {
 					"name": "entity.name.type.class.lgd"
@@ -117,10 +117,10 @@
 			"match": "[ \\t]*\\b(?:(async)[ \\t]+)?(?:(void)|((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*))(?=[ \\t]+[$_a-zA-Z][\\w$]*[ \\t]*\\()",
 			"captures": {
 				"1": {
-					"name": "storage.modifier.async.lgd"
+					"name": "keyword.control.lgd"
 				},
 				"2": {
-					"name": "storage.modifier.async.lgd"
+					"name": "keyword.control.lgd"
 				},
 				"3": {
 					"name": "storage.type.lgd"
@@ -141,7 +141,7 @@
 			"match": "\\b(virtual|override)\\b(?=[ \\t]+(?:async[ \\t]+)?(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
 			"captures": {
 				"1": {
-					"name": "storage.modifier.lgd"
+					"name": "keyword.control.lgd"
 				}
 			}
 		}

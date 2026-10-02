@@ -97,7 +97,7 @@ describe('LgdSemanticTokensProvider', () =>
         await service.openDocument(document);
         const provider = LgdSemanticTokensProvider.create(service);
         const tokens = await provider.provideDocumentSemanticTokens(document);
-        expect(tokens.pushed.map(token => tokenText(document, token))).toEqual([ 'Counter', 'Number', 'void' ]);
+        expect(tokens.pushed.map(token => tokenText(document, token))).toEqual([ 'class', 'Counter', 'Number', 'return', 'void' ]);
     });
 
     test('groups void with async as keywords rather than class/type tokens', async () =>
@@ -107,7 +107,7 @@ describe('LgdSemanticTokensProvider', () =>
         await service.openDocument(document);
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
         const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
-        expect(keywords).toEqual([ 'async', 'void', 'void' ]);
+        expect(keywords).toEqual([ 'class', 'async', 'void', 'void' ]);
         expect(tokens.pushed.filter(token => token.tokenType === 'class').map(token => tokenText(document, token))).toEqual(['Command']);
     });
 
@@ -154,6 +154,150 @@ describe('LgdSemanticTokensProvider', () =>
         const parameters = tokens.pushed.filter(token => token.tokenType === 'parameter');
         const offsets = parameters.map(token => document.offsetAt(token.range.start));
         expect(offsets).toEqual(Array.from(source.matchAll(/commandName/g), match => match.index));
+    });
+
+    test('uses one keyword role for declarations, control flow, operators, modules, and contextual syntax', async () =>
+    {
+        const source = [
+            'import fallback, { item as renamed } from "module";',
+            'export const ready = true;',
+            'export default async function run(items) {',
+            '    let total = 0; var count = 0;',
+            '    for (const item of items) { if(item) continue; else total++; }',
+            '    for (const key in items) { break; }',
+            '    while(total) { break; } do { count++; } while(false);',
+            '    try { await fallback(); } catch(error) { debugger; } finally { delete items.value; }',
+            '    switch(total) { case 0: return typeof total; default: throw new Error("stop"); }',
+            '    return void total;',
+            '}',
+            'function* values() { yield 1; }',
+            'const holder = { get value() { return this.current; }, set value(input) { this.current = input; } };',
+            'const Native = class extends Error { static make() { return new this(); } constructor() { super(); } };',
+            'if(holder instanceof Object) holder.value = 1;',
+            'const target = function() { return new.target; };'
+        ].join('\n');
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const keywords = new Set(tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token)));
+        const expected = [ 'import',
+            'as',
+            'from',
+            'export',
+            'const',
+            'default',
+            'async',
+            'function',
+            'let',
+            'var',
+            'for',
+            'of',
+            'in',
+            'if',
+            'continue',
+            'else',
+            'break',
+            'while',
+            'do',
+            'try',
+            'await',
+            'catch',
+            'debugger',
+            'finally',
+            'delete',
+            'switch',
+            'case',
+            'return',
+            'typeof',
+            'throw',
+            'new',
+            'void',
+            'yield',
+            'get',
+            'set',
+            'this',
+            'class',
+            'extends',
+            'static',
+            'super',
+            'instanceof' ];
+        expect([...keywords].sort()).toEqual(expected.sort());
+    });
+
+    test.each([ 'with', 'assert' ])('recognizes the existing JavaScript import %s clause as contextual syntax', async keyword =>
+    {
+        const source = `import settings from "settings.json" ${keyword} { type: "json" };`;
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        expect(keywords).toEqual([ 'import', 'from', keyword ]);
+    });
+
+    test('recognizes JavaScript resource declarations without classifying a same-name identifier', async () =>
+    {
+        const source = 'async function acquire() { await using resource = open(); }\nconst using = 1;';
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        expect(keywords).toEqual([ 'async', 'function', 'await', 'using', 'const' ]);
+    });
+
+    test('restores erased LGD declaration and method keywords from their parsed source spans', async () =>
+    {
+        const source = [
+            'export readonly Number total = 1;',
+            'class Base { Base(String name) {} virtual async void run(String name) { await Promise.resolve(); } }',
+            'class Derived : Base {',
+            '    Derived(String name) : base(name) {}',
+            '    override async void run(String name) { await base.run(name); }',
+            '}'
+        ].join('\n');
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        const state = await service.openDocument(document);
+        expect(state.errors).toEqual([]);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        expect(keywords).toEqual([ 'export',
+            'readonly',
+            'class',
+            'virtual',
+            'async',
+            'void',
+            'await',
+            'class',
+            'base',
+            'override',
+            'async',
+            'void',
+            'await',
+            'base' ]);
+    });
+
+    test('does not turn contextual identifiers, property names, literal values, or comment text into keywords', async () =>
+    {
+        const source = [
+            'const words = { class: 1, new: 1, async: 1, await: 1, void: 1, return: 1, virtual: 1, override: 1, readonly: 1, as: 1 };',
+            'const async = words.async, from = words.as, virtual = words.virtual;',
+            'words.class; words.new; words.return; words.await;',
+            'const methods = { async() {}, get() {}, set() {} };',
+            'const text = "class virtual new async await void return";',
+            'const template = `readonly override await`; // class async return',
+            'const pattern = /class|return|await/;',
+            'const literals = [true, false, null];'
+        ].join('\n');
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        expect(keywords.every(word => word === 'const')).toBe(true);
+        expect(keywords).toHaveLength(source.split('const ').length - 1);
     });
 
     test('returns null when the document is not open.', async () =>

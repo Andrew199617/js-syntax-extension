@@ -17,10 +17,10 @@ const typeScope = 'storage.type.lgd';
 const nameScope = 'variable.other.definition.lgd';
 
 // Scope the LGD grammar assigns to the readonly modifier.
-const readonlyScope = 'storage.modifier.readonly.lgd';
+const readonlyScope = 'keyword.control.lgd';
 
 // Scope the LGD grammar assigns to the export modifier.
-const exportScope = 'keyword.control.export.lgd';
+const exportScope = 'keyword.control.lgd';
 
 async function createRegistry()
 {
@@ -152,7 +152,7 @@ describe('LGD TextMate grammar.', () =>
     {
         const tokens = tokenize(grammar, 'class Counter {\n    Number count() { return 1; }\n    async void reset() {}\n}');
         assertScope(tokens, 'Number', typeScope);
-        assertScope(tokens, 'void', 'storage.modifier.async.lgd');
+        assertScope(tokens, 'void', 'keyword.control.lgd');
         assertScope(tokens, 'count', 'entity.name.function.js');
         assertScope(tokens, 'reset', 'entity.name.function.js');
         assertNoScope(tokens, 'count', nameScope);
@@ -180,6 +180,28 @@ describe('LGD TextMate grammar.', () =>
         }
     });
 
+    test('groups LGD declaration and modifier words as keywords while keeping types distinct', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'export readonly Number total = 1;',
+            'class Base {',
+            '    virtual async void run(String title) {}',
+            '}',
+            'class Derived : Base {',
+            '    override async void run(String title) {}',
+            '}'
+        ].join('\n'));
+        for(const word of [ 'export', 'readonly', 'class', 'virtual', 'override', 'async', 'void' ])
+        {
+            assertScope(tokens, word, 'keyword.control.lgd');
+        }
+
+        assertScope(tokens, 'Number', typeScope);
+        assertScope(tokens, 'String', typeScope);
+        assertScope(tokens, 'Base', 'entity.name.type.class.lgd');
+        assertNoScope(tokens, 'title', 'keyword.control.lgd');
+    });
+
     test('Does not highlight class-looking comments or strings as class declarations.', () =>
     {
         const tokens = tokenize(grammar, '// class Example : Base {}\nconst example = `class Fake : Base {}`;');
@@ -197,9 +219,9 @@ describe('LGD TextMate grammar.', () =>
             '    async override String describe(Number count) { return String(count); }',
             '}'
         ].join('\n'));
-        assertScope(tokens, 'virtual', 'storage.modifier.lgd');
-        assertScope(tokens, 'override', 'storage.modifier.lgd');
-        assertScope(tokens, 'void', 'storage.modifier.async.lgd');
+        assertScope(tokens, 'virtual', 'keyword.control.lgd');
+        assertScope(tokens, 'override', 'keyword.control.lgd');
+        assertScope(tokens, 'void', 'keyword.control.lgd');
         assertScope(tokens, 'String', typeScope);
         assertScope(tokens, 'executeCommand', 'entity.name.function.js');
         assertScope(tokens, 'describe', 'entity.name.function.js');
