@@ -65,6 +65,19 @@ const LgdSemanticTokensProvider = {
         for(const declaration of declarations)
         {
             this.collectParamTypeSpans(declaration, spans);
+            if(declaration.kind === 'class')
+            {
+                spans.push({ start: declaration.nameStart, end: declaration.nameEnd });
+                if(declaration.baseName)
+                {
+                    spans.push({ start: declaration.baseStart, end: declaration.baseEnd });
+                }
+
+                if(declaration.constructorMember)
+                {
+                    spans.push({ start: declaration.constructorMember.nameStart, end: declaration.constructorMember.nameEnd });
+                }
+            }
         }
 
         this.collectJsdocTypeSpans(text, spans);

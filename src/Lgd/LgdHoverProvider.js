@@ -61,7 +61,7 @@ const LgdHoverProvider = {
             }
 
             const summary = await this.languageService.getTypeSummary(document.uri, document.getText(wordRange));
-            if(summary && (summary.members.length > 0 || summary.params.length > 0))
+            if(summary && (summary.kind === 'class' || summary.members.length > 0 || summary.params.length > 0))
             {
                 return new vscode.Hover(this.renderTypeSummary(summary), wordRange);
             }
@@ -146,6 +146,24 @@ const LgdHoverProvider = {
      */
     renderTypeSummary(summary)
     {
+        if(summary.kind === 'class')
+        {
+            const base = summary.baseName ? ` : ${summary.baseName}` : '';
+            const constructorParams = (summary.constructorParams || []).map(this.formatTypedParameter).join(', ');
+            const lines = summary.members.map(member =>
+            {
+                if(member.name === 'create')
+                {
+                    return `    create(${constructorParams}),`;
+                }
+
+                const type = member.typeName ? `: ${member.typeName}` : '';
+                return `    ${member.name}${member.kind === 'method' ? '()' : type},`;
+            });
+
+            return [ '```lgd', `class ${summary.name}${base} {`, ...lines, '}', '```' ].join('\n');
+        }
+
         const modifier = summary.readonly ? 'readonly ' : '';
         if(summary.params.length > 0)
         {
