@@ -11,7 +11,7 @@ const LgdReturnChecker = {
     signatures(declarations)
     {
         return declarations.flatMap(declaration => (declaration.methodTypedParams || [])
-            .filter(group => group.returnTypeName)
+            .filter(group => group.returnTypeName && !group.abstract)
             .map(group => ({ declaration: declaration, group: group })));
     },
 
@@ -67,7 +67,7 @@ const LgdReturnChecker = {
             context.errors.push({ offset: typeStart, endOffset: typeEnd, message: message });
         }
 
-        if(group.accessor || group.generator)
+        if(group.accessor && signature.declaration.kind !== 'class' || group.generator)
         {
             report('Explicit return annotations on accessors and generators are not supported yet.');
             return;

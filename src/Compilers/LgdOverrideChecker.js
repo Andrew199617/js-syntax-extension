@@ -19,6 +19,7 @@ function createContext(content, declarations, externals)
     const scopes = collectScopes(masked);
     return {
         bindings: collectBindings({ content: content, masked: masked, declarations: declarations, scopes: scopes, externals: externals }),
+        declarations: declarations,
         tables: new Map()
     };
 }
@@ -59,10 +60,28 @@ function methodSignature(member, declaration, inherited)
     }
 
     const returnTypeName = member.returnTypeName || member.override && inherited?.returnTypeName || null;
+    const accessorType = member.accessorKind === 'get' ? returnTypeName : params[0]?.typeName;
+    const propertyTypeName = member.propertyTypeName || accessorType || member.override && inherited?.propertyTypeName || null;
+    const propertyTypes = [];
+    if(member.propertyTypeName)
+    {
+        propertyTypes.push(member.propertyTypeName);
+    }
+    else if(member.accessorKind === 'get' || member.accessorKind === 'set')
+    {
+        propertyTypes.push(propertyTypeName);
+    }
+
     return {
         name: member.name,
         kind: member.kind || 'method',
-        virtual: Boolean(member.virtual || member.override && inherited?.virtual),
+        virtual: Boolean(member.virtual || member.abstract || member.override && inherited?.virtual),
+        abstract: Boolean(member.abstract),
+        accessorKind: member.accessorKind || null,
+        getter: Boolean(member.getter || member.accessorKind === 'get'),
+        setter: Boolean(member.setter || member.accessorKind === 'set'),
+        propertyTypeName: propertyTypeName,
+        propertyTypes: propertyTypes,
         override: Boolean(member.override),
         params: params,
         paramsKnown: Array.isArray(member.params),
@@ -98,6 +117,18 @@ function hasVirtualDocblock(text)
     return Boolean(last && (/(?:^|\n)\s*\*?\s*@virtual(?:\s|$)/).test(last.groups.body));
 }
 
+/** @description Combines the two concrete accessors belonging to the same own property. */
+function mergePropertyAccessors(signature, previous)
+{
+    if(previous?.kind === 'property' && signature.kind === 'property')
+    {
+        signature.getter ||= previous.getter;
+        signature.setter ||= previous.setter;
+        signature.propertyTypeName ||= previous.propertyTypeName;
+        signature.propertyTypes.push(...previous.propertyTypes || []);
+    }
+}
+
 /**
  * @description Describes explicit OLOO members without inventing virtual methods for dynamic objects.
  * @param {Object} declaration the OLOO declaration.
@@ -126,9 +157,14 @@ function objectMethods(declaration)
                 if(head.modifier === 'get' || head.modifier === 'set')
                 {
                     member.kind = 'property';
+                    member.accessorKind = head.modifier;
+                    member.getter = head.modifier === 'get';
+                    member.setter = head.modifier === 'set';
                 }
 
-                signatures.set(member.name, methodSignature(member, declaration));
+                const signature = methodSignature(member, declaration);
+                mergePropertyAccessors(signature, signatures.get(member.name));
+                signatures.set(member.name, signature);
                 continue;
             }
 
@@ -173,7 +209,7 @@ function methodTable(declaration, context, visiting = new Set())
         return context.tables.get(declaration);
     }
 
-    if(declaration.kind !== 'class')
+    if(declaration.kind !== 'class' && declaration.kind !== 'interface')
     {
         return objectMethods(declaration);
     }
@@ -188,11 +224,17 @@ function methodTable(declaration, context, visiting = new Set())
     }
 
     const methods = new Map(inherited.methodSignatures.map(member => [ member.name, member ]));
+    const ownMethods = new Map();
     for(const member of declaration.classMembers || [])
     {
         if(!member.isConstructor)
         {
-            methods.set(member.name, methodSignature(member, declaration, methods.get(member.name)));
+            const signature = methodSignature(member, declaration, methods.get(member.name));
+            const previous = ownMethods.get(member.name);
+            mergePropertyAccessors(signature, previous);
+
+            ownMethods.set(member.name, signature);
+            methods.set(member.name, signature);
         }
     }
 
@@ -255,11 +297,25 @@ function addError(errors, member, message, details = {})
  * @description Reports definite explicit type differences while leaving opaque external types unguessed.
  * @param {string|null} baseType the base annotation.
  * @param {string|null} derivedType the derived annotation.
+ * @param {Object} context lexical declarations and current derived class.
+ * @param {Object} inherited the inherited signature.
  * @returns {boolean} whether the annotations definitely disagree.
  */
-function differentKnownTypes(baseType, derivedType)
+function differentKnownTypes(baseType, derivedType, context, inherited)
 {
-    return baseType !== derivedType && builtinTypes.has(baseType) && builtinTypes.has(derivedType);
+    if(!baseType || !derivedType || baseType === derivedType)
+    {
+        return false;
+    }
+
+    const baseOwner = context.declarations.find(declaration => declaration.name === inherited.declaredIn) || context.currentDeclaration;
+    const baseVisible = visibleBindings(context.bindings, baseOwner.headStart ?? baseOwner.start);
+    const derivedVisible = visibleBindings(context.bindings, context.currentDeclaration.headStart ?? context.currentDeclaration.start);
+    const base = builtinTypes.has(baseType) ? baseType : baseVisible.get(baseType);
+    const derived = builtinTypes.has(derivedType) ? derivedType : derivedVisible.get(derivedType);
+    const baseKnown = typeof base === 'string' || context.declarations.includes(base);
+    const derivedKnown = typeof derived === 'string' || context.declarations.includes(derived);
+    return Boolean(base && derived && baseKnown && derivedKnown && base !== derived);
 }
 
 /**
@@ -278,9 +334,10 @@ function isRequiredParameter(parameter)
  * @param {Object} member the overriding source method.
  * @param {Object} inherited the known virtual target.
  * @param {Array} errors the collected diagnostics.
+ * @param {Object} context lexical declarations and current derived class.
  * @returns {void}
  */
-function checkSignature(member, inherited, errors)
+function checkSignature(member, inherited, errors, context)
 {
     const params = signatureParams(member.params);
     const baseParams = inherited.params || [];
@@ -310,15 +367,32 @@ function checkSignature(member, inherited, errors)
         {
             addError(errors, member, `Override '${member.name}' must preserve the rest parameter at position ${index + 1}.`);
         }
-        else if(differentKnownTypes(baseParameter.typeName, parameter.typeName))
+        else if(differentKnownTypes(baseParameter.typeName, parameter.typeName, context, inherited))
         {
             addError(errors, member, `Override '${member.name}' parameter ${index + 1} must be ${baseParameter.typeName}, not ${parameter.typeName}.`);
         }
     }
 
-    if(differentKnownTypes(inherited.returnTypeName, member.returnTypeName))
+    if(differentKnownTypes(inherited.returnTypeName, member.returnTypeName, context, inherited))
     {
         addError(errors, member, `Override '${member.name}' must return ${inherited.returnTypeName}, not ${member.returnTypeName}.`);
+    }
+}
+
+/** @description Validates established property types and abstract accessor requirements on an override. */
+function checkPropertySignature(member, inherited, errors, context)
+{
+    const signature = methodSignature(member, context.currentDeclaration, inherited);
+    if(differentKnownTypes(inherited.propertyTypeName, signature.propertyTypeName, context, inherited))
+    {
+        addError(errors, member, `Override property '${member.name}' must have type ${inherited.propertyTypeName}, not ${signature.propertyTypeName}.`);
+    }
+
+    const missingGetter = member.abstract && inherited.getter && !member.getter;
+    const missingSetter = member.abstract && inherited.setter && !member.setter;
+    if(missingGetter || missingSetter)
+    {
+        addError(errors, member, `Abstract override property '${member.name}' must preserve its inherited accessors.`);
     }
 }
 
@@ -340,6 +414,7 @@ function check(content, declarations, externals = new Map())
             continue;
         }
 
+        context.currentDeclaration = declaration;
         const inherited = inheritedMethods(declaration, context, new Set([declaration]));
         const methods = new Map(inherited.methodSignatures.map(member => [ member.name, member ]));
         for(const member of declaration.classMembers || [])
@@ -360,7 +435,7 @@ function check(content, declarations, externals = new Map())
                 continue;
             }
 
-            if(!baseMember.virtual || baseMember.kind !== 'method')
+            if(!baseMember.virtual || baseMember.kind !== 'method' && !baseMember.abstract)
             {
                 addError(errors, member, `Cannot override non-virtual inherited member '${member.name}'; declare the base method virtual first.`, {
                     code: 'lgd.override.nonVirtual',
@@ -374,9 +449,13 @@ function check(content, declarations, externals = new Map())
                     quickFix: { kind: 'addOverride', offset: member.virtualStart ?? member.start, endOffset: member.virtualEnd ?? member.start }
                 });
             }
+            else if(baseMember.kind === 'method')
+            {
+                checkSignature(member, baseMember, errors, context);
+            }
             else
             {
-                checkSignature(member, baseMember, errors);
+                checkPropertySignature(member, baseMember, errors, context);
             }
         }
     }
