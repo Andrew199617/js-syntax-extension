@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const { maskCode } = require('../Compilers/LgdInfer');
 
 /** @import { CompletionItem, Position, TextDocument } from 'vscode' */
 
@@ -35,7 +36,8 @@ const LgdCompletionProvider = {
     async provideCompletionItems(document, position)
     {
         const lineStart = new vscode.Position(position.line, 0);
-        const prefix = document.getText(new vscode.Range(lineStart, position));
+        const code = maskCode(document.getText(), true);
+        const prefix = code.slice(document.offsetAt(lineStart), document.offsetAt(position));
         const match = (/(?<objectName>[$A-Z_a-z][\w$]*)\.[\w$]*$/).exec(prefix);
         if(!match)
         {

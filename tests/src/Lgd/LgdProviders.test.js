@@ -369,6 +369,16 @@ describe('LgdCompletionProvider', () =>
         expect(items).toBeNull();
     });
 
+    test.each([ '// config.', 'const text = "config.', 'const text = `config.' ])('does not complete object members inside non-code text: %s', async access =>
+    {
+        const { service, document } = await openObjectDocument(`Object config = { host: "x" };\n${access}`);
+        const provider = LgdCompletionProvider.create(service);
+
+        const items = await provider.provideCompletionItems(document, new vscode.Position(ACCESS_LINE, access.length));
+
+        expect(items).toBeNull();
+    });
+
     test('returns null when the object has no known members', async () =>
     {
         const { service, document } = await openObjectDocument('Number value = 0;\nvalue.');
