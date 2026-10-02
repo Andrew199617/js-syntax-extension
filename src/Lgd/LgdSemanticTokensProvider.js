@@ -169,7 +169,7 @@ const LgdSemanticTokensProvider = {
     appendMappedSpan(context, start, end, tokenType)
     {
         const sourceStart = context.map.toSource(start);
-        const sourceEnd = context.map.toSource(end);
+        const sourceEnd = context.map.toSource(end - 1) + 1;
         if(sourceEnd - sourceStart === end - start && context.source.slice(sourceStart, sourceEnd) === context.code.slice(start, end))
         {
             context.spans.push({ start: sourceStart, end: sourceEnd, tokenType: tokenType });

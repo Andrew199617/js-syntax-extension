@@ -144,6 +144,18 @@ describe('LgdSemanticTokensProvider', () =>
         expect(parameters.every(token => tokenText(document, token) === 'commandName')).toBe(true);
     });
 
+    test('retains parameter references at the generated base-call mapping boundary', async () =>
+    {
+        const source = 'class Base { Base(String commandName) {} }\nclass Derived : Base { Derived(String commandName) : base(commandName) {} }';
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const parameters = tokens.pushed.filter(token => token.tokenType === 'parameter');
+        const offsets = parameters.map(token => document.offsetAt(token.range.start));
+        expect(offsets).toEqual(Array.from(source.matchAll(/commandName/g), match => match.index));
+    });
+
     test('returns null when the document is not open.', async () =>
     {
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
