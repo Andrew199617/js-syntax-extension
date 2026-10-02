@@ -130,6 +130,19 @@ const LgdSemanticTokensProvider = {
                     spans.push({ ...modifier, tokenType: 'keyword' });
                 }
 
+                if(member.abstract && member.kind === 'property')
+                {
+                    if(member.getterStart !== null)
+                    {
+                        spans.push({ start: member.getterStart, end: member.getterEnd, tokenType: 'keyword' });
+                    }
+
+                    if(member.setterStart !== null)
+                    {
+                        spans.push({ start: member.setterStart, end: member.setterEnd, tokenType: 'keyword' });
+                    }
+                }
+
                 if(member.baseArgumentsStart !== null)
                 {
                     const initializer = maskCode(source.slice(member.paramEnd, member.baseArgumentsStart));
