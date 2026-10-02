@@ -5,6 +5,11 @@ const LgdTypeChecker = require('./LgdTypeChecker');
 const LgdClassSyntax = require('./LgdClassSyntax');
 const LgdBaseChecker = require('./LgdBaseChecker');
 const LgdOverrideChecker = require('./LgdOverrideChecker');
+const LgdContractChecker = require('./LgdContractChecker');
+const LgdNativeClassEmitter = require('./LgdNativeClassEmitter');
+const LgdOutputOptions = require('./LgdOutputOptions');
+const LgdInterfaceErasure = require('./LgdInterfaceErasure');
+const LgdInterfaceTypes = require('./LgdInterfaceTypes');
 const LgdReturnChecker = require('./LgdReturnChecker');
 const LgdReturnDocChecker = require('./LgdReturnDocChecker');
 const LgdStandaloneReturnChecker = require('./LgdStandaloneReturnChecker');
@@ -45,13 +50,40 @@ const LgdCompiler = {
      * @description Compiles LGD source to JavaScript.
      * @param {string} content the LGD source text.
      * @param {Map} externals require specs to {exportName, keyword} entries for cross-file typing.
+     * @param {Object} options JavaScript output target and object model options.
      * @returns {LgdCompileResultType} the compiled code, source mappings, declarations, and errors.
      */
-    compileToJs(content, externals = new Map())
+    compileToJs(content, externals = new Map(), options = {})
     {
+        const resolved = LgdOutputOptions.resolve(options);
         const parsed = this.parse(content, externals);
+        for(const error of resolved.errors)
+        {
+            parsed.errors.push({ ...this.createError(content, 0, error.message), ...error });
+        }
+
+        if(resolved.options.javascriptObjectModel === 'class')
+        {
+            for(const error of LgdNativeClassEmitter.check(content, parsed.allDeclarations, externals, this))
+            {
+                parsed.errors.push({ ...this.createError(content, error.offset, error.message, error.endOffset), ...error });
+            }
+        }
+
         const newline = this.detectNewline(content);
-        const emitted = this.emitRange(content, JsBackend.create(newline), this.fullRange(content, parsed.declarations));
+        const backend = JsBackend.create(newline);
+        backend.objectModel = resolved.options.javascriptObjectModel;
+        const output = this.emitRange(content, backend, this.fullRange(content, parsed.declarations));
+        const erased = LgdInterfaceErasure.apply(content, parsed.allDeclarations, externals, output);
+        const emitted = LgdInterfaceTypes.apply(content, parsed.allDeclarations, externals, erased);
+        if(resolved.options.javascriptObjectModel === 'class')
+        {
+            for(const error of LgdNativeClassEmitter.validateOutput(emitted.code, emitted.segments))
+            {
+                parsed.errors.push({ ...this.createError(content, error.offset, error.message, error.endOffset), ...error });
+            }
+        }
+
         return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
     },
 
@@ -181,6 +213,14 @@ const LgdCompiler = {
         found.sort((first, second) => first.headStart - second.headStart);
         this.collectMalformedErrors(masked, found, failedHeadStarts, errors);
 
+        for(const contractError of LgdContractChecker.classify(content, found, externals))
+        {
+            errors.push({
+                ...this.createError(content, contractError.offset, contractError.message, contractError.endOffset),
+                ...contractError
+            });
+        }
+
         for(const typeError of LgdTypeChecker.checkTypes(content, found, externals))
         {
             errors.push(this.createError(content, typeError.offset, typeError.message));
@@ -199,6 +239,23 @@ const LgdCompiler = {
             errors.push({
                 ...this.createError(content, overrideError.offset, overrideError.message, overrideError.endOffset),
                 ...overrideError
+            });
+        }
+
+        for(const contractError of LgdContractChecker.check(content, found, externals))
+        {
+            if(contractError.code === 'lgd.contract.unknownType')
+            {
+                const duplicate = errors.findIndex(error => error.offset === contractError.offset && error.message.startsWith('Unknown type '));
+                if(duplicate !== -1)
+                {
+                    errors.splice(duplicate, 1);
+                }
+            }
+
+            errors.push({
+                ...this.createError(content, contractError.offset, contractError.message, contractError.endOffset),
+                ...contractError
             });
         }
 
@@ -350,9 +407,10 @@ const LgdCompiler = {
             });
             output += gap;
 
-            if(declaration.kind === 'class')
+            if(declaration.kind === 'class' || declaration.kind === 'interface')
             {
-                const lowered = LgdClassSyntax.emit(content, backend, declaration, this);
+                const emitter = backend.objectModel === 'class' ? LgdNativeClassEmitter : LgdClassSyntax;
+                const lowered = emitter.emit(content, backend, declaration, this);
                 for(const segment of lowered.segments)
                 {
                     segments.push(this.shiftSegment(segment, output.length));
