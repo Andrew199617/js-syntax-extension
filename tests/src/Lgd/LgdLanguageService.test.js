@@ -1,3 +1,6 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
@@ -180,5 +183,64 @@ describe('LgdLanguageService asynchronous lifecycle', () =>
         await service.updateDocument(document);
         expect(state.jsDocument.getText()).toContain('let label = "ready";');
         expect(setCalls).toHaveLength(2);
+    });
+});
+
+describe('LgdLanguageService cross-file source reading', () =>
+{
+    let directory;
+
+    beforeEach(async () =>
+    {
+        directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lgd-editor-'));
+    });
+
+    afterEach(async () =>
+    {
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    });
+
+    test('reads the real exported declaration and its create-assigned members from disk', async () =>
+    {
+        const { service } = createService();
+        const sourcePath = path.join(directory, 'Service.lgd');
+        await fs.promises.writeFile(sourcePath, [
+            'Number Wrong = 1;',
+            '// module.exports = Wrong;',
+            'String sample = "module.exports = Wrong;";',
+            'Object Service = { create() { this.ready = true; return this; }, run() {} };',
+            'module.exports = Service;'
+        ].join('\n'));
+
+        const exported = await service.readExportDeclaration(sourcePath);
+
+        expect(exported.name).toBe('Service');
+        expect(exported.members.map(member => member.name)).toEqual([ 'create', 'run', 'ready' ]);
+    });
+
+    test('prefers current open LGD text over stale disk exports', async () =>
+    {
+        const { service } = createService();
+        const sourcePath = path.join(directory, 'Service.lgd');
+        await fs.promises.writeFile(sourcePath, 'Number Service = 1;\nmodule.exports = Service;');
+        const document = makeTextDocument(`file://${sourcePath}`, 'String Service = "updated";\nmodule.exports = Service;');
+        await service.openDocument(document);
+
+        expect((await service.readExportDeclaration(sourcePath)).typeName).toBe('String');
+    });
+
+    test('only executable relative require calls contribute external types', async () =>
+    {
+        const { service } = createService();
+        await fs.promises.writeFile(path.join(directory, 'Value.lgd'), 'Number Value = 1;\nmodule.exports = Value;');
+        const document = makeTextDocument(`file://${path.join(directory, 'Main.lgd')}`, [
+            '// require("./Commented.js")',
+            'String example = "require(\'./Quoted.js\')";',
+            'Number actual = require("./Value.js");'
+        ].join('\n'));
+        const readExport = jest.spyOn(service, 'readExportDeclaration');
+
+        expect((await service.collectExternalTypes(document)).get('./Value.js')).toEqual({ exportName: 'Value', keyword: 'Number' });
+        expect(readExport).toHaveBeenCalledTimes(1);
     });
 });

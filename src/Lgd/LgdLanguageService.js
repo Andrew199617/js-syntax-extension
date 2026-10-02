@@ -271,24 +271,25 @@ const LgdLanguageService = {
      */
     async readExportDeclaration(sourcePath)
     {
+        const openState = [...this.states.values()].find(state => state.document.uri.fsPath === sourcePath);
         let targetText;
         try
         {
-            targetText = await fs.promises.readFile(sourcePath, 'utf8');
+            targetText = openState ? openState.document.getText() : await fs.promises.readFile(sourcePath, 'utf8');
         }
         catch
         {
             return null;
         }
 
-        const exportMatch = (/module\.exports\s*=\s*(?<name>[$A-Z_a-z][\w$]*)/).exec(targetText);
+        const exportMatch = (/\bmodule\.exports\s*=\s*(?<name>[$A-Z_a-z][\w$]*)\s*(?:;|$)/).exec(maskCode(targetText, true));
         if(!exportMatch)
         {
             return null;
         }
 
         const parsed = this.compiler.parse(targetText);
-        const declaration = parsed.allDeclarations.find(candidate => candidate.name === exportMatch[1]);
+        const declaration = parsed.declarations.find(candidate => candidate.name === exportMatch.groups.name);
         if(!declaration)
         {
             return null;
@@ -299,7 +300,11 @@ const LgdLanguageService = {
             name: declaration.name,
             typeName: declaration.typeName,
             keyword: keywords.includes(declaration.typeName) ? declaration.typeName : 'Object',
-            members: declaration.members || []
+            members: this.getObjectMembers(declaration),
+            sourcePath: sourcePath,
+            sourceText: targetText,
+            nameStart: declaration.nameStart,
+            nameEnd: declaration.nameEnd
         };
     },
 
@@ -312,10 +317,18 @@ const LgdLanguageService = {
     {
         const externals = new Map();
         const fromDir = path.dirname(document.uri.fsPath);
+        const text = document.getText();
+        const code = maskCode(text, true);
         const pattern = /\brequire\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\)/g;
-        let match = pattern.exec(document.getText());
+        let match = pattern.exec(text);
         while(match)
         {
+            if(!code.startsWith('require', match.index))
+            {
+                match = pattern.exec(text);
+                continue;
+            }
+
             const spec = match.groups.spec;
             if(!externals.has(spec))
             {
@@ -327,7 +340,7 @@ const LgdLanguageService = {
                 }
             }
 
-            match = pattern.exec(document.getText());
+            match = pattern.exec(text);
         }
 
         return externals;
