@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const LgdExportCache = require('./LgdExportCache');
+const createLgdDiagnostics = require('./LgdDiagnostics');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
 const { maskCode } = require('../Compilers/LgdInfer');
@@ -195,6 +196,7 @@ const LgdLanguageService = {
         }
 
         state.compiledVersion = version;
+        state.compiledText = content;
         state.externals = externals;
         this.publishDiagnostics(state);
         return state;
@@ -243,25 +245,7 @@ const LgdLanguageService = {
      */
     publishDiagnostics(state)
     {
-        const text = state.document.getText();
-        const diagnostics = state.errors.map(error =>
-        {
-            const position = state.document.positionAt(Math.min(error.offset, text.length));
-            const lineRange = state.document.lineAt(position.line).range;
-            const end = Number.isInteger(error.endOffset)
-                ? state.document.positionAt(Math.min(Math.max(error.offset, error.endOffset), text.length))
-                : lineRange.end;
-            const severity = error.severity === 'warning' ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error;
-            const diagnostic = new vscode.Diagnostic(
-                new vscode.Range(position, end),
-                `LGD: ${error.message}`,
-                severity
-            );
-            diagnostic.source = 'LGD';
-            return diagnostic;
-        });
-
-        this.diagnosticCollection.set(state.document.uri, diagnostics);
+        this.diagnosticCollection.set(state.document.uri, createLgdDiagnostics(state.document, state.errors));
     },
 
     /**
@@ -355,6 +339,8 @@ const LgdLanguageService = {
                     const entry = { exportName: exported.name, keyword: exported.keyword };
                     if(exported.keyword === 'Object')
                     {
+                        entry.sourcePath = exported.sourcePath;
+                        entry.sourceText = exported.sourceText;
                         entry.kind = exported.kind;
                         entry.baseName = exported.baseName;
                         entry.members = exported.members;

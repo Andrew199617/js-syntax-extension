@@ -38,7 +38,13 @@ describe('LGD base constructor verification.', () =>
     {
         const source = classSource('Number amount', argumentsText);
         const start = source.indexOf('base(') + 'base('.length;
-        expect(checkSource(source)).toEqual([{ offset: start, endOffset: start + argumentsText.length, message: message }]);
+        const expected = { offset: start, endOffset: start + argumentsText.length, message: message, code: 'lgd.base.argumentCount' };
+        if(argumentsText === '1, 2')
+        {
+            expected.quickFix = { kind: 'removeExtraBaseArguments', offset: start + 1, endOffset: start + argumentsText.length };
+        }
+
+        expect(checkSource(source)).toEqual([expected]);
     });
 
     test('Reports a literal mismatch at the exact argument offset.', () =>

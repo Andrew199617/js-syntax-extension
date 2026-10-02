@@ -397,9 +397,20 @@ function checkArguments(context)
 
         const offset = derived.constructorMember?.baseArgumentsStart;
         const explicitBaseCall = Number.isInteger(offset) && offset >= 0;
-        errors.push({ offset: explicitBaseCall ? offset : derived.baseStart,
+        const error = { offset: explicitBaseCall ? offset : derived.baseStart,
             endOffset: explicitBaseCall ? derived.constructorMember.baseArgumentsEnd : derived.baseEnd,
-            message: `Base '${derived.baseName}' expects ${expected} argument(s), but received ${args.length}.` });
+            message: `Base '${derived.baseName}' expects ${expected} argument(s), but received ${args.length}.`,
+            code: 'lgd.base.argumentCount' };
+        if(explicitBaseCall && args.length > maximum)
+        {
+            error.quickFix = {
+                kind: 'removeExtraBaseArguments',
+                offset: maximum === 0 ? offset : args[maximum - 1].endOffset,
+                endOffset: derived.constructorMember.baseArgumentsEnd
+            };
+        }
+
+        errors.push(error);
     }
 
     const limit = spread === -1 ? args.length : spread;

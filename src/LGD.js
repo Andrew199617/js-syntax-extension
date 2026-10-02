@@ -22,6 +22,7 @@ const LgdHoverProvider = require('./Lgd/LgdHoverProvider');
 const LgdDefinitionProvider = require('./Lgd/LgdDefinitionProvider');
 const LgdReferenceProvider = require('./Lgd/LgdReferenceProvider');
 const LgdCompletionProvider = require('./Lgd/LgdCompletionProvider');
+const LgdCodeActionProvider = require('./Lgd/LgdCodeActionProvider');
 const LgdSemanticTokensProvider = require('./Lgd/LgdSemanticTokensProvider');
 const LgdCompiler = require('./Compilers/LgdCompiler');
 const LgdTransform = require('./Parsers/LgdTransform');
@@ -319,6 +320,14 @@ function activate(context)
         '.'
     );
 
+    const lgdCodeActions = LgdCodeActionProvider.create(lgd.languageService);
+    lgdCodeActions.registerCommands(context.subscriptions);
+    const lgdCodeActionProvider = vscode.languages.registerCodeActionsProvider(
+        LGD_DOCUMENT_SELECTOR,
+        lgdCodeActions,
+        { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] }
+    );
+
     const lgdSemanticTokensProvider = vscode.languages.registerDocumentSemanticTokensProvider(
         LGD_DOCUMENT_SELECTOR,
         LgdSemanticTokensProvider.create(lgd.languageService),
@@ -329,6 +338,7 @@ function activate(context)
     context.subscriptions.push(lgdDefinitionProvider);
     context.subscriptions.push(lgdReferenceProvider);
     context.subscriptions.push(lgdCompletionProvider);
+    context.subscriptions.push(lgdCodeActionProvider);
     context.subscriptions.push(lgdSemanticTokensProvider);
 
     // The open event fires before activation when it triggers it, so pick up

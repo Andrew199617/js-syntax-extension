@@ -237,15 +237,17 @@ function describeMethods(content, declarations, declaration, externals = new Map
  * @param {Array} errors the collected diagnostics.
  * @param {Object} member the source member.
  * @param {string} message the diagnostic message.
+ * @param {Object} details the diagnostic code and optional fix metadata.
  * @returns {void}
  */
-function addError(errors, member, message)
+function addError(errors, member, message, details = {})
 {
     const hasOverrideSpan = member.override && Number.isInteger(member.overrideStart) && Number.isInteger(member.overrideEnd);
     errors.push({
         offset: hasOverrideSpan ? member.overrideStart : member.nameStart,
         endOffset: hasOverrideSpan ? member.overrideEnd : member.nameEnd,
-        message: message
+        message: message,
+        ...details
     });
 }
 
@@ -360,11 +362,17 @@ function check(content, declarations, externals = new Map())
 
             if(!baseMember.virtual || baseMember.kind !== 'method')
             {
-                addError(errors, member, `Cannot override non-virtual inherited member '${member.name}'; declare the base method virtual first.`);
+                addError(errors, member, `Cannot override non-virtual inherited member '${member.name}'; declare the base method virtual first.`, {
+                    code: 'lgd.override.nonVirtual',
+                    quickFix: { kind: 'makeBaseVirtual', declarationStart: declaration.headStart, methodName: member.name }
+                });
             }
             else if(!member.override)
             {
-                addError(errors, member, `Method '${member.name}' overrides an inherited virtual method and requires the override keyword.`);
+                addError(errors, member, `Method '${member.name}' overrides an inherited virtual method and requires the override keyword.`, {
+                    code: 'lgd.override.required',
+                    quickFix: { kind: 'addOverride', offset: member.start, endOffset: member.start }
+                });
             }
             else
             {

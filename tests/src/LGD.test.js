@@ -341,6 +341,14 @@ test('actual content changes report parser errors without popups', async () =>
     expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
 });
 
+test('registers diagnostic quick fixes for file-backed LGD source', () =>
+{
+    const registration = vscode.languages.registerCodeActionsProvider.mock.calls.find(([selector]) => selector.language === 'lgd');
+    expect(registration[0]).toEqual({ scheme: 'file', language: 'lgd' });
+    expect(registration[2]).toEqual({ providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] });
+    expect(vscode.commands.registerCommand.mock.calls.some(([name]) => name === 'lgd.applyDiagnosticQuickFix')).toBe(true);
+});
+
 describe.each([ 'posix', 'win32' ])('output paths using %s', platform =>
 {
     beforeEach(() =>

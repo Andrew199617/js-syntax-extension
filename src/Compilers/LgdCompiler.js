@@ -188,12 +188,18 @@ const LgdCompiler = {
 
         for(const baseError of LgdBaseChecker.check(content, found, externals))
         {
-            errors.push(this.createError(content, baseError.offset, baseError.message, baseError.endOffset));
+            errors.push({
+                ...this.createError(content, baseError.offset, baseError.message, baseError.endOffset),
+                ...baseError
+            });
         }
 
         for(const overrideError of LgdOverrideChecker.check(content, found, externals))
         {
-            errors.push(this.createError(content, overrideError.offset, overrideError.message, overrideError.endOffset));
+            errors.push({
+                ...this.createError(content, overrideError.offset, overrideError.message, overrideError.endOffset),
+                ...overrideError
+            });
         }
 
         for(const warning of LgdReturnDocChecker.check(content, found))
