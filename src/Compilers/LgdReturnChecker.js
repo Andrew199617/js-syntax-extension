@@ -155,9 +155,33 @@ const LgdReturnChecker = {
             return ['null'];
         }
 
-        if(node.type === 'NewExpression' || node.type === 'RegExpLiteral')
+        if(node.type === 'NewExpression')
+        {
+            const nativeConstructor = node.callee.type === 'Identifier' && !path.scope.getBinding(node.callee.name);
+            if(nativeConstructor && [ 'Array', 'Function' ].includes(node.callee.name))
+            {
+                return [node.callee.name];
+            }
+
+            const expected = signature.group.returnTypeName;
+            const primitive = [ 'void', 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object' ].includes(expected);
+            return [primitive ? 'Object' : UNKNOWN];
+        }
+
+        if(node.type === 'RegExpLiteral')
         {
             return ['Object'];
+        }
+
+        if(node.type === 'ThisExpression')
+        {
+            const owner = signature.declaration.name;
+            return [signature.group.returnTypeName === owner ? owner : 'Object'];
+        }
+
+        if(node.type === 'AssignmentExpression' && node.operator === '=')
+        {
+            return this.expressionTypes(path.get('right'), signature, context, visited);
         }
 
         if(node.type === 'UnaryExpression' && node.operator === 'void')

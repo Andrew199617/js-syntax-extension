@@ -49,24 +49,39 @@ const LgdReturnFlow = {
             case 'ForStatement':
             case 'ForInStatement':
             case 'ForOfStatement': return this.loop(node);
-            case 'LabeledStatement':
-            {
-                const outcomes = this.statement(node.body);
-                if(outcomes.delete(`break:${node.label.name}`))
-                {
-                    outcomes.add('normal');
-                }
-
-                if(outcomes.delete(`continue:${node.label.name}`))
-                {
-                    outcomes.add('normal');
-                }
-
-                return outcomes;
-            }
+            case 'LabeledStatement': return this.labeled(node);
 
             default: return new Set(['normal']);
         }
+    },
+
+    /** @description Associates stacked labels with their loop before consuming labeled exits. */
+    labeled(node)
+    {
+        const labels = [];
+        let target = node;
+        while(target.type === 'LabeledStatement')
+        {
+            labels.push(target.label.name);
+            target = target.body;
+        }
+
+        const loopTypes = [ 'WhileStatement', 'DoWhileStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement' ];
+        if(loopTypes.includes(target.type))
+        {
+            return this.loop(target, labels);
+        }
+
+        const outcomes = this.statement(target);
+        for(const label of labels)
+        {
+            if(outcomes.delete(`break:${label}`))
+            {
+                outcomes.add('normal');
+            }
+        }
+
+        return outcomes;
     },
 
     /** @description Accounts for catch paths and finally blocks that replace earlier exits. */
@@ -118,11 +133,17 @@ const LgdReturnFlow = {
     },
 
     /** @description Distinguishes potentially skipped loops from loops with no normal exit. */
-    loop(node)
+    loop(node, labels = [])
     {
         const outcomes = this.statement(node.body);
-        const canBreak = outcomes.delete('break');
-        const canContinue = outcomes.delete('continue');
+        let canBreak = outcomes.delete('break');
+        let canContinue = outcomes.delete('continue');
+        for(const label of labels)
+        {
+            canBreak = outcomes.delete(`break:${label}`) || canBreak;
+            canContinue = outcomes.delete(`continue:${label}`) || canContinue;
+        }
+
         const canComplete = outcomes.delete('normal');
         const endlessFor = node.type === 'ForStatement' && !node.test;
         const alwaysTrue = node.test && node.test.type === 'BooleanLiteral' && node.test.value;

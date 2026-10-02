@@ -33,6 +33,10 @@ describe('LGD explicit named return types.', () =>
         [ 'void reset() { return 1; }', 'Cannot return Number' ],
         [ 'void reset() { return []; }', 'Cannot return Array' ],
         [ 'void reset() { return new Date(); }', 'Cannot return Object' ],
+        [ 'void reset() { return this; }', 'Cannot return Object' ],
+        [ 'async void reset() { return this; }', 'Cannot return Object' ],
+        [ 'void reset() { let result; return result = 3; }', 'Cannot return Number' ],
+        [ 'Number count() { outer: for(;;) { break outer; } }', 'must return Number' ],
         [ 'Number count(String label) { return label; }', 'Cannot return String' ],
         [ 'Number count(...Number values) { return values; }', 'Cannot return Array' ],
         [ 'Number count(Number value) { switch(value) { case 1: return 1; default: break; } }', 'must return Number' ],
@@ -58,7 +62,9 @@ describe('LGD explicit named return types.', () =>
         'Number count() { if(true) return 1; }',
         'Number count(Number value) { switch(value) { case 0: case 1: return 1; default: return 2; } }',
         'Number count() { try { return 1; } finally { console.log("done"); } }',
-        'Number count() { for(;;) {} }'
+        'Number count() { for(;;) {} }',
+        'Number count() { outer: while(true) { continue outer; } }',
+        'Number count() { outer: inner: for(;;) { continue outer; } }'
     ])('Accepts valid completion paths: %s.', method =>
     {
         expect(compile(method).errors).toEqual([]);
@@ -81,6 +87,14 @@ describe('LGD explicit named return types.', () =>
     ])('Still rejects incompatible operator-derived returns: %s.', (method, message) =>
     {
         expect(compile(method).errors[0].message).toContain(message);
+    });
+
+    test('Recognizes native Array and Function construction without confusing shadowed constructors.', () =>
+    {
+        expect(compile('Array items() { return new Array(2); }').errors).toEqual([]);
+        expect(compile('Function callback() { return new Function("return 2"); }').errors).toEqual([]);
+        const unknown = compile('Array items(Function Array) { return new Array(); }');
+        expect(unknown.errors).toEqual([]);
     });
 
     test('Excludes nested returns and honors actual lexical binding shadowing.', () =>
