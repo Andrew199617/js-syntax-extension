@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const manifest = require('../../../package.json');
 const { makeTextDocument } = require('./fakeVscode');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
 const LgdSemanticTokensProvider = require('../../../src/Lgd/LgdSemanticTokensProvider');
@@ -54,6 +55,13 @@ beforeEach(() =>
 
 describe('LgdSemanticTokensProvider', () =>
 {
+    test('enables LGD semantic tokens by default while leaving theme colors unchanged', () =>
+    {
+        const defaults = manifest.contributes.configurationDefaults;
+        expect(defaults['[lgd]']).toEqual({ 'editor.semanticHighlighting.enabled': true });
+        expect(defaults['editor.semanticHighlighting.enabled']).toBeUndefined();
+    });
+
     test('reports class tokens for typed parameter types.', async () =>
     {
         const { service, document } = await openTypedDocument();
