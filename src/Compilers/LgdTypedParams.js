@@ -845,6 +845,8 @@ function typedParamGroupsForOutput(declaration, segments)
 }
 
 module.exports = {
+    isRegexStart: isRegexStart,
+    skipRegexLiteral: skipRegexLiteral,
     parseTypedParams: parseTypedParams,
     parseObjectMethodParams: parseObjectMethodParams,
     splitTopLevelChunks: splitTopLevelChunks,

@@ -2,7 +2,8 @@ const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
 const LgdTypeChecker = require('./LgdTypeChecker');
-const { parseTypedParams, parseObjectMethodParams, splitTopLevelChunks } = require('./LgdTypedParams');
+const { parseTypedParams, parseObjectMethodParams, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
+const { maskCode } = require('./LgdInfer');
 
 /** @description Matches a declaration type name: Number, a declared name (GoToNextParagraph), or a dotted type (vscode.Command); the final segment must be capitalized. */
 const typeNamePattern = String.raw`(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*`;
@@ -104,9 +105,10 @@ const LgdCompiler = {
     {
         const found = [];
         const errors = [];
+        const masked = maskCode(content, true);
         const failedHeadStarts = [];
         declarationHeadPattern.lastIndex = 0;
-        let headMatch = declarationHeadPattern.exec(content);
+        let headMatch = declarationHeadPattern.exec(masked);
         while(headMatch)
         {
             const head = headMatch.groups;
@@ -118,7 +120,7 @@ const LgdCompiler = {
             {
                 errors.push(this.createError(content, headStart, scan.error));
                 failedHeadStarts.push(headStart);
-                headMatch = declarationHeadPattern.exec(content);
+                headMatch = declarationHeadPattern.exec(masked);
                 continue;
             }
 
@@ -127,7 +129,7 @@ const LgdCompiler = {
             {
                 errors.push(this.createError(content, headStart, 'Unexpected "=" in typed declaration.'));
                 failedHeadStarts.push(headStart);
-                headMatch = declarationHeadPattern.exec(content);
+                headMatch = declarationHeadPattern.exec(masked);
                 continue;
             }
 
@@ -165,10 +167,10 @@ const LgdCompiler = {
                 methodTypedParams: parseObjectMethodParams(initializerText),
                 children: []
             });
-            headMatch = declarationHeadPattern.exec(content);
+            headMatch = declarationHeadPattern.exec(masked);
         }
 
-        this.collectMalformedErrors(content, found, failedHeadStarts, errors);
+        this.collectMalformedErrors(masked, found, failedHeadStarts, errors);
 
         for(const typeError of LgdTypeChecker.checkTypes(content, found, externals))
         {
@@ -511,6 +513,14 @@ const LgdCompiler = {
                 {
                     modes.push('block');
                     index++;
+                }
+                else if(character === '/' && isRegexStart(content, index))
+                {
+                    const regexEnd = skipRegexLiteral(content, index);
+                    if(regexEnd !== -1)
+                    {
+                        index = regexEnd - 1;
+                    }
                 }
                 else if(character === '(' || character === '[' || character === '{')
                 {

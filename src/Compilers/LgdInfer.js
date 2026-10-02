@@ -7,6 +7,8 @@
  * Unknown, which never produces a type error.
  */
 
+const { isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
+
 /** @description Marks an expression whose type cannot be determined; never an error. */
 const UNKNOWN = 'Unknown';
 
@@ -44,76 +46,98 @@ const precedenceMultiplicative = 9;
 const maxOperatorWidth = 3;
 
 
-function maskCode(text)
+/**
+ * @description Masks literal and comment contents without changing source offsets.
+ * @param {string} text the source text to mask.
+ * @param {boolean} preserveTemplateExpressions whether executable template expressions remain visible.
+ * @returns {string} the masked source text.
+ */
+function maskCode(text, preserveTemplateExpressions = false)
 {
-    const output = [];
-    let mode = 'code';
+    const output = text.split('');
+    const modes = ['code'];
+    const templateDepths = [];
+    let depth = 0;
     for(let index = 0; index < text.length; index++)
     {
+        const mode = modes[modes.length - 1];
         const character = text[index];
-        const next = index + 1 < text.length ? text[index + 1] : '';
+        const next = text[index + 1];
         if(mode === 'code')
         {
             if(character === "'" || character === '"' || character === '`')
             {
-                mode = character;
-                output.push(character);
+                modes.push(character);
             }
-            else if(character === '/' && next === '/')
+            else if(character === '/' && (next === '/' || next === '*'))
             {
-                mode = 'line';
-                output.push(' ', ' ');
+                modes.push(next === '/' ? 'line' : 'block');
+                output[index] = ' ';
+                output[++index] = ' ';
+            }
+            else if(character === '/' && isRegexStart(text, index))
+            {
+                const end = skipRegexLiteral(text, index);
+                if(end !== -1)
+                {
+                    output.fill(' ', index, end);
+                    index = end - 1;
+                }
+            }
+            else if(character === '{')
+            {
+                depth++;
+            }
+            else if(character === '}')
+            {
+                depth--;
+                if(templateDepths.length > 0 && templateDepths[templateDepths.length - 1] === depth)
+                {
+                    templateDepths.pop();
+                    modes.pop();
+                }
+            }
+
+            continue;
+        }
+
+        if(mode === 'line' && character === '\n')
+        {
+            modes.pop();
+        }
+        else if(mode === 'block' && character === '*' && next === '/')
+        {
+            output[index] = ' ';
+            output[++index] = ' ';
+            modes.pop();
+        }
+        else if(mode !== 'line' && mode !== 'block' && character === mode)
+        {
+            modes.pop();
+        }
+        else if(mode !== 'line' && mode !== 'block' && character === '\\')
+        {
+            output[index] = ' ';
+            if(index + 1 < text.length)
+            {
                 index++;
-            }
-            else if(character === '/' && next === '*')
-            {
-                mode = 'block';
-                output.push(' ', ' ');
-                index++;
-            }
-            else
-            {
-                output.push(character);
+                if(text[index] !== '\n' && text[index] !== '\r')
+                {
+                    output[index] = ' ';
+                }
             }
         }
-        else if(mode === 'line')
+        else if(mode === '`' && preserveTemplateExpressions && character === '$' && next === '{')
         {
-            if(character === '\n')
-            {
-                mode = 'code';
-                output.push(character);
-            }
-            else
-            {
-                output.push(' ');
-            }
-        }
-        else if(mode === 'block')
-        {
-            if(character === '*' && next === '/')
-            {
-                mode = 'code';
-                output.push(' ', ' ');
-                index++;
-            }
-            else
-            {
-                output.push(character === '\n' ? '\n' : ' ');
-            }
-        }
-        else if(character === '\\')
-        {
-            output.push(' ', ' ');
+            output[index] = ' ';
+            templateDepths.push(depth);
+            depth++;
+            modes.push('code');
             index++;
         }
-        else if(character === mode)
+        else if(character !== '\n' && character !== '\r')
         {
-            mode = 'code';
-            output.push(character);
-        }
-        else
-        {
-            output.push(character === '\n' ? '\n' : ' ');
+            output[index] = ' ';
         }
     }
 
