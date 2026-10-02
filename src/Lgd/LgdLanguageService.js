@@ -1,6 +1,6 @@
 const vscode = require('vscode');
 const path = require('path');
-const fs = require('fs');
+const LgdExportCache = require('./LgdExportCache');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
 const { maskCode } = require('../Compilers/LgdInfer');
@@ -34,6 +34,12 @@ const LgdLanguageService = {
 
         /** @description Settled recompile promises by uri string, serializing updates per document. */
         service.pendingUpdates = new Map();
+        service.openStatesByPath = new Map();
+        service.exportCache = new Map();
+        service.sourceVersions = new Map();
+        service.dependencies = new Map();
+        service.dependents = new Map();
+        service.pendingDependencyUpdates = Promise.resolve();
 
         return service;
     },
@@ -51,6 +57,7 @@ const LgdLanguageService = {
             this.states.set(key, { document: document, jsDocument: null, map: null, errors: [], declarations: [] });
         }
 
+        this.openStatesByPath.set(document.uri.fsPath, this.states.get(key));
         return this.updateDocument(document);
     },
 
@@ -58,13 +65,14 @@ const LgdLanguageService = {
      * @description Recompiles an LGD document after it changed, serialized per document.
      * The returned promise rejects when the recompile fails; the stored chain always settles.
      * @param {TextDocument} document the LGD document.
+     * @param {boolean} refreshDependents whether its changed exports should recheck consumers.
      * @returns {Promise<Object|null>} the document state.
      */
-    updateDocument(document)
+    updateDocument(document, refreshDependents = true)
     {
         const key = document.uri.toString();
         const pending = this.pendingUpdates.get(key) || Promise.resolve();
-        const next = this.applyUpdate(document, this.states.get(key), pending);
+        const next = this.applyUpdate(document, this.states.get(key), { pending: pending, refreshDependents: refreshDependents });
         this.pendingUpdates.set(key, this.trackSettled(next));
         return next;
     },
@@ -73,19 +81,26 @@ const LgdLanguageService = {
      * @description Waits for the previous update, then recompiles the document.
      * @param {TextDocument} document the LGD document.
      * @param {Object|undefined} state the document state captured before queuing.
-     * @param {Promise<void>} pending the previous update.
+     * @param {Object} update the previous promise and dependent-refresh choice.
      * @returns {Promise<Object|null>} the document state.
      */
-    async applyUpdate(document, state, pending)
+    async applyUpdate(document, state, update)
     {
-        await pending;
+        await update.pending;
         if(!state || this.getState(document.uri) !== state)
         {
             return null;
         }
 
         state.document = document;
-        return this.recompile(state);
+        const previousSignature = this.exportCache.get(document.uri.fsPath)?.signature;
+        const result = await this.recompile(state);
+        if(result && update.refreshDependents)
+        {
+            this.queueDependencyRefresh(document.uri.fsPath, previousSignature);
+        }
+
+        return result;
     },
 
     /**
@@ -114,8 +129,10 @@ const LgdLanguageService = {
     {
         const key = document.uri.toString();
         this.states.delete(key);
+        this.openStatesByPath.delete(document.uri.fsPath);
         this.pendingUpdates.delete(key);
         this.diagnosticCollection.delete(document.uri);
+        this.invalidateFile(document.uri.fsPath);
     },
 
     /**
@@ -171,6 +188,12 @@ const LgdLanguageService = {
         }
 
         this.applyCompilation(state, result);
+        const cached = this.exportCache.get(state.document.uri.fsPath);
+        if(!cached || cached.sourceText !== content)
+        {
+            this.exportCache.set(state.document.uri.fsPath, { sourceText: content, parsed: result });
+        }
+
         state.compiledVersion = version;
         state.externals = externals;
         this.publishDiagnostics(state);
@@ -276,64 +299,21 @@ const LgdLanguageService = {
         return `${candidate}.lgd`;
     },
 
-    /**
-     * @description Reads a sibling .lgd file and finds the declaration it exports.
-     * Unreadable files and files without a plain `module.exports = Name` export yield null.
-     * @param {string} sourcePath the absolute .lgd source path.
-     * @param {Set} visited the source paths already being resolved, to stop circular imports.
-     * @returns {Object|null} the exported type, constructor signature and source location, or null.
-     */
-    async readExportDeclaration(sourcePath, visited = new Set())
-    {
-        if(visited.has(sourcePath))
-        {
-            return null;
-        }
+    readSourceEntry(sourcePath) { return LgdExportCache.readSourceEntry(this, sourcePath); },
 
-        const resolving = new Set(visited);
-        resolving.add(sourcePath);
-        const openState = [...this.states.values()].find(state => state.document.uri.fsPath === sourcePath);
-        let targetText;
-        try
-        {
-            targetText = openState ? openState.document.getText() : await fs.promises.readFile(sourcePath, 'utf8');
-        }
-        catch
-        {
-            return null;
-        }
+    replaceDependencies(sourcePath, dependencies) { return LgdExportCache.replaceDependencies(this, sourcePath, dependencies); },
 
-        const exportMatch = (/\bmodule\.exports\s*=\s*(?<name>[$A-Z_a-z][\w$]*)\s*(?:;|$)/).exec(maskCode(targetText, true));
-        if(!exportMatch)
-        {
-            return null;
-        }
+    exportSignature(exported) { return LgdExportCache.exportSignature(this, exported); },
 
-        const parsed = this.compiler.parse(targetText);
-        const declaration = parsed.declarations.find(candidate => candidate.name === exportMatch.groups.name);
-        if(!declaration)
-        {
-            return null;
-        }
+    invalidateFile(sourcePath) { return LgdExportCache.invalidateFile(this, sourcePath); },
 
-        const document = { uri: { fsPath: sourcePath }, getText: () => targetText };
-        const externals = declaration.baseName ? await this.collectExternalTypes(document, resolving) : new Map();
-        const context = { declarations: parsed.allDeclarations, externals: externals, sourceText: targetText };
-        const keywords = [ 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object', 'Array', 'Function' ];
-        return {
-            name: declaration.name,
-            typeName: declaration.typeName,
-            keyword: keywords.includes(declaration.typeName) ? declaration.typeName : 'Object',
-            kind: declaration.kind,
-            baseName: declaration.baseName,
-            constructorParams: getConstructorParams(declaration),
-            members: this.getDeclaredMembers(declaration, context),
-            sourcePath: sourcePath,
-            sourceText: targetText,
-            nameStart: declaration.nameStart,
-            nameEnd: declaration.nameEnd
-        };
-    },
+    queueDependencyRefresh(sourcePath, previousSignature) { return LgdExportCache.queueDependencyRefresh(this, sourcePath, previousSignature); },
+
+    invalidateDependentExports(sourcePath) { return LgdExportCache.invalidateDependentExports(this, sourcePath); },
+
+    refreshDependents(sourcePath, previousSignature) { return LgdExportCache.refreshDependents(this, sourcePath, previousSignature); },
+
+    readExportDeclaration(sourcePath, visited = new Set()) { return LgdExportCache.readExportDeclaration(this, sourcePath, visited); },
 
     /**
      * @description Builds the cross-file type map for a document's relative requires.
@@ -344,6 +324,7 @@ const LgdLanguageService = {
     async collectExternalTypes(document, visited = new Set())
     {
         const externals = new Map();
+        const dependencies = new Set();
         const fromDir = path.dirname(document.uri.fsPath);
         const resolving = new Set(visited);
         resolving.add(document.uri.fsPath);
@@ -363,6 +344,11 @@ const LgdLanguageService = {
             if(!externals.has(spec))
             {
                 const sourcePath = this.resolveLgdSourcePath(fromDir, spec);
+                if(sourcePath)
+                {
+                    dependencies.add(sourcePath);
+                }
+
                 const exported = sourcePath ? await this.readExportDeclaration(sourcePath, resolving) : null;
                 if(exported)
                 {
@@ -373,6 +359,8 @@ const LgdLanguageService = {
                         entry.baseName = exported.baseName;
                         entry.members = exported.members;
                         entry.constructorParams = exported.constructorParams;
+                        entry.methodSignatures = exported.methodSignatures;
+                        entry.methodsKnown = exported.methodsKnown;
                     }
 
                     externals.set(spec, entry);
@@ -382,6 +370,7 @@ const LgdLanguageService = {
             match = pattern.exec(text);
         }
 
+        this.replaceDependencies(document.uri.fsPath, dependencies);
         return externals;
     },
 

@@ -77,7 +77,7 @@ async function saveFiles(filenames, source = 'const Example = {\n  value: 1\n};'
 }
 
 jest.unmock('../../src/Errors/VscodeError');
-jest.mock('fs', () => ({ exists: jest.fn(), promises: { readFile: jest.fn() } }));
+jest.mock('fs', () => ({ exists: jest.fn(), promises: { readFile: jest.fn(), stat: jest.fn() } }));
 jest.mock('path', () => ({ ...jest.requireActual('path') }));
 jest.mock('../../src/Logging/FileIO', () => ({ writeFileContents: jest.fn(), rename: jest.fn() }));
 
@@ -101,6 +101,9 @@ jest.mock('vscode', () => ({
         rootPath: 'workspace',
         textDocuments: [],
         findFiles: jest.fn(),
+        createFileSystemWatcher: jest.fn(() => ({
+            onDidChange: jest.fn(), onDidCreate: jest.fn(), onDidDelete: jest.fn(), dispose: jest.fn()
+        })),
         onDidOpenTextDocument: jest.fn(),
         onDidSaveTextDocument: jest.fn(),
         onDidChangeTextDocument: jest.fn(),
@@ -139,6 +142,8 @@ beforeEach(() =>
     vscode.window.activeTextEditor = undefined;
     fs.exists.mockReset();
     fs.promises.readFile.mockReset();
+    fs.promises.stat.mockReset();
+    fs.promises.stat.mockResolvedValue({ mtimeMs: 1, ctimeMs: 1, size: 1 });
     FileIO.rename.mockReset();
     FileIO.writeFileContents.mockReset();
     FileIO.writeFileContents.mockResolvedValue();
@@ -421,6 +426,28 @@ test.each([
 ])('registers %s for file-backed LGD documents', registration =>
 {
     expect(vscode.languages[registration].mock.calls[0][0]).toEqual({ scheme: 'file', language: 'lgd' });
+});
+
+describe('LGD imported-file invalidation', () =>
+{
+    test.each([ 'onDidChange', 'onDidCreate', 'onDidDelete' ])('routes %s only for known dependencies or open documents', event =>
+    {
+        const registrations = vscode.workspace.createFileSystemWatcher.mock.results;
+        const watcher = registrations[registrations.length - 1].value;
+        const invalidate = jest.spyOn(lgd.languageService, 'invalidateFile').mockResolvedValue();
+        const dependency = { fsPath: path.join('workspace', 'Base.lgd') };
+        const opened = { fsPath: path.join('workspace', 'Open.lgd') };
+        const unrelated = { fsPath: path.join('workspace', 'Unrelated.lgd') };
+        lgd.languageService.dependents.set(dependency.fsPath, new Set(['Consumer.lgd']));
+        lgd.languageService.openStatesByPath.set(opened.fsPath, {});
+        const callback = watcher[event].mock.calls[0][0];
+        callback(unrelated);
+        callback(dependency);
+        callback(opened);
+
+        expect(invalidate.mock.calls).toEqual([ [dependency.fsPath], [opened.fsPath] ]);
+        expect(vscode.workspace.createFileSystemWatcher).toHaveBeenLastCalledWith('**/*.lgd');
+    });
 });
 
 describe('manual LGD compilation', () =>

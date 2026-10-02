@@ -351,6 +351,21 @@ function activate(context)
 
     context.subscriptions.push(didOpenLgdDocument);
 
+    const lgdFileWatcher = vscode.workspace.createFileSystemWatcher('**/*.lgd');
+    function invalidateLgdFile(uri)
+    {
+        const service = lgd.languageService;
+        if(service.openStatesByPath.has(uri.fsPath) || service.dependents.has(uri.fsPath))
+        {
+            runLgdTask(() => service.invalidateFile(uri.fsPath));
+        }
+    }
+
+    context.subscriptions.push(lgdFileWatcher);
+    context.subscriptions.push(lgdFileWatcher.onDidChange(invalidateLgdFile));
+    context.subscriptions.push(lgdFileWatcher.onDidCreate(invalidateLgdFile));
+    context.subscriptions.push(lgdFileWatcher.onDidDelete(invalidateLgdFile));
+
     if(lgd.configuration.autoComplete.enabled)
     {
         lgd.completionItemProvider = CompletionItemProvider.create();
