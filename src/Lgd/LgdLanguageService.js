@@ -61,7 +61,7 @@ const LgdLanguageService = {
     {
         const key = document.uri.toString();
         const pending = this.pendingUpdates.get(key) || Promise.resolve();
-        const next = this.applyUpdate(document, key, pending);
+        const next = this.applyUpdate(document, this.states.get(key), pending);
         this.pendingUpdates.set(key, this.trackSettled(next));
         return next;
     },
@@ -69,15 +69,14 @@ const LgdLanguageService = {
     /**
      * @description Waits for the previous update, then recompiles the document.
      * @param {TextDocument} document the LGD document.
-     * @param {string} key the document uri string.
+     * @param {Object|undefined} state the document state captured before queuing.
      * @param {Promise<void>} pending the previous update.
      * @returns {Promise<Object|null>} the document state.
      */
-    async applyUpdate(document, key, pending)
+    async applyUpdate(document, state, pending)
     {
         await pending;
-        const state = this.states.get(key);
-        if(!state)
+        if(!state || this.getState(document.uri) !== state)
         {
             return null;
         }
@@ -149,17 +148,27 @@ const LgdLanguageService = {
     {
         const content = state.document.getText();
         const externals = await this.collectExternalTypes(state.document);
+        if(this.getState(state.document.uri) !== state)
+        {
+            return null;
+        }
+
         const result = this.compiler.compileToJs(content, externals);
-        this.applyCompilation(state, result);
         await this.syncMirror(state, result.code);
+        if(this.getState(state.document.uri) !== state)
+        {
+            return null;
+        }
+
+        this.applyCompilation(state, result);
         this.publishDiagnostics(state);
         return state;
     },
 
     /**
      * @description Creates the JavaScript mirror on first compile, or refreshes its content.
-     * The mirror document is assigned on the stored state after the await, never on a
-     * reference captured before it, so concurrent readers cannot see a stale document.
+     * Only the same open-document state may receive the result after awaiting creation;
+     * closing and reopening a source must never attach an earlier mirror to the new state.
      * @param {Object} state the document state.
      * @param {string} code the compiled JavaScript.
      * @returns {Promise<void>}
@@ -174,16 +183,21 @@ const LgdLanguageService = {
                 state.jsDocument.positionAt(state.jsDocument.getText().length)
             );
             edit.replace(state.jsDocument.uri, fullRange, code);
-            await vscode.workspace.applyEdit(edit);
+            const applied = await vscode.workspace.applyEdit(edit);
+            if(!applied)
+            {
+                throw new Error('LGD: Could not update the JavaScript mirror.');
+            }
+
             return;
         }
 
         const created = await vscode.workspace.openTextDocument({ language: 'javascript', content: code });
         const key = state.document.uri.toString();
         const current = this.states.get(key);
-        if(current)
+        if(current === state)
         {
-            current.jsDocument = created;
+            state.jsDocument = created;
         }
     },
 

@@ -125,3 +125,60 @@ describe('LgdLanguageService', () =>
         expect(deleted).toEqual([document.uri]);
     });
 });
+
+describe('LgdLanguageService asynchronous lifecycle', () =>
+{
+    test('a closing document cannot publish diagnostics or replace a reopened mirror', async () =>
+    {
+        const { service, setCalls } = createService();
+        const original = makeTextDocument(LGD_URI, 'Number oldValue = 1;');
+        let releaseMirror;
+        let started;
+        const mirrorGate = new Promise(resolve =>
+        {
+            releaseMirror = resolve;
+        });
+        const mirrorStarted = new Promise(resolve =>
+        {
+            started = resolve;
+        });
+        vscode.workspace.openTextDocument.mockImplementationOnce(async options =>
+        {
+            started();
+            await mirrorGate;
+            return makeTextDocument('untitled:old-mirror', options.content);
+        });
+
+        const firstOpen = service.openDocument(original);
+        await mirrorStarted;
+        service.closeDocument(original);
+        const reopened = makeTextDocument(LGD_URI, 'String newValue = "ready";');
+        const current = await service.openDocument(reopened);
+        releaseMirror();
+        await firstOpen;
+
+        expect(service.getState(reopened.uri)).toBe(current);
+        expect(current.jsDocument.getText()).toContain('let newValue = "ready";');
+        expect(setCalls).toHaveLength(1);
+        expect(setCalls[0].uri).toBe(reopened.uri);
+    });
+
+    test('a rejected mirror edit does not install mappings for unapplied code', async () =>
+    {
+        const { service, errors, setCalls } = createService();
+        const document = makeTextDocument(LGD_URI, 'Number value = 1;');
+        const state = await service.openDocument(document);
+        const originalMap = state.map;
+        vscode.workspace.applyEdit.mockResolvedValueOnce(false);
+        document.setText('String label = "ready";');
+
+        await expect(service.updateDocument(document)).rejects.toThrow('JavaScript mirror');
+        expect(state.map).toBe(originalMap);
+        expect(setCalls).toHaveLength(1);
+        expect(errors).toHaveLength(1);
+
+        await service.updateDocument(document);
+        expect(state.jsDocument.getText()).toContain('let label = "ready";');
+        expect(setCalls).toHaveLength(2);
+    });
+});
