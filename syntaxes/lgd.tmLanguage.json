@@ -9,6 +9,9 @@
 			"include": "#class-declaration"
 		},
 		{
+			"include": "#method-modifier"
+		},
+		{
 			"include": "#typed-method"
 		},
 		{
@@ -27,6 +30,9 @@
 			"patterns": [
 				{
 					"include": "#class-declaration"
+				},
+				{
+					"include": "#method-modifier"
 				},
 				{
 					"include": "#typed-method"
@@ -108,12 +114,15 @@
 		},
 		"typed-method": {
 			"comment": "Color only the return prefix so native JavaScript rules still parse the method name and parameters.",
-			"match": "[ \\t]*\\b(?:(async)[ \\t]+)?(void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)(?=[ \\t]+[$_a-zA-Z][\\w$]*[ \\t]*\\()",
+			"match": "[ \\t]*\\b(?:(async)[ \\t]+)?(?:(void)|((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*))(?=[ \\t]+[$_a-zA-Z][\\w$]*[ \\t]*\\()",
 			"captures": {
 				"1": {
 					"name": "storage.modifier.async.lgd"
 				},
 				"2": {
+					"name": "storage.modifier.async.lgd"
+				},
+				"3": {
 					"name": "storage.type.lgd"
 				}
 			}
@@ -124,6 +133,15 @@
 			"captures": {
 				"1": {
 					"name": "storage.type.lgd"
+				}
+			}
+		},
+		"method-modifier": {
+			"comment": "Compile-only virtual and override modifiers; leave the signature to native method and LGD type rules.",
+			"match": "\\b(virtual|override)\\b(?=[ \\t]+(?:async[ \\t]+)?(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
+			"captures": {
+				"1": {
+					"name": "storage.modifier.lgd"
 				}
 			}
 		}

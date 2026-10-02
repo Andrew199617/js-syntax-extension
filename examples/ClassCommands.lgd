@@ -9,7 +9,7 @@ class BaseCommand {
         return this.command.command;
     }
 
-    executeCommand() {
+    virtual executeCommand() {
         return this.commandName;
     }
 }
@@ -19,7 +19,7 @@ class GoToAssignment : BaseCommand {
         this.enabled = true;
     }
 
-    async executeCommand() {
+    override async executeCommand() {
         return Oloo.base(this, "executeCommand");
     }
 }

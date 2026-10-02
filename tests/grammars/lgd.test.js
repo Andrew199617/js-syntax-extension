@@ -152,7 +152,7 @@ describe('LGD TextMate grammar.', () =>
     {
         const tokens = tokenize(grammar, 'class Counter {\n    Number count() { return 1; }\n    async void reset() {}\n}');
         assertScope(tokens, 'Number', typeScope);
-        assertScope(tokens, 'void', typeScope);
+        assertScope(tokens, 'void', 'storage.modifier.async.lgd');
         assertScope(tokens, 'count', 'entity.name.function.js');
         assertScope(tokens, 'reset', 'entity.name.function.js');
         assertNoScope(tokens, 'count', nameScope);
@@ -184,6 +184,27 @@ describe('LGD TextMate grammar.', () =>
     {
         const tokens = tokenize(grammar, '// class Example : Base {}\nconst example = `class Fake : Base {}`;');
         assert.ok(tokens.every(token => !token.scopes.includes('entity.name.type.class.lgd')));
+    });
+
+    test('Highlights virtual and override as modifiers without changing method or parameter scopes.', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'class Base {',
+            '    virtual async void executeCommand(String label) {}',
+            '}',
+            'class Derived : Base {',
+            '    override async void executeCommand(String label) {}',
+            '    async override String describe(Number count) { return String(count); }',
+            '}'
+        ].join('\n'));
+        assertScope(tokens, 'virtual', 'storage.modifier.lgd');
+        assertScope(tokens, 'override', 'storage.modifier.lgd');
+        assertScope(tokens, 'void', 'storage.modifier.async.lgd');
+        assertScope(tokens, 'String', typeScope);
+        assertScope(tokens, 'executeCommand', 'entity.name.function.js');
+        assertScope(tokens, 'describe', 'entity.name.function.js');
+        assertScope(tokens, 'label', 'variable.parameter.js');
+        assertScope(tokens, 'count', 'variable.parameter.js');
     });
 
     test('Highlights readonly, export, and string declarations.', () =>

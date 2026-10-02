@@ -52,7 +52,7 @@ class GoToAssignment : BaseCommand {
         this.enabled = true;
     }
 
-    async executeCommand() {
+    override async executeCommand() {
         // Command implementation
     }
 }
@@ -63,6 +63,8 @@ const command = GoToAssignment.create();
 These declarations compile to OLOO objects, preserving the `.create()` API. Constructor assignments initialize each instance; ordinary methods, async methods, getters and setters stay on the linked objects. Derived classes use the existing `Oloo` binding to call `Oloo.assign(BaseCommand.create(...), GoToAssignment)`. Existing OLOO base objects continue to work, including `Oloo.base(this, "methodName")` dispatch.
 
 Use typed parameters such as `String title` and `Number offset = 0` in constructors and methods. A missing constructor or base initializer calls the base's `.create()` with no arguments. Known base signatures are checked for argument counts and types; unresolved values remain conservative. Class names, base names and same-name constructors use your theme's class/type highlighting; ordinary methods keep method highlighting.
+
+Declare overridable class methods with `virtual`, and use `override` when replacing an inherited virtual method. Replacing a known non-virtual method or omitting `override` is an error. Existing OLOO base methods can opt in with a JSDoc `@virtual` tag. Known parameter and explicit return-type mismatches are reported across local and imported bases. Modifiers are compile-time checks and do not change OLOO method dispatch.
 
 The constructor must use the class name. The `constructor` keyword, an explicit `create()` member, fields, static members and private members are not supported in LGD class declarations. Put instance initialization in the constructor. JavaScript files keep their existing class behavior.
 
