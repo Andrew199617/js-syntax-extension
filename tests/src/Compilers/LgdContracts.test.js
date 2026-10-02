@@ -275,6 +275,48 @@ describe('LGD interface and abstract contracts', () =>
         expect(LgdCompiler.create().parse(localShadow, nominalExternals).errors).toEqual([]);
     });
 
+    test('fails closed for exported incomplete interface and abstract member syntax', () =>
+    {
+        const sources = [
+            'interface I { Number run(count); }',
+            'interface I { Number run(Number count) {} }',
+            'abstract class I { abstract Number run(count); }'
+        ];
+        for(const source of sources)
+        {
+            const metadata = exported(source, 'I');
+            expect(metadata.contractsKnown).toBe(false);
+            const externals = new Map([[ './contract', metadata ]]);
+            expect(contracts('const I = require("./contract");\nclass Child : I {}', externals)[0].code).toBe('lgd.contract.unavailable');
+        }
+    });
+
+    test('marks unbound declared contract annotations incomplete without rejecting ordinary body diagnostics', () =>
+    {
+        expect(exported('interface I { Missing run(); }', 'I').contractsKnown).toBe(false);
+        expect(exported('interface I { void run(Missing value); }', 'I').contractsKnown).toBe(false);
+        expect(exported('abstract class I { abstract Missing run(); }', 'I').contractsKnown).toBe(false);
+        const ordinaryBody = 'abstract class I { Number run() { return "wrong"; } }';
+        expect(LgdCompiler.create().parse(ordinaryBody).errors).not.toEqual([]);
+        expect(exported(ordinaryBody, 'I').contractsKnown).toBe(true);
+    });
+
+    test('reclassifies cached interface inheritance using resolved imports without reparsing or stale error gating', () =>
+    {
+        const source = 'const Parent = require("./parent");\ninterface I : Parent {}';
+        const parsed = LgdCompiler.create().parse(source);
+        const declaration = parsed.allDeclarations.find(candidate => candidate.name === 'I');
+        expect(parsed.errors).not.toEqual([]);
+        expect(declaration.contractSyntaxComplete).toBe(true);
+        expect(LgdContractChecker.describeContracts(source, parsed.allDeclarations, declaration).contractsKnown).toBe(false);
+        const parent = exported('interface Parent { Number run(Number count); }', 'Parent');
+        const externals = new Map([[ './parent', parent ]]);
+        LgdContractChecker.classify(source, parsed.allDeclarations, externals);
+        const metadata = LgdContractChecker.describeContracts(source, parsed.allDeclarations, declaration, externals);
+        expect(metadata).toMatchObject({ contractsKnown: true, contractSignatures: [{ name: 'run', returnTypeName: 'Number' }] });
+        expect(contracts('const I = require("./contract");\nclass Child : I {}', new Map([[ './contract', metadata ]]))[0].code).toBe('lgd.contract.missingMember');
+    });
+
     test('reports unknown erased return and property contract types on their exact type names', () =>
     {
         const source = 'interface I { Missing run(); Other Name { get; } }';

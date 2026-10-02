@@ -152,6 +152,7 @@ const LgdClassSyntax = {
             children: []
         };
         const errors = this.parseMembers(content, masked, declaration, compiler);
+        declaration.contractSyntaxComplete = errors.length === 0;
         return { declaration: declaration, errors: errors };
     },
 

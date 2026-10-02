@@ -172,6 +172,38 @@ function ancestors(declaration, context)
     return entries.map(entry => ({ entry: entry, declaration: resolveName(context, declaration, entry.name) }));
 }
 
+/** @description Requires complete own contract syntax and lexically bound annotation names. */
+function ownContractsKnown(declaration, context)
+{
+    const contractDeclaration = declaration.kind === 'interface' || declaration.abstract;
+    if(contractDeclaration && declaration.contractSyntaxComplete === false)
+    {
+        return false;
+    }
+
+    const visible = visibleBindings(context.bindings, declaration.headStart ?? declaration.start);
+    if(declaration.kind === 'interface' && (declaration.heritage || []).some(entry => contractKind(visible.get(entry.name)) !== 'interface'))
+    {
+        return false;
+    }
+
+    for(const member of declaration.classMembers || [])
+    {
+        if(declaration.kind !== 'interface' && !member.abstract)
+        {
+            continue;
+        }
+
+        const annotations = [ member.returnTypeName, member.propertyTypeName, ...member.params.map(parameter => parameter.typeName) ];
+        if(annotations.some(typeName => typeName && !builtinTypes.has(typeName) && !visible.has(typeName.split('.')[0])))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 /** @description Collects transitive interface and abstract obligations while stopping cycles. */
 function contractTable(declaration, context, visiting = new Set())
 {
@@ -207,7 +239,7 @@ function contractTable(declaration, context, visiting = new Set())
     const path = new Set(visiting);
     path.add(declaration);
     let contracts = [];
-    let known = true;
+    let known = ownContractsKnown(declaration, context);
     let cycle = false;
     for(const ancestor of ancestors(declaration, context))
     {
