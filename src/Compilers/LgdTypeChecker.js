@@ -156,26 +156,6 @@ function functionEnclosesOffset(typedFunction, offset)
     return inBody || inParams;
 }
 
-function scopeWithParams(baseScope, typedFunctions, offset)
-{
-    const enclosing = typedFunctions.filter(typedFunction => functionEnclosesOffset(typedFunction, offset));
-    if(enclosing.length === 0)
-    {
-        return baseScope;
-    }
-
-    enclosing.sort((left, right) => left.bodyStart - right.bodyStart);
-    const scope = new Map(baseScope);
-    for(const typedFunction of enclosing)
-    {
-        for(const param of typedFunction.params)
-        {
-            scope.set(param.name, param.entry);
-        }
-    }
-
-    return scope;
-}
 
 /**
  * @description Tells whether the name is a typed parameter of a function enclosing the offset.
@@ -674,65 +654,98 @@ function isSkippedAssignment(scan, nameStart, name)
 }
 
 /**
- * @description Resolves the binding an assignment writes to. The scope map is flat and later
- * declarations overwrite earlier ones, so the nearest preceding declaration wins, matching
- * block scoping; a typed parameter still shadows an outer declaration, but a local declared
- * inside the parameter's function shadows the parameter.
- * @param {Object} context the resolution context: declarations (parsed declarations in document
- * order), declarationEntry (each declaration to its scope entry), typedFunctions (the
- * {bodyStart, bodyEnd, params} records of functions with typed parameters), and extendedScope
- * (the scope with enclosing typed parameters overlaid).
- * @param {string} name the assigned name.
- * @param {number} nameStart the offset of the assigned name.
- * @returns {Object|undefined} the scope entry for the visible binding, if any.
+ * @description Records brace-delimited lexical scopes from literal-masked source.
+ * @param {string} masked the source with literal and comment contents hidden.
+ * @returns {Array} the scopes, including a root scope for top-level bindings.
  */
-function resolveAssignmentEntry(context, name, nameStart)
+function collectLexicalScopes(masked)
 {
-    const { declarations, declarationEntry, typedFunctions, extendedScope } = context;
-    let paramEntry;
-    let paramBodyStart = -1;
-    for(const typedFunction of typedFunctions)
+    const root = { start: -1, end: masked.length + 1 };
+    const scopes = [root];
+    const stack = [root];
+    for(let index = 0; index < masked.length; index++)
     {
-        if(!functionEnclosesOffset(typedFunction, nameStart))
+        if(masked[index] === '{')
         {
-            continue;
+            const scope = { start: index, end: masked.length + 1 };
+            scopes.push(scope);
+            stack.push(scope);
+        }
+        else if(masked[index] === '}' && stack.length > 1)
+        {
+            stack.pop().end = index;
+        }
+    }
+
+    return scopes;
+}
+
+/**
+ * @description Associates each declaration with its innermost lexical scope.
+ * @param {Array} declarations the parsed declarations.
+ * @param {string} masked the source with literal and comment contents hidden.
+ * @returns {Map} declarations to their enclosing scope boundaries.
+ */
+function collectDeclarationScopes(declarations, masked)
+{
+    const scopes = collectLexicalScopes(masked);
+    const owners = new Map();
+    for(const declaration of declarations)
+    {
+        let owner = scopes[0];
+        for(const scope of scopes)
+        {
+            if(scope.start < declaration.headStart && declaration.headStart < scope.end && scope.start > owner.start)
+            {
+                owner = scope;
+            }
         }
 
-        for(const param of typedFunction.params)
+        owners.set(declaration, owner);
+    }
+
+    return owners;
+}
+
+/**
+ * @description Resolves visible bindings at an offset, excluding closed and sibling scopes.
+ * Enclosing parameters override outer declarations; nearer local declarations override parameters.
+ * @param {Object} context the scope, declarations, declarationEntry, declarationScopes, and typedFunctions.
+ * @param {number} offset the expression or assignment offset.
+ * @returns {Map} the visible binding entries.
+ */
+function scopeAtOffset(context, offset)
+{
+    const bindings = [];
+    for(const declaration of context.declarations)
+    {
+        const entry = context.declarationEntry.get(declaration);
+        const owner = context.declarationScopes.get(declaration);
+        if(entry && declaration.headStart < offset && owner.start < offset && offset < owner.end)
         {
-            if(param.name === name && typedFunction.bodyStart > paramBodyStart)
+            bindings.push({ name: declaration.name, entry: entry, start: owner.start, order: declaration.headStart });
+        }
+    }
+
+    for(const typedFunction of context.typedFunctions)
+    {
+        if(functionEnclosesOffset(typedFunction, offset))
+        {
+            for(const param of typedFunction.params)
             {
-                paramEntry = param.entry;
-                paramBodyStart = typedFunction.bodyStart;
+                bindings.push({ name: param.name, entry: param.entry, start: typedFunction.bodyStart, order: -1 });
             }
         }
     }
 
-    let nearest = null;
-    for(const declaration of declarations)
+    bindings.sort((left, right) => left.start - right.start || left.order - right.order);
+    const scope = new Map(context.scope);
+    for(const binding of bindings)
     {
-        if(declaration.name !== name || declaration.headStart >= nameStart)
-        {
-            continue;
-        }
-
-        if(!nearest || declaration.headStart > nearest.headStart)
-        {
-            nearest = declaration;
-        }
+        scope.set(binding.name, binding.entry);
     }
 
-    if(nearest && (!paramEntry || nearest.headStart > paramBodyStart))
-    {
-        return declarationEntry.get(nearest);
-    }
-
-    if(paramEntry)
-    {
-        return paramEntry;
-    }
-
-    return extendedScope.get(name);
+    return scope;
 }
 
 /**
@@ -744,10 +757,9 @@ function resolveAssignmentEntry(context, name, nameStart)
  */
 function checkAssignments(context)
 {
-    const { masked, declarations, scope, errors, externalsByName, requireAt, typedFunctions = [],
-        declarationEntry = new Map() } = context;
+    const { masked, declarations, errors, externalsByName, requireAt, typedFunctions = [] } = context;
 
-    const nameSet = new Set(scope.keys());
+    const nameSet = new Set(declarations.map(declaration => declaration.name));
     for(const typedFunction of typedFunctions)
     {
         for(const param of typedFunction.params)
@@ -795,9 +807,8 @@ function checkAssignments(context)
             continue;
         }
 
-        const extendedScope = scopeWithParams(scope, typedFunctions, nameStart);
-        const entry = resolveAssignmentEntry({ declarations: declarations, declarationEntry: declarationEntry,
-            typedFunctions: typedFunctions, extendedScope: extendedScope }, name, nameStart);
+        const extendedScope = scopeAtOffset(context, nameStart);
+        const entry = extendedScope.get(name);
         if(!entry)
         {
             continue;
@@ -868,7 +879,8 @@ function checkTypes(content, declarations, externals = new Map())
     const errors = [];
     const scope = new Map();
     const declarationEntry = new Map();
-    const masked = maskCode(content);
+    const masked = maskCode(content, true);
+    const declarationScopes = collectDeclarationScopes(declarations, masked);
     const externalsByName = new Map();
     for(const info of externals.values())
     {
@@ -879,7 +891,7 @@ function checkTypes(content, declarations, externals = new Map())
     }
 
     const requireAt = collectRequires(content, externals);
-    for(const requiredName of collectRequiredNames(content))
+    for(const requiredName of collectRequiredNames(masked))
     {
         if(!scope.has(requiredName))
         {
@@ -889,10 +901,12 @@ function checkTypes(content, declarations, externals = new Map())
     }
 
     const typedFunctions = [];
+    const scopeContext = { scope: scope, declarations: declarations, declarationEntry: declarationEntry,
+        declarationScopes: declarationScopes, typedFunctions: typedFunctions };
 
     for(const declaration of declarations)
     {
-        const extendedScope = scopeWithParams(scope, typedFunctions, declaration.headStart);
+        const extendedScope = scopeAtOffset(scopeContext, declaration.headStart);
         const resolved = resolveDeclaredType(declaration, extendedScope, errors);
         const initializer = content.slice(declaration.initializerStart, declaration.initializerEnd);
         let inferred = UNKNOWN;
@@ -949,19 +963,18 @@ function checkTypes(content, declarations, externals = new Map())
         }
 
         const entry = {
-            keyword: effectiveKeyword(resolved, inferred, scope, externalsByName),
+            keyword: effectiveKeyword(resolved, inferred, extendedScope, externalsByName),
             readonly: declaration.readonly,
             kind: resolved.kind,
             typeName: resolved.typeName,
             ref: resolved.ref
         };
-        scope.set(declaration.name, entry);
         declarationEntry.set(declaration, entry);
     }
 
     checkAssignments({ masked: masked, declarations: declarations, scope: scope, errors: errors,
         externalsByName: externalsByName, requireAt: requireAt, typedFunctions: typedFunctions,
-        declarationEntry: declarationEntry });
+        declarationEntry: declarationEntry, declarationScopes: declarationScopes });
     return errors;
 }
 
