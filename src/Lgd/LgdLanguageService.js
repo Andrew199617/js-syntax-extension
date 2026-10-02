@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
+const { maskCode } = require('../Compilers/LgdInfer');
+const { parseTypedParams, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('../Compilers/LgdTypedParams');
 
 /** @import { DiagnosticCollection, Position, Range, TextDocument, Uri } from 'vscode' */
 
@@ -517,8 +519,9 @@ const LgdLanguageService = {
             return [];
         }
 
+        const code = maskCode(body, true);
         const built = new Set();
-        for(const returned of body.matchAll(/\breturn\s+(?<name>[$A-Z_a-z][\w$]*)\s*;/g))
+        for(const returned of code.matchAll(/\breturn\s+(?<name>[$A-Z_a-z][\w$]*)\s*;/g))
         {
             built.add(returned.groups.name);
         }
@@ -526,7 +529,7 @@ const LgdLanguageService = {
         const members = [];
         const seen = new Set();
         const pattern = /\b(?<object>this|[$A-Z_a-z][\w$]*)\.(?<property>[$A-Z_a-z][\w$]*)\s*=(?![=>])/g;
-        let match = pattern.exec(body);
+        let match = pattern.exec(code);
         while(match)
         {
             const target = match.groups.object;
@@ -542,7 +545,7 @@ const LgdLanguageService = {
                 });
             }
 
-            match = pattern.exec(body);
+            match = pattern.exec(code);
         }
 
         return members;
@@ -588,39 +591,7 @@ const LgdLanguageService = {
             return [];
         }
 
-        const segments = [];
-        let depth = 0;
-        let segmentStart = 0;
-        for(let position = 0; position < literal.length; position++)
-        {
-            const character = literal[position];
-            if(character === '{' || character === '(' || character === '[')
-            {
-                depth++;
-            }
-            else if(character === '}' || character === ')' || character === ']')
-            {
-                depth--;
-            }
-            else if(character === ',' && depth === 0)
-            {
-                segments.push(literal.slice(segmentStart, position));
-                segmentStart = position + 1;
-            }
-        }
-
-        segments.push(literal.slice(segmentStart));
-        const properties = [];
-        for(const segment of segments)
-        {
-            const key = segment.match(/^\s*["']?(?<name>[$A-Z_a-z][\w$]*)["']?\s*[(:{]/);
-            if(key && !properties.includes(key.groups.name))
-            {
-                properties.push(key.groups.name);
-            }
-        }
-
-        return properties;
+        return this.compiler.extractMembers(`{${literal}}`).map(member => member.name);
     },
 
     /**
@@ -631,17 +602,26 @@ const LgdLanguageService = {
      */
     findCreateBody(initializerText)
     {
-        const pattern = /(?:^|[\s,;{])(?:async\s+)?create\s*\([^)]*\)\s*{/g;
-        let match = pattern.exec(initializerText);
-        while(match)
+        for(const chunk of splitTopLevelChunks(initializerText.trim()))
         {
-            if(!this.isInsideStringOrComment(initializerText, match.index))
+            const memberText = chunk.text.replace(/^(?:\s|\/\*[\S\s]*?\*\/|\/\/[^\n]*)+/, '');
+            if(!(/^(?:async\s+)?create\s*\(/).test(memberText))
             {
-                const openIndex = match.index + match[0].lastIndexOf('{');
-                return this.extractBalancedBody(initializerText, openIndex);
+                continue;
             }
 
-            match = pattern.exec(initializerText);
+            const parameters = parseTypedParams(memberText);
+            if(!parameters)
+            {
+                continue;
+            }
+
+            const code = maskCode(memberText, true);
+            const bodyStart = parameters.end + code.slice(parameters.end).search(/\S/);
+            if(code[bodyStart] === '{')
+            {
+                return this.extractBalancedBody(memberText, bodyStart);
+            }
         }
 
         return null;
@@ -679,6 +659,19 @@ const LgdLanguageService = {
                     mode = 'block';
                     position++;
                 }
+                else if(character === '/' && isRegexStart(text, position))
+                {
+                    const regexEnd = skipRegexLiteral(text, position);
+                    if(regexEnd > index)
+                    {
+                        return true;
+                    }
+
+                    if(regexEnd !== -1)
+                    {
+                        position = regexEnd - 1;
+                    }
+                }
             }
             else if(mode === 'string')
             {
@@ -715,80 +708,30 @@ const LgdLanguageService = {
 
     /**
      * @description Extracts the body between a brace pair, skipping string literals and
-     * comments so their braces do not affect the depth count. Template literals are
-     * treated as opaque strings; `${}` interpolation inside them is not parsed.
+     * comments so their braces do not affect the depth count. Executable template
+     * interpolation expressions retain their balanced braces.
      * @param {string} text the source text.
      * @param {number} openIndex the index of the opening brace.
      * @returns {string|null} the body without the outer braces, or null when unbalanced.
      */
     extractBalancedBody(text, openIndex)
     {
+        const code = maskCode(text, true);
         let depth = 0;
-        let index = openIndex;
-        let mode = 'code';
-        let quote = '';
-        while(index < text.length)
+        for(let index = openIndex; index < code.length; index++)
         {
-            const character = text[index];
-            const next = index + 1 < text.length ? text[index + 1] : '';
-            if(mode === 'code')
+            if(code[index] === '{')
             {
-                if(character === "'" || character === '"' || character === '`')
+                depth++;
+            }
+            else if(code[index] === '}')
+            {
+                depth--;
+                if(depth === 0)
                 {
-                    mode = 'string';
-                    quote = character;
-                }
-                else if(character === '/' && next === '/')
-                {
-                    mode = 'line';
-                    index++;
-                }
-                else if(character === '/' && next === '*')
-                {
-                    mode = 'block';
-                    index++;
-                }
-                else if(character === '{')
-                {
-                    depth++;
-                }
-                else if(character === '}')
-                {
-                    depth--;
-                    if(depth === 0)
-                    {
-                        return text.slice(openIndex + 1, index);
-                    }
+                    return text.slice(openIndex + 1, index);
                 }
             }
-            else if(mode === 'string')
-            {
-                if(character === '\\')
-                {
-                    index++;
-                }
-                else if(character === quote)
-                {
-                    mode = 'code';
-                }
-            }
-            else if(mode === 'line')
-            {
-                if(character === '\n')
-                {
-                    mode = 'code';
-                }
-            }
-            else if(mode === 'block')
-            {
-                if(character === '*' && next === '/')
-                {
-                    mode = 'code';
-                    index++;
-                }
-            }
-
-            index++;
         }
 
         return null;

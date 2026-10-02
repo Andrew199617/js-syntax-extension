@@ -118,3 +118,39 @@ describe('LGD this. member hover.', () =>
         expect(hover).toBeNull();
     });
 });
+
+describe('LGD create() member extraction regressions', () =>
+{
+    test('ignores assignments and return names in comments and strings', () =>
+    {
+        const service = LgdLanguageService.create({}, () => undefined);
+        const source = [
+            '{ create() {',
+            '  // this.commented = 1;',
+            '  const sample = "this.quoted = 2; return unrelated;";',
+            '  /* return unrelated; */',
+            '  unrelated.noise = 3;',
+            '  this.actual = 4;',
+            '  return this;',
+            '} }'
+        ].join('\n');
+
+        expect(service.extractCreateMembers(source).map(member => member.name)).toEqual(['actual']);
+    });
+
+    test('reads only the object own create method and handles parameter defaults', () =>
+    {
+        const service = LgdLanguageService.create({}, () => undefined);
+        const source = '{ nested: { create() { this.wrong = 1; } }, create(Number count = Number("1")) { this.right = count; return this; } }';
+
+        expect(service.extractCreateMembers(source).map(member => member.name)).toEqual(['right']);
+    });
+
+    test('preserves literal property names around commas, brackets and comments in values', () =>
+    {
+        const service = LgdLanguageService.create({}, () => undefined);
+        const source = '{ create() { this.settings = { label: "[", /* separator , */ enabled: true, nested: { ignored: 1 }, shorthand }; return this; } }';
+
+        expect(service.extractCreateMembers(source)[0].properties).toEqual([ 'label', 'enabled', 'nested', 'shorthand' ]);
+    });
+});
