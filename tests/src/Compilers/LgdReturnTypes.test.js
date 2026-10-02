@@ -144,7 +144,7 @@ describe('LGD explicit named return types.', () =>
     {
         const source = 'class Counter {\r\n    /** Existing description. @returns {string} old */\r\n    Number /* preserve */ count(Number value) { return value; }\r\n}';
         const result = LgdCompiler.create().compileToJs(source);
-        expect(result.errors).toEqual([]);
+        expect(result.errors).toEqual([expect.objectContaining({ severity: 'warning', message: 'Return type is already declared; the JSDoc type is not required.' })]);
         expect(result.code).toContain('/* preserve */');
         expect(result.code).toContain('@returns {number} old');
         expect(result.code.replace(/\r\n/g, '')).not.toContain('\n');

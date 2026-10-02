@@ -50,14 +50,16 @@ const maxOperatorWidth = 3;
  * @description Masks literal and comment contents without changing source offsets.
  * @param {string} text the source text to mask.
  * @param {boolean} preserveTemplateExpressions whether executable template expressions remain visible.
+ * @param {Array|null} jsdocRanges optional output for real, closed JSDoc comment spans.
  * @returns {string} the masked source text.
  */
-function maskCode(text, preserveTemplateExpressions = false)
+function maskCode(text, preserveTemplateExpressions = false, jsdocRanges = null)
 {
     const output = text.split('');
     const modes = ['code'];
     const templateDepths = [];
     let depth = 0;
+    let jsdocStart = -1;
     for(let index = 0; index < text.length; index++)
     {
         const mode = modes[modes.length - 1];
@@ -71,6 +73,7 @@ function maskCode(text, preserveTemplateExpressions = false)
             }
             else if(character === '/' && (next === '/' || next === '*'))
             {
+                jsdocStart = next === '*' && text[index + 2] === '*' ? index : -1;
                 modes.push(next === '/' ? 'line' : 'block');
                 output[index] = ' ';
                 output[++index] = ' ';
@@ -107,6 +110,12 @@ function maskCode(text, preserveTemplateExpressions = false)
         }
         else if(mode === 'block' && character === '*' && next === '/')
         {
+            if(jsdocRanges && jsdocStart !== -1)
+            {
+                jsdocRanges.push({ start: jsdocStart, end: index + 2 });
+            }
+
+            jsdocStart = -1;
             output[index] = ' ';
             output[++index] = ' ';
             modes.pop();

@@ -6,6 +6,7 @@ const LgdClassSyntax = require('./LgdClassSyntax');
 const LgdBaseChecker = require('./LgdBaseChecker');
 const LgdOverrideChecker = require('./LgdOverrideChecker');
 const LgdReturnChecker = require('./LgdReturnChecker');
+const LgdReturnDocChecker = require('./LgdReturnDocChecker');
 const LgdBaseCalls = require('./LgdBaseCalls');
 const { parseTypedParams, parseObjectMethodParams, parseMethodHead, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
 const { maskCode } = require('./LgdInfer');
@@ -192,6 +193,13 @@ const LgdCompiler = {
         for(const overrideError of LgdOverrideChecker.check(content, found, externals))
         {
             errors.push(this.createError(content, overrideError.offset, overrideError.message, overrideError.endOffset));
+        }
+
+        for(const warning of LgdReturnDocChecker.check(content, found))
+        {
+            const diagnostic = this.createError(content, warning.offset, warning.message, warning.endOffset);
+            diagnostic.severity = 'warning';
+            errors.push(diagnostic);
         }
 
         const declarations = this.buildTree(found);

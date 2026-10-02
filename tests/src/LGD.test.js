@@ -642,6 +642,20 @@ describe('LGD compile on save', () =>
         expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'working.js'), 'let value = 1;');
     });
 
+    test('saving real redundant return documentation warnings still updates JavaScript', async () =>
+    {
+        const source = 'Object Working = { /** @returns {number} The count. */ Number count() { return 1; } };';
+        const result = LgdCompiler.create().compileToJs(source);
+        expect(result.errors).toEqual([expect.objectContaining({ severity: 'warning' })]);
+
+        saveLgdDocument(path.join('workspace', 'working.lgd'), source);
+        await nextTurn();
+        await nextTurn();
+
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'working.js'), result.code);
+        expect(result.code).toContain('The count.');
+    });
+
     test('saving valid LGD writes the compiled .js next to the source', async () =>
     {
         vscode.window.createStatusBarItem.mockClear();
