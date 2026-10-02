@@ -81,6 +81,17 @@ describe('LGD interface and abstract syntax.', () =>
         expect(declaration.classMembers.find(member => member.accessorKind === 'set')).toMatchObject({ abstract: false, getter: false, setter: true, override: true });
     });
 
+    test.each([ 'abstract override', 'override abstract' ])('Preserves reabstract property contracts with %s modifiers.', modifiers =>
+    {
+        const source = `abstract class Task : BaseTask { ${modifiers} String Name { get; set; } }`;
+        const parsed = parse(source);
+        expect(parsed.errors).toEqual([]);
+        const property = parsed.declarations[0].classMembers[0];
+        expect(property).toMatchObject({ abstract: true, override: true, virtual: true, propertyTypeName: 'String', getter: true, setter: true });
+        expect(source.slice(property.overrideStart, property.overrideEnd)).toBe('override');
+        expect(source.slice(property.abstractStart, property.abstractEnd)).toBe('abstract');
+    });
+
     test.each([
         [ 'interface Task { run(String text); }', 'explicit return and parameter types' ],
         [ 'interface Task { Number run(text); }', 'explicit return and parameter types' ],
@@ -92,6 +103,7 @@ describe('LGD interface and abstract syntax.', () =>
         [ 'interface Task { String Name { get; get; } }', 'Duplicate' ],
         [ 'interface Task { String Name {} }', 'at least one' ],
         [ 'interface Task { void Name { get; } }', 'value type' ],
+        [ 'interface Task { override String Name { get; } }', 'cannot be override' ],
         [ 'interface Task { Number field = 1; }', 'Fields' ],
         [ 'interface Task : Named, {}', 'heritage list' ],
         [ 'abstract interface Task {}', 'already abstract' ],

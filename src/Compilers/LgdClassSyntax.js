@@ -373,9 +373,14 @@ const LgdClassSyntax = {
             return { error: 'Signature-only properties require an interface or an abstract member in an abstract class.', offset: start };
         }
 
-        if(modifiers.virtualStart !== null || modifiers.overrideStart !== null || head.groups.type === 'void')
+        if(modifiers.virtualStart !== null || head.groups.type === 'void')
         {
-            return { error: 'A property contract must have a value type and cannot be virtual or override.', offset: start };
+            return { error: 'A property contract must have a value type and cannot explicitly be virtual.', offset: start };
+        }
+
+        if(declaration.kind === 'interface' && modifiers.overrideStart !== null)
+        {
+            return { error: 'An interface property contract cannot be override.', offset: modifiers.overrideStart };
         }
 
         const bodyStart = start + head[0].length - 1;
@@ -451,12 +456,12 @@ const LgdClassSyntax = {
             abstract: true,
             abstractStart: modifiers.abstractStart,
             abstractEnd: modifiers.abstractStart === null ? null : modifiers.abstractStart + 'abstract'.length,
-            virtual: false,
-            override: false,
+            virtual: true,
+            override: modifiers.overrideStart !== null,
             virtualStart: null,
             virtualEnd: null,
-            overrideStart: null,
-            overrideEnd: null,
+            overrideStart: modifiers.overrideStart,
+            overrideEnd: modifiers.overrideStart === null ? null : modifiers.overrideStart + 'override'.length,
             modifierSpans: modifiers.spans
         } };
     },
