@@ -194,7 +194,7 @@ const LgdClassSyntax = {
             }
             else if(member.name === 'constructor' || member.name === 'create')
             {
-                errors.push({ offset: member.nameStart, message: `Use ${declaration.name}(...) for the constructor; create() is generated.` });
+                errors.push({ offset: member.nameStart, message: `Use ${declaration.name}(...) for the constructor.` });
             }
             else
             {

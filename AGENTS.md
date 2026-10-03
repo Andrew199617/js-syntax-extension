@@ -17,6 +17,7 @@
 - Keep edited text files in CRLF; do not leave LF-only or mixed line endings after applying patches. Check the final bytes before finishing so saving in the editor does not rewrite the entire file.
 
 ## General guidelines
+- Keep user-facing diagnostics focused on LGD syntax and the action needed. Do not describe generated JavaScript or compilation implementation details unless they are necessary to understand or resolve the problem.
 - Use one module style per file: standalone functions, one class, or one OLOO object. Do not mix module-level functions with class or OLOO definitions, or put multiple classes/OLOO objects in one file.
 - Prefer adding related functions as methods of the existing OLOO object. If a module exports standalone functions, keep the whole module in that style instead of intermingling it with class or OLOO definitions.
 - Imports, constants, plain configuration objects, and local callbacks or helpers inside methods are allowed alongside the chosen module style.
