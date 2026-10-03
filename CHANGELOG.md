@@ -4,6 +4,15 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.14
+
+- Validate completed JavaScript output in a separate syntax-checking module for both OLOO and native class output.
+- Report malformed ordinary JavaScript and unsupported leftover syntax at their original LGD source locations; preserve the last working .js file until repaired.
+- Reuse the validated syntax tree for scoped assignments and returns instead of parsing the same final output again.
+- Keep native-result inference conservative after explicit replacements or supported aliases/escapes, fixing a false assignment alarm.
+- Avoid native-class semantic work for files that contain no LGD classes.
+- Retain JavaScript/JSX module support and Node/CommonJS wrapper returns without permitting ES-module or class-static-block returns.
+
 # 2.7.13
 
 - Enforce typed local and parameter assignments inside classes, constructors, object methods, top-level functions and nested callbacks using their actual lexical bindings.
