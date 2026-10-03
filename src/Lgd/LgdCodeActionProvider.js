@@ -1,7 +1,8 @@
 const vscode = require('vscode');
 const DiagnosticQuickFix = require('./QuickFixes/DiagnosticQuickFix');
 const LgdDiagnosticDefinitions = require('./LgdDiagnosticDefinitions');
-const LgdFixEngine = require('./Fixes/LgdFixEngine');
+const LgdFixRuntime = require('../Editors/VSCode/LgdFixRuntime');
+const LgdFixEdits = require('../Editors/VSCode/LgdFixEdits');
 const LgdFixPlan = require('./Fixes/LgdFixPlan');
 
 /** @description Internal command shared by native diagnostic quick fixes. */
@@ -20,7 +21,7 @@ const LgdCodeActionProvider = {
     {
         const provider = Object.create(LgdCodeActionProvider);
         provider.languageService = languageService;
-        provider.engine = fixService?.engine || LgdFixEngine.create(languageService);
+        provider.engine = fixService?.engine || LgdFixRuntime.create(languageService);
         provider.handlers = provider.engine.handlers;
         provider.fixService = fixService;
         provider.proposals = new Map();
@@ -36,12 +37,14 @@ const LgdCodeActionProvider = {
             return [];
         }
 
-        const state = this.languageService.getState(document.uri);
+        let state = this.languageService.getState(document.uri);
         if(!state || state.compiledVersion !== document.version || state.compiledText !== document.getText())
         {
             return [];
         }
 
+        const analysis = this.fixService ? await this.fixService.analysisRequest(document, state) : { state: state };
+        state = analysis.state;
         const actions = [];
         const offeredEdits = new Map();
         for(const diagnostic of context.diagnostics)
@@ -52,10 +55,11 @@ const LgdCodeActionProvider = {
                 continue;
             }
 
-            const entries = await this.engine.collect(document, state, [error], { token: token });
+            const request = { token: token, configuration: analysis.configuration, formattingErrors: analysis.formattingErrors };
+            const entries = await this.engine.collect(document, state, [error], request);
             for(const { proposal, handler } of entries)
             {
-                if(this.fixService && !await this.fixService.prepareIndividual(proposal, handler))
+                if(this.fixService && !await this.fixService.prepareIndividual(proposal, handler, { document: document, configuration: analysis.configuration }))
                 {
                     continue;
                 }
@@ -108,7 +112,7 @@ const LgdCodeActionProvider = {
             return false;
         }
 
-        return LgdFixPlan.apply(LgdFixPlan.create([{ proposal: proposal }]), this.languageService);
+        return LgdFixEdits.apply(LgdFixPlan.create([{ proposal: proposal }]), this.languageService);
     },
 
     /** @description Matches a coded diagnostic to its exact current source span and requested range. */

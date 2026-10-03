@@ -72,6 +72,539 @@
                     }
                 }
             }
+        },
+        "formatting": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Optional editor-independent LGD style rules. Disabled by default; source readers never execute configuration JavaScript.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "sources": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                        "enum": [
+                            "editorconfig",
+                            "clang-format",
+                            "eslint"
+                        ]
+                    },
+                    "default": [
+                        "editorconfig",
+                        "clang-format",
+                        "eslint"
+                    ],
+                    "description": "Data-only project preferences, lowest to highest priority. Empty means native preferences only."
+                },
+                "options": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "braces": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "style": {
+                                    "enum": [
+                                        "attach",
+                                        "allman",
+                                        "stroustrup",
+                                        "linux",
+                                        "mozilla",
+                                        "webkit",
+                                        "gnu",
+                                        "whitesmiths",
+                                        "custom"
+                                    ]
+                                },
+                                "wrapping": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "classes": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "interfaces": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "enums": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "constructors": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "methods": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "accessors": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "functions": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "lambdas": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "controlBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "switchBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "caseBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "tryBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "elseBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "catchBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "finallyBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "objectLiterals": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "objectPatterns": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        }
+                                    }
+                                },
+                                "beforeElse": {
+                                    "type": "boolean"
+                                },
+                                "beforeCatch": {
+                                    "type": "boolean"
+                                },
+                                "beforeFinally": {
+                                    "type": "boolean"
+                                },
+                                "beforeWhile": {
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "indentation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "style": {
+                                    "enum": [
+                                        "space",
+                                        "tab"
+                                    ]
+                                },
+                                "size": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 16
+                                },
+                                "tabWidth": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 16
+                                },
+                                "continuation": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 32
+                                },
+                                "constructorInitializer": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 32
+                                },
+                                "tabUsage": {
+                                    "enum": [
+                                        "indentation",
+                                        "continuation",
+                                        "always"
+                                    ]
+                                },
+                                "caseLabels": {
+                                    "type": "boolean"
+                                },
+                                "caseContents": {
+                                    "type": "boolean"
+                                },
+                                "caseBlocks": {
+                                    "type": "boolean"
+                                },
+                                "labels": {
+                                    "enum": [
+                                        "preserve",
+                                        "flushLeft",
+                                        "oneLess"
+                                    ]
+                                }
+                            }
+                        },
+                        "spacing": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "afterControlKeywords": {
+                                    "type": "boolean"
+                                },
+                                "beforeFunctionParen": {
+                                    "type": "boolean"
+                                },
+                                "beforeMethodParen": {
+                                    "type": "boolean"
+                                },
+                                "beforeCallParen": {
+                                    "type": "boolean"
+                                },
+                                "insideControlParens": {
+                                    "type": "boolean"
+                                },
+                                "insideDeclarationParens": {
+                                    "type": "boolean"
+                                },
+                                "insideCallParens": {
+                                    "type": "boolean"
+                                },
+                                "insideOtherParens": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptyDeclarationParens": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptyCallParens": {
+                                    "type": "boolean"
+                                },
+                                "beforeInheritanceColon": {
+                                    "type": "boolean"
+                                },
+                                "afterInheritanceColon": {
+                                    "type": "boolean"
+                                },
+                                "binaryOperators": {
+                                    "enum": [
+                                        "both",
+                                        "none",
+                                        "preserve"
+                                    ]
+                                },
+                                "beforeAssignment": {
+                                    "type": "boolean"
+                                },
+                                "afterAssignment": {
+                                    "type": "boolean"
+                                },
+                                "beforeComma": {
+                                    "type": "boolean"
+                                },
+                                "afterComma": {
+                                    "type": "boolean"
+                                },
+                                "beforeDot": {
+                                    "type": "boolean"
+                                },
+                                "afterDot": {
+                                    "type": "boolean"
+                                },
+                                "beforeForSemicolon": {
+                                    "type": "boolean"
+                                },
+                                "afterForSemicolon": {
+                                    "type": "boolean"
+                                },
+                                "beforeSquareBracket": {
+                                    "type": "boolean"
+                                },
+                                "insideSquareBrackets": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptySquareBrackets": {
+                                    "type": "boolean"
+                                },
+                                "insideObjectBraces": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptyBlockBraces": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptyObjectBraces": {
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "lineBreaks": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "shortBlocks": {
+                                    "enum": [
+                                        "preserve",
+                                        "never",
+                                        "empty",
+                                        "always"
+                                    ]
+                                },
+                                "shortFunctions": {
+                                    "enum": [
+                                        "preserve",
+                                        "never",
+                                        "empty",
+                                        "inline",
+                                        "all"
+                                    ]
+                                },
+                                "shortLambdas": {
+                                    "enum": [
+                                        "preserve",
+                                        "never",
+                                        "empty",
+                                        "inline",
+                                        "all"
+                                    ]
+                                },
+                                "shortIfs": {
+                                    "enum": [
+                                        "preserve",
+                                        "never",
+                                        "withoutElse",
+                                        "all"
+                                    ]
+                                },
+                                "shortLoops": {
+                                    "type": "boolean"
+                                },
+                                "shortCases": {
+                                    "type": "boolean"
+                                },
+                                "preserveSingleLineBlocks": {
+                                    "type": "boolean"
+                                },
+                                "preserveSingleLineStatements": {
+                                    "type": "boolean"
+                                },
+                                "objectMembers": {
+                                    "enum": [
+                                        "preserve",
+                                        "onePerLine",
+                                        "singleLine"
+                                    ]
+                                },
+                                "separateDefinitions": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "never"
+                                    ]
+                                },
+                                "maxEmptyLines": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 10
+                                },
+                                "emptyLinesAtBlockStart": {
+                                    "type": "boolean"
+                                },
+                                "emptyLinesAtBlockEnd": {
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "wrapping": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "columnLimit": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                },
+                                "arguments": {
+                                    "enum": [
+                                        "preserve",
+                                        "binPack",
+                                        "onePerLine"
+                                    ]
+                                },
+                                "parameters": {
+                                    "enum": [
+                                        "preserve",
+                                        "binPack",
+                                        "onePerLine"
+                                    ]
+                                },
+                                "alignAfterOpenBracket": {
+                                    "type": "boolean"
+                                },
+                                "allowAllArgumentsOnNextLine": {
+                                    "type": "boolean"
+                                },
+                                "allowAllParametersOnNextLine": {
+                                    "type": "boolean"
+                                },
+                                "binaryOperators": {
+                                    "enum": [
+                                        "preserve",
+                                        "before",
+                                        "after",
+                                        "beforeNonAssignment"
+                                    ]
+                                },
+                                "constructorInitializer": {
+                                    "enum": [
+                                        "preserve",
+                                        "beforeColon",
+                                        "afterColon"
+                                    ]
+                                }
+                            }
+                        },
+                        "whitespace": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "endOfLine": {
+                                    "enum": [
+                                        "preserve",
+                                        "lf",
+                                        "crlf",
+                                        "cr"
+                                    ]
+                                },
+                                "finalNewline": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "never"
+                                    ]
+                                },
+                                "trimTrailingWhitespace": {
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "bracesRequired": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "mode": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "multiLine"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -124,11 +657,2587 @@
                 "static-member-receiver": {
                     "$ref": "#/definitions/rule"
                 },
+                "lgd.format.braces": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "style": {
+                                    "enum": [
+                                        "attach",
+                                        "allman",
+                                        "stroustrup",
+                                        "linux",
+                                        "mozilla",
+                                        "webkit",
+                                        "gnu",
+                                        "whitesmiths",
+                                        "custom"
+                                    ]
+                                },
+                                "wrapping": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "classes": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "interfaces": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "enums": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "constructors": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "methods": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "accessors": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "functions": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "lambdas": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "controlBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "switchBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "caseBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "tryBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "elseBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "catchBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "finallyBlocks": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "objectLiterals": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        },
+                                        "objectPatterns": {
+                                            "enum": [
+                                                "inherit",
+                                                "sameLine",
+                                                "nextLine",
+                                                "nextLineIndented",
+                                                "nextLineIfMultiline"
+                                            ]
+                                        }
+                                    }
+                                },
+                                "beforeElse": {
+                                    "type": "boolean"
+                                },
+                                "beforeCatch": {
+                                    "type": "boolean"
+                                },
+                                "beforeFinally": {
+                                    "type": "boolean"
+                                },
+                                "beforeWhile": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.indentation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "style": {
+                                    "enum": [
+                                        "space",
+                                        "tab"
+                                    ]
+                                },
+                                "size": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 16
+                                },
+                                "tabWidth": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 16
+                                },
+                                "continuation": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 32
+                                },
+                                "constructorInitializer": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 32
+                                },
+                                "tabUsage": {
+                                    "enum": [
+                                        "indentation",
+                                        "continuation",
+                                        "always"
+                                    ]
+                                },
+                                "caseLabels": {
+                                    "type": "boolean"
+                                },
+                                "caseContents": {
+                                    "type": "boolean"
+                                },
+                                "caseBlocks": {
+                                    "type": "boolean"
+                                },
+                                "labels": {
+                                    "enum": [
+                                        "preserve",
+                                        "flushLeft",
+                                        "oneLess"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.spacing": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "afterControlKeywords": {
+                                    "type": "boolean"
+                                },
+                                "beforeFunctionParen": {
+                                    "type": "boolean"
+                                },
+                                "beforeMethodParen": {
+                                    "type": "boolean"
+                                },
+                                "beforeCallParen": {
+                                    "type": "boolean"
+                                },
+                                "insideControlParens": {
+                                    "type": "boolean"
+                                },
+                                "insideDeclarationParens": {
+                                    "type": "boolean"
+                                },
+                                "insideCallParens": {
+                                    "type": "boolean"
+                                },
+                                "insideOtherParens": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptyDeclarationParens": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptyCallParens": {
+                                    "type": "boolean"
+                                },
+                                "beforeInheritanceColon": {
+                                    "type": "boolean"
+                                },
+                                "afterInheritanceColon": {
+                                    "type": "boolean"
+                                },
+                                "binaryOperators": {
+                                    "enum": [
+                                        "both",
+                                        "none",
+                                        "preserve"
+                                    ]
+                                },
+                                "beforeAssignment": {
+                                    "type": "boolean"
+                                },
+                                "afterAssignment": {
+                                    "type": "boolean"
+                                },
+                                "beforeComma": {
+                                    "type": "boolean"
+                                },
+                                "afterComma": {
+                                    "type": "boolean"
+                                },
+                                "beforeDot": {
+                                    "type": "boolean"
+                                },
+                                "afterDot": {
+                                    "type": "boolean"
+                                },
+                                "beforeForSemicolon": {
+                                    "type": "boolean"
+                                },
+                                "afterForSemicolon": {
+                                    "type": "boolean"
+                                },
+                                "beforeSquareBracket": {
+                                    "type": "boolean"
+                                },
+                                "insideSquareBrackets": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptySquareBrackets": {
+                                    "type": "boolean"
+                                },
+                                "insideObjectBraces": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptyBlockBraces": {
+                                    "type": "boolean"
+                                },
+                                "insideEmptyObjectBraces": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "shortBlocks": {
+                                    "enum": [
+                                        "preserve",
+                                        "never",
+                                        "empty",
+                                        "always"
+                                    ]
+                                },
+                                "shortFunctions": {
+                                    "enum": [
+                                        "preserve",
+                                        "never",
+                                        "empty",
+                                        "inline",
+                                        "all"
+                                    ]
+                                },
+                                "shortLambdas": {
+                                    "enum": [
+                                        "preserve",
+                                        "never",
+                                        "empty",
+                                        "inline",
+                                        "all"
+                                    ]
+                                },
+                                "shortIfs": {
+                                    "enum": [
+                                        "preserve",
+                                        "never",
+                                        "withoutElse",
+                                        "all"
+                                    ]
+                                },
+                                "shortLoops": {
+                                    "type": "boolean"
+                                },
+                                "shortCases": {
+                                    "type": "boolean"
+                                },
+                                "preserveSingleLineBlocks": {
+                                    "type": "boolean"
+                                },
+                                "preserveSingleLineStatements": {
+                                    "type": "boolean"
+                                },
+                                "objectMembers": {
+                                    "enum": [
+                                        "preserve",
+                                        "onePerLine",
+                                        "singleLine"
+                                    ]
+                                },
+                                "separateDefinitions": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "never"
+                                    ]
+                                },
+                                "maxEmptyLines": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 10
+                                },
+                                "emptyLinesAtBlockStart": {
+                                    "type": "boolean"
+                                },
+                                "emptyLinesAtBlockEnd": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.wrapping": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "columnLimit": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                },
+                                "arguments": {
+                                    "enum": [
+                                        "preserve",
+                                        "binPack",
+                                        "onePerLine"
+                                    ]
+                                },
+                                "parameters": {
+                                    "enum": [
+                                        "preserve",
+                                        "binPack",
+                                        "onePerLine"
+                                    ]
+                                },
+                                "alignAfterOpenBracket": {
+                                    "type": "boolean"
+                                },
+                                "allowAllArgumentsOnNextLine": {
+                                    "type": "boolean"
+                                },
+                                "allowAllParametersOnNextLine": {
+                                    "type": "boolean"
+                                },
+                                "binaryOperators": {
+                                    "enum": [
+                                        "preserve",
+                                        "before",
+                                        "after",
+                                        "beforeNonAssignment"
+                                    ]
+                                },
+                                "constructorInitializer": {
+                                    "enum": [
+                                        "preserve",
+                                        "beforeColon",
+                                        "afterColon"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.whitespace": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Whitespace and line endings",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "endOfLine": {
+                                    "enum": [
+                                        "preserve",
+                                        "lf",
+                                        "crlf",
+                                        "cr"
+                                    ]
+                                },
+                                "finalNewline": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "never"
+                                    ]
+                                },
+                                "trimTrailingWhitespace": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.bracesRequired": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Control-flow braces",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "mode": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "multiLine"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.braces.beforeElse": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: beforeElse",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.beforeCatch": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: beforeCatch",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.beforeFinally": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: beforeFinally",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.beforeWhile": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: beforeWhile",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.classes": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: classes",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.interfaces": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: interfaces",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.enums": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: enums",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.constructors": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: constructors",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.methods": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: methods",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.accessors": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: accessors",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.functions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: functions",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.lambdas": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: lambdas",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.controlBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: controlBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.switchBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: switchBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.caseBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: caseBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.tryBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: tryBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.elseBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: elseBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.catchBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: catchBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.finallyBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: finallyBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.objectLiterals": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: objectLiterals",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.braces.objectPatterns": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Brace placement: objectPatterns",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.indentation.style": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: style",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.indentation.size": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: size",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.indentation.tabWidth": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: tabWidth",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.indentation.continuation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: continuation",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.indentation.caseLabels": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: caseLabels",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.indentation.caseContents": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: caseContents",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.indentation.caseBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: caseBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.indentation.labels": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: labels",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.afterControlKeywords": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: afterControlKeywords",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.beforeFunctionParen": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: beforeFunctionParen",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.beforeMethodParen": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: beforeMethodParen",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.beforeCallParen": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: beforeCallParen",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideControlParens": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideControlParens",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideDeclarationParens": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideDeclarationParens",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideCallParens": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideCallParens",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideOtherParens": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideOtherParens",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideEmptyDeclarationParens": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideEmptyDeclarationParens",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideEmptyCallParens": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideEmptyCallParens",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.beforeInheritanceColon": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: beforeInheritanceColon",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.afterInheritanceColon": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: afterInheritanceColon",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.binaryOperators": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: binaryOperators",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.beforeAssignment": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: beforeAssignment",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.afterAssignment": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: afterAssignment",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.beforeComma": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: beforeComma",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.afterComma": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: afterComma",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.beforeDot": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: beforeDot",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.afterDot": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: afterDot",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.beforeForSemicolon": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: beforeForSemicolon",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.afterForSemicolon": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: afterForSemicolon",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.beforeSquareBracket": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: beforeSquareBracket",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideSquareBrackets": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideSquareBrackets",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideEmptySquareBrackets": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideEmptySquareBrackets",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideObjectBraces": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideObjectBraces",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideEmptyBlockBraces": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideEmptyBlockBraces",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideEmptyObjectBraces": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideEmptyObjectBraces",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.shortBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: shortBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.shortFunctions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: shortFunctions",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.shortLambdas": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: shortLambdas",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.shortIfs": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: shortIfs",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.shortLoops": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: shortLoops",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.shortCases": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: shortCases",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.objectMembers": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: objectMembers",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.separateDefinitions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: separateDefinitions",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.maxEmptyLines": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: maxEmptyLines",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.emptyLinesAtBlockStart": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: emptyLinesAtBlockStart",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.emptyLinesAtBlockEnd": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: emptyLinesAtBlockEnd",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.columnLimit": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: columnLimit",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.arguments": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: arguments",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.parameters": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: parameters",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.alignAfterOpenBracket": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: alignAfterOpenBracket",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.allowAllArgumentsOnNextLine": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: allowAllArgumentsOnNextLine",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.allowAllParametersOnNextLine": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: allowAllParametersOnNextLine",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.binaryOperators": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: binaryOperators",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.constructorInitializer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: constructorInitializer",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.whitespace.endOfLine": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Whitespace and line endings: endOfLine",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.whitespace.finalNewline": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Whitespace and line endings: finalNewline",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.whitespace.trimTrailingWhitespace": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Whitespace and line endings: trimTrailingWhitespace",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.bracesRequired.mode": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Control-flow braces: mode",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
                 "constructor-return-value": {
                     "$ref": "#/definitions/rule"
                 },
                 "class-constructor-name": {
                     "$ref": "#/definitions/rule"
+                },
+                "lgd.format.indentation.constructorInitializer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: constructorInitializer",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.indentation.tabUsage": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Indentation: tabUsage",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.preserveSingleLineBlocks": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: preserveSingleLineBlocks",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.preserveSingleLineStatements": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: preserveSingleLineStatements",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
                 }
             }
         },

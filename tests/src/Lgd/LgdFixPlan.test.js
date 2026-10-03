@@ -24,7 +24,7 @@ test('deduplicates actions, preserves adjacent replacements and drops overlappin
     expect(plan.entries).toHaveLength(2);
     expect(plan.skipped).toBe(1);
     expect(LgdFixPlan.previews(plan)[0]).toMatchObject({ before: 'abcdef', after: 'ABcdef' });
-    expect(LgdFixPlan.workspaceEdit(plan).replacements).toHaveLength(2);
+    expect(plan.edits).toHaveLength(2);
     document.version++;
     expect(LgdFixPlan.isCurrent(plan)).toBe(false);
 });

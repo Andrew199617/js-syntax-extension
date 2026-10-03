@@ -3,10 +3,12 @@ const os = require('os');
 const path = require('path');
 const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
-const LgdFixConfiguration = require('../../../src/Lgd/Fixes/LgdFixConfiguration');
+const LgdFixConfiguration = require('../../../src/Editors/VSCode/LgdFixConfiguration');
 const LgdFixGlob = require('../../../src/Lgd/Fixes/LgdFixGlob');
 const createQuickFixRegistry = require('../../../src/Lgd/QuickFixes/QuickFixRegistry');
 const configurationSchema = require('../../../schemas/lgd.schema.json');
+const LgdFormattingSources = require('../../../src/Lgd/Formatting/LgdFormattingSources');
+const LgdFormattingPolicy = require('../../../src/Lgd/Fixes/LgdFormattingPolicy');
 
 /** @description Writes a JSON configuration in a real temporary workspace. */
 async function writeConfiguration(directory, configuration, name = '.vscode/lgd.json')
@@ -393,6 +395,37 @@ describe('LGD project fix configuration', () =>
         await fs.promises.mkdir(path.join(workspaceRoot, 'generated'));
         await fs.promises.symlink(path.join(workspaceRoot, 'generated'), path.join(workspaceRoot, 'sources'));
         expect((await reader.resolve(makeDocument(workspaceRoot, 'sources/Example.lgd'))).ignored).toBe(true);
+    });
+
+    test('native style options and per-option policies merge after declarative imports', async () =>
+    {
+        reader.formattingSources = LgdFormattingSources;
+        const nativeIndentSize = 4;
+        const editorConfig = await writeConfiguration(directory, '[*.lgd]\nindent_style = space\nindent_size = 2\n', '.editorconfig');
+        await writeConfiguration(directory, { version: 1, formatting: { enabled: true, sources: ['editorconfig'], options: { indentation: { size: 8 } } },
+            rules: { 'lgd.format.indentation': { fix: 'automatic', severity: 'error', options: { size: nativeIndentSize } },
+                'lgd.format.indentation.size': { fix: 'manual' } } });
+        const document = makeDocument(directory, 'Example.lgd');
+        const result = await reader.resolve(document);
+        expect(result.valid).toBe(true);
+        expect(result.formatting.options.indentation.size).toBe(nativeIndentSize);
+        expect(LgdFormattingPolicy.setting('lgd.format.indentation.size', result.rules)).toMatchObject({ fix: 'manual', severity: 'error' });
+        expect(result.configSnapshots.some(snapshot => snapshot.path === editorConfig)).toBe(true);
+        await fs.promises.writeFile(editorConfig, '[*.lgd]\nindent_size = 3\n');
+        expect(await reader.isCurrent(document, result)).toBe(false);
+    });
+
+    test.each([
+        { enabled: 'yes' },
+        { enabled: true, sources: ['executable-config'] },
+        { enabled: true, sources: [ 'eslint', 'eslint' ] },
+        { options: { spacing: { unknown: true } } },
+        { options: { indentation: { size: 0 } } },
+        { options: { braces: { wrapping: { constructors: 'nextLine' }, style: 'invented' } } }
+    ])('invalid native style settings fail closed: %p', async formatting =>
+    {
+        await writeConfiguration(directory, { version: 1, formatting: formatting });
+        expect((await reader.resolve(makeDocument(directory, 'Example.lgd'))).valid).toBe(false);
     });
 
     test('configuration events refresh diagnostics without editing source documents', async () =>

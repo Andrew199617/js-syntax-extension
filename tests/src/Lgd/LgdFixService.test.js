@@ -1,7 +1,7 @@
 const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
-const LgdFixService = require('../../../src/Lgd/Fixes/LgdFixService');
+const LgdFixService = require('../../../src/Editors/VSCode/LgdFixService');
 
 
 /** @description Creates real compiler diagnostics with controlled configuration and atomic source edits. */
@@ -19,6 +19,7 @@ async function fixture(source, options = {})
     const fixes = LgdFixService.create(service);
     const config = { valid: true, ignored: false, root: '/project', autoFix: false, rules: {}, ...options };
     fixes.configuration = { resolve: jest.fn(() => Promise.resolve(config)), isCurrent: jest.fn(() => Promise.resolve(true)), buffersCurrent: jest.fn(() => true) };
+    fixes.formattingDiagnostics.configuration = fixes.configuration;
     const baseApply = vscode.workspace.applyEdit.getMockImplementation();
     vscode.workspace.applyEdit.mockImplementation(edit =>
     {
@@ -62,10 +63,14 @@ jest.mock('vscode', () =>
 /** @description Original mirror-edit implementation, restored between fixtures. */
 const baseApply = vscode.workspace.applyEdit.getMockImplementation();
 
+/** @description Restores document creation after discovery tests customize file opening. */
+const baseOpen = vscode.workspace.openTextDocument.getMockImplementation();
+
 beforeEach(() =>
 {
     vscode.__reset();
     vscode.workspace.applyEdit.mockImplementation(baseApply);
+    vscode.workspace.openTextDocument.mockImplementation(baseOpen);
     vscode.workspace.isTrusted = true;
     vscode.workspace.workspaceFolders = [];
     vscode.workspace.textDocuments = [];
@@ -286,4 +291,51 @@ test('allows the narrowly safe return-this fix without enabling factory migratio
     expect(batch.plan.entries).toHaveLength(1);
     expect(batch.plan.entries[0].proposal.newText).toBe('return;');
     expect(document.getText()).toBe(source);
+});
+
+test('native save actions inherit a family mode while respecting a per-option manual override', async () =>
+{
+    const { fixes, document } = await fixture('Number count=1;', {
+        autoFix: true,
+        formatting: { enabled: true, options: {} },
+        rules: { 'lgd.format.spacing': { fix: 'automatic' }, 'lgd.format.spacing.beforeAssignment': { fix: 'manual' } }
+    });
+    const batch = await fixes.plan([document], { automatic: true });
+    expect(batch.plan.entries.map(entry => entry.handler.ruleId)).toEqual(['lgd.format.spacing.afterAssignment']);
+    expect(await fixes.applyBatch(batch, true)).toBe(true);
+    expect(document.getText()).toBe('Number count= 1;');
+});
+
+test('style diagnostic severity is independent of compiler errors and fix enablement', async () =>
+{
+    const { fixes, document, service, config } = await fixture('Number count=1;', {
+        formatting: { enabled: true, options: {} },
+        rules: { 'lgd.format.spacing': { fix: 'off', severity: 'error' } }
+    });
+    await fixes.formattingDiagnostics.refresh(document);
+    const diagnostics = fixes.formattingDiagnostics.collection.set.mock.calls[0][1];
+    expect(diagnostics).toHaveLength(2);
+    expect(diagnostics.every(diagnostic => diagnostic.severity === vscode.DiagnosticSeverity.Error && diagnostic.code === 'style')).toBe(true);
+    expect(service.getState(document.uri).errors).toEqual([]);
+    expect((await fixes.plan([document], { automatic: false })).plan.entries).toEqual([]);
+    config.rules['lgd.format.spacing'].severity = 'off';
+    await fixes.formattingDiagnostics.refresh(document);
+    expect(fixes.formattingDiagnostics.collection.set.mock.calls.slice(-1)[0][1]).toEqual([]);
+    config.valid = false;
+    await fixes.formattingDiagnostics.refresh(document);
+    expect(fixes.formattingDiagnostics.collection.delete).toHaveBeenCalledWith(document.uri);
+});
+
+test('every contributing option must permit an automatic formatting edit', async () =>
+{
+    const { fixes, config } = await fixture('Number count=1;', {
+        autoFix: true,
+        formatting: { enabled: true, options: {} },
+        rules: { 'lgd.format.spacing': { fix: 'automatic' }, 'lgd.format.whitespace': { fix: 'manual' } }
+    });
+    const handler = fixes.ruleHandlers.get('lgd.format.spacing.beforeAssignment');
+    const error = { relatedRuleIds: ['lgd.format.whitespace.endOfLine'] };
+    expect(fixes.eligibleError(handler, error, config, { automatic: true })).toBe(false);
+    config.rules['lgd.format.whitespace'].fix = 'automatic';
+    expect(fixes.eligibleError(handler, error, config, { automatic: true })).toBe(true);
 });

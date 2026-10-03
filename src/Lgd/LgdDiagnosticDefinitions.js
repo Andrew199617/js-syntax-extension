@@ -1,6 +1,9 @@
+const LgdFormattingPolicy = require('./Fixes/LgdFormattingPolicy');
+
 /** @description Short editor categories, independent of stable compiler diagnostic identities. */
 const categories = Object.freeze({
     syntax: 'syntax',
+    style: 'style',
     type: 'type',
     inheritance: 'inheritance',
     configuration: 'configuration',
@@ -51,7 +54,13 @@ const LgdDiagnosticDefinitions = {
     /** @description Resolves a stable compiler identity to an explicit short editor definition. */
     get(error)
     {
-        const definition = Object.hasOwn(definitions, error.code) ? definitions[error.code] : null;
+        let definition = Object.hasOwn(definitions, error.code) ? definitions[error.code] : null;
+        if(!definition && LgdFormattingPolicy.definition(error.code))
+        {
+            const kind = `format:${error.code}`;
+            definition = { category: 'style', proposalKind: kind, fixKinds: [kind] };
+        }
+
         let category = definition?.category;
         if(Object.hasOwn(categories, error.category))
         {

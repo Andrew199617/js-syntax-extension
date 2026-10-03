@@ -1,8 +1,13 @@
 const path = require('path');
 const vscode = require('vscode');
-const LgdFixEngine = require('./LgdFixEngine');
-const LgdFixPlan = require('./LgdFixPlan');
+const LgdFixRuntime = require('./LgdFixRuntime');
+const LgdFixEdits = require('./LgdFixEdits');
+const LgdFixPlan = require('../../Lgd/Fixes/LgdFixPlan');
 const LgdFixConfiguration = require('./LgdFixConfiguration');
+const LgdFormattingDiagnostics = require('./LgdFormattingDiagnostics');
+const LgdFormattingPolicy = require('../../Lgd/Fixes/LgdFormattingPolicy');
+const LgdFormattingRules = require('../../Lgd/Fixes/LgdFormattingRules');
+const LgdFormattingSources = require('../../Lgd/Formatting/LgdFormattingSources');
 
 /** @description Native save-participant source action; no save listener or filesystem write loop. */
 const SOURCE_KIND = 'source.fixAll.lgd';
@@ -23,9 +28,11 @@ const LgdFixService = {
     {
         const service = Object.create(LgdFixService);
         service.languageService = languageService;
-        service.engine = LgdFixEngine.create(languageService);
+        service.engine = LgdFixRuntime.create(languageService);
         const ruleIds = Array.from(new Set(Array.from(service.engine.handlers.values(), handler => handler.ruleId)));
-        service.configuration = LgdFixConfiguration.create(ruleIds);
+        service.configuration = LgdFixConfiguration.create(ruleIds, LgdFormattingSources);
+        service.ruleHandlers = new Map(Array.from(service.engine.handlers.values(), handler => [ handler.ruleId, handler ]));
+        service.formattingDiagnostics = LgdFormattingDiagnostics.create(service.configuration, languageService.onError);
         service.pending = new Map();
         service.previews = new Map();
         service.nextId = 0;
@@ -36,7 +43,8 @@ const LgdFixService = {
     /** @description Registers explicit commands, save source actions and read-only native diff documents. */
     register(subscriptions)
     {
-        this.configuration.register(subscriptions);
+        this.formattingDiagnostics.register(subscriptions);
+        this.configuration.register(subscriptions, () => this.formattingDiagnostics.refreshAll());
         subscriptions.push(vscode.commands.registerCommand('lgd.fixAll', () => this.chooseScope()));
         subscriptions.push(vscode.commands.registerCommand('lgd.fixAllDocument', () => this.run('document')));
         subscriptions.push(vscode.commands.registerCommand('lgd.fixAllFile', () => this.run('document')));
@@ -57,14 +65,15 @@ const LgdFixService = {
     },
 
     /** @description Keeps individual quick fixes available unless the project explicitly disables their rule. */
-    async prepareIndividual(proposal, handler)
+    async prepareIndividual(proposal, handler, analysis = {})
     {
         const targets = new Set([ proposal, ...proposal.additionalEdits || [] ].map(edit => edit.target.document));
         proposal.fixConfigurations = [];
         for(const document of targets)
         {
-            const config = await this.configuration.resolve(document);
-            if(!config.valid || config.ignored || config.rules[handler.ruleId]?.fix === 'off')
+            const config = document === analysis.document ? analysis.configuration : await this.configuration.resolve(document);
+            const enabled = (proposal.ruleIds || [handler.ruleId]).every(ruleId => LgdFormattingPolicy.setting(ruleId, config.rules).fix !== 'off');
+            if(!config.valid || config.ignored || !enabled)
             {
                 return false;
             }
@@ -99,19 +108,48 @@ const LgdFixService = {
     /** @description Defaults only source-preserving migrations into manual Fix All; automatic fixes are opt-in twice. */
     eligible(handler, config, automatic, selectedRules)
     {
-        if(handler.individualOnly || selectedRules && !selectedRules.includes(handler.ruleId))
+        const selected = !selectedRules || selectedRules.includes(handler.ruleId) || selectedRules.includes(handler.parentRuleId);
+        if(handler.individualOnly || !selected)
         {
             return false;
         }
 
-        const configured = config.rules[handler.ruleId]?.fix;
-        const mode = configured || (handler.automatic ? 'manual' : 'off');
+        const setting = LgdFormattingPolicy.setting(handler.ruleId, config.rules);
+        if(setting.severity === 'off')
+        {
+            return false;
+        }
+
+        const mode = setting.fix || (handler.automatic ? 'manual' : 'off');
         if(automatic)
         {
             return config.autoFix && mode === 'automatic' && handler.automatic === true;
         }
 
         return mode !== 'off';
+    },
+
+    /** @description Requires every option contributing to an atomic style edit to permit the requested mode. */
+    eligibleError(handler, error, configuration, options)
+    {
+        if(options.safeOnly && !handler.automatic || !this.eligible(handler, configuration, options.automatic, options.rules))
+        {
+            return false;
+        }
+
+        return (error.relatedRuleIds || []).every(ruleId =>
+        {
+            const related = this.ruleHandlers.get(ruleId);
+            return related && this.eligible(related, configuration, options.automatic, options.rules);
+        });
+    },
+
+    /** @description Adds fresh style findings for this request without mutating semantic compiler state. */
+    async analysisRequest(document, state, configuration)
+    {
+        const config = configuration || await this.configuration.resolve(document);
+        const formattingErrors = LgdFormattingRules.analyze(document.getText(), config);
+        return { configuration: config, formattingErrors: formattingErrors, state: { ...state, errors: [ ...state?.errors || [], ...formattingErrors ] } };
     },
 
     /** @description Offers save-compatible actions only for explicitly opted-in, automatic-safe migrations. */
@@ -252,10 +290,10 @@ const LgdFixService = {
             }
 
             const state = await this.engine.currentState(document);
-            const candidates = await this.engine.collect(
-                document, state, state?.errors || [],
-                { token: options.token, eligible: handler => (!options.safeOnly || handler.automatic) && this.eligible(handler, config, options.automatic, options.rules) }
-            );
+            const analysis = await this.analysisRequest(document, state, config);
+            const request = { token: options.token, configuration: config, formattingErrors: analysis.formattingErrors,
+                eligible: (handler, error) => this.eligibleError(handler, error, config, options) };
+            const candidates = await this.engine.collect(document, analysis.state, analysis.state.errors, request);
             for(const entry of candidates)
             {
                 const edits = [ entry.proposal, ...entry.proposal.additionalEdits || [] ];
@@ -266,7 +304,7 @@ const LgdFixService = {
                     const key = target.uri.toString();
                     const targetConfig = configurations.get(key)?.config || await this.configuration.resolve(target);
                     configurations.set(key, { document: target, config: targetConfig });
-                    if(!targetConfig.valid || targetConfig.ignored || !this.eligible(entry.handler, targetConfig, options.automatic, options.rules))
+                    if(!targetConfig.valid || targetConfig.ignored || !this.eligibleError(entry.handler, entry.error, targetConfig, options))
                     {
                         permitted = false;
                     }
@@ -457,7 +495,7 @@ const LgdFixService = {
             }
 
             seen.add(signature);
-            if(!await LgdFixPlan.apply(batch.plan, this.languageService))
+            if(!await LgdFixEdits.apply(batch.plan, this.languageService))
             {
                 return applied;
             }

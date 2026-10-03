@@ -1,6 +1,8 @@
 const RenameClassConstructorFix = require('./RenameClassConstructorFix');
 const ReplaceConstructorReturnThisFix = require('./ReplaceConstructorReturnThisFix');
 const RemoveReturnDocTypeFix = require('./RemoveReturnDocTypeFix');
+const FormattingFix = require('./FormattingFix');
+const LgdFormattingPolicy = require('../Fixes/LgdFormattingPolicy');
 const ReplaceReadonlyLocalFix = require('./ReplaceReadonlyLocalFix');
 const ConvertObjectInheritanceFix = require('./ConvertObjectInheritanceFix');
 const ChangeParameterAndReturnTypeFix = require('./ChangeParameterAndReturnTypeFix');
@@ -31,6 +33,11 @@ function createQuickFixRegistry()
         { handler: new ChangeReturnTypeFix(), ruleId: 'return-type' },
         { handler: new UseStaticTypeReceiverFix(), ruleId: 'static-member-receiver' }
     ];
+
+    for(const rule of LgdFormattingPolicy.rules())
+    {
+        handlers.push({ handler: new FormattingFix(rule), ruleId: rule.id, parentRuleId: rule.parentRuleId, automatic: true });
+    }
 
     return new Map(handlers.map(entry =>
     {

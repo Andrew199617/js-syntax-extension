@@ -1,16 +1,15 @@
 const DiagnosticQuickFix = require('../QuickFixes/DiagnosticQuickFix');
-const QuickFixContext = require('../QuickFixes/QuickFixContext');
-const createQuickFixRegistry = require('../QuickFixes/QuickFixRegistry');
 const LgdDiagnosticDefinitions = require('../LgdDiagnosticDefinitions');
 
 /** @description Shared diagnostic-to-proposal pipeline; strategies own all syntax-specific changes. */
 const LgdFixEngine = {
     /** @description Creates the common strategy registry for interactive and batch callers. */
-    create(languageService)
+    create(languageService, adapter)
     {
         const engine = Object.create(LgdFixEngine);
         engine.languageService = languageService;
-        engine.handlers = createQuickFixRegistry();
+        engine.handlers = adapter.handlers;
+        engine.createContext = adapter.createContext;
         return engine;
     },
 
@@ -40,7 +39,9 @@ const LgdFixEngine = {
         }
 
         const analysisIdentity = this.analysisIdentity(document, state.externals);
-        const context = new QuickFixContext(this.languageService, document, state);
+        const context = this.createContext(document, state);
+        context.configuration = options.configuration;
+        context.formattingErrors = options.formattingErrors;
         if(!await context.prepare())
         {
             return [];
