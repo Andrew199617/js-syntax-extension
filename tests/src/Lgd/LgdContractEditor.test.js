@@ -40,7 +40,11 @@ describe('LGD interface and abstract editor contracts', () =>
         expect(abstractHover.contents).not.toContain('create(');
         const spans = LgdSemanticTokensProvider.create(service).collectSemanticSpans(source, state);
         const keywords = spans.filter(span => span.tokenType === 'keyword').map(span => source.slice(span.start, span.end));
-        expect(keywords).toEqual(expect.arrayContaining([ 'interface', 'abstract', 'class', 'get', 'set' ]));
+        expect(keywords).toEqual(expect.arrayContaining([ 'get', 'set' ]));
+        const declarations = spans.filter(span => span.tokenType === 'lgdDeclarationKeyword').map(span => source.slice(span.start, span.end));
+        expect(declarations).toEqual(expect.arrayContaining([ 'interface', 'class' ]));
+        const modifiers = spans.filter(span => span.tokenType === 'lgdModifierKeyword').map(span => source.slice(span.start, span.end));
+        expect(modifiers).toEqual(expect.arrayContaining(['abstract']));
         const interfaceTypes = spans.filter(span => source.slice(span.start, span.end) === 'ILabel');
         expect(interfaceTypes).toHaveLength(2);
         expect(interfaceTypes.every(span => span.tokenType === 'class')).toBe(true);
