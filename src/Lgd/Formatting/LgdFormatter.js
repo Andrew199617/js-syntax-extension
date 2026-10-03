@@ -206,7 +206,12 @@ const LgdFormatter = {
 
         let preference;
         let option;
-        if(assignments.has(previous.text))
+        if(context.model.casts.some(cast => cast.headEnd === previous.end))
+        {
+            option = 'afterCast';
+            preference = spacing.afterCast;
+        }
+        else if(assignments.has(previous.text))
         {
             option = 'afterAssignment';
             preference = spacing[option];
@@ -338,6 +343,11 @@ const LgdFormatter = {
         if(kind === 'call')
         {
             return empty ? 'insideEmptyCallParens' : 'insideCallParens';
+        }
+
+        if(kind === 'cast')
+        {
+            return 'insideCastParens';
         }
 
         return [ 'control', 'for' ].includes(kind) ? 'insideControlParens' : 'insideOtherParens';

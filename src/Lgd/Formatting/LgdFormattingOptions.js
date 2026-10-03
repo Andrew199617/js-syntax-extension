@@ -25,7 +25,7 @@ const catalog = [
         id: 'lgd.format.spacing', title: 'Horizontal spacing',
         defaults: {
             afterControlKeywords: false, beforeFunctionParen: false, beforeMethodParen: false, beforeCallParen: false,
-            insideControlParens: false, insideDeclarationParens: false, insideCallParens: false, insideOtherParens: false,
+            afterCast: false, insideCastParens: false, insideControlParens: false, insideDeclarationParens: false, insideCallParens: false, insideOtherParens: false,
             insideEmptyDeclarationParens: false, insideEmptyCallParens: false,
             beforeInheritanceColon: true, afterInheritanceColon: true, binaryOperators: 'both', beforeAssignment: true, afterAssignment: true,
             beforeComma: false, afterComma: true, beforeDot: false, afterDot: false, beforeForSemicolon: false, afterForSemicolon: true,

@@ -364,6 +364,12 @@
                                 "beforeCallParen": {
                                     "type": "boolean"
                                 },
+                                "afterCast": {
+                                    "type": "boolean"
+                                },
+                                "insideCastParens": {
+                                    "type": "boolean"
+                                },
                                 "insideControlParens": {
                                     "type": "boolean"
                                 },
@@ -1035,6 +1041,12 @@
                                     "type": "boolean"
                                 },
                                 "beforeCallParen": {
+                                    "type": "boolean"
+                                },
+                                "afterCast": {
+                                    "type": "boolean"
+                                },
+                                "insideCastParens": {
                                     "type": "boolean"
                                 },
                                 "insideControlParens": {
@@ -3571,6 +3583,52 @@
                     "type": "object",
                     "additionalProperties": false,
                     "title": "Whitespace and line endings: fileHeader",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.afterCast": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: afterCast",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.insideCastParens": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: insideCastParens",
                     "properties": {
                         "fix": {
                             "type": "string",

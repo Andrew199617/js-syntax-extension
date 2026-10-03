@@ -127,7 +127,7 @@ it('maps independent C# parentheses, binary operator and inherited colon prefere
         [ 'csharp_space_before_colon_in_inheritance_clause', 'false' ],
         [ 'csharp_space_around_binary_operators', 'none' ]
     ]));
-    expect(mapped.options.spacing).toEqual({ insideControlParens: true, insideOtherParens: true, insideCallParens: false, insideDeclarationParens: true, beforeInheritanceColon: false, binaryOperators: 'none' });
+    expect(mapped.options.spacing).toEqual({ insideCastParens: false, insideControlParens: true, insideOtherParens: true, insideCallParens: false, insideDeclarationParens: true, beforeInheritanceColon: false, binaryOperators: 'none' });
     expect(mapped.issues).toEqual([]);
 });
 
@@ -207,5 +207,15 @@ it('maps explicit declaration, embedded-statement, import-group and header prefe
     expect(imported.options.lineBreaks).toEqual({ embeddedStatementsSameLine: false, importGroups: 'origin' });
     expect(imported.options.whitespace.fileHeader).toBe('My Project\nCopyright 2026');
     expect(imported.rules['lgd.format.whitespace.fileHeader'].severity).toBe('warning');
+    expect(imported.issues).toHaveLength(0);
+});
+
+it('imports cast-head and post-cast spacing independently', () =>
+{
+    const imported = LgdEditorConfig.map(Object.fromEntries([
+        [ 'csharp_space_after_cast', 'true' ],
+        [ 'csharp_space_between_parentheses', 'type_casts, expressions' ]
+    ]));
+    expect(imported.options.spacing).toMatchObject({ afterCast: true, insideCastParens: true, insideOtherParens: true, insideControlParens: false });
     expect(imported.issues).toHaveLength(0);
 });

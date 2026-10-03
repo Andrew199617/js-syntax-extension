@@ -240,3 +240,35 @@ it('inserts only an explicit header and preserves existing license comments', ()
     expect(LgdFormatter.format(source)).toBe(source);
     expect(LgdFormatter.format(`// lgd-format off\n${source}`, configuration)).toBe(`// lgd-format off\n${source}`);
 });
+
+it.each([
+    'Number count=( Number ) "2";',
+    'Number count=(Number)(Number) "2";',
+    'class Example {}\nObject value = {};\nExample casted = ( Example ) value;',
+    'const result = (Number) /2/.test("2");',
+    'const result = (Number) `2`;'
+])('formats checked cast source without changing conversion or assertion behavior: %s', source =>
+{
+    const compiler = require('../../../../src/Compilers/LgdCompiler').create();
+
+    const before = compiler.compileToJs(source);
+    expect(before.errors).toHaveLength(0);
+    const configuration = { options: { spacing: { afterCast: true, insideCastParens: true } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    const after = compiler.compileToJs(formatted);
+    expect(after.errors).toHaveLength(0);
+    expect(after.casts.map(cast => cast.typeName)).toEqual(before.casts.map(cast => cast.typeName));
+    expect(formatted).toMatch(/\( (?:Number|Example) \) /u);
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});
+
+it('keeps casts separate from grouped expressions and invocation parentheses', () =>
+{
+    const source = 'Number count = (Number) "2";\nconst grouped = ( count + 1 );\nconst called = call( count );';
+    const configuration = { options: { spacing: { insideCastParens: true, insideOtherParens: false, insideCallParens: false } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('( Number )"2"');
+    expect(formatted).toContain('(count + 1)');
+    expect(formatted).toContain('call(count)');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});

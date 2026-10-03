@@ -1,5 +1,6 @@
 const parser = require('@babel/parser');
 const LgdCompiler = require('../../Compilers/LgdCompiler');
+const LgdCastSyntax = require('../../Compilers/LgdCastSyntax');
 const JsBackend = require('../../Compilers/JsBackend');
 const LgdSourceMap = require('../../Compilers/LgdSourceMap');
 
@@ -15,10 +16,10 @@ const LgdFormattingModel = {
         {
             const compiler = LgdCompiler.create();
             const parsed = compiler.parse(source, new Map(), { deferAnalysis: true });
-            const emitted = compiler.emitRange(source, JsBackend.create(compiler.detectNewline(source)), compiler.fullRange(source, parsed.declarations));
+            const emitted = LgdCastSyntax.emit(compiler, source, JsBackend.create(compiler.detectNewline(source)), { parsed: parsed, externals: new Map() });
             const tree = parser.parse(emitted.code, { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true });
             const model = {
-                source: source, parsed: parsed, emitted: emitted, tree: tree, map: LgdSourceMap.create(emitted.segments),
+                source: source, parsed: parsed, casts: parsed.casts || [], emitted: emitted, tree: tree, map: LgdSourceMap.create(emitted.segments),
                 protected: [], nodes: [], braces: new Map(), parens: new Map(), controls: [], cases: [], labels: new Set(),
                 heritageColons: new Set(), constructorColons: new Set(), functionParens: new Set(), doWhileKeywords: new Set(),
                 conditionalTokens: new Set(), returnTypes: new Set(), declarationHeads: [], importStarts: new Map(), importEnds: new Map()
@@ -323,6 +324,11 @@ const LgdFormattingModel = {
         for(const record of model.nodes)
         {
             this.classifyNode(model, record);
+        }
+
+        for(const cast of model.casts)
+        {
+            model.parens.set(cast.start, 'cast');
         }
 
         for(const [ index, token ] of model.codeTokens.entries())

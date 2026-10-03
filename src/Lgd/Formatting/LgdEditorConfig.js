@@ -40,6 +40,7 @@ const booleanMappings = Object.fromEntries([
     [ 'csharp_style_allow_blank_line_after_token_in_conditional_expression_experimental', [ 'lineBreaks', 'blankLineAfterConditionalToken' ] ],
     [ 'csharp_style_allow_blank_line_after_arrow_expression_clause_experimental', [ 'lineBreaks', 'blankLineAfterArrow' ] ],
     [ 'csharp_style_allow_embedded_statements_on_same_line_experimental', [ 'lineBreaks', 'embeddedStatementsSameLine' ] ],
+    [ 'csharp_space_after_cast', [ 'spacing', 'afterCast' ] ],
     [ 'trim_trailing_whitespace', [ 'whitespace', 'trimTrailingWhitespace' ] ]
 ]);
 
@@ -616,14 +617,15 @@ const LgdEditorConfig = {
     parenthesisOption(result, key, value)
     {
         const elements = value === 'false' ? [] : value.split(',').map(part => part.trim());
-        if(elements.some(element => ![ 'control_flow_statements', 'expressions' ].includes(element)))
+        if(elements.some(element => ![ 'control_flow_statements', 'expressions', 'type_casts' ].includes(element)))
         {
-            return this.unsupported(result, key, 'Only control_flow_statements and expressions have LGD parenthesis mappings.');
+            return this.unsupported(result, key, 'Only control_flow_statements, expressions and type_casts have LGD parenthesis mappings.');
         }
 
         const control = this.setOption(result, [ 'spacing', 'insideControlParens' ], elements.includes('control_flow_statements'));
         const expressions = this.setOption(result, [ 'spacing', 'insideOtherParens' ], elements.includes('expressions'));
-        return [ ...control, ...expressions ];
+        const casts = this.setOption(result, [ 'spacing', 'insideCastParens' ], elements.includes('type_casts'));
+        return [ ...control, ...expressions, ...casts ];
     },
 
     /** @description Severity imports never authorize a fix or suppress an LGD compiler error. */
