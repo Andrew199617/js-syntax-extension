@@ -116,7 +116,9 @@ describe('LGD immutable variable declarations', () =>
     test('never migrates readonly member syntax and preserves getter-only contracts', () =>
     {
         const source = 'class Sample {\n    readonly Number value = 1;\n}';
-        expect(compile(source).errors.map(error => error.code)).toEqual(['lgd.syntax.memberModifier']);
+        const field = compile(source);
+        expect(field.errors).toEqual([]);
+        expect(field.declarations[0].classMembers[0]).toMatchObject({ kind: 'field', readonly: true });
         const contract = compile('interface IRead { Number value { get; } }');
         expect(contract.errors).toEqual([]);
         expect(contract.code).toContain('readonly value: number');
