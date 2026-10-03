@@ -78,7 +78,7 @@ describe('final generated JavaScript validation', () =>
         expect(result.errors).toEqual([expect.objectContaining({
             offset: position,
             endOffset: Math.min(position + 1, source.length),
-            message: "Expected an expression after '='.",
+            message: "Expected an expression after '='. Add a value.",
             debug: {
                 reasonCode: 'UnexpectedToken',
                 generatedOffset: position,
@@ -168,7 +168,7 @@ describe('final generated JavaScript validation', () =>
         const result = LgdGeneratedJsValidator.validate({ code: code, segments: segments }, source);
         expect(result.errors[0].offset).toBe(source.indexOf(';'));
         expect(result.errors[0].endOffset).toBe(source.indexOf(';') + 1);
-        expect(result.errors[0].message).toBe("Expected an expression after '='.");
+        expect(result.errors[0].message).toBe("Expected an expression after '='. Add a value.");
     });
 
     test('maps syntax failures after interface erasure to the original CRLF source', () =>
@@ -180,7 +180,7 @@ describe('final generated JavaScript validation', () =>
         const result = LgdGeneratedJsValidator.validate({ code: code, segments: segments }, source);
         expect(result.errors[0].offset).toBe(source.indexOf(';'));
         expect(result.errors[0].endOffset).toBe(source.indexOf(';') + 1);
-        expect(result.errors[0].message).toBe("Expected an expression after '='.");
+        expect(result.errors[0].message).toBe("Expected an expression after '='. Add a value.");
     });
 
     test('maps an unexpected end of file to the source end without inventing a character', () =>
@@ -205,7 +205,7 @@ describe('generated JavaScript compiler integration', () =>
             offset: source.lastIndexOf(';'),
             endOffset: source.lastIndexOf(';') + 1,
             line: 2,
-            message: "Expected an expression after '='."
+            message: "Expected an expression after '='. Add a value."
         });
     });
 
@@ -215,7 +215,7 @@ describe('generated JavaScript compiler integration', () =>
         const result = LgdCompiler.create().compileToJs(source, new Map(), { javascriptObjectModel: javascriptObjectModel });
         expect(result.errors).toEqual([expect.objectContaining({
             offset: source.lastIndexOf(';'), endOffset: source.length, line: 2,
-            message: "Expected an expression after '='.",
+            message: "Expected an expression after '='. Add a value.",
             debug: expect.objectContaining({ reasonCode: 'UnexpectedToken' })
         })]);
     });

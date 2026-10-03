@@ -18,16 +18,20 @@ const LgdSyntaxDiagnostic = {
         const endOffset = Math.max(offset, map.toSource(Math.min(position + 1, emitted.code.length)));
         const detail = error.message.replace(/ \(\d+:\d+\)$/, '');
         const sourcePosition = typeof source === 'string' && this._isCopiedPosition(emitted, source, position, offset);
+        const identitySource = typeof source === 'string' && source === emitted.code;
+        let category = identitySource ? 'syntax' : 'compilation';
         let message = `Unable to compile this syntax: ${detail}`;
         if(sourcePosition && error.reasonCode === 'UnexpectedToken' && this._hasMissingExpression(emitted, source, position, offset))
         {
-            message = "Expected an expression after '='.";
+            category = 'syntax';
+            message = "Expected an expression after '='. Add a value.";
         }
 
         return {
             offset: offset,
             endOffset: endOffset,
             code: 'lgd.output.syntax',
+            category: category,
             message: message,
             debug: { reasonCode: error.reasonCode, generatedOffset: position, parserMessage: error.message }
         };
