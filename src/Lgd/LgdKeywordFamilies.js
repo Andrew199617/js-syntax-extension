@@ -2,7 +2,7 @@
 const families = Object.freeze({
     control: { tokenType: 'keyword', scope: 'keyword.control.lgd', words: [] },
     declaration: { tokenType: 'lgdDeclarationKeyword', scope: 'storage.type.lgd',
-        words: [ 'class', 'interface', 'function', 'const', 'let', 'var', 'using' ] },
+        words: [ 'class', 'interface', 'enum', 'function', 'const', 'let', 'var', 'using' ] },
     modifier: { tokenType: 'lgdModifierKeyword', scope: 'storage.modifier.lgd',
         words: [ 'abstract', 'async', 'extends', 'override', 'private', 'protected', 'public', 'readonly', 'sealed', 'static', 'virtual' ] },
     builtin: { tokenType: 'lgdTypeKeyword', scope: 'keyword.type.lgd', words: ['void'] }

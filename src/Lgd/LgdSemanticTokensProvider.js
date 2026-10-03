@@ -118,14 +118,14 @@ const LgdSemanticTokensProvider = {
                 spans.push({ start: start, end: start + match[0].length, tokenType: LgdKeywordFamilies.get(match[0]).tokenType });
             }
 
-            if(declaration.kind !== 'class' && declaration.kind !== 'interface')
+            if(declaration.kind !== 'class' && declaration.kind !== 'interface' && declaration.kind !== 'enum')
             {
                 continue;
             }
 
             spans.push({ start: declaration.typeStart, end: declaration.typeStart + declaration.kind.length,
                 tokenType: LgdKeywordFamilies.get(declaration.kind).tokenType });
-            for(const member of declaration.classMembers)
+            for(const member of declaration.classMembers || [])
             {
                 for(const modifier of member.modifierSpans || [])
                 {
@@ -274,7 +274,7 @@ const LgdSemanticTokensProvider = {
         for(const declaration of declarations)
         {
             this.collectParamTypeSpans(declaration, spans);
-            if(declaration.kind === 'class' || declaration.kind === 'interface')
+            if(declaration.kind === 'class' || declaration.kind === 'interface' || declaration.kind === 'enum')
             {
                 spans.push({ start: declaration.nameStart, end: declaration.nameEnd });
                 for(const heritage of declaration.heritage || [])

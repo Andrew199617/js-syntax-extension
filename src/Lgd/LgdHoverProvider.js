@@ -203,6 +203,12 @@ const LgdHoverProvider = {
      */
     renderTypeSummary(summary)
     {
+        if(summary.kind === 'enum')
+        {
+            const lines = summary.members.map(member => `    ${member.name} = ${member.valueText},`);
+            return [ '```lgd', `enum ${summary.name} {`, ...lines, '}', '```' ].join('\n');
+        }
+
         if(summary.kind === 'class' || summary.kind === 'interface')
         {
             const heritage = [ summary.baseName, ...summary.interfaceNames || [] ].filter(Boolean);

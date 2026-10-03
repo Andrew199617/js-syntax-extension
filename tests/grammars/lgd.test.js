@@ -131,6 +131,13 @@ describe('LGD TextMate grammar.', () =>
         assertScope(tokens, 'total', nameScope);
     });
 
+    test('Highlights enum declarations and names with the existing declaration and type families.', () =>
+    {
+        const tokens = tokenize(grammar, "export enum DownloadState {\n    Progress = 'progress',\n}");
+        assertScope(tokens, 'enum', 'storage.type.lgd');
+        assertScope(tokens, 'DownloadState', 'entity.name.type.class.lgd');
+    });
+
     test('Highlights class names and colon-style bases as types while ordinary methods remain functions.', () =>
     {
         const tokens = tokenize(grammar, [

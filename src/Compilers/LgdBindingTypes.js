@@ -1,3 +1,4 @@
+const LgdEnumSyntax = require('./LgdEnumSyntax');
 const traverse = require('@babel/traverse').default;
 const { tsTypeMap } = require('./LgdTypeMaps');
 const { UNKNOWN } = require('./LgdInfer');
@@ -168,6 +169,15 @@ const LgdBindingTypes = {
         }
 
         const context = this._context;
+        const enumDeclaration = binding.path.isVariableDeclarator() && LgdEnumSyntax.receiver(binding.path.get('id'), context);
+        if(enumDeclaration)
+        {
+            const entry = { keyword: enumDeclaration.enumValueType || 'Object', kind: 'keyword', typeName: 'Object',
+                readonly: true, ref: null, enumIdentity: enumDeclaration.name };
+            this._entries.set(binding, entry);
+            return entry;
+        }
+
         const empty = { declaration: {}, group: { inherited: false } };
         const type = this.type(binding, empty);
         if(!type)
@@ -203,7 +213,7 @@ const LgdBindingTypes = {
             {
                 descriptor.kind = 'nominal';
                 descriptor.keyword = target.keyword;
-                descriptor.ref = type;
+                descriptor.ref = target.enumIdentity || type;
             }
         }
 

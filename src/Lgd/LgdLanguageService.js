@@ -345,6 +345,7 @@ const LgdLanguageService = {
                         entry.sourcePath = exported.sourcePath;
                         entry.sourceText = exported.sourceText;
                         entry.kind = exported.kind;
+                        entry.enumValueType = exported.enumValueType;
                         entry.baseName = exported.baseName;
                         entry.members = exported.members;
                         entry.constructorParams = exported.constructorParams;
@@ -432,6 +433,7 @@ const LgdLanguageService = {
         }
 
         const summary = {
+            kind: required?.kind === 'enum' ? 'enum' : declaration.kind,
             name: declaration.name,
             typeName: declaration.typeName,
             readonly: declaration.readonly,

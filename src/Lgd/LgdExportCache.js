@@ -287,6 +287,7 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
         typeName: declaration.typeName,
         keyword: keywords.includes(declaration.typeName) ? declaration.typeName : 'Object',
         kind: declaration.kind,
+        enumValueType: declaration.enumValueType,
         baseName: declaration.baseName,
         constructorParams: getConstructorParams(declaration),
         methodSignatures: methods.methodSignatures,

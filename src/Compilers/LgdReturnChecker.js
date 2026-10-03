@@ -1,4 +1,5 @@
 const parser = require('@babel/parser');
+const LgdEnumSyntax = require('./LgdEnumSyntax');
 const traverse = require('@babel/traverse').default;
 const LgdSourceMap = require('./LgdSourceMap');
 const LgdReturnFlow = require('./LgdReturnFlow');
@@ -38,7 +39,7 @@ const LgdReturnChecker = {
         };
         for(const info of externals.values())
         {
-            context.externalsByName.set(info.exportName, { keyword: info.keyword, kind: 'external' });
+            context.externalsByName.set(info.exportName, { keyword: info.enumValueType || info.keyword, kind: 'external' });
         }
 
         context.bindings = LgdBindingTypes.create(context);
@@ -251,6 +252,17 @@ const LgdReturnChecker = {
     /** @description Infers each possible expression result while retaining null and undefined distinctions. */
     expressionTypes(path, signature, context, visited = new Set())
     {
+        if(path.isIdentifier() && LgdEnumSyntax.receiver(path, context))
+        {
+            return ['Object'];
+        }
+
+        const enumType = LgdEnumSyntax.memberType(path, context);
+        if(enumType)
+        {
+            return [enumType];
+        }
+
         const node = path.node;
         const literals = { NumericLiteral: 'Number', StringLiteral: 'String', BooleanLiteral: 'Boolean',
             BigIntLiteral: 'BigInt', TemplateLiteral: 'String', ObjectExpression: 'Object', ArrayExpression: 'Array',
@@ -431,7 +443,7 @@ const LgdReturnChecker = {
         const declared = context.bindings.type(binding, signature);
         const offset = context.map.toSource(binding.identifier.start);
         const declaration = context.declarations.find(candidate => candidate.nameStart === offset);
-        if(declaration?.kind === 'class')
+        if(declaration?.kind === 'class' || declaration?.kind === 'enum')
         {
             return [declared];
         }

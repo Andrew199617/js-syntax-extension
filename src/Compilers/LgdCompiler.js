@@ -1,3 +1,4 @@
+const LgdEnumSyntax = require('./LgdEnumSyntax');
 const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
@@ -128,6 +129,11 @@ const LgdCompiler = {
     {
         const parsed = this.parse(content, externals);
         const newline = this.detectNewline(content);
+        for(const declaration of parsed.allDeclarations.filter(candidate => candidate.kind === 'enum'))
+        {
+            parsed.errors.push(this.createError(content, declaration.typeStart, 'LGD enum emission is not supported by the experimental C# backend. String-valued enums are not C# enums.'));
+        }
+
         const emitted = this.emitRange(content, CSharpBackend.create(newline), this.fullRange(content, parsed.declarations));
         const body = emitted.code;
         const header = `// Generated from an LGD source file by the LGD compiler (C# backend v0.2.0).${newline}`
@@ -161,8 +167,9 @@ const LgdCompiler = {
     parse(content, externals = new Map(), options = {})
     {
         const classes = LgdClassSyntax.parse(content, this);
-        const found = classes.declarations;
-        const errors = classes.errors;
+        const enums = LgdEnumSyntax.parse(content, this);
+        const found = [ ...classes.declarations, ...enums.declarations ];
+        const errors = [ ...classes.errors, ...enums.errors ];
         const masked = maskCode(content, true);
         const failedHeadStarts = [];
         declarationHeadPattern.lastIndex = 0;
@@ -289,7 +296,8 @@ const LgdCompiler = {
         const hasBaseCalls = LgdBaseCalls.hasCalls(content, found);
         const standaloneCandidates = LgdStandaloneReturnChecker.hasCandidates(content);
         const parsed = { declarations: declarations, allDeclarations: found, errors: errors };
-        const required = found.length > 0 || hasBaseCalls || standaloneCandidates;
+        const importedEnums = [...externals.values()].some(entry => entry.kind === 'enum');
+        const required = found.length > 0 || hasBaseCalls || standaloneCandidates || importedEnums;
         if(options.deferAnalysis)
         {
             parsed.analysis = { inherited: inheritedReturnSignatures, required: required };
@@ -341,7 +349,7 @@ const LgdCompiler = {
         if(context)
         {
             const assignmentErrors = LgdAssignmentChecker.check(context);
-            const checked = [ ...assignmentErrors, ...LgdReturnChecker.check(context) ];
+            const checked = [ ...LgdEnumSyntax.check(context), ...assignmentErrors, ...LgdReturnChecker.check(context) ];
             this.appendTypeErrors(content, parsed.errors, checked);
         }
 
@@ -395,7 +403,8 @@ const LgdCompiler = {
                 }
             }
 
-            if(!covered && !alreadyFailed)
+            const memberExpression = (/^[\t ]*[$A-Z_a-z][\w$]*\s*[.[]/).test(content.slice(lineMatch.index));
+            if(!covered && !alreadyFailed && !memberExpression)
             {
                 errors.push(this.createError(content, lineMatch.index, 'Invalid typed declaration.'));
             }
@@ -473,6 +482,20 @@ const LgdCompiler = {
                 verbatim: true
             });
             output += gap;
+
+            if(declaration.kind === 'enum')
+            {
+                const lowered = LgdEnumSyntax.emit(content, declaration, Object.getPrototypeOf(backend) === TsBackend);
+
+                for(const segment of lowered.segments)
+                {
+                    segments.push(this.shiftSegment(segment, output.length));
+                }
+
+                output += lowered.code;
+                cursor = declaration.end;
+                continue;
+            }
 
             if(declaration.kind === 'class' || declaration.kind === 'interface')
             {

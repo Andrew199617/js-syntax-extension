@@ -84,7 +84,7 @@
 		"class-declaration": {
 			"name": "meta.class.lgd",
 			"comment": "Declaration/modifier scopes also cover contextual public/sealed headers without enabling unsupported compiler syntax.",
-			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?((?:(?:abstract|sealed|public|protected|private|static)[ \\t]+)*)(class|interface)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
+			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?((?:(?:abstract|sealed|public|protected|private|static)[ \\t]+)*)(class|interface|enum)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
 			"beginCaptures": {
 				"2": {
 					"name": "keyword.control.lgd"
