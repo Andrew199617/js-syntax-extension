@@ -113,6 +113,17 @@ describe('legacy object inheritance conversion', () =>
         expect(DiagnosticQuickFix.canApply(proposal)).toBe(false);
     });
 
+    test.each([ '/** @extends {BaseType} */', '/**\r\n * @extends {BaseType}\r\n */' ])('removes an otherwise empty inheritance docblock: %s', async comment =>
+    {
+        const original = fixture();
+        const source = original.context.source.text.replace('/**\r\n * @description Child documentation.\r\n * @extends {BaseType}\r\n */', comment);
+        const example = fixture({ source: source });
+        const proposal = await new ConvertObjectInheritanceFix().create(example.context, example.fix);
+        expect(proposal).not.toBeNull();
+        expect(proposal.newText).toMatch(/^class Child : Base/);
+        expect(proposal.newText).toContain('@description Creates the child.');
+    });
+
     test('preserves the exported factory lifecycle and instance behavior at runtime', async () =>
     {
         const original = fixture();
@@ -207,7 +218,7 @@ describe('legacy object inheritance conversion', () =>
         expect(member).toMatchObject({ returnTypeName: 'Number', params: [expect.objectContaining({ name: 'amount', typeName: 'Number', defaultText: '2' })] });
     });
 
-    test.each([ [ false, false ], [ true, false ], [ false, true ] ])('checks the reported GoToLastMethod migration (virtual: %s, incompatible: %s)', async (alreadyVirtual, incompatible) =>
+    test.each([ [ false, false, 'base-first' ], [ false, false, 'conversion-first' ], [ true, false, 'conversion-first' ], [ false, true, 'conversion-first' ] ])('checks GoToLastMethod migration (virtual: %s, incompatible: %s, order: %s)', async (alreadyVirtual, incompatible, order) =>
     {
         const source = await fs.promises.readFile(path.join(__dirname, '../../fixtures/object-inheritance-go-to-last-method.lgd'), 'utf8');
         const baseSource = [
@@ -265,56 +276,106 @@ describe('legacy object inheritance conversion', () =>
             return;
         }
 
-        expect(actions).toHaveLength(1);
+        expect(actions).toHaveLength(alreadyVirtual ? 1 : 2);
         if(!alreadyVirtual)
         {
-            expect(actions[0].title).toBe('Make GoToNextMethod.executeCommand virtual to enable class conversion');
-            const preparation = provider.proposals.get(actions[0].command.arguments[0]);
+            expect(actions.map(action => action.title)).toEqual([
+                "Convert 'GoToLastMethod' to LGD class : GoToNextMethod and make GoToNextMethod.executeCommand virtual",
+                'Make GoToNextMethod.executeCommand virtual to enable class conversion'
+            ]);
+            const preparation = provider.proposals.get(actions[1].command.arguments[0]);
             expect(preparation.target.document).toBe(base);
             base.setText(`${baseSource}\r\n// unsaved change`);
             base.version++;
             vscode.workspace.applyEdit.mockClear();
-            expect(await provider.applyFix(actions[0].command.arguments[0])).toBe(false);
+            for(const action of actions)
+            {
+                expect(await provider.applyFix(action.command.arguments[0])).toBe(false);
+            }
+
             expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
             await service.updateDocument(base);
             await service.pendingDependencyUpdates;
             await service.updateDocument(document);
             actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance'))) }, {});
-            vscode.workspace.applyEdit.mockImplementation(edit =>
-            {
-                const replacement = edit.replacements[0];
-                if(replacement.uri.fsPath !== base.uri.fsPath)
-                {
-                    return mirrorApi.workspace.applyEdit(edit);
-                }
-
-                expect(edit.replacements).toHaveLength(1);
-                const text = base.getText();
-                base.setText(text.slice(0, base.offsetAt(replacement.range.start)) + replacement.newText + text.slice(base.offsetAt(replacement.range.end)));
-                base.version++;
-                return true;
-            });
-
-            expect(await provider.applyFix(actions[0].command.arguments[0])).toBe(true);
-            expect(base.getText()).toContain('@description Runs the next command.');
-            expect(base.getText()).toContain('@virtual');
-            expect(base.getText()).toContain('// unsaved change');
-            expect(document.getText()).toBe(source);
-            expect(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance')).toHaveLength(1);
-            actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance'))) }, {});
         }
 
-        expect(actions).toHaveLength(1);
-        expect(actions[0].title).toBe("Convert 'GoToLastMethod' to LGD class : GoToNextMethod");
+        const sourceEdits = [];
+        const documents = new Map([ [ base.uri.fsPath, base ], [ document.uri.fsPath, document ] ]);
+        vscode.workspace.applyEdit.mockImplementation(edit =>
+        {
+            if(!edit.replacements.some(replacement => documents.has(replacement.uri.fsPath)))
+            {
+                return mirrorApi.workspace.applyEdit(edit);
+            }
+
+            const replacements = edit.replacements.map(replacement =>
+            {
+                const target = documents.get(replacement.uri.fsPath);
+                const text = target.getText();
+                const newText = text.slice(0, target.offsetAt(replacement.range.start)) + replacement.newText + text.slice(target.offsetAt(replacement.range.end));
+                return { target: target, newText: newText };
+            });
+
+            for(const replacement of replacements)
+            {
+                replacement.target.setText(replacement.newText);
+                replacement.target.version++;
+            }
+
+            sourceEdits.push(edit);
+            return true;
+        });
+
+        if(!alreadyVirtual && order === 'base-first')
+        {
+            const oldConversion = provider.proposals.get(actions[0].command.arguments[0]);
+            expect(await provider.applyFix(actions[1].command.arguments[0])).toBe(true);
+            expect(document.getText()).toBe(source);
+            expect(DiagnosticQuickFix.canApply(oldConversion)).toBe(false);
+            expect(sourceEdits[0].replacements).toHaveLength(1);
+            expect(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance')).toHaveLength(1);
+            actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance'))) }, {});
+            expect(actions).toHaveLength(1);
+        }
+
+        if(!alreadyVirtual && order === 'conversion-first')
+        {
+            const unchangedBase = base.getText();
+            vscode.workspace.applyEdit.mockImplementationOnce(() => false);
+            expect(await provider.applyFix(actions[0].command.arguments[0])).toBe(false);
+            expect(document.getText()).toBe(source);
+            expect(base.getText()).toBe(unchangedBase);
+            actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance'))) }, {});
+            expect(actions).toHaveLength(2);
+        }
+
         const proposal = provider.proposals.get(actions[0].command.arguments[0]);
         const converted = source.slice(0, proposal.offset) + proposal.newText + source.slice(proposal.endOffset);
         expect(converted).toContain('GoToLastMethod() : base("lgd.goToLastMethod", "Go To Last Method") {}');
         expect(converted).toContain('@returns {GoToLastMethodType}');
         expect(converted).toContain('override async executeCommand()');
+        expect(converted).toContain('@description Command to navigate to the last method in a class or object.\r\n */\r\nclass GoToLastMethod');
+        expect(converted).not.toMatch(/\r?\n[\t ]*\*[\t ]*\r?\n[\t ]*\*\//);
+        expect(await provider.applyFix(actions[0].command.arguments[0])).toBe(true);
+        const finalEdit = sourceEdits[sourceEdits.length - 1];
+        expect(finalEdit.replacements).toHaveLength(!alreadyVirtual && order === 'conversion-first' ? 2 : 1);
+        expect(document.getText()).toBe(converted);
+        expect(base.getText()).toContain('@description Runs the next command.');
+        expect(base.getText().match(/@virtual/g)).toHaveLength(1);
+        if(!alreadyVirtual)
+        {
+            expect(base.getText()).toContain('// unsaved change');
+        }
+
+        expect(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance')).toEqual([]);
+        expect(await provider.provideCodeActions(document, range, { diagnostics: [] }, {})).toEqual([]);
         const externals = service.getState(document.uri).externals;
         const compiled = LgdCompiler.create().compileToJs(converted, externals);
         expect(compiled.errors.length).toBeGreaterThan(0);
-        expect(compiled.errors.every(error => error.code === 'lgd.declaration.readonly' && error.severity === 'warning')).toBe(true);
+        const advisories = [ 'lgd.declaration.readonly', 'lgd.jsdoc.returnType' ];
+        expect(compiled.errors.every(error => advisories.includes(error.code) && error.severity === 'warning')).toBe(true);
+        expect(compiled.errors.filter(error => error.code === 'lgd.jsdoc.returnType')).toHaveLength(1);
         const results = [];
         for(const program of [ source, converted ])
         {

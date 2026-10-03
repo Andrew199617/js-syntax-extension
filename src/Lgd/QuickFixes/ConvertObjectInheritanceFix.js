@@ -4,6 +4,7 @@ const { parse, parseExpression } = require('@babel/parser');
 const DiagnosticQuickFix = require('./DiagnosticQuickFix');
 const ObjectInheritanceContracts = require('./ObjectInheritanceContracts');
 const LgdCompiler = require('../../Compilers/LgdCompiler');
+const LgdDocComment = require('../../Compilers/LgdDocComment');
 const { maskCode } = require('../../Compilers/LgdInfer');
 const { typedParamGroups } = require('../../Compilers/LgdTypedParams');
 const { collectScopes, collectBindings, visibleBindings } = require('../../Compilers/LgdBaseChecker');
@@ -11,14 +12,19 @@ const { collectScopes, collectBindings, visibleBindings } = require('../../Compi
 /** @description Converts only the established OLOO allocation lifecycle without guessing JSDoc type aliases. */
 class ConvertObjectInheritanceFix extends DiagnosticQuickFix
 {
-    constructor() { super('convertObjectInheritance'); }
+    /** @description Exposes conversion and optional base preparation as separate named actions. */
+    constructor(prepareBaseOnly = false)
+    {
+        super(prepareBaseOnly ? 'prepareObjectInheritance' : 'convertObjectInheritance');
+        this.prepareBaseOnly = prepareBaseOnly;
+    }
 
     /** @description Resolves the real base, preserves source methods, and validates the complete class preview. */
     async createProposal(context, fix)
     {
         const { source, document, languageService, state } = context;
         const options = languageService.getOutputOptions(document);
-        if(options.javascriptObjectModel === 'class' || fix.kind !== this.kind)
+        if(options.javascriptObjectModel === 'class' || fix.kind !== 'convertObjectInheritance')
         {
             return null;
         }
@@ -62,19 +68,30 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
         const originalErrors = compiler.compileToJs(source.text, state.externals, options).errors;
         const preview = compiler.compileToJs(previewText, contracts.externals, options);
         const delta = newText.length - (declaration.end - declaration.start);
-        if(!this._validErrors(originalErrors, preview.errors, declaration, delta))
+        if(!this._validErrors(originalErrors, preview, declaration, delta))
         {
             return null;
         }
 
         const signature = JSON.stringify(options);
-        if(contracts.preparation)
+        if(this.prepareBaseOnly)
         {
+            if(!contracts.preparation)
+            {
+                return null;
+            }
+
             return { ...contracts.preparation, snapshots: snapshots,
                 validate: () => JSON.stringify(languageService.getOutputOptions(document)) === signature };
         }
 
-        return { title: `Convert '${declaration.name}' to LGD class : ${shape.baseName}`,
+        let title = `Convert '${declaration.name}' to LGD class : ${shape.baseName}`;
+        if(contracts.preparation)
+        {
+            title += ` and make ${contracts.virtualTargets} virtual`;
+        }
+
+        return { title: title, additionalEdits: contracts.preparation ? [contracts.preparation] : [],
             target: source, snapshots: snapshots, offset: declaration.start, endOffset: declaration.end, newText: newText,
             validate: () => JSON.stringify(languageService.getOutputOptions(document)) === signature };
     }
@@ -380,8 +397,13 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
             body = body.slice(0, edit.start) + edit.text + body.slice(edit.end);
         }
 
-        const docs = source.slice(declaration.start, declaration.headStart)
-            .replace(/@(?:extends|augments)\s*{[^}]*}/g, '');
+        const tags = Array.from(
+            declaration.jsdoc.matchAll(/@(?:extends|augments)\s*{[^}]*}/g),
+            match => ({ offset: match.index, endOffset: match.index + match[0].length })
+        );
+        const cleaned = LgdDocComment.removeTags(declaration.jsdoc, tags);
+        const gap = source.slice(declaration.start + declaration.jsdoc.length, declaration.headStart);
+        const docs = LgdDocComment.hasContent(cleaned) ? cleaned + gap : '';
         const exported = declaration.exported ? 'export ' : '';
         return `${docs}${declaration.indent}${exported}class ${declaration.name} : ${shape.baseName}${body}`;
     }
@@ -390,8 +412,21 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
     _validErrors(original, preview, declaration, delta)
     {
         const legacyWarnings = original.filter(error => error.code === 'lgd.declaration.readonly' && error.severity === 'warning');
-        return preview.every(error =>
+        const converted = preview.declarations.find(candidate =>
         {
+            const namedClass = candidate.kind === 'class' && candidate.name === declaration.name;
+            return namedClass && candidate.start >= declaration.start && candidate.end <= declaration.end + delta;
+        });
+
+        return preview.errors.every(error =>
+        {
+            const docWarning = error.code === 'lgd.jsdoc.returnType' && error.severity === 'warning' && error.quickFix?.kind === 'removeReturnDocType';
+            const constructorDoc = docWarning && error.quickFix.declarationStart === converted?.headStart && error.quickFix.memberStart === converted?.constructorMember?.start;
+            if(constructorDoc)
+            {
+                return true;
+            }
+
             if(error.code === 'lgd.declaration.readonly' && error.severity === 'warning')
             {
                 const index = legacyWarnings.findIndex(previous => previous.quickFix?.name === error.quickFix?.name);

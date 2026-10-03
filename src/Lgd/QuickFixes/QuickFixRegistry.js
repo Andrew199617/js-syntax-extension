@@ -15,6 +15,7 @@ function createQuickFixRegistry()
 {
     const handlers = [ new ReplaceReadonlyLocalFix(),
         new ConvertObjectInheritanceFix(),
+        new ConvertObjectInheritanceFix(true),
         new AddOverrideFix(),
         new MakeBaseVirtualFix(),
         new RemoveExtraBaseArgumentsFix(),

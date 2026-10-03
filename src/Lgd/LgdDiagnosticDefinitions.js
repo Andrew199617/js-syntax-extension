@@ -14,7 +14,7 @@ const definitions = Object.freeze({
     'lgd.jsdoc.returnType': { category: 'warning', proposalKind: 'removeReturnDocType', fixKinds: ['removeReturnDocType'] },
     'lgd.jsdoc.virtual': { category: 'warning', proposalKind: 'moveVirtualModifier', fixKinds: ['moveVirtualModifier'] },
     'lgd.declaration.readonly': { category: 'warning', proposalKind: 'replaceReadonlyLocal', fixKinds: ['replaceReadonlyLocal'] },
-    'lgd.object.inheritance': { category: 'inheritance', proposalKind: 'convertObjectInheritance', fixKinds: ['convertObjectInheritance'] },
+    'lgd.object.inheritance': { category: 'inheritance', proposalKind: 'convertObjectInheritance', fixKinds: [ 'convertObjectInheritance', 'prepareObjectInheritance' ] },
     'lgd.output.syntax': { category: 'syntax' },
     'lgd.output.nativeSyntax': { category: 'syntax' },
     'lgd.assignment.typeMismatch': { category: 'type', proposalKind: 'changeParameterType',

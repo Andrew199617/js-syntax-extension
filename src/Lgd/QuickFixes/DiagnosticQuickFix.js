@@ -17,7 +17,11 @@ class DiagnosticQuickFix
             return null;
         }
 
-        proposal.expectedText = proposal.target.text.slice(proposal.offset, proposal.endOffset);
+        for(const edit of DiagnosticQuickFix.edits(proposal))
+        {
+            edit.expectedText = edit.target.text.slice(edit.offset, edit.endOffset);
+        }
+
         proposal.isPreferred = this.isPreferred;
         return proposal;
     }
@@ -31,7 +35,7 @@ class DiagnosticQuickFix
     /** @description Runs shared edit guards and any synchronous contract-specific currentness check. */
     static canApply(proposal)
     {
-        if(!DiagnosticQuickFix.isCurrent(proposal) || !DiagnosticQuickFix.isValidEdit(proposal))
+        if(!DiagnosticQuickFix.isCurrent(proposal) || !DiagnosticQuickFix.isValidEdits(proposal))
         {
             return false;
         }
@@ -39,6 +43,42 @@ class DiagnosticQuickFix
         if(proposal.validate !== undefined)
         {
             return typeof proposal.validate === 'function' && proposal.validate() === true;
+        }
+
+        return true;
+    }
+
+    /** @description Lists the primary edit and any explicitly declared companion edits in one atomic action. */
+    static edits(proposal)
+    {
+        return [ proposal, ...proposal.additionalEdits || [] ];
+    }
+
+    /** @description Requires independently guarded, nonoverlapping ranges for every document in an atomic action. */
+    static isValidEdits(proposal)
+    {
+        if(proposal.additionalEdits !== undefined && !Array.isArray(proposal.additionalEdits))
+        {
+            return false;
+        }
+
+        const edits = DiagnosticQuickFix.edits(proposal);
+        for(const [ index, edit ] of edits.entries())
+        {
+            if(!edit || edit !== proposal && edit.additionalEdits !== undefined || !DiagnosticQuickFix.isValidEdit({ ...edit, snapshots: proposal.snapshots }))
+            {
+                return false;
+            }
+
+            for(const previous of edits.slice(0, index))
+            {
+                const sameDocument = previous.target.document.uri.toString() === edit.target.document.uri.toString();
+                const intersects = previous.offset <= edit.endOffset && edit.offset <= previous.endOffset;
+                if(sameDocument && intersects)
+                {
+                    return false;
+                }
+            }
         }
 
         return true;

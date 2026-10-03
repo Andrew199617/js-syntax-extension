@@ -47,7 +47,7 @@ const ObjectInheritanceContracts = {
             return plan;
         }
 
-        // Preparing a base is a separate, explicitly named action, never an implicit second-file edit.
+        // Companion edits retain the imported snapshot and are identified in each offered action title.
         if(base.snapshot === context.source || !base.entry)
         {
             return null;
@@ -72,6 +72,7 @@ const ObjectInheritanceContracts = {
         }
 
         const names = pending.map(name => `${shape.baseName}.${name}`).join(', ');
+        plan.virtualTargets = names;
         plan.preparation = { title: `Make ${names} virtual to enable class conversion`,
             target: base.snapshot, offset: base.declaration.start, endOffset: base.declaration.end,
             newText: prepared.replacement };

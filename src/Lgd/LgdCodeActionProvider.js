@@ -70,7 +70,8 @@ const LgdCodeActionProvider = {
                     continue;
                 }
 
-                const editKey = JSON.stringify([ proposal.target.document.uri.toString(), proposal.offset, proposal.endOffset, proposal.newText ]);
+                const editKey = JSON.stringify(DiagnosticQuickFix.edits(proposal).map(edit => [ edit.target.document.uri.toString(), edit.offset, edit.endOffset, edit.newText ]));
+
                 const existingAction = offeredEdits.get(editKey);
                 if(existingAction)
                 {
@@ -115,14 +116,27 @@ const LgdCodeActionProvider = {
             return false;
         }
 
-        const document = proposal.target.document;
-        const range = new vscode.Range(document.positionAt(proposal.offset), document.positionAt(proposal.endOffset));
-        const edit = new vscode.WorkspaceEdit();
-        edit.replace(document.uri, range, proposal.newText);
-        const applied = await vscode.workspace.applyEdit(edit);
-        if(applied && this.languageService.getState(document.uri))
+        const edits = DiagnosticQuickFix.edits(proposal);
+        const workspaceEdit = new vscode.WorkspaceEdit();
+        for(const edit of edits)
         {
-            await this.languageService.updateDocument(document);
+            const document = edit.target.document;
+            const range = new vscode.Range(document.positionAt(edit.offset), document.positionAt(edit.endOffset));
+            workspaceEdit.replace(document.uri, range, edit.newText);
+        }
+
+        const applied = await vscode.workspace.applyEdit(workspaceEdit);
+        if(applied)
+        {
+            const documents = new Set(edits.map(edit => edit.target.document).reverse());
+            for(const document of documents)
+            {
+                if(this.languageService.getState(document.uri))
+                {
+                    await this.languageService.updateDocument(document);
+                }
+            }
+
             await this.languageService.pendingDependencyUpdates;
         }
 
