@@ -4,6 +4,15 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.16
+
+- Display short diagnostic categories such as syntax, type and inheritance while retaining stable compiler identities for Quick Fix routing.
+- Explain a missing expression with a concise repair hint; keep unproven emission faults separate from source-syntax errors.
+- Offer a separate atomic parameter-and-return String suggestion only when every return path and the closed local contract are proven safe.
+- Offer an explicit followup return-type suggestion after a parameter-only edit when the same safety proof succeeds.
+- Require real module-private or nested-local scope for every type-signature edit; unreferenced script globals are no longer assumed private.
+- Reject unknown helper results, fallthrough, mixed/null returns, async/default contracts, exposed callers and stale edits.
+
 # 2.7.15
 
 - Remove the duplicated LGD label from diagnostic messages while preserving source labels, diagnostic codes and ranges.
