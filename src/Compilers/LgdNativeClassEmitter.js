@@ -1,3 +1,4 @@
+const LgdConstructorOverloadEmitter = require('./LgdConstructorOverloadEmitter');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const LgdClassSyntax = require('./LgdClassSyntax');
@@ -122,7 +123,14 @@ const LgdNativeClassEmitter = {
             }
             else if(member.isConstructor)
             {
-                this.emitConstructor(output, context, member);
+                if(declaration.constructorMembers.length < 2)
+                {
+                    this.emitConstructor(output, context, member);
+                }
+                else if(member === declaration.constructorMember)
+                {
+                    LgdConstructorOverloadEmitter.emitNative(output, context);
+                }
             }
             else
             {
@@ -150,7 +158,17 @@ const LgdNativeClassEmitter = {
             LgdClassSyntax.appendGenerated(output, helper, declaration.end);
         }
 
-        const concrete = { ...declaration, methodTypedParams: declaration.methodTypedParams.filter(group => !group.abstract) };
+        const groups = declaration.methodTypedParams.filter(group => !group.abstract).map(group =>
+        {
+            if(declaration.constructorMembers.length > 1 && group.name === 'create')
+            {
+                return { ...group, methodStart: undefined };
+            }
+
+            return group;
+        });
+
+        const concrete = { ...declaration, methodTypedParams: groups };
         output.code = backend.rewriteInitializer(concrete, output.code, output.segments);
         const constructorMember = declaration.constructorMember;
         if(constructorMember && (/\breturn\b/).test(maskCode(content.slice(constructorMember.bodyStart, constructorMember.bodyEnd), true)))

@@ -230,6 +230,18 @@ const LgdHoverProvider = {
     renderDeclaredMember(detail)
     {
         const visibility = this.visibilityPrefix(detail);
+        if(detail.constructorSignatures?.length > 1)
+        {
+            const lines = detail.constructorSignatures.map(signature =>
+            {
+                const parameters = signature.params.map(this.formatTypedParameter).join(', ');
+                const prefix = signature.accessibility === 'public' ? '' : `${signature.accessibility} `;
+                return `${prefix}${detail.declaringType}.${detail.name}(${parameters})`;
+            });
+
+            return [ '```lgd', ...lines, '```' ].join('\n');
+        }
+
         const params = (detail.params || []).map(this.formatTypedParameter).join(', ');
         if(detail.isConstructor)
         {
@@ -311,6 +323,16 @@ const LgdHoverProvider = {
             {
                 if(member.name === 'create')
                 {
+                    if(summary.constructorSignatures?.length > 1)
+                    {
+                        return summary.constructorSignatures.map(signature =>
+                        {
+                            const parameters = signature.params.map(this.formatTypedParameter).join(', ');
+                            const visibility = signature.accessibility === 'public' ? '' : `${signature.accessibility} `;
+                            return `    ${visibility}create(${parameters}),`;
+                        }).join('\n');
+                    }
+
                     return `    ${this.visibilityPrefix(member)}create(${constructorParams}),`;
                 }
 

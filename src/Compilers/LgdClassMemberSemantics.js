@@ -1,3 +1,4 @@
+const LgdConstructorSignatures = require('./LgdConstructorSignatures');
 const LgdMemberTypeGraph = require('./LgdMemberTypeGraph');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
@@ -108,6 +109,7 @@ const LgdClassMemberSemantics = {
                 returnTypeName: declaration.name, declaringType: declaration.name, params: declaration.constructorMember?.params || [],
                 accessibility: declaration.constructorMember?.accessibility || 'public',
                 explicitAccessibility: Number.isInteger(declaration.constructorMember?.accessibilityStart),
+                constructorSignatures: LgdConstructorSignatures.describeAll(declaration),
                 declaringNameStart: declaration.nameStart, declaringSourcePath: declaration.sourceIdentityPath || declaration.sourcePath || null,
                 declaringProjectId: declaration.projectId || null };
             this._declaringTypes.set(factory, declaration);

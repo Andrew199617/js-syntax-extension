@@ -1,3 +1,4 @@
+const LgdConstructorSignatures = require('./LgdConstructorSignatures');
 const traverse = require('@babel/traverse').default;
 const { visibleBindings } = require('./LgdBaseChecker');
 const { baseTypeName } = require('./LgdTypeMaps');
@@ -182,14 +183,19 @@ const LgdAccessibility = {
 
             if(declaration.kind === 'class' && base?.kind === 'class')
             {
-                const constructor = declaration.constructorMember;
-                const access = base.constructorAccessibility || this.visibility(base.constructorMember || {});
-                if(!this.allowed(access, base, { registry: registry, lexicalOwner: declaration,
-                    projectId: declaration.projectId, baseCall: true, isConstructor: true }))
+                const constructors = declaration.constructorMembers?.length ? declaration.constructorMembers : [declaration.constructorMember];
+                for(const constructor of constructors)
                 {
-                    const start = constructor?.baseArgumentsStart ?? declaration.baseStart;
-                    const end = constructor?.baseArgumentsEnd ?? declaration.baseEnd;
-                    errors.push(this.diagnostic(start, end, `${declaration.baseName} constructor`, access));
+                    const selected = LgdConstructorSignatures.selectBase(base, constructor, registry._context.content);
+                    const access = selected?.accessibility;
+                    const allowed = this.allowed(access, base, { registry: registry, lexicalOwner: declaration,
+                        projectId: declaration.projectId, baseCall: true, isConstructor: true });
+                    if(access && !allowed)
+                    {
+                        const start = constructor?.baseArgumentsStart ?? declaration.baseStart;
+                        const end = constructor?.baseArgumentsEnd ?? declaration.baseEnd;
+                        errors.push(this.diagnostic(start, end, `${declaration.baseName} constructor`, access));
+                    }
                 }
             }
 
@@ -284,6 +290,21 @@ const LgdAccessibility = {
             if(!this.allowed(typeAccess, receiverType, { registry: registry, lexicalOwner: lexicalOwner, projectId: projectId }))
             {
                 errors.push(this.diagnostic(offset, endOffset, receiverType.name || receiverType.exportName, typeAccess));
+                return;
+            }
+
+            if(member.name === 'create' && LgdConstructorSignatures.get(receiverType).length > 1)
+            {
+                const accessible = LgdConstructorSignatures.get(receiverType).some(signature => this.allowed(
+                    signature.accessibility, receiverType,
+                    { registry: registry, lexicalOwner: lexicalOwner, receiver: resolved.receiver, projectId: projectId, isConstructor: true }
+                ));
+
+                if(!accessible)
+                {
+                    errors.push(this.diagnostic(offset, endOffset, `${receiverType.name || receiverType.exportName} constructor`, this.visibility(member)));
+                }
+
                 return;
             }
 
@@ -386,6 +407,11 @@ const LgdAccessibility = {
                 }
 
                 const owner = receiver.declaration;
+                if(LgdConstructorSignatures.get(owner).length > 1)
+                {
+                    return;
+                }
+
                 const accessibility = owner.constructorAccessibility || this.visibility(owner.constructorMember || {});
                 const offset = context.map.toSource(path.node.callee.start);
                 const endOffset = context.map.toSource(path.node.callee.end);

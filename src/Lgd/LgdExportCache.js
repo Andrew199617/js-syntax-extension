@@ -1,3 +1,4 @@
+const LgdConstructorSignatures = require('../Compilers/LgdConstructorSignatures');
 const fs = require('fs');
 const LgdProjectIdentity = require('../Compilers/LgdProjectIdentity');
 const LgdAccessibility = require('../Compilers/LgdAccessibility');
@@ -132,7 +133,7 @@ function exportSignature(service, exported)
         kind: exported.kind, baseName: exported.baseName, abstract: exported.abstract,
         contractKind: exported.contractKind, interfaceNames: exported.interfaceNames,
         contractSignatures: exported.contractSignatures, contractsKnown: exported.contractsKnown,
-        constructorParams: constructors,
+        constructorParams: constructors, constructorSignatures: exported.constructorSignatures,
         members: exported.members?.map(member =>
         {
             const signature = { ...member };
@@ -318,6 +319,7 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
         enumValueType: declaration.enumValueType,
         baseName: declaration.baseName,
         constructorParams: getConstructorParams(declaration),
+        constructorSignatures: declaration.kind === 'class' ? LgdConstructorSignatures.describeAll(declaration) : undefined,
         methodSignatures: methods.methodSignatures,
         methodsKnown: methods.methodsKnown,
         ...contracts,

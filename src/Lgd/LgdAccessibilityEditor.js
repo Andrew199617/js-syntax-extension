@@ -46,7 +46,7 @@ const LgdAccessibilityEditor = {
         {
             const member = known.find(entry => entry.name === candidate.name) || candidate;
             const owner = LgdAccessibility.memberOwner(member, registry);
-            const accesses = [member.accessibility || 'public'];
+            const accesses = member.constructorSignatures?.map(signature => signature.accessibility) || [member.accessibility || 'public'];
             if(member.accessor)
             {
                 accesses.splice(0, 1, ...[ member.getterAccessibility, member.setterAccessibility ].filter(Boolean));

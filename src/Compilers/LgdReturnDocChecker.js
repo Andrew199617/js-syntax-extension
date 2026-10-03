@@ -87,9 +87,12 @@ function migrations(content, declarations)
         const methods = (declaration.methodTypedParams || [])
             .filter(group => group.returnTypeName)
             .map(group => ({ memberStart: declaration.initializerStart + group.methodStart, isConstructor: false }));
-        if(declaration.kind === 'class' && declaration.constructorMember)
+        if(declaration.kind === 'class')
         {
-            methods.push({ memberStart: declaration.constructorMember.start, isConstructor: true });
+            for(const constructor of declaration.constructorMembers || [])
+            {
+                methods.push({ memberStart: constructor.start, isConstructor: true });
+            }
         }
 
         return methods.map(member => ({ ...member, declarationStart: declaration.headStart }));

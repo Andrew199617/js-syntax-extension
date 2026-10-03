@@ -296,9 +296,9 @@ const LgdSemanticTokensProvider = {
                     }
                 }
 
-                if(declaration.constructorMember)
+                for(const constructor of declaration.constructorMembers || [])
                 {
-                    spans.push({ start: declaration.constructorMember.nameStart, end: declaration.constructorMember.nameEnd });
+                    spans.push({ start: constructor.nameStart, end: constructor.nameEnd });
                 }
             }
         }

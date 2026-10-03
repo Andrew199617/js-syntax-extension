@@ -1,3 +1,4 @@
+const LgdConstructorSignatures = require('./LgdConstructorSignatures');
 const LgdAccessibility = require('./LgdAccessibility');
 
 /** @description Preserves nominal member-result identities across files as an acyclic table of source-backed types. */
@@ -50,6 +51,7 @@ const LgdMemberTypeGraph = {
 
             types.set(key, { ...identity, exportName: declaration.name, kind: declaration.kind,
                 accessibility: declaration.accessibility, constructorAccessibility: declaration.constructorMember?.accessibility || 'public',
+                constructorSignatures: LgdConstructorSignatures.describeAll(declaration),
                 ancestry: LgdAccessibility.ancestry(declaration, registry), members: members });
         }
 

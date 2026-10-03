@@ -1,3 +1,4 @@
+const LgdConstructorSignatures = require('../Compilers/LgdConstructorSignatures');
 const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
 const LgdClassMemberSemantics = require('../Compilers/LgdClassMemberSemantics');
 const LgdContractChecker = require('../Compilers/LgdContractChecker');
@@ -28,6 +29,7 @@ async function getTypeSummary(service, uri, name)
                 abstract: imported.abstract, interfaceNames: imported.interfaceNames,
                 accessibility: imported.accessibility, explicitAccessibility: imported.explicitAccessibility,
                 readonly: true, members: imported.members || [], params: [],
+                constructorSignatures: imported.constructorSignatures,
                 constructorParams: imported.constructorParams || []
             }
             : null;
@@ -66,6 +68,7 @@ async function getTypeSummary(service, uri, name)
         summary.interfaceNames = declaration.interfaceNames || required?.interfaceNames || [];
         summary.baseName = declaration.baseName || required?.baseName;
         summary.constructorParams = getConstructorParams(declaration) || required?.constructorParams || [];
+        summary.constructorSignatures = LgdConstructorSignatures.describeAll(required?.kind === 'class' ? required : declaration);
     }
 
     return summary;

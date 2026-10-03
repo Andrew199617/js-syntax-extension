@@ -1,3 +1,4 @@
+const LgdConstructorSignatures = require('./LgdConstructorSignatures');
 const { UNKNOWN, NULL, inferExpression, maskCode } = require('./LgdInfer');
 const { parseTypedParams, splitTopLevelChunks } = require('./LgdTypedParams');
 
@@ -569,9 +570,34 @@ function check(content, declarations, externals = new Map())
         }
 
         const params = getConstructorParams(base);
-        if(params !== null)
+        const signatures = base.kind === 'class' ? LgdConstructorSignatures.get(base) : params && [LgdConstructorSignatures.describe(params)];
+        if(!signatures)
         {
-            checkArguments({ content: content, derived: derived, params: params, scope: scope, errors: errors });
+            continue;
+        }
+
+        const constructors = derived.constructorMembers?.length ? derived.constructorMembers : [derived.constructorMember];
+        for(const constructor of constructors)
+        {
+            const owner = { ...derived, constructorMember: constructor };
+            const args = baseArguments(content, owner);
+            const spread = args.some(argument => maskCode(argument.text).trim().startsWith('...'));
+            const selected = signatures.length === 1 ? signatures[0] : signatures.find(signature => LgdConstructorSignatures.accepts(signature, args.length));
+            if(signatures.length > 1 && spread)
+            {
+                continue;
+            }
+
+            if(!selected)
+            {
+                errors.push({ offset: constructor?.baseArgumentsStart ?? derived.baseStart,
+                    endOffset: constructor?.baseArgumentsEnd ?? derived.baseEnd, code: 'lgd.base.argumentCount',
+                    message: `No constructor overload for base '${derived.baseName}' accepts ${args.length} argument(s).` });
+                continue;
+            }
+
+            checkArguments({ content: content, derived: owner, params: selected.params,
+                scope: argumentScope(visible, declarations, owner), errors: errors });
         }
     }
 

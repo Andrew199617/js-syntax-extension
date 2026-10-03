@@ -1,4 +1,5 @@
 const LgdAccessibility = require('./LgdAccessibility');
+const LgdConstructorCallChecker = require('./LgdConstructorCallChecker');
 const LgdEnumSyntax = require('./LgdEnumSyntax');
 const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
@@ -390,7 +391,13 @@ const LgdCompiler = {
         {
             const assignmentErrors = LgdAssignmentChecker.check(context);
             const memberErrors = context.members.check(context);
-            const checked = [ ...LgdAccessibility.check(context), ...LgdEnumSyntax.check(context), ...assignmentErrors, ...memberErrors, ...LgdReturnChecker.check(context) ];
+            const constructorErrors = LgdConstructorCallChecker.check(context);
+            const checked = [ ...constructorErrors,
+                ...LgdAccessibility.check(context),
+                ...LgdEnumSyntax.check(context),
+                ...assignmentErrors,
+                ...memberErrors,
+                ...LgdReturnChecker.check(context) ];
             this.appendTypeErrors(content, parsed.errors, checked);
         }
 

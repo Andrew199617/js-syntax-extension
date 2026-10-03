@@ -349,6 +349,7 @@ const LgdLanguageService = {
                         entry.baseName = exported.baseName;
                         entry.members = exported.members;
                         entry.constructorParams = exported.constructorParams;
+                        entry.constructorSignatures = exported.constructorSignatures;
                         entry.methodSignatures = exported.methodSignatures;
                         entry.methodsKnown = exported.methodsKnown;
                         Object.assign(entry, getContractMetadata(exported));
@@ -669,18 +670,26 @@ const LgdLanguageService = {
             return this.extractCreateMembers(declaration.initializerText || '', getConstructorParams(declaration) || []);
         }
 
-        const constructor = declaration.constructorMember;
-        if(!constructor)
+        const members = new Map();
+        for(const constructor of declaration.constructorMembers || [])
         {
-            return [];
+            const body = declaration.initializerText.slice(
+                constructor.bodyStart + 1 - declaration.initializerStart,
+                constructor.bodyEnd - 1 - declaration.initializerStart
+            );
+            for(const member of this.extractAssignedMembers(body, false, constructor.params))
+            {
+                const previous = members.get(member.name);
+                if(previous && previous.typeName !== member.typeName)
+                {
+                    member.typeName = null;
+                }
+
+                members.set(member.name, previous ? { ...previous, ...member } : member);
+            }
         }
 
-        const body = declaration.initializerText.slice(
-            constructor.bodyStart + 1 - declaration.initializerStart,
-            constructor.bodyEnd - 1 - declaration.initializerStart
-        );
-
-        return this.extractAssignedMembers(body, false, constructor.params);
+        return [...members.values()];
     },
 
     /**

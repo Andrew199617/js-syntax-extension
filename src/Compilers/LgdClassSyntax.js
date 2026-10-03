@@ -1,4 +1,6 @@
 const LgdAccessibilitySyntax = require('./LgdAccessibilitySyntax');
+const LgdConstructorSignatures = require('./LgdConstructorSignatures');
+const LgdConstructorOverloadEmitter = require('./LgdConstructorOverloadEmitter');
 const { maskCode } = require('./LgdInfer');
 const { parseTypedParams, parseMethodHead } = require('./LgdTypedParams');
 const LgdObjectInheritance = require('./LgdObjectInheritance');
@@ -140,6 +142,8 @@ const LgdClassSyntax = {
             baseStart: baseStart,
             baseEnd: baseName ? baseStart + baseName.length : null,
             constructorMember: null,
+            constructorMembers: [],
+            invalidMembers: [],
             classMembers: [],
             members: kind === 'interface' ? [] : [{ name: 'create', kind: 'method' }],
             methodTypedParams: [],
@@ -160,13 +164,15 @@ const LgdClassSyntax = {
             const parsed = this.parseMember(content, masked, cursor, { declaration: declaration, compiler: compiler });
             if(parsed.error)
             {
-                const { error, recoveryOffset, ...diagnostic } = parsed;
+                const { error, recoveryOffset: parsedRecovery, ...diagnostic } = parsed;
+                const recoveryOffset = parsedRecovery ?? LgdClassMemberRecovery.findBoundary(masked, cursor, declaration.initializerEnd - 1);
                 errors.push({ ...diagnostic, message: error });
                 if(!Number.isInteger(recoveryOffset) || recoveryOffset <= cursor)
                 {
                     break;
                 }
 
+                declaration.invalidMembers.push({ start: cursor, end: recoveryOffset });
                 cursor = this.skipSpace(masked, recoveryOffset);
                 continue;
             }
@@ -177,12 +183,8 @@ const LgdClassSyntax = {
             declaration.classMembers.push(member);
             if(member.isConstructor)
             {
-                if(declaration.constructorMember)
-                {
-                    errors.push({ offset: member.nameStart, message: 'LGD classes support one constructor.' });
-                }
-
-                declaration.constructorMember = member;
+                declaration.constructorMembers.push(member);
+                declaration.constructorMember ||= member;
             }
             else if(member.name === 'constructor' || member.name === 'create')
             {
@@ -197,6 +199,7 @@ const LgdClassSyntax = {
             cursor = this.skipSpace(masked, member.bodyEnd);
         }
 
+        errors.push(...LgdConstructorSignatures.check(declaration));
         return errors;
     },
 
@@ -264,7 +267,10 @@ const LgdClassSyntax = {
 
         if(isConstructor && (head.modifier || head.generator || head.returnTypeName || modifiers.spans.some(span => span.start !== modifiers.accessibilityStart)))
         {
-            return { error: 'An LGD constructor cannot have a return type or be static, virtual, override, async, a generator, or an accessor.', offset: start };
+            const bodyStart = this.skipSpace(masked, paramClose + 1);
+            const bodyEnd = masked[bodyStart] === '{' ? this.findClose(masked, bodyStart) : -1;
+            return { error: 'An LGD constructor cannot have a return type or be static, virtual, override, async, a generator, or an accessor.',
+                offset: start, recoveryOffset: bodyEnd >= 0 ? bodyEnd + 1 : null };
         }
 
         if(modifiers.virtualStart !== null && (head.modifier === 'get' || head.modifier === 'set'))
@@ -528,6 +534,23 @@ const LgdClassSyntax = {
     /** @description Recursively emits a verbatim class source span, including its typed locals. */
     appendSource(output, context, start, end)
     {
+        const invalid = context.declaration.invalidMembers?.find(member => member.start < end && start < member.end);
+        if(invalid)
+        {
+            if(start < invalid.start)
+            {
+                this.appendSource(output, context, start, invalid.start);
+            }
+
+            this.appendGenerated(output, '', Math.max(start, invalid.start), { end: Math.min(end, invalid.end) });
+            if(invalid.end < end)
+            {
+                this.appendSource(output, context, invalid.end, end);
+            }
+
+            return;
+        }
+
         const children = context.declaration.children.filter(child => child.start >= start && child.end <= end);
         const inner = context.compiler.emitRange(context.content, context.backend, { start: start, end: end, declarations: children });
         for(const segment of inner.segments)
@@ -660,9 +683,15 @@ const LgdClassSyntax = {
             instanceName += '$';
         }
 
+        const overloaded = declaration.constructorMembers?.length > 1;
+        if(overloaded && member === declaration.constructorMember)
+        {
+            LgdConstructorOverloadEmitter.emitDispatch(output, context, 'create');
+        }
+
         if(member)
         {
-            this.appendGenerated(output, 'create', member.nameStart, {
+            this.appendGenerated(output, overloaded ? LgdConstructorOverloadEmitter.key(declaration, member, 'create') : 'create', member.nameStart, {
                 end: member.nameEnd,
                 name: { srcStart: member.nameStart, srcEnd: member.nameEnd, outStart: 0, outEnd: 'create'.length }
             });
