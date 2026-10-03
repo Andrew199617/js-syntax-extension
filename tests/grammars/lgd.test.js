@@ -252,6 +252,41 @@ describe('LGD TextMate grammar.', () =>
         }
     });
 
+    test('preserves new construction scopes before semantic tokens arrive', () =>
+    {
+        const source = [
+            'const first = new Widget();',
+            'const second = new models.Widget();',
+            'function create() { if (ready) return new Widget(); return new models.Widget(); }'
+        ].join('\n');
+        const tokens = tokenize(grammar, source);
+        const constructors = tokens.filter(token => token.text === 'new');
+        assert.strictEqual(constructors.length, source.match(/\bnew\b/g).length);
+        assert.ok(constructors.every(token => token.scopes.includes('keyword.operator.new.js')));
+        for(const word of [ 'if', 'return' ])
+        {
+            assertPartialScope(tokens, word, 'keyword.control');
+            assertNoScope(tokens, word, 'keyword.operator.new.js');
+        }
+    });
+
+    test('leaves new member names, strings, and comments outside construction scopes', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'const holder = { new: 1 }; holder.new;',
+            'const methods = { new() {} }; methods.new();',
+            'const text = "new";',
+            'const template = `new`;',
+            'const pattern = /new/;',
+            '// new',
+            '/* new */'
+        ].join('\n'));
+        for(const token of tokens)
+        {
+            assert.ok(!token.scopes.includes('keyword.operator.new.js'));
+        }
+    });
+
     test('Highlights explicit return types separately from named methods.', () =>
     {
         const tokens = tokenize(grammar, 'class Counter {\n    Number count() { return 1; }\n    async void reset() {}\n}');
