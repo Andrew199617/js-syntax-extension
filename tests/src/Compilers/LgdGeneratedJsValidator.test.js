@@ -9,11 +9,12 @@ const parser = require('@babel/parser');
 function validate(code)
 {
     const segments = [{ srcStart: 0, srcEnd: code.length, outStart: 0, outEnd: code.length, verbatim: true }];
-    return LgdGeneratedJsValidator.validate({ code: code, segments: segments });
+    return LgdGeneratedJsValidator.validate({ code: code, segments: segments }, code);
 }
 
 describe('final generated JavaScript validation', () =>
 {
+    afterEach(() => jest.restoreAllMocks());
     test.each([
         [ 'ES modules', 'import value from "./value.js"; export const count = value;' ],
         [ 'CommonJS and shebangs', '#!/usr/bin/env node\r\nconst value = require("./value.js"); module.exports = value;' ],
@@ -35,7 +36,6 @@ describe('final generated JavaScript validation', () =>
     });
 
     test.each([
-        [ 'missing expressions', 'const count = ;' ],
         [ 'unclosed blocks', 'function read() { return 1;' ],
         [ 'unterminated strings', 'const label = "unfinished;' ],
         [ 'unterminated templates', 'const label = `unfinished;' ],
@@ -54,10 +54,103 @@ describe('final generated JavaScript validation', () =>
         expect(result.errors).toHaveLength(1);
         expect(result.errors[0]).toEqual(expect.objectContaining({
             code: 'lgd.output.syntax',
-            message: expect.stringContaining('Generated JavaScript is invalid:')
+            message: expect.stringContaining('Unable to compile this syntax:')
         }));
         expect(result.errors[0].offset).toBeGreaterThanOrEqual(0);
         expect(result.errors[0].endOffset).toBeLessThanOrEqual(code.length);
+    });
+
+    test.each([
+        [ 'constant initializer', 'const broken = ;' ],
+        [ 'mutable initializer', 'let broken = ;' ],
+        [ 'assignment', 'broken = ;' ],
+        [ 'member assignment', 'reader.broken = ;' ],
+        [ 'block comments', 'const broken = /* ignored = ; */ ;' ],
+        [ 'LF line comments', 'const broken = // ignored = ;\n;' ],
+        [ 'CRLF line comments', 'const broken = // ignored = ;\r\n;' ],
+        [ 'EOF', 'const broken =' ],
+        [ 'EOF after whitespace', 'broken = \r\n' ],
+        [ 'EOF after a comment', 'broken = /* ignored */' ]
+    ])('explains a missing expression in %s at the exact source boundary', (description, source) =>
+    {
+        const result = validate(source);
+        const position = source.endsWith(';') ? source.length - 1 : source.length;
+        expect(result.errors).toEqual([expect.objectContaining({
+            offset: position,
+            endOffset: Math.min(position + 1, source.length),
+            message: "Expected an expression after '='.",
+            debug: {
+                reasonCode: 'UnexpectedToken',
+                generatedOffset: position,
+                parserMessage: expect.stringContaining('Unexpected token')
+            }
+        })]);
+    });
+
+    test.each([
+        [ 'comparison', 'broken == ;' ],
+        [ 'strict comparison', 'broken === ;' ],
+        [ 'inequality', 'broken != ;' ],
+        [ 'less than or equal', 'broken <= ;' ],
+        [ 'compound assignment', 'broken += ;' ],
+        [ 'arrow function', 'broken => ;' ],
+        [ 'string containing an assignment', 'const label = " = ;"; + ;' ],
+        [ 'template containing an assignment', 'const label = ` = ;`; + ;' ],
+        [ 'regular expression containing an assignment', 'const pattern = / = ;/; + ;' ],
+        [ 'unclosed block with a misleading comment', 'function read() { // = ;' ],
+        [ 'unterminated string', 'const label = " = ;' ],
+        [ 'unterminated template', 'const label = ` = ;' ]
+    ])('retains parser detail for %s without inventing a missing assignment expression', (description, source) =>
+    {
+        const result = validate(source);
+        expect(result.errors[0].message).toContain('Unable to compile this syntax:');
+        expect(result.errors[0].message).not.toContain('Generated JavaScript');
+        const parserDetail = result.errors[0].debug.parserMessage.replace(/ \(\d+:\d+\)$/, '');
+        expect(result.errors[0].message).toBe(`Unable to compile this syntax: ${parserDetail}`);
+    });
+
+    test('does not specialize a different parser failure with the same token context', () =>
+    {
+        const source = 'const broken = ;';
+        const error = Object.assign(new SyntaxError('A different syntax failure (1:15)'), {
+            reasonCode: 'DifferentFailure', pos: source.indexOf(';')
+        });
+        jest.spyOn(parser, 'parse').mockImplementation(() =>
+        {
+            throw error;
+        });
+
+        expect(validate(source).errors[0].message).toBe('Unable to compile this syntax: A different syntax failure');
+    });
+
+    test('does not infer source syntax when original source is unavailable', () =>
+    {
+        const code = 'const broken = ;';
+        const segments = [{ srcStart: 0, srcEnd: code.length, outStart: 0, outEnd: code.length, verbatim: true }];
+        const result = LgdGeneratedJsValidator.validate({ code: code, segments: segments });
+        expect(result.errors[0].message).toBe('Unable to compile this syntax: Unexpected token');
+    });
+
+    test.each([ false, true ])('keeps an emitter defect separate from source syntax when the failing token is copied: %s', copiedToken =>
+    {
+        const source = 'let broken;';
+        const code = 'let broken = ;';
+        const sourceName = source.indexOf('broken');
+        const outputName = code.indexOf('broken');
+        const segments = [ {
+            srcStart: 0, srcEnd: source.length - 1, outStart: 0, outEnd: code.length - 1, verbatim: false,
+            nameSrcStart: sourceName, nameSrcEnd: sourceName + 'broken'.length,
+            nameOutStart: outputName, nameOutEnd: outputName + 'broken'.length
+        }, {
+            srcStart: source.length - 1, srcEnd: source.length, outStart: code.length - 1, outEnd: code.length, verbatim: copiedToken,
+            nameSrcStart: sourceName, nameSrcEnd: sourceName + 'broken'.length,
+            nameOutStart: outputName, nameOutEnd: outputName + 'broken'.length
+        } ];
+        const result = LgdGeneratedJsValidator.validate({ code: code, segments: segments }, source);
+        expect(result.errors[0].message).toBe('Unable to compile this syntax: Unexpected token');
+        expect(result.errors[0].debug).toEqual({
+            reasonCode: 'UnexpectedToken', generatedOffset: code.indexOf(';'), parserMessage: 'Unexpected token (1:13)'
+        });
     });
 
     test('maps an invalid initializer through a generated typed declaration head', () =>
@@ -72,9 +165,10 @@ describe('final generated JavaScript validation', () =>
                 nameOutStart: code.indexOf('count'), nameOutEnd: outputTail },
             { srcStart: sourceTail, srcEnd: source.length, outStart: outputTail, outEnd: code.length, verbatim: true }
         ];
-        const result = LgdGeneratedJsValidator.validate({ code: code, segments: segments });
+        const result = LgdGeneratedJsValidator.validate({ code: code, segments: segments }, source);
         expect(result.errors[0].offset).toBe(source.indexOf(';'));
         expect(result.errors[0].endOffset).toBe(source.indexOf(';') + 1);
+        expect(result.errors[0].message).toBe("Expected an expression after '='.");
     });
 
     test('maps syntax failures after interface erasure to the original CRLF source', () =>
@@ -83,9 +177,10 @@ describe('final generated JavaScript validation', () =>
         const sourceStart = source.indexOf('const');
         const code = source.slice(sourceStart);
         const segments = [{ srcStart: sourceStart, srcEnd: source.length, outStart: 0, outEnd: code.length, verbatim: true }];
-        const result = LgdGeneratedJsValidator.validate({ code: code, segments: segments });
+        const result = LgdGeneratedJsValidator.validate({ code: code, segments: segments }, source);
         expect(result.errors[0].offset).toBe(source.indexOf(';'));
         expect(result.errors[0].endOffset).toBe(source.indexOf(';') + 1);
+        expect(result.errors[0].message).toBe("Expected an expression after '='.");
     });
 
     test('maps an unexpected end of file to the source end without inventing a character', () =>
@@ -110,8 +205,19 @@ describe('generated JavaScript compiler integration', () =>
             offset: source.lastIndexOf(';'),
             endOffset: source.lastIndexOf(';') + 1,
             line: 2,
-            message: expect.stringContaining('Generated JavaScript is invalid:')
+            message: "Expected an expression after '='."
         });
+    });
+
+    test.each([ 'oloo', 'class' ])('explains a missing typed initializer after interface erasure in %s output', javascriptObjectModel =>
+    {
+        const source = 'interface IUnused {}\r\nNumber broken = /* explain */ ;';
+        const result = LgdCompiler.create().compileToJs(source, new Map(), { javascriptObjectModel: javascriptObjectModel });
+        expect(result.errors).toEqual([expect.objectContaining({
+            offset: source.lastIndexOf(';'), endOffset: source.length, line: 2,
+            message: "Expected an expression after '='.",
+            debug: expect.objectContaining({ reasonCode: 'UnexpectedToken' })
+        })]);
     });
 
     test('still blocks malformed plain JavaScript in native mode without creating class or type-analysis scopes', () =>
@@ -164,7 +270,7 @@ describe('generated JavaScript compiler integration', () =>
         const result = LgdCompiler.create().compileToJs(source, new Map(), { javascriptObjectModel: javascriptObjectModel });
         expect(result.errors).toEqual([expect.objectContaining({
             offset: source.lastIndexOf(';'),
-            message: expect.stringContaining('Generated JavaScript is invalid:')
+            message: expect.stringContaining('Unable to compile this syntax:')
         })]);
         expect(result.code).not.toContain('interface IReader');
     });
@@ -175,7 +281,7 @@ describe('generated JavaScript compiler integration', () =>
         const result = LgdCompiler.create().compileToJs(source);
         expect(result.errors.filter(error => error.severity === 'warning')).toHaveLength(1);
         expect(result.errors.filter(error => error.severity !== 'warning')).toEqual([expect.objectContaining({
-            message: expect.stringContaining('Generated JavaScript is invalid:')
+            message: expect.stringContaining('Unable to compile this syntax:')
         })]);
     });
 

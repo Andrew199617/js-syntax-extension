@@ -1,14 +1,15 @@
 const parser = require('@babel/parser');
-const LgdSourceMap = require('./LgdSourceMap');
+const LgdSyntaxDiagnostic = require('./LgdSyntaxDiagnostic');
 
 /** @description Validates the complete emitted JavaScript independently of LGD type checking. */
 const LgdGeneratedJsValidator = {
     /**
      * @description Parses a complete emitted file and returns its reusable syntax tree or mapped syntax diagnostics.
      * @param {Object} emitted the final JavaScript code and source-mapping segments.
+     * @param {string} source the original LGD source, when available for precise diagnostic context.
      * @returns {Object} the Babel tree and source-relative errors.
      */
-    validate(emitted)
+    validate(emitted, source)
     {
         try
         {
@@ -22,16 +23,7 @@ const LgdGeneratedJsValidator = {
                 throw error;
             }
 
-            const map = LgdSourceMap.create(emitted.segments);
-            const position = Math.min(error.pos ?? 0, emitted.code.length);
-            const offset = map.toSource(position);
-            const endOffset = Math.max(offset, map.toSource(Math.min(position + 1, emitted.code.length)));
-            return { tree: null, errors: [{
-                offset: offset,
-                endOffset: endOffset,
-                code: 'lgd.output.syntax',
-                message: `Generated JavaScript is invalid: ${error.message.replace(/ \(\d+:\d+\)$/, '')}`
-            }] };
+            return { tree: null, errors: [LgdSyntaxDiagnostic.create(emitted, source, error)] };
         }
     },
 
