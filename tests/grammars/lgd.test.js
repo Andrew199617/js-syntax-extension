@@ -142,6 +142,25 @@ describe('LGD TextMate grammar.', () =>
         assertScope(tokens, 'total', nameScope);
     });
 
+    test('Highlights readonly and static typed fields in either modifier order.', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'class Sample {',
+            '    readonly Number value;',
+            '    static readonly Number total = 1;',
+            '    readonly static String label = "ready";',
+            '}'
+        ].join('\n'));
+        assertScope(tokens, 'readonly', readonlyScope);
+        assertScope(tokens, 'static', readonlyScope);
+        assertScope(tokens, 'Number', typeScope);
+        assertScope(tokens, 'String', typeScope);
+        for(const name of [ 'value', 'total', 'label' ])
+        {
+            assertScope(tokens, name, nameScope);
+        }
+    });
+
     test('Highlights enum declarations and names with the existing declaration and type families.', () =>
     {
         const tokens = tokenize(grammar, "export enum DownloadState {\n    Progress = 'progress',\n}");

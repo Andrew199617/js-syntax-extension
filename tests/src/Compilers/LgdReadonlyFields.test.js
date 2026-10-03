@@ -22,6 +22,15 @@ beforeEach(() => Oloo.objectMap.clear());
 
 describe.each([ 'oloo', 'class' ])('Readonly fields with %s output', objectModel =>
 {
+    test('Erases readonly without adding runtime checks or changing generated storage.', () =>
+    {
+        const source = 'class Sample { readonly Number value = 1; static readonly Array items = []; Sample() { this.value = 2; } }';
+        const checked = compile(source, objectModel);
+        const mutable = compile(source.replaceAll('readonly ', ''), objectModel);
+        expect(checked.errors).toEqual([]);
+        expect(checked.code).toBe(mutable.code);
+    });
+
     test('Initializes defaults and fresh references, allowing repeated constructor writes and early returns.', () =>
     {
         const Sample = execute([
@@ -81,6 +90,7 @@ describe.each([ 'oloo', 'class' ])('Readonly fields with %s output', objectModel
         [ 'array destructuring', 'change() { [this.value] = [2]; }' ],
         [ 'object destructuring', 'change() { ({ next: this.value = 2 } = {}); }' ],
         [ 'for-of target', 'change() { for(this.value of [2]) {} }' ],
+        [ 'unqualified for-of target', 'change() { for(value of [2]) {} }' ],
         [ 'for-in target', 'change() { for(this.value in {}) {} }' ],
         [ 'deletion even in constructor', 'Sample() { delete this.value; }' ],
         [ 'other instance in constructor', 'Sample(Sample other) { other.value = 2; }' ],

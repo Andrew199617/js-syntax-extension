@@ -7,6 +7,7 @@ const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
 const LgdCompletionProvider = require('../../../src/Lgd/LgdCompletionProvider');
 const LgdDefinitionProvider = require('../../../src/Lgd/LgdDefinitionProvider');
 const LgdHoverProvider = require('../../../src/Lgd/LgdHoverProvider');
+const LgdSemanticTokensProvider = require('../../../src/Lgd/LgdSemanticTokensProvider');
 const LgdClassMemberLookup = require('../../../src/Lgd/LgdClassMemberLookup');
 
 /** @description Opens a source in a recording editor service. */
@@ -171,6 +172,77 @@ describe('Source-backed declared field hover', () =>
                 const hover = await provider.provideHover(consumer, consumer.positionAt(offset));
                 expect(hover.contents).toContain(entry[1]);
             }
+        }
+        finally
+        {
+            await service.pendingDependencyUpdates;
+            await fs.promises.rm(directory, { recursive: true, force: true });
+        }
+    });
+});
+
+describe('Readonly field editor contracts', () =>
+{
+    test.each([ 'oloo', 'class' ])('Shows readonly hovers, tokens, and exact write diagnostics in %s output.', async objectModel =>
+    {
+        const source = [
+            'class Sample {',
+            '    readonly Number value;',
+            '    static readonly Number total = 1;',
+            '    Sample() { this.value = 2; }',
+            '}',
+            'const item = Sample.create();',
+            'item.value = 2; Sample.total++;'
+        ].join('\n');
+        const { service, document, state } = await openSource(source, { javascriptObjectModel: objectModel });
+        expect(state.errors.map(error => error.code)).toEqual([ 'lgd.member.readonly', 'lgd.member.readonly' ]);
+        expect(state.errors.map(error => source.slice(error.offset, error.endOffset))).toEqual([ 'item.value', 'Sample.total' ]);
+        const hoverProvider = LgdHoverProvider.create(service);
+        for(const [ phrase, expected ] of [ [ 'item.value', 'readonly Number Sample.value' ], [ 'Sample.total', 'static readonly Number Sample.total' ] ])
+        {
+            const offset = source.lastIndexOf(phrase) + phrase.indexOf('.') + 1;
+            const hover = await hoverProvider.provideHover(document, document.positionAt(offset));
+            expect(hover.contents).toContain(expected);
+        }
+
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const modifiers = tokens.pushed.filter(token => token.tokenType === 'lgdModifierKeyword').map(token => document.getText(token.range));
+        expect(modifiers).toEqual([ 'readonly', 'static', 'readonly' ]);
+        document.setText(source.replaceAll('readonly ', ''));
+        await service.updateDocument(document);
+        expect(state.errors).toEqual([]);
+    });
+
+    test('Refreshes readonly writes and hover metadata through relative imports when the declaration changes.', async () =>
+    {
+        const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lgd-readonly-fields-'));
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const rootSource = 'class Root { readonly Number value; static readonly Number total; }\nmodule.exports = Root;';
+        const root = makeTextDocument(`file://${path.join(directory, 'Root.lgd')}`, rootSource);
+        const consumerSource = [
+            'const Remote = require("./Root.js");',
+            'Remote item = Remote.create();',
+            'item.value = 2; Remote.total = 2;',
+            'class Consumer { change(Remote other) { other.value++; } }'
+        ].join('\n');
+        const consumer = makeTextDocument(`file://${path.join(directory, 'Consumer.lgd')}`, consumerSource);
+        try
+        {
+            await service.openDocument(root);
+            const state = await service.openDocument(consumer);
+            await service.pendingDependencyUpdates;
+            expect(state.errors.map(error => error.code)).toEqual([ 'lgd.member.readonly', 'lgd.member.readonly', 'lgd.member.readonly' ]);
+            const offset = consumerSource.indexOf('item.value') + 'item.'.length;
+            const hover = await LgdHoverProvider.create(service).provideHover(consumer, consumer.positionAt(offset));
+            expect(hover.contents).toContain('readonly Number Root.value');
+            root.setText(rootSource.replaceAll('readonly ', ''));
+            await service.updateDocument(root);
+            await service.pendingDependencyUpdates;
+            expect(state.errors).toEqual([]);
+            root.setText(rootSource);
+            await service.updateDocument(root);
+            await service.pendingDependencyUpdates;
+            expect(state.errors.map(error => error.code)).toEqual([ 'lgd.member.readonly', 'lgd.member.readonly', 'lgd.member.readonly' ]);
         }
         finally
         {

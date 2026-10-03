@@ -117,9 +117,25 @@ Each instance gets its own writable data fields before constructor execution, in
 
 Static fields initialize once when the class declaration executes. Inherited reads and writes share the declaring class's storage, including `Derived.count++`; inherited static methods retain their declaring context. This eager initialization timing is LGD's JavaScript behavior; C# can defer initialization. Use `Player.count` or `Player.total()`: accessing a static member through `first` is an error, as is accessing an instance member through `Player`. Static methods cannot use `this` or implicit instance members, but may access an explicit instance parameter. Locals and parameters shadow implicit member names normally.
 
-Known field types, writes, returns and receiver kinds are checked across relative LGD imports. Completion lists separate instance and static members. These remain compile-time checks; arbitrary external JavaScript can bypass them.
+Use `readonly` for a field whose reference/value can only be assigned during initialization:
 
-LGD members are accessible from other code by default; C# access-control defaults are not modeled. This field subset does not support access modifiers, `readonly`/`const` fields, static classes or constructors, constructor chaining with `this(...)`, or fields in interfaces. Same-named inherited instance fields and member collisions are diagnosed because JavaScript properties cannot represent C#'s separate base and derived field storage. Use a distinct field name instead. Declare an LGD base before its derived class; unresolved or later-declared bases cannot provide a verified field lifecycle. Native class output also reserves the static field name `prototype`. Use `const Type name = value;` for immutable local or top-level bindings. Legacy `readonly Type name = value;` declarations still compile with a migration warning and a quick fix to `const`.
+```lgd
+class PlayerName {
+    readonly String name;
+    readonly Array history = [];
+    static readonly String category = "player";
+
+    PlayerName(String name) { this.name = name; }
+    rename() { this.name = "other"; } // error: outside the declaring constructor
+    record() { this.history.push(this.name); } // allowed: the array stays mutable
+}
+```
+
+An instance readonly field can be assigned at its declaration or directly through `this` (including an implicit member name) in its declaring constructor. Repeated assignment, compound assignment and increments are permitted there. Other instances, aliases of `this`, derived constructors, ordinary methods and nested functions cannot reassign it. `static readonly` fields can be assigned in static field initializers of their declaring class; static constructors are not supported. Readonly fields retain ordinary default values when no initializer is provided. They do not freeze referenced objects or change initialization order.
+
+Known field types, writes, returns and receiver kinds are checked across relative LGD imports. Completion lists separate instance and static members. These remain compile-time checks: dynamic property names, reflection helpers such as `Object.assign`, external JavaScript, and aliases whose receiver type cannot be determined can bypass them. Use typed receiver annotations when values pass through untyped containers or other dynamic code.
+
+LGD members are accessible from other code by default; C# access-control defaults are not modeled. This field subset does not support access modifiers, `const` fields, static classes or constructors, constructor chaining with `this(...)`, or fields in interfaces. Same-named inherited instance fields and member collisions are diagnosed because JavaScript properties cannot represent C#'s separate base and derived field storage. Use a distinct field name instead. Declare an LGD base before its derived class; unresolved or later-declared bases cannot provide a verified field lifecycle. Native class output also reserves the static field name `prototype`. Use `const Type name = value;` for immutable local or top-level bindings. Legacy `readonly Type name = value;` declarations still compile with a migration warning and a quick fix to `const`.
 
 ## LGD interfaces and abstract classes
 

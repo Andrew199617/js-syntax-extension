@@ -179,7 +179,7 @@ const LgdHoverProvider = {
     /** @description Shows the declared field type and owner even when the JavaScript mirror cannot infer a default-only field. */
     renderDeclaredField(detail)
     {
-        const modifier = detail.static ? 'static ' : '';
+        const modifier = `${detail.static ? 'static ' : ''}${detail.readonly ? 'readonly ' : ''}`;
         const owner = detail.declaringType ? `${detail.declaringType}.` : '';
         const type = detail.propertyTypeName || detail.typeName;
         return [ '```lgd', `${modifier}${type} ${owner}${detail.name}`, '```' ].join('\n');

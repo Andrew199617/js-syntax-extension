@@ -475,6 +475,11 @@ const LgdClassMemberSemantics = {
                 return parent.node.left === current.node;
             }
 
+            if(parent.isForXStatement())
+            {
+                return parent.node.left === current.node;
+            }
+
             if(parent.isUpdateExpression())
             {
                 return true;

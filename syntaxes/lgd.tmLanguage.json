@@ -15,6 +15,9 @@
 			"include": "#typed-method"
 		},
 		{
+			"include": "#typed-field"
+		},
+		{
 			"include": "#typed-declaration"
 		},
 		{
@@ -36,6 +39,9 @@
 				},
 				{
 					"include": "#typed-method"
+				},
+				{
+					"include": "#typed-field"
 				},
 				{
 					"include": "#typed-declaration"
@@ -185,6 +191,26 @@
 			"comment": "Direct base method dispatch in class bodies; native call scopes keep ordinary property names unchanged.",
 			"name": "variable.language.lgd",
 			"match": "(?<![\\w$.])\\bbase\\b(?=[ \\t]*\\.[ \\t]*[$_a-zA-Z][\\w$]*[ \\t]*\\()"
+		},
+		"typed-field": {
+			"comment": "Typed readonly and static fields keep modifier, type and name roles before semantic tokens arrive.",
+			"match": "^[ \\t]*((?:(?:static|readonly)[ \\t]+)+)((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)[ \\t]+([$_a-zA-Z][\\w$]*)(?=[ \\t]*[;=])",
+			"captures": {
+				"1": {
+					"patterns": [
+						{
+							"match": "\\b(?:static|readonly)\\b",
+							"name": "storage.modifier.lgd"
+						}
+					]
+				},
+				"2": {
+					"name": "storage.type.lgd"
+				},
+				"3": {
+					"name": "variable.other.definition.lgd"
+				}
+			}
 		}
 	},
 	"scopeName": "source.lgd"
