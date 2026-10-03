@@ -438,6 +438,75 @@ describe('LGD diagnostic quick fixes', () =>
         expect(await actionsFor(fixture, 'lgd.assignment.typeMismatch', { only: { contains: () => false } })).toEqual([]);
     });
 
+    test('offers separate parameter-only and atomic complete fixes for a provably module-local signature', async () =>
+    {
+        const source = 'export {};\r\nclass Counter { Number increment(Number value) { value = "wrong"; return value; } }';
+        const fixture = await openFixture(source);
+        const actions = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
+        expect(actions).toHaveLength(2);
+        const parameter = actions.find(action => action.title.startsWith("Change parameter 'value' to"));
+        const combined = actions.find(action => action.title.includes('return'));
+        expect(parameter.title).toContain('1 existing diagnostic remains');
+        expect(combined.isPreferred).toBe(false);
+        await applyAction(fixture, combined);
+        const sourceEdits = vscode.workspace.applyEdit.mock.calls.filter(([edit]) => edit.replacements.some(replacement => replacement.uri === fixture.document.uri));
+
+        expect(sourceEdits).toHaveLength(1);
+        expect(sourceEdits[0][0].replacements).toHaveLength(1);
+        expect(fixture.document.getText()).toBe(source.replace('Number increment(Number', 'String increment(String'));
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
+
+    test('offers an explicit followup return fix after choosing the parameter-only edit', async () =>
+    {
+        const source = 'export {};\nclass Counter { Number increment(Number value) { value = "wrong"; return value; } }';
+        const fixture = await openFixture(source);
+        const actions = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
+        const parameter = actions.find(action => action.title.startsWith("Change parameter 'value' to"));
+        await applyAction(fixture, parameter);
+        const diagnostics = fixture.diagnostics.get(fixture.document.uri.toString());
+        expect(diagnostics).toHaveLength(1);
+        expect(diagnostics[0].code).toBe('type');
+        const [followup] = await actionsFor(fixture, 'lgd.return.typeMismatch');
+        expect(followup.isPreferred).toBe(false);
+        await applyAction(fixture, followup);
+        expect(fixture.document.getText()).toBe(source.replace('Number increment(Number', 'String increment(String'));
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
+
+    test('withholds complete return changes for script-global, mixed-branch, unknown and inherited cases', async () =>
+    {
+        const sources = [
+            'class Counter { Number increment(Number value) { value = "wrong"; return value; } }',
+            'export {};\nclass Counter { Number increment(Number value) { value = "wrong"; if(ready) return value; return 1; } }',
+            'export {};\nclass Counter { Number increment(Number value) { value = "wrong"; return unknown(); } }',
+            'export {};\nclass Parent {}\nclass Counter : Parent { Number increment(Number value) { value = "wrong"; return value; } }'
+        ];
+        for(const source of sources)
+        {
+            const fixture = await openFixture(source);
+            const actions = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
+            expect(actions.some(action => action.title.includes('return'))).toBe(false);
+        }
+    });
+
+    test('rejects a combined edit if its source changes or new consumers appear after the menu', async () =>
+    {
+        const source = 'export {};\nclass Counter { Number increment(Number value) { value = "wrong"; return value; } }';
+        const fixture = await openFixture(source);
+        const actions = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
+        const combined = actions.find(action => action.title.includes('return'));
+        fixture.document.setText(source.replace('"wrong"', '"changed"'));
+        fixture.document.version++;
+        expect(await fixture.provider.applyFix(combined.command.arguments[0])).toBe(false);
+        expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
+        await fixture.service.updateDocument(fixture.document);
+        const nextActions = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
+        const current = nextActions.find(action => action.title.includes('return'));
+        fixture.service.dependents.set(fixture.document.uri.fsPath, new Set(['/workspace/new-consumer.lgd']));
+        expect(await fixture.provider.applyFix(current.command.arguments[0])).toBe(false);
+    });
+
     test('rejects an already offered parameter edit when a new consumer appears', async () =>
     {
         const fixture = await openFixture('export {};\nclass Counter { void increment(Number value) { value = "wrong"; } }');

@@ -98,6 +98,7 @@ const LgdReturnChecker = {
             return;
         }
 
+        const returnFix = this.returnTypeFix(path, signature, context);
         path.get('body').traverse({
             Function: nested => nested.skip(),
 
@@ -116,11 +117,18 @@ const LgdReturnChecker = {
                     if(!this.compatible(declared, type, group.opaqueReturn))
                     {
                         const node = argument.node || returned.node;
-                        context.errors.push({
+                        const error = {
                             offset: context.map.toSource(node.start),
                             endOffset: context.map.toSource(node.end),
+                            code: 'lgd.return.typeMismatch',
                             message: `Cannot return ${type} from a ${declared} method.`
-                        });
+                        };
+                        if(returnFix)
+                        {
+                            error.quickFix = { ...returnFix, returnStart: error.offset, returnEnd: error.endOffset };
+                        }
+
+                        context.errors.push(error);
                     }
                 }
             }
@@ -130,6 +138,76 @@ const LgdReturnChecker = {
         {
             report(`Method '${group.name}' must return ${declared} on every normal path.`);
         }
+    },
+
+    /** @description Supplies exact Number-to-String return provenance only when every reachable result is provably String. */
+    returnTypeFix(path, signature, context)
+    {
+        const { declaration, group } = signature;
+        const unsupported = group.inherited || group.async || group.accessor || group.generator || group.abstract;
+        const offset = declaration.initializerStart + group.returnTypeStart;
+        const endOffset = declaration.initializerStart + group.returnTypeEnd;
+        if(unsupported || group.returnTypeName !== 'Number' || context.content.slice(offset, endOffset) !== 'Number')
+        {
+            return null;
+        }
+
+        if(!this.returnsOnly(path, signature, context, 'String'))
+        {
+            return null;
+        }
+
+        return { kind: 'changeReturnType', declarationStart: declaration.headStart, groupStart: group.start,
+            methodName: group.name, offset: offset, endOffset: endOffset, oldTypeName: 'Number', newTypeName: 'String' };
+    },
+
+    /** @description Requires an explicit consistent result on every normal path without trusting unknown-compatible returns. */
+    returnsOnly(path, signature, context, expected)
+    {
+        if(signature.group.async || signature.group.generator || signature.group.accessor || LgdReturnFlow.statement(path.node.body).has('normal'))
+        {
+            return false;
+        }
+
+        let foundReturn = false;
+        let consistent = true;
+        path.get('body').traverse({
+            Function: nested => nested.skip(),
+
+            /** @description Rejects null, undefined, mixed, unknown and captured-write values in directly owned returns. */
+            ReturnStatement: returned =>
+            {
+                if(!context.flow.reachable(returned))
+                {
+                    return;
+                }
+
+                foundReturn = true;
+                const argument = returned.get('argument');
+                const proofContext = { ...context, strictReturnProof: true };
+                const types = argument.node ? this.expressionTypes(argument, signature, proofContext) : ['undefined'];
+                if(types.length === 0 || types.some(type => type !== expected))
+                {
+                    consistent = false;
+                }
+            },
+
+            /** @description Withholds proof when a captured binding can be changed outside the method's direct flow. */
+            Identifier: referenced =>
+            {
+                if(!referenced.isReferencedIdentifier())
+                {
+                    return;
+                }
+
+                const binding = referenced.scope.getBinding(referenced.node.name);
+                if(binding?.constantViolations.some(write => write.getFunctionParent() !== path))
+                {
+                    consistent = false;
+                }
+            }
+        });
+        return foundReturn && consistent;
     },
 
     /** @description Checks known returned values without inventing types for unknown calls or members. */
@@ -407,6 +485,11 @@ const LgdReturnChecker = {
     /** @description Resolves calls to annotated methods on the current or a directly bound object. */
     methodCallType(path, signature, context)
     {
+        if(context.strictReturnProof)
+        {
+            return UNKNOWN;
+        }
+
         const callee = path.node.callee;
         if(callee.type === 'Identifier' && callee.name === 'require' && !path.scope.getBinding('require'))
         {

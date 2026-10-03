@@ -25,6 +25,12 @@ function previewText(current, proposal)
     return current.source.slice(0, proposal.offset) + proposal.newText + current.source.slice(proposal.endOffset);
 }
 
+/** @description Makes a tested contract module-private without exporting it. */
+function inModule(source)
+{
+    return `export {};\r\n${source}`;
+}
+
 describe('LGD parameter-type assignment suggestions', () =>
 {
     test('preserves stable assignment diagnostic metadata with the exact parameter type and name spans', () =>
@@ -48,18 +54,19 @@ describe('LGD parameter-type assignment suggestions', () =>
         'class Counter { void increment(Number value) { value = "wrong"; } }'
     ])('offers an annotation-only unpreferred edit and independently compiles the fixed source: %s', async source =>
     {
-        const current = fixture(source);
+        const moduleSource = inModule(source);
+        const current = fixture(moduleSource);
         const proposal = await proposalFor(current);
         expect(proposal.title).toBe("Change parameter 'value' to String (changes signature)");
         expect(proposal.isPreferred).toBe(false);
         expect(proposal.expectedText).toBe('Number');
-        expect(previewText(current, proposal)).toBe(`${source.slice(0, current.fix.offset)}String${source.slice(current.fix.endOffset)}`);
+        expect(previewText(current, proposal)).toBe(`${moduleSource.slice(0, current.fix.offset)}String${moduleSource.slice(current.fix.endOffset)}`);
         expect(LgdCompiler.create().compileToJs(previewText(current, proposal)).errors).toEqual([]);
     });
 
     test('retains the existing screenshot return mismatch and discloses the residual diagnostic', async () =>
     {
-        const source = 'class Counter { Number increment(Number value) { value = "wrong"; return value; } }';
+        const source = inModule('class Counter { Number increment(Number value) { value = "wrong"; return value; } }');
         const current = fixture(source);
         const proposal = await proposalFor(current);
         expect(proposal.title).toBe("Change parameter 'value' to String (changes signature); 1 existing diagnostic remains");
@@ -70,7 +77,7 @@ describe('LGD parameter-type assignment suggestions', () =>
 
     test('supports both output models and preserves CRLF, Unicode, comments, and shadowing locals', async () =>
     {
-        const source = [
+        const source = inModule([
             'class Counter {',
             '    // café Number value',
             '    void increment(Number /* contract */ value) {',
@@ -78,7 +85,7 @@ describe('LGD parameter-type assignment suggestions', () =>
             '        value = "wrong";',
             '    }',
             '}'
-        ].join('\r\n');
+        ].join('\r\n'));
         for(const javascriptObjectModel of [ 'oloo', 'class' ])
         {
             const current = fixture(source, { javascriptObjectModel: javascriptObjectModel });
@@ -141,12 +148,33 @@ describe('LGD parameter-type assignment suggestions', () =>
         'class Counter { Number increment(Number value) { if(ready) return value; value = "wrong"; return 1; } }'
     ])('withholds an automatic edit for exposed contracts, callers, inheritance, or a newly invalid preview: %s', async source =>
     {
-        expect(await proposalFor(fixture(source))).toBeNull();
+        expect(await proposalFor(fixture(inModule(source)))).toBeNull();
+    });
+
+    test.each([
+        'Function record = (Number value) => { value = "wrong"; };',
+        'Object Counter = { void increment(Number value) { value = "wrong"; } };',
+        'class Counter { void increment(Number value) { value = "wrong"; } }',
+        'class Counter { void increment(Number value) { value = "wrong"; } }\r\nmodule.exports = {};'
+    ])('preserves compiler diagnostics while withholding a signature edit for global script owners: %s', async source =>
+    {
+        const current = fixture(source);
+        expect(current.fix.kind).toBe('changeParameterType');
+        expect(current.result.errors.some(error => error.code === 'lgd.assignment.typeMismatch')).toBe(true);
+        expect(await proposalFor(current)).toBeNull();
+    });
+
+    test('supports an unused genuinely nested-local parameter contract without a module marker', async () =>
+    {
+        const source = 'function build() {\r\nclass Counter { void increment(Number value) { value = "wrong"; } }\r\n}';
+        const current = fixture(source);
+        const proposal = await proposalFor(current);
+        expect(LgdCompiler.create().compileToJs(previewText(current, proposal)).errors).toEqual([]);
     });
 
     test('rejects known external consumers and forged parameter metadata', async () =>
     {
-        const current = fixture('Function record = (Number value) => { value = "wrong"; };');
+        const current = fixture(inModule('Function record = (Number value) => { value = "wrong"; };'));
         const offered = await proposalFor(current);
         expect(offered.validate()).toBe(true);
         current.context.languageService.dependents.set(current.context.document.uri.fsPath, new Set(['/workspace/Consumer.lgd']));
