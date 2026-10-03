@@ -153,14 +153,14 @@ const LgdSemanticTokensProvider = {
                     if(base)
                     {
                         const start = member.paramEnd + base.index;
-                        spans.push({ start: start, end: start + 'base'.length, tokenType: 'keyword' });
+                        spans.push({ start: start, end: start + 'base'.length, tokenType: LgdKeywordFamilies.get('base').tokenType });
                     }
                 }
             }
 
             for(const call of declaration.baseCalls || [])
             {
-                spans.push({ start: call.baseStart, end: call.baseEnd, tokenType: 'keyword' });
+                spans.push({ start: call.baseStart, end: call.baseEnd, tokenType: LgdKeywordFamilies.get('base').tokenType });
             }
         }
     },

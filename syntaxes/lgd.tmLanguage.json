@@ -51,6 +51,20 @@
 					"include": "#typed-parameter"
 				}
 			]
+		},
+		"L:source.lgd meta.class.lgd meta.return.type.js -meta.type.paren.cover -comment -string": {
+			"patterns": [
+				{
+					"include": "#base-initializer-keyword"
+				}
+			]
+		},
+		"L:source.lgd meta.class.lgd meta.block.js -meta.function-call -comment -string": {
+			"patterns": [
+				{
+					"include": "#base-method-keyword"
+				}
+			]
 		}
 	},
 	"repository": {
@@ -152,6 +166,16 @@
 					"name": "storage.modifier.lgd"
 				}
 			}
+		},
+		"base-initializer-keyword": {
+			"comment": "Constructor initializer fallback while the JavaScript grammar treats the colon as a return annotation.",
+			"name": "variable.language.lgd",
+			"match": "(?<![\\w$.])\\bbase\\b(?=[ \\t]*\\()"
+		},
+		"base-method-keyword": {
+			"comment": "Direct base method dispatch in class bodies; native call scopes keep ordinary property names unchanged.",
+			"name": "variable.language.lgd",
+			"match": "(?<![\\w$.])\\bbase\\b(?=[ \\t]*\\.[ \\t]*[$_a-zA-Z][\\w$]*[ \\t]*\\()"
 		}
 	},
 	"scopeName": "source.lgd"

@@ -5,7 +5,8 @@ const families = Object.freeze({
         words: [ 'class', 'interface', 'enum', 'function', 'const', 'let', 'var', 'using' ] },
     modifier: { tokenType: 'lgdModifierKeyword', scope: 'storage.modifier.lgd',
         words: [ 'abstract', 'async', 'extends', 'override', 'private', 'protected', 'public', 'readonly', 'sealed', 'static', 'virtual' ] },
-    builtin: { tokenType: 'lgdTypeKeyword', scope: 'keyword.type.lgd', words: ['void'] }
+    builtin: { tokenType: 'lgdTypeKeyword', scope: 'keyword.type.lgd', words: ['void'] },
+    expression: { tokenType: 'lgdExpressionKeyword', scope: 'variable.language.lgd', words: ['base'] }
 });
 
 /** @description Shared vocabulary for source semantic tokens and checked TextMate/manifest fallback scopes. */

@@ -156,6 +156,50 @@ describe('LGD TextMate grammar.', () =>
         assertScope(tokens, 'total', nameScope);
     });
 
+    test('gives constructor initializers and direct base dispatch the expression keyword fallback', () =>
+    {
+        const source = [
+            'class GoToAssignment : BaseCommand {',
+            '    GoToAssignment() : base("lgd.goToAssignment", "Go To Assignment") {}',
+            '    async override executeCommand() {',
+            '        await base.executeCommand();',
+            '        if (ready) { base.executeCommand(); }',
+            '        const invoke = () => base.executeCommand();',
+            '    }',
+            '}'
+        ].join('\n');
+        const tokens = tokenize(grammar, source);
+        const baseTokens = tokens.filter(token => token.text === 'base');
+        assert.strictEqual(baseTokens.length, source.match(/\bbase\b/g).length);
+        assert.ok(baseTokens.every(token => token.scopes.includes(LgdKeywordFamilies.families.expression.scope)));
+        for(const token of baseTokens)
+        {
+            assert.ok(token.scopes.every(scope => !scope.startsWith('keyword.control')));
+        }
+
+        assertScope(tokens, 'executeCommand', 'entity.name.function.js');
+    });
+
+    test('leaves ordinary base identifiers, properties, strings, and comments unchanged', () =>
+    {
+        const source = [
+            'const base = { executeCommand() {} }; base.executeCommand();',
+            'class Command {',
+            '    base() {}',
+            '    run(Object base) {',
+            '        base(); this.base(); this.base.executeCommand(); object . base . executeCommand();',
+            '        const text = "base.executeCommand() : base()";',
+            '        const template = `base.executeCommand() : base()`;',
+            '        const pattern = /base.executeCommand()/;',
+            '        // base.executeCommand() : base()',
+            '        /* base.executeCommand() : base() */',
+            '    }',
+            '}'
+        ].join('\n');
+        const tokens = tokenize(grammar, source);
+        assert.ok(tokens.every(token => !token.scopes.includes(LgdKeywordFamilies.families.expression.scope)));
+    });
+
     test('Highlights explicit return types separately from named methods.', () =>
     {
         const tokens = tokenize(grammar, 'class Counter {\n    Number count() { return 1; }\n    async void reset() {}\n}');

@@ -6,7 +6,7 @@ const LgdSemanticTokensProvider = require('../../../src/Lgd/LgdSemanticTokensPro
 const LgdKeywordFamilies = require('../../../src/Lgd/LgdKeywordFamilies');
 
 /** @description Keyword roles independently expected from the extension's semantic legend. */
-const keywordTypes = [ 'keyword', 'lgdDeclarationKeyword', 'lgdModifierKeyword', 'lgdTypeKeyword' ];
+const keywordTypes = [ 'keyword', 'lgdDeclarationKeyword', 'lgdModifierKeyword', 'lgdTypeKeyword', 'lgdExpressionKeyword' ];
 
 /** @description Uri of the LGD document used across semantic token tests. */
 const LGD_URI = 'file:///workspace/Typed.lgd';
@@ -297,6 +297,38 @@ describe('LgdSemanticTokensProvider', () =>
         expect(modifiers.map(token => tokenText(document, token))).toEqual([ 'readonly', 'virtual', 'async', 'override', 'async' ]);
         const builtins = tokens.pushed.filter(token => token.tokenType === 'lgdTypeKeyword');
         expect(builtins.map(token => tokenText(document, token))).toEqual([ 'void', 'void' ]);
+        const expressions = tokens.pushed.filter(token => token.tokenType === 'lgdExpressionKeyword');
+        expect(expressions.map(token => tokenText(document, token))).toEqual([ 'base', 'base' ]);
+    });
+
+    test('keeps the screenshot constructor base initializer distinct from control flow', async () =>
+    {
+        const source = [
+            'class BaseCommand { BaseCommand(String command, String title) {} virtual async executeCommand() {} }',
+            '/** @description Command to go to the start of the assignment in the current line. */',
+            'class GoToAssignment : BaseCommand {',
+            '    /**',
+            '     * @description Initialize an instance of GoToAssignment.',
+            '     * @returns {GoToAssignmentType}',
+            '     */',
+            '    GoToAssignment() : base("lgd.goToAssignment", "Go To Assignment") { }',
+            '    async override executeCommand() {',
+            '        readonly Object editor = vscode.window.activeTextEditor;',
+            '        if (!editor) { return; }',
+            '    }',
+            '}'
+        ].join('\n');
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        const state = await service.openDocument(document);
+        expect(state.errors).toEqual([]);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const baseTokens = tokens.pushed.filter(token => tokenText(document, token) === 'base');
+        expect(baseTokens).toHaveLength(1);
+        expect(baseTokens[0].tokenType).toBe('lgdExpressionKeyword');
+        expect(document.offsetAt(baseTokens[0].range.start)).toBe(source.indexOf('base('));
+        const controls = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        expect(controls).toEqual([ 'if', 'return' ]);
     });
 
     test('does not turn contextual identifiers, property names, literal values, or comment text into keywords', async () =>
@@ -304,11 +336,12 @@ describe('LgdSemanticTokensProvider', () =>
         const source = [
             'const words = { class: 1, new: 1, async: 1, await: 1, void: 1, return: 1, virtual: 1, override: 1, readonly: 1, public: 1, sealed: 1, static: 1, as: 1 };',
             'const async = words.async, from = words.as, virtual = words.virtual;',
+            'const base = { run() {}, base() {} }; base.run(); base.base();',
             'words.class; words.new; words.return; words.await; words.public; words.sealed; words.static;',
             'const methods = { async() {}, get() {}, set() {} };',
-            'const text = "class virtual new async await void return";',
-            'const template = `readonly override await`; // class async return',
-            'const pattern = /class|return|await/;',
+            'const text = "class virtual new async await void return base";',
+            'const template = `readonly override await base`; // class async return base',
+            'const pattern = /class|return|await|base/;',
             'const literals = [true, false, null];'
         ].join('\n');
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
@@ -381,6 +414,7 @@ describe('LgdSemanticTokensProvider', () =>
         const names = tokens.pushed.map(token => tokenText(document, token));
         expect(names.filter(name => name === 'Derived')).toHaveLength(2);
         expect(names).toContain('void');
+        expect(tokens.pushed.find(token => tokenText(document, token) === 'base').tokenType).toBe('lgdExpressionKeyword');
     });
 
     test.each([ 'canceled', 'changed', 'closed' ])('discards a %s semantic request while compilation is pending', async reason =>

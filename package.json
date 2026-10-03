@@ -161,6 +161,10 @@
             {
                 "id": "lgdTypeKeyword",
                 "description": "The LGD void return-type keyword."
+            },
+            {
+                "id": "lgdExpressionKeyword",
+                "description": "An LGD base receiver or constructor initializer keyword."
             }
         ],
         "semanticTokenScopes": [
@@ -178,6 +182,9 @@
                     ],
                     "lgdTypeKeyword": [
                         "keyword.type.lgd"
+                    ],
+                    "lgdExpressionKeyword": [
+                        "variable.language.lgd"
                     ]
                 }
             }
