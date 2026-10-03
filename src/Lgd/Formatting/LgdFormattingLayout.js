@@ -272,6 +272,15 @@ const LgdFormattingLayout = {
     {
         const { previous, next } = gap;
         const options = context.options.lineBreaks;
+        const importGroup = context.model.importStarts.get(next.start);
+        const precedingImport = context.model.importEnds.get(previous.end);
+        if(importGroup && precedingImport && options.importGroups !== 'preserve')
+        {
+            const separate = options.importGroups === 'origin' && importGroup !== precedingImport;
+            gap.text = context.newline.repeat(separate ? 2 : 1);
+            gap.rule = 'lineBreaks.importGroups';
+        }
+
         const breaks = gap.original.match(/\r\n|\r|\n/gu)?.length || 0;
         if(previous.text === '}' && next.text === '}')
         {
@@ -333,7 +342,8 @@ const LgdFormattingLayout = {
         {
             const isIf = control.parent.type === 'IfStatement';
             const mode = context.options.lineBreaks.shortIfs;
-            const allow = isIf ? mode === 'all' || mode === 'withoutElse' && !control.parent.alternate : context.options.lineBreaks.shortLoops;
+            const shortAllowed = isIf ? mode === 'all' || mode === 'withoutElse' && !control.parent.alternate : context.options.lineBreaks.shortLoops;
+            const allow = context.options.lineBreaks.embeddedStatementsSameLine && shortAllowed;
             if(this.shouldInsertBraces(context, control))
             {
                 const placement = this.bracePlacement(context, { location: 'controlBlocks', definition: false });
@@ -341,10 +351,11 @@ const LgdFormattingLayout = {
                 gap.rule = 'bracesRequired.mode';
                 gap.contributors.add('lgd.format.braces.controlBlocks');
             }
-            else if(!isIf || mode !== 'preserve')
+            else if(!isIf || mode !== 'preserve' || !context.options.lineBreaks.embeddedStatementsSameLine)
             {
                 gap.text = allow ? ' ' : context.newline;
                 gap.rule = isIf ? 'lineBreaks.shortIfs' : 'lineBreaks.shortLoops';
+                gap.contributors.add('lgd.format.lineBreaks.embeddedStatementsSameLine');
             }
         }
 
@@ -501,6 +512,12 @@ const LgdFormattingLayout = {
     {
         const { previous, next } = gap;
         const wrapping = context.options.wrapping;
+        if(context.model.returnTypes.has(previous.end) && wrapping.returnType !== 'preserve')
+        {
+            gap.text = wrapping.returnType === 'nextLine' ? context.newline : ' ';
+            gap.rule = 'wrapping.returnType';
+        }
+
         const planned = context.wraps.get(next.start);
         if(planned)
         {

@@ -163,3 +163,10 @@ it.each([
     expect(imported.options.wrapping.binaryOperations).toBe(native);
     expect(imported.issues).toHaveLength(0);
 });
+
+it.each([ [ 'None', 'preserve' ], [ 'All', 'nextLine' ], [ 'AllDefinitions', 'nextLine' ] ])('imports %s return type line style', (external, native) =>
+{
+    const imported = LgdClangFormat.parse(`AlwaysBreakAfterReturnType: ${external}`);
+    expect(imported.options.wrapping.returnType).toBe(native);
+    expect(imported.issues).toHaveLength(0);
+});

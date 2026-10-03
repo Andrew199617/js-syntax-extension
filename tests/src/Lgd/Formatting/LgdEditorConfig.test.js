@@ -193,3 +193,19 @@ it('imports independent experimental blank-line rules with their severities', ()
     expect(imported.rules['lgd.format.lineBreaks.statementImmediatelyAfterBlock'].severity).toBe('error');
     expect(imported.issues).toHaveLength(0);
 });
+
+it('maps explicit declaration, embedded-statement, import-group and header preferences', () =>
+{
+    const imported = LgdEditorConfig.map(Object.fromEntries([
+        [ 'csharp_space_around_declaration_statements', 'ignore' ],
+        [ 'csharp_style_allow_embedded_statements_on_same_line_experimental', 'false:warning' ],
+        [ 'dotnet_separate_import_directive_groups', 'true' ],
+        [ 'file_header_template', 'My Project\\nCopyright 2026' ],
+        [ 'dotnet_diagnostic.IDE0073.severity', 'warning' ]
+    ]));
+    expect(imported.options.spacing.declarations).toBe('preserve');
+    expect(imported.options.lineBreaks).toEqual({ embeddedStatementsSameLine: false, importGroups: 'origin' });
+    expect(imported.options.whitespace.fileHeader).toBe('My Project\nCopyright 2026');
+    expect(imported.rules['lgd.format.whitespace.fileHeader'].severity).toBe('warning');
+    expect(imported.issues).toHaveLength(0);
+});

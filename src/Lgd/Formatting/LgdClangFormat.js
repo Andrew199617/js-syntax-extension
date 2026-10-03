@@ -263,6 +263,11 @@ const LgdClangFormat = {
             const values = { Never: 'preserve', RespectPrecedence: 'respectPrecedence', OnePerLine: 'onePerLine' };
             set('wrapping', 'binaryOperations', values[value]);
         }
+        else if(key === 'AlwaysBreakAfterReturnType' || key === 'BreakAfterReturnType')
+        {
+            const values = { None: 'preserve', Automatic: 'preserve', All: 'nextLine', AllDefinitions: 'nextLine', TopLevel: 'preserve', TopLevelDefinitions: 'preserve' };
+            set('wrapping', 'returnType', values[value]);
+        }
         else if(key === 'BreakConstructorInitializers')
         {
             const values = { BeforeColon: 'beforeColon', AfterColon: 'afterColon' };

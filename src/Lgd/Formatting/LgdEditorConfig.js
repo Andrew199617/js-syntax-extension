@@ -39,6 +39,7 @@ const booleanMappings = Object.fromEntries([
     [ 'csharp_style_allow_blank_line_after_colon_in_constructor_initializer_experimental', [ 'lineBreaks', 'blankLineAfterConstructorColon' ] ],
     [ 'csharp_style_allow_blank_line_after_token_in_conditional_expression_experimental', [ 'lineBreaks', 'blankLineAfterConditionalToken' ] ],
     [ 'csharp_style_allow_blank_line_after_arrow_expression_clause_experimental', [ 'lineBreaks', 'blankLineAfterArrow' ] ],
+    [ 'csharp_style_allow_embedded_statements_on_same_line_experimental', [ 'lineBreaks', 'embeddedStatementsSameLine' ] ],
     [ 'trim_trailing_whitespace', [ 'whitespace', 'trimTrailingWhitespace' ] ]
 ]);
 
@@ -482,6 +483,18 @@ const LgdEditorConfig = {
             return this.booleanOption(result, key, value, booleanMappings[key]);
         }
 
+        if(key === 'file_header_template')
+        {
+            const header = value === 'unset' ? '' : properties[key].replaceAll('\\n', '\n');
+            return this.setOption(result, [ 'whitespace', 'fileHeader' ], header);
+        }
+
+        if(key === 'dotnet_diagnostic.ide0073.severity')
+        {
+            this.applySeverity(result, ['whitespace.fileHeader'], value, key);
+            return [];
+        }
+
         if(key === 'dotnet_diagnostic.ide0055.severity')
         {
             this.applySeverity(result, LgdFormattingOptions.catalog.map(rule => rule.id.slice('lgd.format.'.length)), value, key);
@@ -494,6 +507,8 @@ const LgdEditorConfig = {
         }
 
         const enums = Object.fromEntries([
+            [ 'csharp_space_around_declaration_statements', [ 'spacing', 'declarations', { false: 'normalize', ignore: 'preserve' } ] ],
+            [ 'dotnet_separate_import_directive_groups', [ 'lineBreaks', 'importGroups', { true: 'origin', false: 'none' } ] ],
             [ 'indent_style', [ 'indentation', 'style', { tab: 'tab', space: 'space' } ] ],
             [ 'end_of_line', [ 'whitespace', 'endOfLine', Object.fromEntries([ [ 'lf', 'lf' ], [ 'crlf', 'crlf' ], [ 'cr', 'cr' ] ]) ] ],
             [ 'insert_final_newline', [ 'whitespace', 'finalNewline', { true: 'always', false: 'never' } ] ],

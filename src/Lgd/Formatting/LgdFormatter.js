@@ -58,6 +58,7 @@ const LgdFormatter = {
         }
 
         this.insertBraces(context);
+        this.insertHeader(context);
         const preview = this.apply(source, context.errors);
         if(preview !== source)
         {
@@ -69,6 +70,37 @@ const LgdFormatter = {
         }
 
         return context.errors;
+    },
+
+    /** @description Adds only explicitly configured comment text, preserving existing licenses and the shebang. */
+    insertHeader(context)
+    {
+        const value = context.options.whitespace.fileHeader;
+        if(!value || !context.source)
+        {
+            return;
+        }
+
+        const header = value.split(/\r\n|\r|\n/u).map(line => `// ${line}`).join(context.newline) + context.newline;
+        let offset = context.source.startsWith('\uFEFF') ? 1 : 0;
+        if(context.source.startsWith('#!', offset))
+        {
+            const ending = (/\r\n|\r|\n/u).exec(context.source.slice(offset));
+            if(!ending)
+            {
+                return;
+            }
+
+            offset += ending.index + ending[0].length;
+        }
+
+        if(context.source.startsWith(header, offset) || this.isBlocked(context, offset, offset))
+        {
+            return;
+        }
+
+        context.errors = context.errors.filter(error => error.offset > offset || error.endOffset < offset);
+        this.add(context, 'whitespace.fileHeader', { offset: offset, endOffset: offset, newText: header });
     },
 
     /** @description Applies non-overlapping edits to a string for previews and tests. */
@@ -161,6 +193,17 @@ const LgdFormatter = {
         }
 
         const spacing = context.options.spacing;
+        const declaration = context.model.declarationHeads.some(span => span.start < gap.start && span.end >= gap.end);
+        if(declaration && spacing.declarations === 'preserve')
+        {
+            return;
+        }
+
+        if(declaration)
+        {
+            gap.contributors.add('lgd.format.spacing.declarations');
+        }
+
         let preference;
         let option;
         if(assignments.has(previous.text))
@@ -332,6 +375,7 @@ const LgdFormatter = {
             parent = parent.parent;
         }
 
+        level += context.model.controls.filter(control => next.start >= control.start && next.start < control.end && !this.shouldInsertBraces(context, control)).length;
         const block = context.model.braces.get(next.start);
         if(block && this.bracePlacement(context, block) === 'nextLineIndented')
         {

@@ -30,30 +30,30 @@ const catalog = [
             beforeInheritanceColon: true, afterInheritanceColon: true, binaryOperators: 'both', beforeAssignment: true, afterAssignment: true,
             beforeComma: false, afterComma: true, beforeDot: false, afterDot: false, beforeForSemicolon: false, afterForSemicolon: true,
             beforeSquareBracket: false, insideSquareBrackets: false, insideEmptySquareBrackets: false,
-            insideObjectBraces: true, insideEmptyBlockBraces: true, insideEmptyObjectBraces: false
+            declarations: 'normalize', insideObjectBraces: true, insideEmptyBlockBraces: true, insideEmptyObjectBraces: false
         },
         properties: {}
     },
     {
         id: 'lgd.format.lineBreaks', title: 'Block layout and blank lines',
-        defaults: { shortBlocks: 'never', shortFunctions: 'empty', shortLambdas: 'never', shortIfs: 'never', shortLoops: false, shortCases: false, preserveSingleLineBlocks: false, preserveSingleLineStatements: false, objectMembers: 'preserve', separateDefinitions: 'preserve', blankLinesBetweenClosingBraces: false, statementImmediatelyAfterBlock: true, blankLineAfterConstructorColon: true, blankLineAfterConditionalToken: true, blankLineAfterArrow: true, maxEmptyLines: 1, emptyLinesAtBlockStart: false, emptyLinesAtBlockEnd: false },
+        defaults: { shortBlocks: 'never', shortFunctions: 'empty', shortLambdas: 'never', shortIfs: 'never', shortLoops: false, shortCases: false, embeddedStatementsSameLine: true, preserveSingleLineBlocks: false, preserveSingleLineStatements: false, objectMembers: 'preserve', importGroups: 'preserve', separateDefinitions: 'preserve', blankLinesBetweenClosingBraces: false, statementImmediatelyAfterBlock: true, blankLineAfterConstructorColon: true, blankLineAfterConditionalToken: true, blankLineAfterArrow: true, maxEmptyLines: 1, emptyLinesAtBlockStart: false, emptyLinesAtBlockEnd: false },
         properties: {
             shortBlocks: { enum: [ 'preserve', 'never', 'empty', 'always' ] }, shortFunctions: { enum: [ 'preserve', 'never', 'empty', 'inline', 'all' ] }, shortLambdas: { enum: [ 'preserve', 'never', 'empty', 'inline', 'all' ] },
-            shortIfs: { enum: [ 'preserve', 'never', 'withoutElse', 'all' ] }, shortLoops: { type: 'boolean' }, shortCases: { type: 'boolean' }, preserveSingleLineBlocks: { type: 'boolean' }, preserveSingleLineStatements: { type: 'boolean' },
-            objectMembers: { enum: [ 'preserve', 'onePerLine', 'singleLine' ] }, separateDefinitions: { enum: [ 'preserve', 'always', 'never' ] }, blankLinesBetweenClosingBraces: { type: 'boolean' }, statementImmediatelyAfterBlock: { type: 'boolean' }, blankLineAfterConstructorColon: { type: 'boolean' }, blankLineAfterConditionalToken: { type: 'boolean' }, blankLineAfterArrow: { type: 'boolean' }, maxEmptyLines: { type: 'integer', minimum: 0, maximum: 10 }, emptyLinesAtBlockStart: { type: 'boolean' }, emptyLinesAtBlockEnd: { type: 'boolean' }
+            shortIfs: { enum: [ 'preserve', 'never', 'withoutElse', 'all' ] }, shortLoops: { type: 'boolean' }, shortCases: { type: 'boolean' }, embeddedStatementsSameLine: { type: 'boolean' }, preserveSingleLineBlocks: { type: 'boolean' }, preserveSingleLineStatements: { type: 'boolean' },
+            importGroups: { enum: [ 'preserve', 'origin', 'none' ] }, objectMembers: { enum: [ 'preserve', 'onePerLine', 'singleLine' ] }, separateDefinitions: { enum: [ 'preserve', 'always', 'never' ] }, blankLinesBetweenClosingBraces: { type: 'boolean' }, statementImmediatelyAfterBlock: { type: 'boolean' }, blankLineAfterConstructorColon: { type: 'boolean' }, blankLineAfterConditionalToken: { type: 'boolean' }, blankLineAfterArrow: { type: 'boolean' }, maxEmptyLines: { type: 'integer', minimum: 0, maximum: 10 }, emptyLinesAtBlockStart: { type: 'boolean' }, emptyLinesAtBlockEnd: { type: 'boolean' }
         }
     },
     {
         id: 'lgd.format.wrapping', title: 'Argument and expression wrapping',
-        defaults: { columnLimit: 120, arguments: 'preserve', parameters: 'preserve', alignAfterOpenBracket: false, allowAllArgumentsOnNextLine: false, allowAllParametersOnNextLine: false, binaryOperators: 'preserve', binaryOperations: 'preserve', constructorInitializer: 'preserve' },
+        defaults: { columnLimit: 120, arguments: 'preserve', parameters: 'preserve', alignAfterOpenBracket: false, allowAllArgumentsOnNextLine: false, allowAllParametersOnNextLine: false, binaryOperators: 'preserve', binaryOperations: 'preserve', returnType: 'preserve', constructorInitializer: 'preserve' },
         properties: {
-            columnLimit: { type: 'integer', minimum: 0, maximum: 1000 }, arguments: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, parameters: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, alignAfterOpenBracket: { type: 'boolean' }, allowAllArgumentsOnNextLine: { type: 'boolean' }, allowAllParametersOnNextLine: { type: 'boolean' }, binaryOperators: { enum: [ 'preserve', 'before', 'after', 'beforeNonAssignment' ] }, binaryOperations: { enum: [ 'preserve', 'respectPrecedence', 'onePerLine' ] }, constructorInitializer: { enum: [ 'preserve', 'beforeColon', 'afterColon' ] }
+            columnLimit: { type: 'integer', minimum: 0, maximum: 1000 }, arguments: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, parameters: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, alignAfterOpenBracket: { type: 'boolean' }, allowAllArgumentsOnNextLine: { type: 'boolean' }, allowAllParametersOnNextLine: { type: 'boolean' }, binaryOperators: { enum: [ 'preserve', 'before', 'after', 'beforeNonAssignment' ] }, binaryOperations: { enum: [ 'preserve', 'respectPrecedence', 'onePerLine' ] }, returnType: { enum: [ 'preserve', 'sameLine', 'nextLine' ] }, constructorInitializer: { enum: [ 'preserve', 'beforeColon', 'afterColon' ] }
         }
     },
     {
         id: 'lgd.format.whitespace', title: 'Whitespace and line endings',
-        defaults: { endOfLine: 'preserve', finalNewline: 'preserve', trimTrailingWhitespace: true },
-        properties: { endOfLine: { enum: [ 'preserve', 'lf', 'crlf', 'cr' ] }, finalNewline: { enum: [ 'preserve', 'always', 'never' ] }, trimTrailingWhitespace: { type: 'boolean' } }
+        defaults: { fileHeader: '', endOfLine: 'preserve', finalNewline: 'preserve', trimTrailingWhitespace: true },
+        properties: { fileHeader: { type: 'string', maxLength: 4096 }, endOfLine: { enum: [ 'preserve', 'lf', 'crlf', 'cr' ] }, finalNewline: { enum: [ 'preserve', 'always', 'never' ] }, trimTrailingWhitespace: { type: 'boolean' } }
     },
     {
         id: 'lgd.format.bracesRequired', title: 'Control-flow braces',
@@ -65,6 +65,8 @@ for(const [ key, value ] of Object.entries(catalog[2].defaults))
 {
     catalog[2].properties[key] = typeof value === 'boolean' ? { type: 'boolean' } : { enum: [ 'both', 'none', 'preserve' ] };
 }
+
+catalog[2].properties.declarations = { enum: [ 'normalize', 'preserve' ] };
 
 /** @description Supplies the single option catalog used by config validation, adapters and formatting. */
 const LgdFormattingOptions = {
@@ -150,6 +152,11 @@ const LgdFormattingOptions = {
         if(schema.enum)
         {
             return schema.enum.includes(value);
+        }
+
+        if(schema.type === 'string')
+        {
+            return typeof value === 'string' && value.length <= schema.maxLength;
         }
 
         if(schema.type === 'boolean')

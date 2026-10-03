@@ -143,6 +143,11 @@ const LgdFormattingPolicy = {
                 throw new Error(`LGD ${name} must be one of: ${schema.enum.join(', ')}.`);
             }
 
+            if(schema.type === 'string' && (typeof option !== 'string' || option.length > schema.maxLength))
+            {
+                throw new TypeError(`LGD ${name} must be a string of at most ${schema.maxLength} characters.`);
+            }
+
             if(schema.type === 'boolean' && typeof option !== 'boolean')
             {
                 throw new TypeError(`LGD ${name} must be true or false.`);

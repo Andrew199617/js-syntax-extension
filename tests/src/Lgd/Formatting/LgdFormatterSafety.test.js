@@ -188,3 +188,55 @@ it('leaves comments and opaque expression contents unchanged during precedence w
     expect(formatted).toContain('+ /* keep exactly */ secondValue');
     expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
 });
+
+it('supports typed return-line style without breaking constructor signatures', () =>
+{
+    const source = 'class Example { Example() {} Number add(Number first) { return first; } }';
+    const configuration = { options: { wrapping: { returnType: 'nextLine' } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('Number\n    add(Number first)');
+    expect(formatted).toContain('Example()');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+    const joined = LgdFormatter.format(formatted, { options: { wrapping: { returnType: 'sameLine' } } });
+    expect(joined).toContain('Number add(Number first)');
+});
+
+it('preserves declaration-head alignment while formatting initializer expressions', () =>
+{
+    const source = 'Number total    =    first+second;';
+    const formatted = LgdFormatter.format(source, { options: { spacing: { declarations: 'preserve' } } });
+    expect(formatted).toBe('Number total    =    first + second;');
+    expect(LgdFormatter.format(source)).toBe('Number total = first + second;');
+});
+
+it('separates and indents nested embedded statements when same-line controls are disabled', () =>
+{
+    const source = 'if(first) if(second) act();';
+    const configuration = { options: { lineBreaks: { shortIfs: 'all', embeddedStatementsSameLine: false } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toBe('if(first)\n    if(second)\n        act();');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});
+
+it.each([
+    "import external from 'package';\nimport local from './local.js';",
+    "const external = require('package');\nconst local = require('./local.js');"
+])('groups adjacent imports by origin without reordering %s', source =>
+{
+    const configuration = { options: { lineBreaks: { importGroups: 'origin' } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain(';\n\n');
+    expect(formatted.replace('\n\n', '\n')).toBe(source);
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});
+
+it('inserts only an explicit header and preserves existing license comments', () =>
+{
+    const source = '// Existing license\nNumber count = 1;';
+    const configuration = { options: { whitespace: { fileHeader: 'Project\nCopyright 2026' } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toBe(`// Project\n// Copyright 2026\n${source}`);
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+    expect(LgdFormatter.format(source)).toBe(source);
+    expect(LgdFormatter.format(`// lgd-format off\n${source}`, configuration)).toBe(`// lgd-format off\n${source}`);
+});

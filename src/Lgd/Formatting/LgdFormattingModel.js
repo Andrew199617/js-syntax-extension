@@ -20,7 +20,8 @@ const LgdFormattingModel = {
             const model = {
                 source: source, parsed: parsed, emitted: emitted, tree: tree, map: LgdSourceMap.create(emitted.segments),
                 protected: [], nodes: [], braces: new Map(), parens: new Map(), controls: [], cases: [], labels: new Set(),
-                heritageColons: new Set(), constructorColons: new Set(), functionParens: new Set(), doWhileKeywords: new Set(), conditionalTokens: new Set()
+                heritageColons: new Set(), constructorColons: new Set(), functionParens: new Set(), doWhileKeywords: new Set(),
+                conditionalTokens: new Set(), returnTypes: new Set(), declarationHeads: [], importStarts: new Map(), importEnds: new Map()
             };
             this.collectNodes(model, tree, null, '');
             model.tokens = this.tokenize(model);
@@ -265,6 +266,11 @@ const LgdFormattingModel = {
     {
         for(const declaration of model.parsed.allDeclarations)
         {
+            if(![ 'class', 'interface', 'enum' ].includes(declaration.kind))
+            {
+                model.declarationHeads.push({ start: declaration.headStart, end: declaration.initializerStart });
+            }
+
             if([ 'class', 'interface', 'enum' ].includes(declaration.kind))
             {
                 const locations = { class: 'classes', interface: 'interfaces', enum: 'enums' };
@@ -281,6 +287,11 @@ const LgdFormattingModel = {
                 model.braces.set(declaration.initializerStart, { location: location, definition: true, headStart: declaration.headStart });
                 for(const member of declaration.classMembers || [])
                 {
+                    if(!member.isConstructor && member.returnTypeName && Number.isInteger(member.returnTypeEnd))
+                    {
+                        model.returnTypes.add(declaration.initializerStart + member.returnTypeEnd);
+                    }
+
                     let memberLocation = 'methods';
                     if(member.isConstructor)
                     {
@@ -358,6 +369,32 @@ const LgdFormattingModel = {
                 {
                     model.conditionalTokens.add(token.start);
                 }
+            }
+        }
+
+        if(node.type === 'VariableDeclarator' && node.init)
+        {
+            const initializer = this.range(model, node.init);
+            if(initializer)
+            {
+                model.declarationHeads.push({ start: start, end: initializer.start });
+            }
+        }
+
+        if(parent?.type === 'Program')
+        {
+            let moduleName = node.type === 'ImportDeclaration' ? node.source?.value : null;
+            const expression = node.type === 'VariableDeclaration' && node.declarations.length === 1 ? node.declarations[0].init : node.expression;
+            if(expression?.type === 'CallExpression' && expression.callee.type === 'Identifier' && expression.callee.name === 'require' && expression.arguments.length === 1)
+            {
+                moduleName = expression.arguments[0].type === 'StringLiteral' ? expression.arguments[0].value : null;
+            }
+
+            if(typeof moduleName === 'string')
+            {
+                const group = moduleName.startsWith('.') || moduleName.startsWith('/') ? 'relative' : 'external';
+                model.importStarts.set(start, group);
+                model.importEnds.set(end, group);
             }
         }
 

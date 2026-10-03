@@ -428,6 +428,12 @@
                                 "insideEmptySquareBrackets": {
                                     "type": "boolean"
                                 },
+                                "declarations": {
+                                    "enum": [
+                                        "normalize",
+                                        "preserve"
+                                    ]
+                                },
                                 "insideObjectBraces": {
                                     "type": "boolean"
                                 },
@@ -483,11 +489,21 @@
                                 "shortCases": {
                                     "type": "boolean"
                                 },
+                                "embeddedStatementsSameLine": {
+                                    "type": "boolean"
+                                },
                                 "preserveSingleLineBlocks": {
                                     "type": "boolean"
                                 },
                                 "preserveSingleLineStatements": {
                                     "type": "boolean"
+                                },
+                                "importGroups": {
+                                    "enum": [
+                                        "preserve",
+                                        "origin",
+                                        "none"
+                                    ]
                                 },
                                 "objectMembers": {
                                     "enum": [
@@ -578,6 +594,13 @@
                                         "onePerLine"
                                     ]
                                 },
+                                "returnType": {
+                                    "enum": [
+                                        "preserve",
+                                        "sameLine",
+                                        "nextLine"
+                                    ]
+                                },
                                 "constructorInitializer": {
                                     "enum": [
                                         "preserve",
@@ -591,6 +614,10 @@
                             "type": "object",
                             "additionalProperties": false,
                             "properties": {
+                                "fileHeader": {
+                                    "type": "string",
+                                    "maxLength": 4096
+                                },
                                 "endOfLine": {
                                     "enum": [
                                         "preserve",
@@ -1074,6 +1101,12 @@
                                 "insideEmptySquareBrackets": {
                                     "type": "boolean"
                                 },
+                                "declarations": {
+                                    "enum": [
+                                        "normalize",
+                                        "preserve"
+                                    ]
+                                },
                                 "insideObjectBraces": {
                                     "type": "boolean"
                                 },
@@ -1153,11 +1186,21 @@
                                 "shortCases": {
                                     "type": "boolean"
                                 },
+                                "embeddedStatementsSameLine": {
+                                    "type": "boolean"
+                                },
                                 "preserveSingleLineBlocks": {
                                     "type": "boolean"
                                 },
                                 "preserveSingleLineStatements": {
                                     "type": "boolean"
+                                },
+                                "importGroups": {
+                                    "enum": [
+                                        "preserve",
+                                        "origin",
+                                        "none"
+                                    ]
                                 },
                                 "objectMembers": {
                                     "enum": [
@@ -1272,6 +1315,13 @@
                                         "onePerLine"
                                     ]
                                 },
+                                "returnType": {
+                                    "enum": [
+                                        "preserve",
+                                        "sameLine",
+                                        "nextLine"
+                                    ]
+                                },
                                 "constructorInitializer": {
                                     "enum": [
                                         "preserve",
@@ -1309,6 +1359,10 @@
                             "type": "object",
                             "additionalProperties": false,
                             "properties": {
+                                "fileHeader": {
+                                    "type": "string",
+                                    "maxLength": 4096
+                                },
                                 "endOfLine": {
                                     "enum": [
                                         "preserve",
@@ -3402,6 +3456,121 @@
                     "type": "object",
                     "additionalProperties": false,
                     "title": "Argument and expression wrapping: binaryOperations",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.declarations": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: declarations",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.embeddedStatementsSameLine": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: embeddedStatementsSameLine",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.returnType": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: returnType",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.importGroups": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: importGroups",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.whitespace.fileHeader": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Whitespace and line endings: fileHeader",
                     "properties": {
                         "fix": {
                             "type": "string",
