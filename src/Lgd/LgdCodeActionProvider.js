@@ -1,8 +1,8 @@
 const vscode = require('vscode');
 const DiagnosticQuickFix = require('./QuickFixes/DiagnosticQuickFix');
 const LgdDiagnosticDefinitions = require('./LgdDiagnosticDefinitions');
-const QuickFixContext = require('./QuickFixes/QuickFixContext');
-const createQuickFixRegistry = require('./QuickFixes/QuickFixRegistry');
+const LgdFixEngine = require('./Fixes/LgdFixEngine');
+const LgdFixPlan = require('./Fixes/LgdFixPlan');
 
 /** @description Internal command shared by native diagnostic quick fixes. */
 const APPLY_FIX_COMMAND = 'lgd.applyDiagnosticQuickFix';
@@ -16,11 +16,13 @@ const STALE_FIX_STATUS_MS = 3000;
 /** @description Provides conservative, diagnostic-linked fixes on original LGD source documents. */
 const LgdCodeActionProvider = {
     /** @description Creates a provider backed by the current LGD compilation state. */
-    create(languageService)
+    create(languageService, fixService = null)
     {
         const provider = Object.create(LgdCodeActionProvider);
         provider.languageService = languageService;
-        provider.handlers = createQuickFixRegistry();
+        provider.engine = fixService?.engine || LgdFixEngine.create(languageService);
+        provider.handlers = provider.engine.handlers;
+        provider.fixService = fixService;
         provider.proposals = new Map();
         provider.nextProposalId = 0;
         return provider;
@@ -50,22 +52,10 @@ const LgdCodeActionProvider = {
                 continue;
             }
 
-            for(const fixKind of LgdDiagnosticDefinitions.fixKinds(error))
+            const entries = await this.engine.collect(document, state, [error], { token: token });
+            for(const { proposal, handler } of entries)
             {
-                const handler = this.handlers.get(fixKind);
-                if(!handler)
-                {
-                    continue;
-                }
-
-                const fixContext = new QuickFixContext(this.languageService, document, state);
-                if(!await fixContext.prepare())
-                {
-                    continue;
-                }
-
-                const proposal = await handler.create(fixContext, error.quickFix);
-                if(!proposal || token?.isCancellationRequested || !DiagnosticQuickFix.canApply(proposal))
+                if(this.fixService && !await this.fixService.prepareIndividual(proposal, handler))
                 {
                     continue;
                 }
@@ -110,37 +100,13 @@ const LgdCodeActionProvider = {
     {
         const proposal = this.proposals.get(proposalId);
         this.proposals.delete(proposalId);
-        if(!proposal || !DiagnosticQuickFix.canApply(proposal))
+        if(!proposal || !DiagnosticQuickFix.canApply(proposal) || this.fixService && !await this.fixService.individualCurrent(proposal))
         {
             vscode.window.setStatusBarMessage('LGD: Source changed; reopen Quick Fix to refresh the available actions.', STALE_FIX_STATUS_MS);
             return false;
         }
 
-        const edits = DiagnosticQuickFix.edits(proposal);
-        const workspaceEdit = new vscode.WorkspaceEdit();
-        for(const edit of edits)
-        {
-            const document = edit.target.document;
-            const range = new vscode.Range(document.positionAt(edit.offset), document.positionAt(edit.endOffset));
-            workspaceEdit.replace(document.uri, range, edit.newText);
-        }
-
-        const applied = await vscode.workspace.applyEdit(workspaceEdit);
-        if(applied)
-        {
-            const documents = new Set(edits.map(edit => edit.target.document).reverse());
-            for(const document of documents)
-            {
-                if(this.languageService.getState(document.uri))
-                {
-                    await this.languageService.updateDocument(document);
-                }
-            }
-
-            await this.languageService.pendingDependencyUpdates;
-        }
-
-        return applied;
+        return LgdFixPlan.apply(LgdFixPlan.create([{ proposal: proposal }]), this.languageService);
     },
 
     /** @description Matches a coded diagnostic to its exact current source span and requested range. */

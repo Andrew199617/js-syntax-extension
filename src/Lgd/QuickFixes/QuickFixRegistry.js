@@ -13,20 +13,27 @@ const MoveVirtualModifierFix = require('./MoveVirtualModifierFix');
 /** @description Creates the diagnostic strategy registry; future fixes register one isolated handler here. */
 function createQuickFixRegistry()
 {
-    const handlers = [ new ReplaceReadonlyLocalFix(),
-        new ConvertObjectInheritanceFix(),
-        new ConvertObjectInheritanceFix(true),
-        new AddOverrideFix(),
-        new MakeBaseVirtualFix(),
-        new RemoveExtraBaseArgumentsFix(),
-        new ChangeParameterTypeFix(),
-        new ChangeParameterAndReturnTypeFix(),
-        new ChangeReturnTypeFix(),
-        new UseStaticTypeReceiverFix(),
-        new MoveVirtualModifierFix(),
-        new RemoveReturnDocTypeFix() ];
+    const handlers = [
+        { handler: new ReplaceReadonlyLocalFix(), ruleId: 'readonly-variable-declaration', automatic: true },
+        { handler: new RemoveReturnDocTypeFix(), ruleId: 'return-type-documentation', automatic: true },
+        { handler: new MoveVirtualModifierFix(), ruleId: 'virtual-documentation', automatic: true },
+        { handler: new ConvertObjectInheritanceFix(), ruleId: 'object-inheritance' },
+        { handler: new ConvertObjectInheritanceFix(true), ruleId: 'object-inheritance', individualOnly: true },
+        { handler: new AddOverrideFix(), ruleId: 'missing-override' },
+        { handler: new MakeBaseVirtualFix(), ruleId: 'nonvirtual-base' },
+        { handler: new RemoveExtraBaseArgumentsFix(), ruleId: 'extra-base-arguments' },
+        { handler: new ChangeParameterTypeFix(), ruleId: 'parameter-type' },
+        { handler: new ChangeParameterAndReturnTypeFix(), ruleId: 'parameter-type', individualOnly: true },
+        { handler: new ChangeReturnTypeFix(), ruleId: 'return-type' },
+        { handler: new UseStaticTypeReceiverFix(), ruleId: 'static-member-receiver' }
+    ];
 
-    return new Map(handlers.map(handler => [ handler.kind, handler ]));
+    return new Map(handlers.map(entry =>
+    {
+        const { handler, ...policy } = entry;
+        Object.assign(handler, policy);
+        return [ handler.kind, handler ];
+    }));
 }
 
 module.exports = createQuickFixRegistry;
