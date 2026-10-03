@@ -251,6 +251,20 @@ describe('LgdLanguageService cross-file source reading', () =>
         await fs.promises.rm(directory, { recursive: true, force: true });
     });
 
+    test('An imported BaseCommand loop cannot prevent the dependent document from creating its hover mirror.', async () =>
+    {
+        const { service, errors } = createService();
+        const fixtures = path.join(__dirname, '../../fixtures');
+        const baseSource = await fs.promises.readFile(path.join(fixtures, 'basecommand.lgd'), 'utf8');
+        const source = await fs.promises.readFile(path.join(fixtures, 'object-inheritance.lgd'), 'utf8');
+        await fs.promises.writeFile(path.join(directory, 'BaseCommand.lgd'), baseSource);
+        const document = makeTextDocument(`file://${path.join(directory, 'GoToAssignment.lgd')}`, source);
+        const state = await service.openDocument(document);
+        expect(errors).toEqual([]);
+        expect(state.jsDocument.getText()).toContain('const GoToAssignment =');
+        expect(state.errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'lgd.object.inheritance' })]));
+    });
+
     test('reads the real exported declaration and its create-assigned members from disk', async () =>
     {
         const { service } = createService();

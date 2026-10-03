@@ -257,6 +257,19 @@ const LgdReturnChecker = {
     /** @description Infers each possible expression result while retaining null and undefined distinctions. */
     expressionTypes(path, signature, context, visited = new Set())
     {
+        if(visited.has(path.node))
+        {
+            return [UNKNOWN];
+        }
+
+        const next = new Set(visited);
+        next.add(path.node);
+        return this._expressionTypes(path, signature, context, next);
+    },
+
+    /** @description Infers one expression with branch-local cycle protection for binding origins. */
+    _expressionTypes(path, signature, context, visited)
+    {
         if(path.isIdentifier() && LgdEnumSyntax.receiver(path, context))
         {
             return ['Object'];
@@ -619,14 +632,7 @@ const LgdReturnChecker = {
             return [path.node.name === 'undefined' ? 'undefined' : UNKNOWN];
         }
 
-        if(visited.has(path.node))
-        {
-            return [UNKNOWN];
-        }
-
-        const next = new Set(visited);
-        next.add(path.node);
-        return this.currentBindingTypes({ path: path, binding: binding }, signature, context, next);
+        return this.currentBindingTypes({ path: path, binding: binding }, signature, context, visited);
     }
 };
 
