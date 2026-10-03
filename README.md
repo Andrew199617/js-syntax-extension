@@ -58,6 +58,8 @@ A missing assignment expression such as `const broken = ;` is reported as **Expe
 
 LGD diagnostics show short categories such as **syntax**, **type** and **inheritance**. Internal compiler IDs are retained separately for correct Quick Fix association.
 
+LGD keyword highlighting distinguishes control flow such as `return` and `if` from declarations/modifiers such as `class`, `static` and `virtual`, and from the `void` return-type keyword. Your theme chooses their colors. Contextual highlighting does not add compiler support for otherwise unsupported keywords.
+
 ## LGD classes with OLOO instances
 
 In `.lgd` files, use `class`, a colon for inheritance, and the class name for its constructor:

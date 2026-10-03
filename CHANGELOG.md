@@ -4,6 +4,13 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.17
+
+- Separate control-flow keywords from declaration, modifier and void-return keyword families using theme-controlled scopes.
+- Match the installed C# grammar’s control-flow versus declaration/modifier distinction without hardcoded colors.
+- Preserve class/type symbols, parameters, property identifiers, comments, strings and template contents.
+- Keep public/sealed as contextual highlighting only; compiler acceptance is unchanged.
+
 # 2.7.16
 
 - Display short diagnostic categories such as syntax, type and inheritance while retaining stable compiler identities for Quick Fix routing.
