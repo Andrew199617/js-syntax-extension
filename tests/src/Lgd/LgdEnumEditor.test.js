@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
+const LgdDefinitionProvider = require('../../../src/Lgd/LgdDefinitionProvider');
 const LgdHoverProvider = require('../../../src/Lgd/LgdHoverProvider');
 const LgdCompletionProvider = require('../../../src/Lgd/LgdCompletionProvider');
 const LgdSemanticTokensProvider = require('../../../src/Lgd/LgdSemanticTokensProvider');
@@ -46,6 +47,17 @@ describe('LGD enum editor integration', () =>
         expect(declaration.tokenType).toBe('lgdDeclarationKeyword');
         const name = tokens.pushed.find(token => document.getText(token.range) === 'DownloadState');
         expect(name.tokenType).toBe('class');
+    });
+
+    test('resolves an enum type annotation to its source declaration name', async () =>
+    {
+        const source = "enum State { Ready = 'ready' }\nState current = State.Ready;";
+        const { service, document } = await openEnum(source);
+        const position = document.positionAt(source.indexOf('State current'));
+        const definitions = await LgdDefinitionProvider.create(service).provideDefinition(document, position);
+        expect(definitions).toHaveLength(1);
+        expect(document.getText(definitions[0].range)).toBe('State');
+        expect(document.offsetAt(definitions[0].range.start)).toBe(source.indexOf('State'));
     });
 
     test('updates member values and names after an edit rather than keeping a stale hover', async () =>

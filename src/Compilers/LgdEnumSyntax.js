@@ -145,7 +145,9 @@ const LgdEnumSyntax = {
             }
         }
 
-        segments.unshift({ srcStart: declaration.start, srcEnd: declaration.start, outStart: 0, outEnd: prefix.length, verbatim: false });
+        const aliasStart = typescript ? prefix.indexOf(declaration.name) : prefix.lastIndexOf(declaration.name);
+        segments.unshift({ srcStart: declaration.start, srcEnd: declaration.start, outStart: 0, outEnd: prefix.length, verbatim: false,
+            nameSrcStart: declaration.nameStart, nameSrcEnd: declaration.nameEnd, nameOutStart: aliasStart, nameOutEnd: aliasStart + declaration.name.length });
         return { code: prefix + code, segments: segments };
     },
 

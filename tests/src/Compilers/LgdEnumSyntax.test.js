@@ -78,6 +78,17 @@ describe('explicit LGD enum syntax', () =>
         }
     });
 
+    test('maps synthetic typedef definitions to the actual enum name', () =>
+    {
+        const source = "export enum State { Ready = 'ready' }";
+        const result = compile(source);
+        const map = LgdSourceMap.create(result.mappings);
+        const aliasStart = result.code.indexOf('} State') + '} '.length;
+        expect(map.toSource(aliasStart)).toBe(source.indexOf('State'));
+        expect(map.toSource(aliasStart + 'State'.length)).toBe(source.indexOf('State') + 'State'.length);
+        expect(Number.isFinite(map.toSource(result.code.indexOf('@typedef')))).toBe(true);
+    });
+
     test('ignores enum-shaped text in comments and strings', () =>
     {
         const source = "// enum State { A = 'a' }\nconst text = \"enum State { A = 'a' }\";";
@@ -195,6 +206,43 @@ describe('explicit LGD enum syntax', () =>
         const result = LgdCompiler.create().compileToJs(source, externals);
         expect(result.errors.map(error => error.message)).toEqual([
             "Enum 'State' has no member 'Missing'.", 'Cannot assign String to Alias.', 'Cannot assign Object to Alias.'
+        ]);
+    });
+
+    test.each([ 'oloo', 'class' ])('integrates enum values with instance and static fields in %s', objectModel =>
+    {
+        const source = [
+            "enum State { Started = 'started', Completed = 'completed' }",
+            'class Task {',
+            '    State state = State.Started;',
+            '    static State Initial = State.Started;',
+            '    State read() { return this.state; }',
+            '    void finish() { this.state = State.Completed; }',
+            '}',
+            'Task first = Task.create();',
+            'Task second = Task.create();',
+            'first.finish();'
+        ].join('\n');
+        const result = compile(source, { javascriptObjectModel: objectModel });
+        expect(result.errors).toEqual([]);
+        const values = virtualMachine.runInNewContext(`${result.code}\n[first.read(), second.read(), Task.Initial, Object.isFrozen(State)];`);
+        expect(values).toEqual([ 'completed', 'started', 'started', true ]);
+    });
+
+    test.each([ 'oloo', 'class' ])('retains enum type checks on instance and static field writes in %s', objectModel =>
+    {
+        const source = [
+            "enum State { Ready = 'ready' }",
+            'class Task {',
+            '    State state = State.Ready;',
+            '    static State Initial = State.Ready;',
+            "    void invalidate() { this.state = 'bad'; }",
+            '}',
+            "Task.Initial = 'bad';"
+        ].join('\n');
+        const result = compile(source, { javascriptObjectModel: objectModel });
+        expect(result.errors.map(error => error.message)).toEqual([
+            "Cannot assign String to State member 'state'.", "Cannot assign String to State member 'Initial'."
         ]);
     });
 

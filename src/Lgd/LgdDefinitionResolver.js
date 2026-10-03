@@ -206,7 +206,8 @@ async function resolveImportedDefinition(languageService, state, position)
     const bindings = collectBindings({ content: document.getText(), masked: sourceCode,
         declarations: state.declarations, scopes: scopes, externals: state.externals || new Map() });
     const erased = visibleBindings(bindings, offset).get(name);
-    if(erased?.kind === 'interface' && (isTypeReference(state, offset, name) || offset === erased.nameStart))
+    const declaredType = erased?.kind === 'interface' || erased?.kind === 'enum';
+    if(declaredType && (isTypeReference(state, offset, name) || offset === erased.nameStart))
     {
         const text = erased.sourceText || document.getText();
         const range = new vscode.Range(positionAt(text, erased.nameStart), positionAt(text, erased.nameEnd));
