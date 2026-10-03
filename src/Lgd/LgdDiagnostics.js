@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const LgdDiagnosticDefinitions = require('./LgdDiagnosticDefinitions');
 
 /**
  * @description Builds coded LGD diagnostics from precise compiler source spans.
@@ -22,8 +23,9 @@ function createLgdDiagnostics(document, errors)
             error.message,
             severity
         );
-        diagnostic.source = 'LGD';
-        diagnostic.code = error.code;
+        const definition = LgdDiagnosticDefinitions.get(error);
+        diagnostic.source = definition.source;
+        diagnostic.code = definition.visibleCode;
         return diagnostic;
     });
 }

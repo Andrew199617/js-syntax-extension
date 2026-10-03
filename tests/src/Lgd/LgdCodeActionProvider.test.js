@@ -11,6 +11,7 @@ const LgdCodeActionProvider = require('../../../src/Lgd/LgdCodeActionProvider');
 const VscodeError = jest.requireActual('../../../src/Errors/VscodeError');
 
 const ErrorTypes = require('../../../src/Errors/ErrorTypes');
+const LgdDiagnosticDefinitions = require('../../../src/Lgd/LgdDiagnosticDefinitions');
 const createLgdDiagnostics = require('../../../src/Lgd/LgdDiagnostics');
 
 /** @description Exact source shown in the user's screenshot, with CRLF and preserved indentation. */
@@ -74,7 +75,10 @@ async function openFixture(source, filename = '/workspace/DemoBad.lgd')
 function actionsFor(fixture, code, options = {})
 {
     const diagnostics = fixture.diagnostics.get(fixture.document.uri.toString());
-    const diagnostic = diagnostics.find(candidate => candidate.code === code);
+    const error = fixture.service.getState(fixture.document.uri).errors.find(candidate => candidate.code === code);
+    const visibleCode = LgdDiagnosticDefinitions.get(error).visibleCode;
+    const diagnostic = diagnostics.find(candidate => candidate.message === error.message && candidate.code === visibleCode);
+
     return fixture.provider.provideCodeActions(fixture.document, diagnostic.range, { diagnostics: [diagnostic], ...options }, {});
 }
 
@@ -114,7 +118,8 @@ describe('LGD diagnostic quick fixes', () =>
     {
         const fixture = await openFixture(screenshotSource);
         const diagnostics = fixture.diagnostics.get(fixture.document.uri.toString());
-        expect(diagnostics.map(diagnostic => diagnostic.code)).toEqual([ 'lgd.base.argumentCount', 'lgd.override.nonVirtual' ]);
+        expect(diagnostics.map(diagnostic => diagnostic.code)).toEqual([ 'inheritance', 'inheritance' ]);
+        expect(fixture.service.getState(fixture.document.uri).errors.map(error => error.code)).toEqual([ 'lgd.base.argumentCount', 'lgd.override.nonVirtual' ]);
         expect(fixture.document.getText(diagnostics[0].range)).toBe('"too", "many", "args"');
         expect(fixture.document.getText(diagnostics[1].range)).toBe('override');
         const [remove] = await actionsFor(fixture, 'lgd.base.argumentCount');
@@ -133,10 +138,10 @@ describe('LGD diagnostic quick fixes', () =>
     test.each([ 'sideEffect()', 'object.value', '...values', '"value" /* keep this comment */', '/* keep */ "value"', '`literal`', '+1n' ])('does not offer argument removal for effectful or comment-bearing suffix %s', async argument =>
     {
         const fixture = await openFixture(`class Parent { Parent() {} }\nclass Child : Parent { Child() : base(${argument}) {} }`);
-        const diagnostic = fixture.diagnostics.get(fixture.document.uri.toString()).find(candidate => candidate.code === 'lgd.base.argumentCount');
+        const diagnostic = fixture.diagnostics.get(fixture.document.uri.toString()).find(candidate => candidate.code === 'inheritance');
         if(diagnostic)
         {
-            expect(await actionsFor(fixture, diagnostic.code)).toEqual([]);
+            expect(await actionsFor(fixture, 'lgd.base.argumentCount')).toEqual([]);
         }
         else
         {
@@ -207,6 +212,32 @@ describe('LGD diagnostic quick fixes', () =>
         const [current] = await actionsFor(fixture, 'lgd.base.argumentCount');
         fixture.document.isClosed = true;
         expect(await fixture.provider.applyFix(current.command.arguments[0])).toBe(false);
+    });
+
+    test('re-associates a transported short-category diagnostic with its current internal compiler identity', async () =>
+    {
+        const fixture = await openFixture(screenshotSource);
+        const [original] = fixture.diagnostics.get(fixture.document.uri.toString());
+        const transported = JSON.parse(JSON.stringify(original));
+        const actions = await fixture.provider.provideCodeActions(fixture.document, transported.range, { diagnostics: [transported] }, {});
+        expect(transported.code).toBe('inheritance');
+        expect(actions).toHaveLength(1);
+        expect(actions[0].title).toBe('Remove extra arguments from base call');
+        await applyAction(fixture, actions[0]);
+        expect(fixture.document.getText()).toContain('base()');
+    });
+
+    test('rejects same-span category ambiguity and altered message/source identities', async () =>
+    {
+        const fixture = await openFixture(screenshotSource);
+        const [diagnostic] = fixture.diagnostics.get(fixture.document.uri.toString());
+        const altered = { ...diagnostic, message: 'Different problem.' };
+        expect(await fixture.provider.provideCodeActions(fixture.document, diagnostic.range, { diagnostics: [altered] }, {})).toEqual([]);
+        const foreign = { ...diagnostic, source: 'Different provider' };
+        expect(await fixture.provider.provideCodeActions(fixture.document, diagnostic.range, { diagnostics: [foreign] }, {})).toEqual([]);
+        const state = fixture.service.getState(fixture.document.uri);
+        state.errors.push({ ...state.errors[0], code: 'lgd.override.required' });
+        expect(await fixture.provider.provideCodeActions(fixture.document, diagnostic.range, { diagnostics: [diagnostic] }, {})).toEqual([]);
     });
 
     test('targets the nearest lexical base and follows an inherited local method', async () =>
@@ -287,7 +318,7 @@ describe('LGD diagnostic quick fixes', () =>
 
     test('uses one LGD source label without duplicating it in diagnostic messages', async () =>
     {
-        const fixture = await openFixture('class Counter { void increment(Number value) { value = "wrong"; } }');
+        const fixture = await openFixture('export {};\nclass Counter { void increment(Number value) { value = "wrong"; } }');
         const diagnostics = fixture.diagnostics.get(fixture.document.uri.toString());
         expect(diagnostics).toHaveLength(1);
         expect(diagnostics[0].message).toBe('Cannot assign String to Number.');
@@ -313,13 +344,14 @@ describe('LGD diagnostic quick fixes', () =>
         const [diagnostic] = createLgdDiagnostics(document, [compilerError]);
         expect(diagnostic.message).toBe('Example warning.');
         expect(diagnostic.source).toBe('LGD');
-        expect(diagnostic.code).toBe('lgd.test.warning');
+        expect(diagnostic.code).toBe('warning');
         expect(diagnostic.severity).toBe(vscode.DiagnosticSeverity.Warning);
     });
 
     test.each([ '\n', '\r\n' ])('changes only the parameter annotation with %j line endings', async newline =>
     {
         const source = [
+            'export {};',
             'Number earlier = 1;',
             'class Counter {',
             '    void increment(Number value) {',
@@ -340,7 +372,7 @@ describe('LGD diagnostic quick fixes', () =>
 
     test('discloses and preserves the original Number return error after the parameter-only fix', async () =>
     {
-        const source = 'class Counter { Number increment(Number value) { value = "wrong"; return value; } }';
+        const source = 'export {};\nclass Counter { Number increment(Number value) { value = "wrong"; return value; } }';
         const fixture = await openFixture(source);
         const before = fixture.diagnostics.get(fixture.document.uri.toString());
         expect(before).toHaveLength(2);
@@ -349,13 +381,13 @@ describe('LGD diagnostic quick fixes', () =>
         await applyAction(fixture, action);
         const after = fixture.diagnostics.get(fixture.document.uri.toString());
         expect(after).toHaveLength(1);
-        expect(after[0].message).toBe(before.find(diagnostic => diagnostic.code !== 'lgd.assignment.typeMismatch').message);
+        expect(after[0].message).toBe(before.find(diagnostic => diagnostic.message.startsWith('Cannot return')).message);
         expect(fixture.document.getText()).toBe(source.replace('increment(Number value)', 'increment(String value)'));
     });
 
     test('deduplicates compatible writes to the same parameter without hiding their diagnostics', async () =>
     {
-        const fixture = await openFixture('class Counter { void increment(Number value) { value = "wrong"; value = "again"; } }');
+        const fixture = await openFixture('export {};\nclass Counter { void increment(Number value) { value = "wrong"; value = "again"; } }');
         const diagnostics = fixture.diagnostics.get(fixture.document.uri.toString());
         const range = new vscode.Range(fixture.document.positionAt(0), fixture.document.positionAt(fixture.document.getText().length));
         const actions = await fixture.provider.provideCodeActions(fixture.document, range, { diagnostics: diagnostics }, {});
@@ -367,7 +399,7 @@ describe('LGD diagnostic quick fixes', () =>
 
     test('targets the correct lexical method parameter rather than same-name locals or sibling parameters', async () =>
     {
-        const source = 'class Counter { void first(Number value) { value = "wrong"; } void second(Number value) { value = 2; } }';
+        const source = 'export {};\nclass Counter { void first(Number value) { value = "wrong"; } void second(Number value) { value = 2; } }';
         const fixture = await openFixture(source);
         const [action] = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
         await applyAction(fixture, action);
@@ -395,7 +427,7 @@ describe('LGD diagnostic quick fixes', () =>
 
     test('rejects a parameter proposal after source changes and does not offer signature fixes as Fix All', async () =>
     {
-        const source = 'class Counter { void increment(Number value) { value = "wrong"; } }';
+        const source = 'export {};\nclass Counter { void increment(Number value) { value = "wrong"; } }';
         const fixture = await openFixture(source);
         const [action] = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
         fixture.document.setText(source.replace('"wrong"', '"new value"'));
@@ -408,7 +440,7 @@ describe('LGD diagnostic quick fixes', () =>
 
     test('rejects an already offered parameter edit when a new consumer appears', async () =>
     {
-        const fixture = await openFixture('class Counter { void increment(Number value) { value = "wrong"; } }');
+        const fixture = await openFixture('export {};\nclass Counter { void increment(Number value) { value = "wrong"; } }');
         const [action] = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
         const consumer = makeTextDocument('file:///workspace/Consumer.lgd', '');
         fixture.service.states.set(consumer.uri.toString(), {

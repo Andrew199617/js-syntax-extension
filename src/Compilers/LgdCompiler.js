@@ -355,7 +355,7 @@ const LgdCompiler = {
             const duplicate = errors.some(error => error.offset === typeError.offset && error.message === typeError.message);
             if(!duplicate)
             {
-                errors.push({ ...this.createError(content, typeError.offset, typeError.message, typeError.endOffset), ...typeError });
+                errors.push({ ...this.createError(content, typeError.offset, typeError.message, typeError.endOffset), category: 'type', ...typeError });
             }
         }
     },

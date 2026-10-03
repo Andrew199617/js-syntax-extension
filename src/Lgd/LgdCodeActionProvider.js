@@ -1,5 +1,6 @@
 const vscode = require('vscode');
 const DiagnosticQuickFix = require('./QuickFixes/DiagnosticQuickFix');
+const LgdDiagnosticDefinitions = require('./LgdDiagnosticDefinitions');
 const QuickFixContext = require('./QuickFixes/QuickFixContext');
 const createQuickFixRegistry = require('./QuickFixes/QuickFixRegistry');
 
@@ -49,48 +50,51 @@ const LgdCodeActionProvider = {
                 continue;
             }
 
-            const handler = this.handlers.get(error.quickFix.kind);
-            if(!handler)
+            for(const fixKind of LgdDiagnosticDefinitions.fixKinds(error))
             {
-                continue;
-            }
+                const handler = this.handlers.get(fixKind);
+                if(!handler)
+                {
+                    continue;
+                }
 
-            const fixContext = new QuickFixContext(this.languageService, document, state);
-            if(!await fixContext.prepare())
-            {
-                continue;
-            }
+                const fixContext = new QuickFixContext(this.languageService, document, state);
+                if(!await fixContext.prepare())
+                {
+                    continue;
+                }
 
-            const proposal = await handler.create(fixContext, error.quickFix);
-            if(!proposal || token?.isCancellationRequested || !DiagnosticQuickFix.canApply(proposal))
-            {
-                continue;
-            }
+                const proposal = await handler.create(fixContext, error.quickFix);
+                if(!proposal || token?.isCancellationRequested || !DiagnosticQuickFix.canApply(proposal))
+                {
+                    continue;
+                }
 
-            const editKey = JSON.stringify([ proposal.target.document.uri.toString(), proposal.offset, proposal.endOffset, proposal.newText ]);
-            const existingAction = offeredEdits.get(editKey);
-            if(existingAction)
-            {
-                existingAction.diagnostics.push(diagnostic);
-                continue;
-            }
+                const editKey = JSON.stringify([ proposal.target.document.uri.toString(), proposal.offset, proposal.endOffset, proposal.newText ]);
+                const existingAction = offeredEdits.get(editKey);
+                if(existingAction)
+                {
+                    existingAction.diagnostics.push(diagnostic);
+                    continue;
+                }
 
-            const action = new vscode.CodeAction(proposal.title, vscode.CodeActionKind.QuickFix);
-            action.diagnostics = [diagnostic];
-            action.isPreferred = proposal.isPreferred;
-            const proposalId = this.nextProposalId++;
-            this.proposals.set(proposalId, proposal);
-            if(this.proposals.size > MAX_PENDING_FIXES)
-            {
-                this.proposals.delete(this.proposals.keys().next().value);
-            }
+                const action = new vscode.CodeAction(proposal.title, vscode.CodeActionKind.QuickFix);
+                action.diagnostics = [diagnostic];
+                action.isPreferred = proposal.isPreferred;
+                const proposalId = this.nextProposalId++;
+                this.proposals.set(proposalId, proposal);
+                if(this.proposals.size > MAX_PENDING_FIXES)
+                {
+                    this.proposals.delete(this.proposals.keys().next().value);
+                }
 
-            action.command = { command: APPLY_FIX_COMMAND, title: proposal.title, arguments: [proposalId] };
-            actions.push(action);
-            offeredEdits.set(editKey, action);
+                action.command = { command: APPLY_FIX_COMMAND, title: proposal.title, arguments: [proposalId] };
+                actions.push(action);
+                offeredEdits.set(editKey, action);
+            }
         }
 
-        return actions;
+        return token?.isCancellationRequested ? [] : actions;
     },
 
     /** @description Registers the compatible quick-fix command and clears retained proposals on disposal. */
@@ -128,7 +132,8 @@ const LgdCodeActionProvider = {
     /** @description Matches a coded diagnostic to its exact current source span and requested range. */
     matchError(document, state, diagnostic, range)
     {
-        if(diagnostic.source !== 'LGD' || typeof diagnostic.code !== 'string')
+        const visibleCode = typeof diagnostic.code === 'object' ? diagnostic.code?.value : diagnostic.code;
+        if(diagnostic.source !== LgdDiagnosticDefinitions.source || typeof visibleCode !== 'string')
         {
             return null;
         }
@@ -142,7 +147,15 @@ const LgdCodeActionProvider = {
             return null;
         }
 
-        return state.errors.find(error => error.code === diagnostic.code && error.offset === start && error.endOffset === end) || null;
+        const matches = state.errors.filter(error =>
+        {
+            const sameSpan = error.offset === start && error.endOffset === end;
+            const definition = LgdDiagnosticDefinitions.get(error);
+            return sameSpan && error.message === diagnostic.message && definition.visibleCode === visibleCode;
+        });
+
+        // Editor diagnostics are marshaled objects: use fresh compiler identity rather than untransported extra fields.
+        return matches.length === 1 ? matches[0] : null;
     }
 };
 
