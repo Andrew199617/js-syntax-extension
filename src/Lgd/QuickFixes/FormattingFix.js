@@ -1,4 +1,5 @@
 const DiagnosticQuickFix = require('./DiagnosticQuickFix');
+const LgdFormattingOptions = require('../Formatting/LgdFormattingOptions');
 
 /** @description Adapts a verified formatter edit to the common guarded diagnostic-fix pipeline. */
 class FormattingFix extends DiagnosticQuickFix
@@ -31,7 +32,8 @@ class FormattingFix extends DiagnosticQuickFix
             return null;
         }
 
-        return { title: `Apply LGD ${this.title.toLowerCase()}`, target: context.source, snapshots: context.snapshots,
+        const options = LgdFormattingOptions.resolve({ options: context.configuration.formatting.options, rules: context.configuration.rules });
+        return { endOfLine: options.whitespace.endOfLine, title: `Apply LGD ${this.title.toLowerCase()}`, target: context.source, snapshots: context.snapshots,
             offset: error.offset, endOffset: error.endOffset, newText: error.newText,
             ruleIds: Array.from(new Set([ this.ruleId, ...error.relatedRuleIds || [] ])) };
     }

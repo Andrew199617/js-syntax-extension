@@ -53,6 +53,7 @@ const LgdFormatter = {
 
             if(gap.rule && gap.text !== original && this.safeGap(gap))
             {
+                this.attributeLineEndings(context, gap);
                 this.add(context, gap.rule, { offset: start, endOffset: end, newText: gap.text }, [...gap.contributors]);
             }
         }
@@ -101,6 +102,32 @@ const LgdFormatter = {
 
         context.errors = context.errors.filter(error => error.offset > offset || error.endOffset < offset);
         this.add(context, 'whitespace.fileHeader', { offset: offset, endOffset: offset, newText: header });
+    },
+
+    /** @description Attributes final newline-byte changes even when an earlier layout stage performed them. */
+    attributeLineEndings(context, gap)
+    {
+        if(context.options.whitespace.endOfLine === 'preserve')
+        {
+            return;
+        }
+
+        const normalizedBefore = gap.original.replace(/\r\n|\r/gu, '\n');
+        const normalizedAfter = gap.text.replace(/\r\n|\r/gu, '\n');
+        if(normalizedBefore === normalizedAfter)
+        {
+            gap.rule = 'whitespace.endOfLine';
+            gap.contributors.clear();
+            gap.contributors.add('lgd.format.whitespace.endOfLine');
+            return;
+        }
+
+        const before = gap.original.match(/\r\n|\r|\n/gu) || [];
+        const after = gap.text.match(/\r\n|\r|\n/gu) || [];
+        if(after.length > 0 && before.some(ending => ending !== context.newline))
+        {
+            gap.contributors.add('lgd.format.whitespace.endOfLine');
+        }
     },
 
     /** @description Applies non-overlapping edits to a string for previews and tests. */
@@ -175,7 +202,7 @@ const LgdFormatter = {
         const ruleId = `lgd.format.${group}`;
         const parentId = `lgd.format.${group.split('.')[0]}`;
         const rule = { ...context.configuration.rules?.[parentId], ...context.configuration.rules?.[ruleId] };
-        const title = LgdFormattingOptions.catalog.find(entry => entry.id === parentId).title;
+        const title = group === 'whitespace.endOfLine' ? 'Line ending style' : LgdFormattingOptions.catalog.find(entry => entry.id === parentId).title;
         context.errors.push({
             code: ruleId, ruleId: ruleId, offset: offset, endOffset: endOffset, newText: newText,
             expectedText: context.source.slice(offset, endOffset), message: `${title} does not match the configured LGD style.`,
