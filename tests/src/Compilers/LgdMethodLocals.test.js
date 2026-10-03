@@ -18,7 +18,7 @@ describe('LGD method-local typed declarations.', () =>
             '        index = 1;',
             '    },',
             '    findPrevious: function() {',
-            '        readonly Number index = 2;',
+            '        const Number index = 2;',
             '    }',
             '};'
         ].join('\n');
@@ -34,7 +34,7 @@ describe('LGD method-local typed declarations.', () =>
             '        {',
             '            Number other = index;',
             '        }',
-            '        readonly Number index2 = 1;',
+            '        const Number index2 = 1;',
             '        index = 2;',
             '    }',
             '};'
@@ -47,7 +47,7 @@ describe('LGD method-local typed declarations.', () =>
         const source = [
             'Object widget = {',
             '    run: function() {',
-            '        readonly Number index = 0;',
+            '        const Number index = 0;',
             '        index = 1;',
             '    },',
             '    walk: function() {',
@@ -57,7 +57,7 @@ describe('LGD method-local typed declarations.', () =>
         ].join('\n');
         const result = compile(source);
         expect(result.errors.length).toBe(1);
-        expect(result.errors[0].message).toBe('Cannot assign to readonly variable \'index\'.');
+        expect(result.errors[0].message).toBe('Cannot assign to const variable \'index\'.');
     });
 
     test('Strips method parameter types at the right offset when earlier methods have typed locals.', () =>
@@ -65,7 +65,7 @@ describe('LGD method-local typed declarations.', () =>
         const source = [
             'Object o = {',
             '  first() {',
-            '    readonly Number count = 1;',
+            '    const Number count = 1;',
             '    return count;',
             '  },',
             '  second(Number value) {',
@@ -92,11 +92,11 @@ describe('LGD typed method hover regressions.', () =>
         '   * @returns {string} The label.',
         '   */',
         '  create(String name, Number count = 0) {',
-        '    readonly Number total = count;',
+        '    const Number total = count;',
         '    return name + total;',
         '  },',
         '  next(...String labels) {',
-        '    readonly String first = labels[0];',
+        '    const String first = labels[0];',
         '    return first;',
         '  }',
         '};',
@@ -171,6 +171,27 @@ describe('LGD typed method hover regressions.', () =>
         expect(result.code).toContain('next(...labels)');
     });
 
+    test('infers ordinary const hovers alongside annotated immutable bindings', () =>
+    {
+        const source = 'const Number total = 2;\nconst label = "ready";';
+        const result = LgdCompiler.create().compileToJs(source);
+        const map = LgdSourceMap.create(result.mappings);
+        const { service, fileName } = createTypeService(result.code);
+        try
+        {
+            expect(result.errors).toEqual([]);
+            for(const [ name, expected ] of [ [ 'total', 'const total: number' ], [ 'label', 'const label: "ready"' ] ])
+            {
+                const info = service.getQuickInfoAtPosition(fileName, map.toOutput(source.indexOf(name)));
+                expect(typescript.displayPartsToString(info.displayParts)).toBe(expected);
+            }
+        }
+        finally
+        {
+            service.dispose();
+        }
+    });
+
     test('Resolves real TypeScript hover types through the adjusted source map.', () =>
     {
         const source = lines.join('\n');
@@ -207,7 +228,7 @@ describe('LGD module namespace inference.', () =>
     test('Leaves broad Object require imports inferable without changing ordinary Objects.', () =>
     {
         const source = [
-            "readonly Object vscode = require('vscode');",
+            "const Object vscode = require('vscode');",
             '/** @description Loaded dependency. */',
             'Object dependency = require("dependency");',
             '/** @type {CustomShape} */',

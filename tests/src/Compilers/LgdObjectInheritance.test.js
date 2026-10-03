@@ -29,7 +29,7 @@ describe('LGD legacy object inheritance diagnostics.', () =>
 
     test.each([ '@extends {MissingType}', '@extends {ChildType}', '@extends', '@augments {BaseType}' ])('Reports unsupported or unresolved object inheritance: %s.', annotation =>
     {
-        const source = `/** ${annotation} */\nreadonly Object Child = { read() { return 1; } };`;
+        const source = `/** ${annotation} */\nconst Object Child = { read() { return 1; } };`;
         const result = LgdCompiler.create().compileToJs(source);
         expect(result.errors.filter(error => error.code === 'lgd.object.inheritance')).toHaveLength(1);
     });
@@ -38,7 +38,7 @@ describe('LGD legacy object inheritance diagnostics.', () =>
     {
         const source = [
             '/** @extends {BaseType} */',
-            'readonly Object Imported = require("./Base");',
+            'const Object Imported = require("./Base");',
             '/** @extends {BaseType} */',
             'class Base {}',
             'class Child : Base {}',

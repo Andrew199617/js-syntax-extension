@@ -46,7 +46,7 @@ describe('Nullable LGD type syntax.', () =>
     test('Parses nullable declarations, fields and interface contracts with complete type ranges.', () =>
     {
         const source = [
-            "readonly Object vscode = require('vscode');",
+            "const Object vscode = require('vscode');",
             'vscode.Position? current = null;',
             'interface PositionSource { vscode.Position? position { get; set; } vscode.Position? find(vscode.Position? start); }',
             'class PositionStore { vscode.Position? position = null; static Number? count; }'

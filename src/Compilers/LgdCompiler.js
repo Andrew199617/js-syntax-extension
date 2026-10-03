@@ -24,13 +24,10 @@ const LgdGeneratedJsValidator = require('./LgdGeneratedJsValidator');
 const { parseTypedParams, parseObjectMethodParams, parseMethodHead, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
 const { maskCode } = require('./LgdInfer');
 
-const { typeNamePattern } = require('./LgdTypeMaps');
+const LgdVariableSyntax = require('./LgdVariableSyntax');
 
-/** @description Matches a typed declaration head at a line start or after a statement semicolon through the '='. */
-const declarationHeadPattern = new RegExp(`(?:^|(?<=;))(?<indent>[\\t ]*)(?<exportKeyword>export[\\t ]+)?(?<readonlyKeyword>readonly[\\t ]+)?(?<typeName>${typeNamePattern})[\\t ]+(?<variableName>[$A-Z_a-z][\\w$]*)[\\t ]*=`, 'gm');
-
-/** @description Matches malformed declaration heads: lines starting with a type name that never parsed as a declaration. */
-const typeNameLinePattern = new RegExp(`^[\\t ]*(?:export[\\t ]+)?(?:readonly[\\t ]+)?(?<typeName>${typeNamePattern})(?![\\w$.?])(?![\\t ]*(?:\\(|\\[|\\.))`, 'gm');
+/** @description Shared annotated-variable patterns retain their own scanning positions. */
+const { declarationHeadPattern, typeNameLinePattern } = LgdVariableSyntax;
 
 /** @description Length of the JSDoc opening marker. */
 const jsdocOpenLength = 3;
@@ -207,7 +204,9 @@ const LgdCompiler = {
                 return member.kind === 'field' && inHeader;
             }));
 
-            if(classField)
+            const classMemberHead = LgdVariableSyntax.isClassMemberHead(masked, classes.declarations, headStart, headEnd);
+
+            if(classField || classMemberHead)
             {
                 headMatch = declarationHeadPattern.exec(masked);
                 continue;
@@ -241,7 +240,7 @@ const LgdCompiler = {
             }
 
             const nameStart = nameEnd - head.variableName.length;
-            const typeStart = headStart + head.indent.length + (head.exportKeyword || '').length + (head.readonlyKeyword || '').length;
+            const typeStart = headStart + head.indent.length + (head.exportKeyword || '').length + (head.bindingKeyword || '').length;
             const typeEnd = typeStart + head.typeName.length;
 
             found.push({
@@ -251,7 +250,10 @@ const LgdCompiler = {
                 name: head.variableName,
                 nameStart: nameStart,
                 nameEnd: nameEnd,
-                readonly: Boolean(head.readonlyKeyword),
+                readonly: Boolean(head.bindingKeyword),
+                bindingKind: head.bindingKeyword?.trim() || 'let',
+                bindingStart: headStart + head.indent.length + (head.exportKeyword || '').length,
+                bindingEnd: typeStart,
                 exported: Boolean(head.exportKeyword),
                 indent: head.indent,
                 jsdoc: jsdoc ? jsdoc.text : null,
@@ -268,6 +270,8 @@ const LgdCompiler = {
             });
             headMatch = declarationHeadPattern.exec(masked);
         }
+
+        errors.push(...LgdVariableSyntax.checkLegacy(content, found, this));
 
         found.sort((first, second) => first.headStart - second.headStart);
         this.collectMalformedErrors(masked, found, failedHeadStarts, errors);
@@ -346,7 +350,8 @@ const LgdCompiler = {
         const standaloneCandidates = LgdStandaloneReturnChecker.hasCandidates(content);
         const parsed = { declarations: declarations, allDeclarations: found, errors: errors };
         const importedEnums = [...externals.values()].some(entry => entry.kind === 'enum');
-        const required = found.length > 0 || hasBaseCalls || standaloneCandidates || importedEnums;
+        const hasConstBindings = (/\bconst\s+(?:[$A-Z_a-z]|[[{])/).test(masked);
+        const required = found.length > 0 || hasBaseCalls || standaloneCandidates || importedEnums || hasConstBindings;
         if(options.deferAnalysis)
         {
             parsed.analysis = { inherited: inheritedReturnSignatures, required: required };
@@ -434,6 +439,12 @@ const LgdCompiler = {
         let lineMatch = typeNameLinePattern.exec(content);
         while(lineMatch)
         {
+            if(LgdVariableSyntax.isInferredConst(content, lineMatch))
+            {
+                lineMatch = typeNameLinePattern.exec(content);
+                continue;
+            }
+
             let covered = false;
             for(const declaration of found)
             {
@@ -818,7 +829,7 @@ const LgdCompiler = {
                 {
                     return { end: index };
                 }
-                else if(character === '\n' && depth === 0 && this.nextLineStartsDeclaration(content, index + 1))
+                else if(character === '\n' && depth === 0 && LgdVariableSyntax.nextLineStartsDeclaration(content, index + 1))
                 {
                     return { error: 'Missing semicolon in typed declaration.' };
                 }
@@ -876,18 +887,6 @@ const LgdCompiler = {
         }
 
         return { error: 'Missing semicolon in typed declaration.' };
-    },
-
-    /**
-     * @description Checks whether the next line starts a new typed declaration, signalling a missing semicolon.
-     * @param {string} content the LGD source text.
-     * @param {number} from the offset where the next line starts.
-     * @returns {boolean} true when the next line starts a declaration head.
-     */
-    nextLineStartsDeclaration(content, from)
-    {
-        const pattern = new RegExp(`^\\s*(?:export[\\t ]+)?(?:readonly[\\t ]+)?${typeNamePattern}[\\t ]+[$A-Z_a-z][\\w$]*[\\t ]*=`);
-        return pattern.test(content.slice(from));
     },
 
     /**

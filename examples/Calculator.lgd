@@ -5,7 +5,7 @@
  */
 
 /** Display name shown in reports. */
-readonly String calculatorName = "LGD Calculator";
+const String calculatorName = "LGD Calculator";
 
 /** Running total of all calculations. */
 Number total = 0;

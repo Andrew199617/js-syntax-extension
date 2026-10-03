@@ -78,6 +78,13 @@ const LgdAssignmentChecker = {
         }
 
         const binding = target.scope.getBinding(target.node.name);
+        if(binding?.kind === 'const' && !initializing)
+        {
+            errors.push({ offset: context.map.toSource(target.node.start), endOffset: context.map.toSource(target.node.end),
+                message: `Cannot assign to const variable '${target.node.name}'.` });
+            return;
+        }
+
         const descriptor = binding && context.bindings.descriptor(binding);
         if(!descriptor)
         {
@@ -100,7 +107,7 @@ const LgdAssignmentChecker = {
         if(descriptor.readonly && !initializing)
         {
             errors.push({ offset: context.map.toSource(target.node.start), endOffset: context.map.toSource(target.node.end),
-                message: `Cannot assign to readonly variable '${target.node.name}'.` });
+                message: `Cannot assign to const variable '${target.node.name}'.` });
             return;
         }
 

@@ -1,6 +1,6 @@
 const { Oloo } = require('@mavega/oloo');
-readonly Object BaseCommand = require("./BaseCommand");
-readonly Object vscode = require('vscode');
+const Object BaseCommand = require("./BaseCommand");
+const Object vscode = require('vscode');
 
 class GoToAssignment2 {
   constructor() {
@@ -13,25 +13,25 @@ class GoToAssignment2 {
  * @description Command to go to the start of the assignment in the current line.
  * @extends {BaseCommandType}
  */
-readonly Object GoToAssignment = {
+const Object GoToAssignment = {
   /**
    * @description Initialize an instance of GoToAssignment.
    * @returns {GoToAssignmentType}
    */
   create() {
-    readonly Object goToAssignment = Oloo.assign(BaseCommand.create("lgd.goToAssignment", "Go To Assignment"), GoToAssignment);
+    const Object goToAssignment = Oloo.assign(BaseCommand.create("lgd.goToAssignment", "Go To Assignment"), GoToAssignment);
     return goToAssignment;
   },
 
   async executeCommand() {
-    readonly Object editor = vscode.window.activeTextEditor;
+    const Object editor = vscode.window.activeTextEditor;
     if (!editor) {
       return;
     }
 
-    readonly Object document = editor.document;
-    readonly Object position = editor.selection.active;
-    readonly String textLine = document.lineAt(position.line).text;
+    const Object document = editor.document;
+    const Object position = editor.selection.active;
+    const String textLine = document.lineAt(position.line).text;
     Object match = textLine.match(/=(\s*)/);
     if (!match) {
       return;
@@ -39,7 +39,7 @@ readonly Object GoToAssignment = {
 
     Number assignmentIndex = match.index + match[0].length;
     if (assignmentIndex !== -1) {
-      readonly Object newPosition = new vscode.Position(position.line, assignmentIndex);
+      const Object newPosition = new vscode.Position(position.line, assignmentIndex);
       editor.selection = new vscode.Selection(newPosition, newPosition);
       editor.revealRange(new vscode.Range(newPosition, newPosition));
     }

@@ -48,7 +48,7 @@ describe.each([ 'object', 'oloo', 'class' ])('LGD nullable return checking in %s
 
     test('Resolves qualified nullable parameters and returns from the actual vscode import.', () =>
     {
-        const prefix = 'const vscode = require("vscode");\nreadonly vscode.Position? origin = null;';
+        const prefix = 'const vscode = require("vscode");\nconst vscode.Position? origin = null;';
         expect(methods(['vscode.Position? read(vscode.Position? position) { return position; }'], owner, prefix).errors).toEqual([]);
         expect(methods(['vscode.Position? read() { return "wrong"; }'], owner, prefix).errors)
             .toEqual([expect.objectContaining({ message: 'Cannot return String from a vscode.Position? method.' })]);

@@ -91,7 +91,7 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
                 continue;
             }
 
-            const headStart = child.typeStart - (child.readonly ? 'readonly '.length : 0);
+            const headStart = child.bindingStart ?? child.typeStart;
             const length = child.nameStart - headStart;
             if(length < 'let '.length)
             {

@@ -293,7 +293,7 @@ describe('LGD native JavaScript class output.', () =>
     test('Rejects known local and external OLOO bases and dispatch without changing default OLOO output.', () =>
     {
         const source = [
-            'readonly Object Base = { create() { return Object.create(Base); }, /** @virtual */ read() { return 1; } };',
+            'const Object Base = { create() { return Object.create(Base); }, /** @virtual */ read() { return 1; } };',
             'class Derived : Base { override read() { return Oloo.base(this, "read"); } }',
             'module.exports = Derived;'
         ].join('\n');
@@ -308,7 +308,7 @@ describe('LGD native JavaScript class output.', () =>
         virtualMachine.runInNewContext(defaultResult.code, context);
         expect(context.module.exports.create().read()).toBe(1);
         const externals = new Map([[ 'base', { exportName: 'Base', keyword: 'Object', constructorParams: [] } ]]);
-        const imported = compile('readonly Object Base = require("base");\nclass Derived : Base {}', undefined, externals);
+        const imported = compile('const Object Base = require("base");\nclass Derived : Base {}', undefined, externals);
         expect(imported.errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'lgd.output.objectBase' })]));
         const literal = compile('class Example { read() { return "Oloo.base(this, read)"; } }');
         expect(literal.errors).toEqual([]);

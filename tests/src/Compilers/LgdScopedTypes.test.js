@@ -115,10 +115,10 @@ describe('LGD assignment operators and patterns.', () =>
 
     test.each([ 'value += 1;', 'value++;', '[value] = [2];', '({ value } = { value: 2 });' ])('Keeps readonly bindings protected through %s.', statement =>
     {
-        const source = `readonly Number value = 1;\n${statement}`;
+        const source = `const Number value = 1;\n${statement}`;
         const errors = compileErrors(source);
         const assignmentOffset = source.indexOf(statement, source.indexOf('\n')) + statement.indexOf('value');
-        expect(errors).toContainEqual(expect.objectContaining({ message: "Cannot assign to readonly variable 'value'.", offset: assignmentOffset }));
+        expect(errors).toContainEqual(expect.objectContaining({ message: "Cannot assign to const variable 'value'.", offset: assignmentOffset }));
     });
 
     test('Treats a rest parameter binding as an Array rather than its element type.', () =>

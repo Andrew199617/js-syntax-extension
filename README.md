@@ -66,7 +66,7 @@ In `.lgd` files, use `class`, a colon for inheritance, and the class name for it
 
 ```lgd
 const { Oloo } = require('@mavega/oloo');
-readonly Object BaseCommand = require('./BaseCommand');
+const Object BaseCommand = require('./BaseCommand');
 
 class GoToAssignment : BaseCommand {
     GoToAssignment() : base("lgd.goToAssignment", "Go To Assignment") {
@@ -119,7 +119,7 @@ Static fields initialize once when the class declaration executes. Inherited rea
 
 Known field types, writes, returns and receiver kinds are checked across relative LGD imports. Completion lists separate instance and static members. These remain compile-time checks; arbitrary external JavaScript can bypass them.
 
-LGD members are accessible from other code by default; C# access-control defaults are not modeled. This field subset does not support access modifiers, `readonly`/`const` fields, static classes or constructors, constructor chaining with `this(...)`, or fields in interfaces. Same-named inherited instance fields and member collisions are diagnosed because JavaScript properties cannot represent C#'s separate base and derived field storage. Use a distinct field name instead. Declare an LGD base before its derived class; unresolved or later-declared bases cannot provide a verified field lifecycle. Native class output also reserves the static field name `prototype`. Existing top-level `readonly` declarations are unchanged.
+LGD members are accessible from other code by default; C# access-control defaults are not modeled. This field subset does not support access modifiers, `readonly`/`const` fields, static classes or constructors, constructor chaining with `this(...)`, or fields in interfaces. Same-named inherited instance fields and member collisions are diagnosed because JavaScript properties cannot represent C#'s separate base and derived field storage. Use a distinct field name instead. Declare an LGD base before its derived class; unresolved or later-declared bases cannot provide a verified field lifecycle. Native class output also reserves the static field name `prototype`. Use `const Type name = value;` for immutable local or top-level bindings. Legacy `readonly Type name = value;` declarations still compile with a migration warning and a quick fix to `const`.
 
 ## LGD interfaces and abstract classes
 
@@ -199,7 +199,7 @@ class Counter {
 Append `?` to a value type to include `null`: `vscode.Position?` means `vscode.Position | null`, and `Number?` means `number | null`. Nullable annotations work on supported method returns, parameters, local declarations, class fields and interface contracts. Nullable fields without an initializer default to `null`. They do not include `undefined`; a nullable-returning method must still return a value or `null` on every normal path. For example:
 
 ```lgd
-readonly Object vscode = require("vscode");
+const Object vscode = require("vscode");
 
 class PositionSearch {
     vscode.Position? findPreviousChar(vscode.TextDocument document, vscode.Position position, String char, Number offset = 0) {

@@ -39,7 +39,7 @@ describe('LGD lexical boundaries.', () =>
     test('Skips regex delimiters and assignment lookalikes while preserving division.', () =>
     {
         const source = [
-            'readonly Number value = 2;',
+            'const Number value = 2;',
             'Object pattern = /value = 3[};]/;',
             'Number quotient = value / 2;',
             'Object matcher = { match(String input) { return /[})]/.test(input); } };'

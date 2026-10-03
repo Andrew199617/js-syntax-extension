@@ -28,7 +28,7 @@ describe.each([ 'oloo', 'class' ])('LGD expression inference cycles with %s outp
     test.each([ 'document.text', 'document.lineAt(0).text', 'document?.text' ])('Stops cyclic loop origins for %s.', initializer =>
     {
         const source = `while(flag) {
-            readonly String text = ${initializer};
+            const String text = ${initializer};
         }`;
         const result = compile(source, objectModel);
         expect(result.errors).toEqual([]);
@@ -38,7 +38,7 @@ describe.each([ 'oloo', 'class' ])('LGD expression inference cycles with %s outp
     test('Retains an actionable independent mismatch after an unknown loop initializer.', () =>
     {
         const source = `while(flag) {
-            readonly String text = document.text;
+            const String text = document.text;
             Number count = "wrong";
         }`;
         const result = compile(source, objectModel);
@@ -54,7 +54,7 @@ describe.each([ 'oloo', 'class' ])('LGD expression inference cycles with %s outp
         const source = `class Sample {
             Number read(Object document, Boolean ready) {
                 while(ready) {
-                    readonly String text = document.text;
+                    const String text = document.text;
                     if(ready) return text;
                 }
                 return 1;

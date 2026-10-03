@@ -157,7 +157,7 @@ describe('LGD compiler.', () =>
 
     test.each([ 'oloo', 'class' ])('Compiles consecutive same-line declarations inside a function with %s output.', objectModel =>
     {
-        const source = 'Function read = () => {\n    Number first = 1;readonly Number second = 2; Number third = first + second; return third;\n};';
+        const source = 'Function read = () => {\n    Number first = 1;const Number second = 2; Number third = first + second; return third;\n};';
         const result = LgdCompiler.create().compileToJs(source, new Map(), { javascriptObjectModel: objectModel });
         expect(result.errors).toEqual([]);
         expect(result.allDeclarations.map(declaration => declaration.name)).toEqual([ 'read', 'first', 'second', 'third' ]);
@@ -198,7 +198,7 @@ describe('LGD compiler.', () =>
 
         expect(stripHeader(compiler.compileToCSharp('BigInt n = 123n;').code).trim()).toBe('long n = 123L;');
         expect(stripHeader(compiler.compileToCSharp('Array x = y[0];').code).trim()).toBe('List<dynamic> x = y[0];');
-        expect(stripHeader(compiler.compileToCSharp('readonly Number x = compute();').code).trim()).toBe('double x = compute();');
+        expect(stripHeader(compiler.compileToCSharp('const Number x = compute();').code).trim()).toBe('double x = compute();');
         expect(stripHeader(compiler.compileToCSharp('Boolean b = x === 1;').code).trim()).toBe('bool b = x == 1;');
         expect(stripHeader(compiler.compileToCSharp('String s = "a === b";').code).trim()).toBe('string s = "a === b";');
         expect(stripHeader(compiler.compileToCSharp('Function f = (a) => { do(a); };').code).trim()).toBe('Action<dynamic> f = (a) => { do(a); };');
@@ -276,9 +276,9 @@ describe('LGD source mappings.', () =>
         expect(result.code.slice(jsOffset, jsOffset + 'total'.length)).toBe('total');
     });
 
-    test('Mappings survive nested declarations and readonly heads.', () =>
+    test('Mappings survive nested declarations and const heads.', () =>
     {
-        const source = 'readonly Number outer = 1;\nFunction f = () => {\n  Number first = 1; Number inner = 2;\n  return inner;\n};\n';
+        const source = 'const Number outer = 1;\nFunction f = () => {\n  Number first = 1; Number inner = 2;\n  return inner;\n};\n';
         const result = LgdCompiler.create().compileToJs(source);
         expect(result.errors).toEqual([]);
         const map = LgdSourceMap.create(result.mappings);
@@ -367,11 +367,11 @@ describe('LGD type checking.', () =>
         expectTypeError('Number total = 0;\ntotal = "many";', 'Cannot assign String to Number.', 'Number total = 0;\ntotal = '.length);
     });
 
-    test('Rejects assignments to readonly variables.', () =>
+    test('Rejects assignments to const variables.', () =>
     {
-        const result = check('readonly Number total = 0;\ntotal = 1;');
+        const result = check('const Number total = 0;\ntotal = 1;');
         expect(result.errors.length).toBe(1);
-        expect(result.errors[0].message).toBe('Cannot assign to readonly variable \'total\'.');
+        expect(result.errors[0].message).toBe('Cannot assign to const variable \'total\'.');
     });
 
     test('Ignores lookalikes: strings, member writes, comparisons, shadowing declarations.', () =>
@@ -438,16 +438,16 @@ describe('JavaScript backend.', () =>
         }
     });
 
-    test('Mutable declarations become let, readonly become const.', () =>
+    test('Mutable declarations become let, const remain const.', () =>
     {
         expect(compile('Number n = 1;').code).toBe('/** @type {number} */\nlet n = 1;');
-        expect(compile('readonly Number n = 1;').code).toBe('/** @type {number} */\nconst n = 1;');
+        expect(compile('const Number n = 1;').code).toBe('/** @type {number} */\nconst n = 1;');
     });
 
     test('Exported declarations keep their export keyword.', () =>
     {
         expect(compile('export Number n = 1;').code).toBe('/** @type {number} */\nexport let n = 1;');
-        expect(compile('export readonly Number n = 1;').code).toBe('/** @type {number} */\nexport const n = 1;');
+        expect(compile('export const Number n = 1;').code).toBe('/** @type {number} */\nexport const n = 1;');
     });
 
     test('Merges a JSDoc block without an @type tag.', () =>
@@ -732,7 +732,7 @@ describe('LGD typed function parameters.', () =>
     test('Accepts nominal parameter types for declared names.', () =>
     {
         const source = [
-            'readonly GoToNextParagraph GoToNextParagraph = { create() {} };',
+            'const GoToNextParagraph GoToNextParagraph = { create() {} };',
             'Function run = (GoToNextParagraph target) => {',
             '    GoToNextParagraph same = target;',
             '};'

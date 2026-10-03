@@ -233,7 +233,7 @@ describe.each([ 'oloo', 'class' ])('LGD declared fields with %s output.', object
             'class Sample {',
             '    // Keep this field comment.',
             '    Object settings = (() => {',
-            '        readonly String label = "left;right";',
+            '        const String label = "left;right";',
             '        return { label, matches: /;/.test(label), nested: () => { return 2; } };',
             '    })();',
             '    static String name = "static;name";',
@@ -527,7 +527,7 @@ describe('LGD field syntax and member diagnostics.', () =>
     test('Rejects declared instance fields on foreign OLOO factory bases.', () =>
     {
         const source = [
-            'readonly Object Foreign = { create() { return Object.create(Foreign); } };',
+            'const Object Foreign = { create() { return Object.create(Foreign); } };',
             'class Sample : Foreign { Number value = 1; }'
         ].join('\n');
         expect(compile(source).errors).toEqual(expect.arrayContaining([

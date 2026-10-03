@@ -64,7 +64,7 @@ describe('LGD class-member error locations and bounded recovery.', () =>
     test('Locates a missing constructor opener after parameters and recovers past its object assignment.', () =>
     {
         const source = [
-            "readonly Object vscode = require('vscode');",
+            "const Object vscode = require('vscode');",
             'class BaseCommand {',
             '  BaseCommand(String commandName, String title)',
             '    /** @type {vscode.Command} */',

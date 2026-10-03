@@ -143,7 +143,7 @@ describe('Lexical LGD base method calls.', () =>
             'class Base { virtual String describe(String label) { return label; } }',
             'class Derived : Base {',
             '    override String describe(String label) {',
-            '        readonly Function callback = () => base /* receiver */ . describe /* method */ (label);',
+            '        const Function callback = () => base /* receiver */ . describe /* method */ (label);',
             '        return callback();',
             '    }',
             '}',
@@ -210,7 +210,7 @@ describe('Lexical LGD base method calls.', () =>
             'class Base { virtual Number run(Number amount) { return amount; } }',
             'class Derived : Base {',
             '    override Number run(Number amount) {',
-            '        readonly Function callback = (Number count) => base.run(count);',
+            '        const Function callback = (Number count) => base.run(count);',
             '        return callback(amount);',
             '    }',
             '}',
@@ -269,7 +269,7 @@ describe('Lexical LGD base method calls.', () =>
 
     test('Checks imported known accessor contracts and leaves unrelated JavaScript base values unchanged.', () =>
     {
-        const source = 'readonly Object Parent = require("./parent");\nclass Derived : Parent { read() { return base.label(); } }';
+        const source = 'const Object Parent = require("./parent");\nclass Derived : Parent { read() { return base.label(); } }';
         const externals = new Map([[ './parent', { exportName: 'Parent', keyword: 'Object', methodsKnown: true,
             methodSignatures: [{ name: 'label', kind: 'property' }] } ]]);
         expect(compile(source, externals).errors.some(error => error.message.includes('property or accessor'))).toBe(true);

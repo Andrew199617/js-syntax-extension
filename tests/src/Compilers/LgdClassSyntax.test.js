@@ -48,7 +48,7 @@ describe('LGD class syntax lowering.', () =>
     test('Runs the real Oloo.assign lifecycle with an existing base object and async override.', async () =>
     {
         const exported = execute([
-            'readonly Object BaseCommand = {',
+            'const Object BaseCommand = {',
             '    create(String commandName, String title) {',
             '        const instance = Object.create(BaseCommand);',
             '        instance.command = { command: commandName, title: title };',
@@ -222,7 +222,7 @@ describe('LGD class syntax lowering.', () =>
         const source = [
             'const example = `class Fake { Fake() {} }`;',
             '/* class Comment { Comment() {} } */',
-            'readonly Object Existing = { create() { return Object.create(Existing); } };'
+            'const Object Existing = { create() { return Object.create(Existing); } };'
         ].join('\n');
         const result = compile(source);
         expect(result.errors).toEqual([]);
