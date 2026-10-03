@@ -16,6 +16,13 @@ const LgdVariableSyntax = {
     {
         return declarations.some(declaration =>
         {
+            const classField = declaration.classMembers?.some(member => member.kind === 'field' && member.start <= headEnd && headEnd <= member.initializerStart);
+
+            if(classField)
+            {
+                return true;
+            }
+
             if(headStart < declaration.initializerStart || headEnd >= declaration.initializerEnd)
             {
                 return false;
@@ -42,7 +49,7 @@ const LgdVariableSyntax = {
             const message = "Use 'const' for variable declarations. 'readonly' is reserved for members.";
             return { ...compiler.createError(content, offset, message, endOffset),
                 code: 'lgd.declaration.readonly', severity: 'warning',
-                quickFix: { kind: 'replaceReadonlyLocal', offset: offset, endOffset: endOffset, declarationStart: declaration.headStart } };
+                quickFix: { kind: 'replaceReadonlyLocal', offset: offset, endOffset: endOffset, declarationStart: declaration.headStart, name: declaration.name } };
         });
     },
 

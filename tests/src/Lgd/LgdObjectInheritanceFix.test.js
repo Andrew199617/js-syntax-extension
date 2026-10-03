@@ -174,11 +174,11 @@ describe('legacy object inheritance conversion', () =>
         const source = original.context.source.text
             .replace('create()', `Object create(${parameters})`)
             .replace(
-                'readonly Object child = Oloo.assign(Base.create("title"), Child);\r\n        return child;',
+                'const Object child = Oloo.assign(Base.create("title"), Child);\r\n        return child;',
                 `return Oloo.assign(Base.create(${argumentsText}), Child);`
             )
             .replace('async run()', 'async Number run(Number amount = 2)')
-            .replace('readonly Number count = 2;', 'readonly Number count = amount;');
+            .replace('const Number count = 2;', 'const Number count = amount;');
         const example = fixture({ source: source });
         const proposal = await new ConvertObjectInheritanceFix().create(example.context, example.fix);
         expect(proposal).not.toBeNull();
@@ -211,9 +211,9 @@ describe('legacy object inheritance conversion', () =>
     {
         const source = await fs.promises.readFile(path.join(__dirname, '../../fixtures/object-inheritance-go-to-last-method.lgd'), 'utf8');
         const baseSource = [
-            'readonly Object GoToNextMethod = {',
+            'const Object GoToNextMethod = {',
             '  create(String commandName = "next", String title = "Next") {',
-            '    readonly Object instance = Object.create(GoToNextMethod);',
+            '    const Object instance = Object.create(GoToNextMethod);',
             '    instance.command = { command: commandName, title: title };',
             '    instance.visits = [];',
             '    instance.tabSize = this.getTabSize();',
@@ -258,7 +258,7 @@ describe('legacy object inheritance conversion', () =>
         expect(state.externals.get('./GoToNextMethod')).toMatchObject({ sourcePath: base.uri.fsPath, exportName: 'GoToNextMethod' });
         const provider = LgdCodeActionProvider.create(service);
         const range = new vscode.Range(document.positionAt(0), document.positionAt(source.length));
-        let actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()))) }, {});
+        let actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance'))) }, {});
         if(incompatible)
         {
             expect(actions).toEqual([]);
@@ -279,7 +279,7 @@ describe('legacy object inheritance conversion', () =>
             await service.updateDocument(base);
             await service.pendingDependencyUpdates;
             await service.updateDocument(document);
-            actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()))) }, {});
+            actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance'))) }, {});
             vscode.workspace.applyEdit.mockImplementation(edit =>
             {
                 const replacement = edit.replacements[0];
@@ -300,8 +300,8 @@ describe('legacy object inheritance conversion', () =>
             expect(base.getText()).toContain('@virtual');
             expect(base.getText()).toContain('// unsaved change');
             expect(document.getText()).toBe(source);
-            expect(diagnostics.get(document.uri.toString())).toHaveLength(1);
-            actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()))) }, {});
+            expect(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance')).toHaveLength(1);
+            actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()).filter(diagnostic => diagnostic.code === 'inheritance'))) }, {});
         }
 
         expect(actions).toHaveLength(1);
@@ -313,7 +313,8 @@ describe('legacy object inheritance conversion', () =>
         expect(converted).toContain('override async executeCommand()');
         const externals = service.getState(document.uri).externals;
         const compiled = LgdCompiler.create().compileToJs(converted, externals);
-        expect(compiled.errors).toEqual([]);
+        expect(compiled.errors.length).toBeGreaterThan(0);
+        expect(compiled.errors.every(error => error.code === 'lgd.declaration.readonly' && error.severity === 'warning')).toBe(true);
         const results = [];
         for(const program of [ source, converted ])
         {

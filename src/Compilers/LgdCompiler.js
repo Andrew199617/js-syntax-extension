@@ -198,15 +198,7 @@ const LgdCompiler = {
             const head = headMatch.groups;
             const headStart = headMatch.index;
             const headEnd = headStart + headMatch[0].length;
-            const classField = classes.declarations.some(declaration => (declaration.classMembers || []).some(member =>
-            {
-                const inHeader = member.start <= headEnd && headEnd <= member.initializerStart;
-                return member.kind === 'field' && inHeader;
-            }));
-
-            const classMemberHead = LgdVariableSyntax.isClassMemberHead(masked, classes.declarations, headStart, headEnd);
-
-            if(classField || classMemberHead)
+            if(LgdVariableSyntax.isClassMemberHead(masked, classes.declarations, headStart, headEnd))
             {
                 headMatch = declarationHeadPattern.exec(masked);
                 continue;

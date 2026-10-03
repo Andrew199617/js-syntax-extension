@@ -389,16 +389,32 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
     /** @description Suppresses proposals introducing errors while allowing unrelated existing diagnostics to remain. */
     _validErrors(original, preview, declaration, delta)
     {
-        return preview.every(error => original.some(previous =>
+        const legacyWarnings = original.filter(error => error.code === 'lgd.declaration.readonly' && error.severity === 'warning');
+        return preview.every(error =>
         {
-            if(previous.offset >= declaration.start && previous.offset < declaration.end)
+            if(error.code === 'lgd.declaration.readonly' && error.severity === 'warning')
             {
-                return false;
+                const index = legacyWarnings.findIndex(previous => previous.quickFix?.name === error.quickFix?.name);
+                if(index === -1)
+                {
+                    return false;
+                }
+
+                legacyWarnings.splice(index, 1);
+                return true;
             }
 
-            const offset = previous.offset >= declaration.end ? previous.offset + delta : previous.offset;
-            return error.offset === offset && error.code === previous.code && error.message === previous.message;
-        }));
+            return original.some(previous =>
+            {
+                if(previous.offset >= declaration.start && previous.offset < declaration.end)
+                {
+                    return false;
+                }
+
+                const offset = previous.offset >= declaration.end ? previous.offset + delta : previous.offset;
+                return error.offset === offset && error.code === previous.code && error.message === previous.message;
+            });
+        });
     }
 }
 
