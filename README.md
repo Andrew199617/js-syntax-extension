@@ -468,3 +468,18 @@ See changelogs for more info.
 
 Initial release
 - Added foo.create syntax highlighting.
+
+## Explicit-value enums
+
+Use an enum when a set of named values must retain its serialized strings or numbers:
+
+```lgd
+export enum DownloadState {
+    Progress = 'progress',
+    Started = 'started',
+    Failed = 'failed',
+    Completed = 'completed',
+}
+```
+
+`export` is optional. Both JavaScript output modes emit an equivalent `Object.freeze` object. Hover and completion show the members, and known invalid members or direct writes are diagnosed. Members require explicit values of one primitive type; implicit numbering and full C# enum semantics are not included. String-valued LGD enums are not C# enums.
