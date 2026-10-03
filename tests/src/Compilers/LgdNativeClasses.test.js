@@ -43,6 +43,17 @@ function typeDiagnostics(code)
 
 describe('LGD native JavaScript class output.', () =>
 {
+    test('Exposes every constructor overload in native factory and new-call typing.', () =>
+    {
+        const result = compile([
+            'class Example { Example() {} Example(String name, Number count = 1) {} }',
+            'Example.create(); Example.create("ready"); Example.create("ready", 2);',
+            'new Example(); new Example("ready", 2);'
+        ].join('\n'));
+        expect(result.errors).toEqual([]);
+        expect(typeDiagnostics(result.code).map(diagnostic => typescript.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))).toEqual([]);
+    });
+
     test('Keeps OLOO as the default and rejects unimplemented language and object-model options.', () =>
     {
         expect(LgdOutputOptions.resolve()).toEqual({ options: { outputTarget: 'javascript', javascriptObjectModel: 'oloo' }, errors: [] });

@@ -153,6 +153,26 @@ For a plain `return this;`, Quick Fix can replace the value return with `return;
 
 Quick Fix can rename an ordinary `constructor()` and migrate a recognized `Oloo.assign(Base.create(...), ClassName)` factory in an existing class, including its documented `@extends` base. Migration preserves arguments, method bodies and documentation, and previews any required base-method `virtual` change as one atomic action. Factories with extra work, ambiguous bases or receiver-dependent arguments need manual migration. An LGD class base must have verified root initialization without constructor-time receiver calls or escapes: initialize `this` in the class-name constructor and pass base arguments with `: base(...)`. A recognized root `Object.create(ClassName)` factory with direct property initializers can also become `this` initialization; escaping aliases and extra control flow remain manual.
 
+#### Constructor overloads
+
+A class can declare several constructors when their accepted argument counts do not overlap:
+
+```lgd
+class Command {
+    Command(String commandName, String title) {
+        this.command = { command: commandName, title: title };
+    }
+    Command() {}
+}
+
+const Command empty = Command.create();
+const Command named = Command.create("lgd.run", "Run");
+```
+
+Defaults and rest parameters count toward each constructor's accepted range. For example, `Command()` conflicts with `Command(String title = "Run")`, because both accept zero arguments. Duplicate signatures and same-count overloads distinguished only by parameter types are diagnosed. Unlike C#, LGD does not yet select same-count constructors by parameter type. Constructors remain public by default.
+
+Calls and `base(...)` initializers select the matching count and validate known argument types and accessibility. Both JavaScript output modes dispatch using argument counts only, without runtime type inspection. Each selected constructor retains its defaults, callback scopes, `arguments`, early `return;`, and existing field/base initialization order. Constructor chaining with `this(...)` and ordinary method overloads remain unsupported.
+
 ### Typed instance and static fields
 
 Fields next to the constructor belong to each instance by default. Use `static` explicitly for state shared by the class:
