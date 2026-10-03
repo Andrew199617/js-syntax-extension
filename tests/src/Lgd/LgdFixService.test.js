@@ -158,7 +158,7 @@ test('project discovery respects nested project boundaries and solution discover
         return document;
     });
 
-    fixes.configuration.resolve.mockImplementation(target => Promise.resolve({ valid: true, ignored: false, rules: {}, root: target === nested ? '/project/nested' : '/project' }));
+    fixes.configuration.resolve.mockImplementation(target => Promise.resolve({ valid: true, ignored: false, rules: {}, root: target.uri.toString() === nested.uri.toString() ? '/project/nested' : '/project' }));
     expect(await fixes.documents('project', document, {})).toEqual([document]);
     expect(await fixes.documents('solution', document, {})).toEqual([ document, nested ]);
 });
@@ -248,4 +248,21 @@ test('a target policy is read once and never replaced with a newer policy during
     fixes.configuration.resolve.mockImplementation(() => Promise.resolve(config));
     await fixes.plan([ other, document ], { automatic: false });
     expect(fixes.configuration.resolve.mock.calls.filter(([target]) => target === document)).toHaveLength(1);
+});
+
+test('a manifest-only project identity change invalidates a prepared fix', async () =>
+{
+    const { fixes, document, service } = await fixture('readonly Number value = 1;');
+    const externals = service.getState(document.uri).externals;
+    externals.sourceContext = { projectId: '/project/first.csproj' };
+    const batch = await fixes.plan([document], { automatic: false });
+    service.collectExternalTypes = jest.fn(() =>
+    {
+        const current = new Map();
+        current.sourceContext = { projectId: '/project/second.csproj' };
+        return Promise.resolve(current);
+    });
+
+    expect(await fixes.applyBatch(batch, false)).toBe(false);
+    expect(document.getText()).toBe('readonly Number value = 1;');
 });

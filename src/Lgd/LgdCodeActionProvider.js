@@ -100,7 +100,9 @@ const LgdCodeActionProvider = {
     {
         const proposal = this.proposals.get(proposalId);
         this.proposals.delete(proposalId);
-        if(!proposal || !DiagnosticQuickFix.canApply(proposal) || this.fixService && !await this.fixService.individualCurrent(proposal))
+        const current = proposal && DiagnosticQuickFix.canApply(proposal) && await this.engine.isAnalysisCurrent(proposal);
+        const allowed = current && (!this.fixService || await this.fixService.individualCurrent(proposal));
+        if(!allowed)
         {
             vscode.window.setStatusBarMessage('LGD: Source changed; reopen Quick Fix to refresh the available actions.', STALE_FIX_STATUS_MS);
             return false;

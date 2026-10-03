@@ -196,10 +196,10 @@ const LgdFixService = {
                     return [];
                 }
 
-                const opened = await vscode.workspace.openTextDocument(uri);
-                const config = await this.configuration.resolve(opened);
+                const config = await this.configuration.resolve({ uri: uri });
                 if(config.valid && !config.ignored && (!projectRoot || config.root === projectRoot))
                 {
+                    const opened = await vscode.workspace.openTextDocument(uri);
                     documents.set(uri.toString(), opened);
                 }
             }
@@ -301,6 +301,15 @@ const LgdFixService = {
         for(const entry of batch.configurations)
         {
             if(!await this.configuration.isCurrent(entry.document, entry.config))
+            {
+                return false;
+            }
+        }
+
+        const identities = new Map();
+        for(const entry of batch.plan.entries)
+        {
+            if(!await this.engine.isAnalysisCurrent(entry.proposal, identities))
             {
                 return false;
             }
