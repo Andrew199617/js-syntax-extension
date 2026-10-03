@@ -52,13 +52,71 @@ In a `.lgd` file, place the cursor on a diagnostic and open Quick Fix with `Ctrl
 
 Argument removal is an explicit choice. Calls, property reads, spreads, and comments in the removed suffix are preserved by leaving the diagnostic for you to resolve. Missing arguments are never filled with guessed values. Fixes check that the source and imported contracts are still current, support Undo, and refresh Problems after application.
 
-Parameter changes are suggestions, never Fix All or a preferred automatic action. They are withheld for script-global or exposed owners, known callers, exports, inherited/interface contracts, defaults, rest/destructured parameters, captures, mixed writes, unknown return values or a preview that adds unrelated errors. Merely having no references in the open file does not prove a global contract is unused. The source contracts remain unchanged until you choose an action. Changing only a parameter can create a return mismatch when the method still promises Number; the title warns you before applying it. A return contract changes only through the explicitly chosen safe combined or followup action.
+Parameter changes are suggestions and never automatic. They are excluded from Fix All unless explicitly enabled as a manual rule in the project configuration, with review before applying. They are withheld for script-global or exposed owners, known callers, exports, inherited/interface contracts, defaults, rest/destructured parameters, captures, mixed writes, unknown return values or a preview that adds unrelated errors. Merely having no references in the open file does not prove a global contract is unused. The source contracts remain unchanged until you choose an action. Changing only a parameter can create a return mismatch when the method still promises Number; the title warns you before applying it. A return contract changes only through the explicitly chosen safe combined or followup action.
 
 A missing assignment expression such as `const broken = ;` is reported as **Expected an expression after '='. Add a value.** at the semicolon. Add the intended value or expression before saving; the extension does not guess one.
 
 LGD diagnostics show short categories such as **syntax**, **type** and **inheritance**. Internal compiler IDs are retained separately for correct Quick Fix association.
 
 LGD keyword highlighting distinguishes control flow such as `return` and `if` from declarations/modifiers such as `class`, `static` and `virtual`, and from the `void` return-type keyword. Your theme chooses their colors. Contextual highlighting does not add compiler support for otherwise unsupported keywords.
+
+## Configurable fixes and Fix All
+
+Use the **LGD: Fix All…** editor-title button or command to choose a scope:
+
+- **Document / File** edits the current LGD buffer, including unsaved changes. The two command names are aliases for the same scope. An untitled LGD document can use manual fixes, but has no project configuration or automatic fixes.
+- **Project** uses the nearest ancestor `.vscode/lgd.json` as its project boundary, falling back to the current workspace folder. Nested configured projects are separate.
+- **Solution / Workspace** includes every folder in the current VS Code multi-root workspace, with each project's own configuration. A solution is the open workspace; no separate solution file is needed.
+
+Create `.vscode/lgd.json` in the project to choose which fixes are available. VS Code supplies completion and validation from the extension's bundled schema:
+
+```json
+{
+    "version": 1,
+    "autoFix": true,
+    "rules": {
+        "readonly-variable-declaration": { "fix": "automatic" },
+        "return-type-documentation": { "fix": "manual" },
+        "virtual-documentation": { "fix": "manual" },
+        "nonvirtual-base": { "fix": "off" }
+    },
+    "ignores": ["legacy/**"],
+    "overrides": [
+        {
+            "files": ["examples/**/*.lgd"],
+            "rules": {
+                "readonly-variable-declaration": { "fix": "manual" }
+            }
+        }
+    ]
+}
+```
+
+`readonly-variable-declaration` only replaces a legacy variable's `readonly` token with `const`; it does not remove or change readonly class fields. Rule modes are:
+
+- `off`: hide this rule's quick fixes and exclude it from Fix All
+- `manual`: allow explicit Quick Fix and Fix All
+- `automatic`: also allow automatic-safe fixes when `autoFix` is true and VS Code requests the save action
+
+Automatic changes are disabled by default. Enable VS Code's native save action in `.vscode/settings.json`:
+
+```json
+{
+    "editor.codeActionsOnSave": {
+        "source.fixAll.lgd": "explicit"
+    }
+}
+```
+
+`"explicit"` runs on explicit saves; use VS Code's `"always"` option if you also want its supported Auto Save triggers. Older VS Code releases use `true` instead. LGD does not install a second save watcher or save edited files itself.
+
+Without rule settings, manual Fix All includes `readonly-variable-declaration`, `return-type-documentation`, and `virtual-documentation`. These are also the only rules eligible for automatic fixing. API or behavioral changes always need a manual choice, even if their rule is set to `automatic`: `object-inheritance`, `missing-override`, `nonvirtual-base`, `extra-base-arguments`, `parameter-type`, `return-type`, and `static-member-receiver`. They are excluded from bulk fixes by default. Explicit individual lightbulb fixes stay available unless configured `off`. Alternative preparation-only inheritance and combined parameter/return actions remain individual choices.
+
+Project/solution fixes and semantic document fixes offer **Review changes** using native diffs, then **Apply fixes**. Edits stay unsaved and support Undo. A reviewed batch applies only the displayed plan; rerun Fix All if overlapping actions were deferred. Safe document/save fixes recheck diagnostics for up to ten passes, stopping when no fixes remain or a repeated state is detected. Conflicting atomic actions are skipped as a whole, never partially applied. Changes to a buffer, imported contract, configuration, workspace boundary, or trust invalidate the plan. Cancellation stops the next edit; it does not undo edits already applied.
+
+Configuration uses strict JSON. Unknown rules/settings, invalid values, broken inheritance, and unsupported globs produce Problems diagnostics and disable fixes for the affected project. Unsaved config edits take effect too. `extends` accepts one relative JSON path or an array, resolved from the containing config; parents merge in order, then the current file. Inheritance stays inside the workspace folder, including symlink targets, with a ten-level limit. Ancestor configs are not merged implicitly: use `extends` when a nested project should inherit them. All globs are relative to the selected project root. Inherited ignores accumulate, then matching overrides apply in order. An override's `ignores` excludes only that override.
+
+Patterns support `*`, `?`, and whole-segment `**` with `/` separators, plus a trailing `/` for descendants. Negation, braces, character classes, extglobs, absolute paths, and `..` segments are not supported. Generated/vendor directories (`node_modules`, `.git`, `dist`, `build`, `coverage`, `vendor`, `generated`, `typings`), parser fixtures (`tests/mocks`, `tests/__mocks__`), and `*.generated.lgd` are always excluded. Cross-file edits cannot escape the selected scope or edit an excluded target.
 
 ## LGD classes with OLOO instances
 

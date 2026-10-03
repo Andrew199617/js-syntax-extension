@@ -25,6 +25,7 @@ const LgdDefinitionProvider = require('./Lgd/LgdDefinitionProvider');
 const LgdReferenceProvider = require('./Lgd/LgdReferenceProvider');
 const LgdCompletionProvider = require('./Lgd/LgdCompletionProvider');
 const LgdCodeActionProvider = require('./Lgd/LgdCodeActionProvider');
+const LgdFixService = require('./Lgd/Fixes/LgdFixService');
 const LgdSemanticTokensProvider = require('./Lgd/LgdSemanticTokensProvider');
 const LgdProjectIdentity = require('./Compilers/LgdProjectIdentity');
 const LgdCompiler = require('./Compilers/LgdCompiler');
@@ -337,7 +338,8 @@ function activate(context)
         '.'
     );
 
-    const lgdCodeActions = LgdCodeActionProvider.create(lgd.languageService);
+    const lgdFixes = LgdFixService.create(lgd.languageService);
+    const lgdCodeActions = LgdCodeActionProvider.create(lgd.languageService, lgdFixes);
     lgdCodeActions.registerCommands(context.subscriptions);
     const lgdCodeActionProvider = vscode.languages.registerCodeActionsProvider(
         LGD_DOCUMENT_SELECTOR,
@@ -593,6 +595,7 @@ function activate(context)
     // context.subscriptions.push(definitionProvider);
 
     lgd.codeActions.registerCommands(context.subscriptions);
+    lgdFixes.register(context.subscriptions);
 
     // lgd.definitionProvider.registerCommands(context.subscriptions);
 }

@@ -46,7 +46,12 @@
         "onLanguage:javascriptreact",
         "onLanguage:typescript",
         "onLanguage:typescriptreact",
-        "onLanguage:lgd"
+        "onLanguage:lgd",
+        "onCommand:lgd.fixAll",
+        "onCommand:lgd.fixAllDocument",
+        "onCommand:lgd.fixAllFile",
+        "onCommand:lgd.fixAllProject",
+        "onCommand:lgd.fixAllSolution"
     ],
     "main": "./dist/extension.js",
     "contributes": {
@@ -74,6 +79,32 @@
             {
                 "command": "lgd.invertIf",
                 "title": "Invert if statement to reduce christmas tree code.",
+                "category": "LGD"
+            },
+            {
+                "command": "lgd.fixAll",
+                "title": "Fix All\u2026",
+                "category": "LGD",
+                "icon": "$(wand)"
+            },
+            {
+                "command": "lgd.fixAllDocument",
+                "title": "Fix All in Document",
+                "category": "LGD"
+            },
+            {
+                "command": "lgd.fixAllFile",
+                "title": "Fix All in File",
+                "category": "LGD"
+            },
+            {
+                "command": "lgd.fixAllProject",
+                "title": "Fix All in Project",
+                "category": "LGD"
+            },
+            {
+                "command": "lgd.fixAllSolution",
+                "title": "Fix All in Solution / Workspace",
                 "category": "LGD"
             }
         ],
@@ -250,6 +281,28 @@
                     ".lgd"
                 ],
                 "configuration": "./language-configuration.json"
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "lgd.fixAll",
+                    "when": "resourceLangId == lgd",
+                    "group": "navigation"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "lgd.fixAll",
+                    "when": "resourceLangId == lgd",
+                    "group": "1_modification"
+                }
+            ]
+        },
+        "jsonValidation": [
+            {
+                "fileMatch": "**/.vscode/lgd.json",
+                "url": "./schemas/lgd.schema.json"
             }
         ]
     },

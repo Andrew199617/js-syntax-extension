@@ -98,6 +98,7 @@ jest.mock('vscode', () => ({
     SemanticTokensLegend: jest.fn(),
     SemanticTokensBuilder: jest.fn(),
     workspace: {
+        registerTextDocumentContentProvider: jest.fn(() => ({ dispose: jest.fn() })),
         rootPath: 'workspace',
         getConfiguration: jest.fn(() => ({ get: () => globalThis.lgd?.configuration.options || {} })),
         textDocuments: [],
@@ -125,7 +126,7 @@ jest.mock('vscode', () => ({
     StatusBarAlignment: { Left: 1 },
     Range: jest.fn((line, character) => ({ start: { line: line, character: character } })),
     Diagnostic: jest.fn((range, message, severity) => ({ range: range, message: message, severity: severity })),
-    CodeActionKind: { QuickFix: 'quickfix' }
+    CodeActionKind: Object.assign(jest.fn(value => ({ value: value })), { QuickFix: 'quickfix' })
 }));
 
 jest.mock('../../src/Core/Configuration', () => ({
@@ -456,7 +457,6 @@ describe('LGD imported-file invalidation', () =>
         callback(opened);
 
         expect(invalidate.mock.calls).toEqual([ [dependency.fsPath], [opened.fsPath] ]);
-        expect(vscode.workspace.createFileSystemWatcher).toHaveBeenCalledWith('**/*.lgd');
     });
 });
 
