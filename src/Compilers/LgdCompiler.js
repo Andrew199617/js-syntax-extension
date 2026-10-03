@@ -6,6 +6,7 @@ const LgdTypeChecker = require('./LgdTypeChecker');
 const LgdAssignmentChecker = require('./LgdAssignmentChecker');
 const LgdClassMemberSemantics = require('./LgdClassMemberSemantics');
 const LgdSourceMap = require('./LgdSourceMap');
+const LgdObjectInheritance = require('./LgdObjectInheritance');
 const LgdClassSyntax = require('./LgdClassSyntax');
 const LgdBaseChecker = require('./LgdBaseChecker');
 const LgdOverrideChecker = require('./LgdOverrideChecker');
@@ -270,6 +271,11 @@ const LgdCompiler = {
 
         found.sort((first, second) => first.headStart - second.headStart);
         this.collectMalformedErrors(masked, found, failedHeadStarts, errors);
+
+        for(const inheritanceError of LgdObjectInheritance.check(found))
+        {
+            errors.push({ ...this.createError(content, inheritanceError.offset, inheritanceError.message, inheritanceError.endOffset), ...inheritanceError });
+        }
 
         for(const contractError of LgdContractChecker.classify(content, found, externals))
         {

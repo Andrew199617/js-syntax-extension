@@ -18,6 +18,7 @@ const FileIO = require('./Logging/FileIO');
 const Document = require('./Core/Document');
 const RefactorProvider = require('./Refactor/RefactorProvider');
 const LgdLanguageService = require('./Lgd/LgdLanguageService');
+const createLgdDiagnostics = require('./Lgd/LgdDiagnostics');
 const { readOutputOptions } = require('./Lgd/LgdOutputConfiguration');
 const LgdHoverProvider = require('./Lgd/LgdHoverProvider');
 const LgdDefinitionProvider = require('./Lgd/LgdDefinitionProvider');
@@ -80,22 +81,34 @@ function getLgdErrors(result)
  */
 async function compileLgdDocument(document)
 {
-    const uri = document.uri || { fsPath: document.fileName };
+    const uri = document.uri || vscode.Uri.file(document.fileName);
     const snapshot = Document.create(document.fileName, document.getText(), uri);
-    const externals = await lgd.languageService.collectExternalTypes(snapshot);
-    const result = LgdCompiler.create().compileToJs(snapshot.getText(), externals, readOutputOptions(snapshot));
-    const errors = getLgdErrors(result);
-    if(errors.length > 0)
+    let result;
+    try
     {
-        StatusBarMessage.show(`LGD: ${errors.length} error(s), .js output not updated.`, StatusBarMessageTypes.ERROR);
+        const externals = await lgd.languageService.collectExternalTypes(snapshot);
+        result = LgdCompiler.create().compileToJs(snapshot.getText(), externals, readOutputOptions(snapshot));
+        lgd.lgdDiagnosticCollection.set(uri, createLgdDiagnostics(snapshot, result.errors));
+        const errors = getLgdErrors(result);
+        if(errors.length > 0)
+        {
+            StatusBarMessage.show(`LGD: ${errors.length} error(s), .js output not updated. See Problems.`, StatusBarMessageTypes.ERROR);
+            return result;
+        }
+
+        const parsedPath = path.parse(snapshot.fileName);
+        const jsPath = path.join(parsedPath.dir, `${parsedPath.name}.js`);
+        await FileIO.writeFileContents(jsPath, result.code);
         return result;
     }
-
-    const parsedPath = path.parse(snapshot.fileName);
-    const jsPath = path.join(parsedPath.dir, `${parsedPath.name}.js`);
-    await FileIO.writeFileContents(jsPath, result.code);
-
-    return result;
+    catch(error)
+    {
+        const failure = { offset: 0, endOffset: 0, code: 'lgd.output.failure', category: 'compilation',
+            message: `Unable to update output: ${error.message || String(error)}` };
+        lgd.lgdDiagnosticCollection.set(uri, createLgdDiagnostics(snapshot, [ ...result?.errors || [], failure ]));
+        StatusBarMessage.show('LGD: Unable to update output. See Problems.', StatusBarMessageTypes.ERROR);
+        throw error;
+    }
 }
 
 /**
@@ -106,6 +119,7 @@ async function compileLgdDocument(document)
 function reportLgdError(error)
 {
     console.error(error);
+    lgd.outputChannel?.appendLine(`LGD error: ${error.stack || error.message || String(error)}`);
 }
 
 /**

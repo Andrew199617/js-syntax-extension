@@ -4,6 +4,7 @@ const path = require('path');
 const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
+const LgdHoverProvider = require('../../../src/Lgd/LgdHoverProvider');
 
 /** @description Uri of the LGD document used across language service tests. */
 const LGD_URI = 'file:///workspace/examples/Calculator.lgd';
@@ -71,6 +72,23 @@ describe('LgdLanguageService', () =>
         expect(state.jsDocument.getText()).toContain('let value = 0;');
         expect(state.map).toBeTruthy();
         expect(state.jsDocument.getText()).toContain('//# lgd-source="/workspace/examples/Calculator.lgd"');
+    });
+
+    test('Reports unsupported inheritance while preserving the reported document mirror and unrelated hovers.', async () =>
+    {
+        const source = await fs.promises.readFile(path.join(__dirname, '../../fixtures/object-inheritance.lgd'), 'utf8');
+        const { service, setCalls } = createService();
+        const document = makeTextDocument(LGD_URI, source);
+        const state = await service.openDocument(document);
+        const provider = LgdHoverProvider.create(service);
+        expect(setCalls.at(-1).diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'inheritance' })]));
+        const fieldHover = await provider.provideHover(document, document.positionAt(source.indexOf('test =')));
+        expect(fieldHover.contents).toContain('Number GoToAssignment2.test');
+        vscode.commands.executeCommand.mockResolvedValue([{ contents: ['let assignmentIndex: number'] }]);
+        const position = document.positionAt(source.indexOf('assignmentIndex ='));
+        const hover = await provider.provideHover(document, position);
+        expect(hover.contents).toEqual(['let assignmentIndex: number']);
+        expect(vscode.commands.executeCommand).toHaveBeenCalledWith('vscode.executeHoverProvider', state.jsDocument.uri, service.toJsPosition(document.uri, position));
     });
 
     test('positions roundtrip between LGD source and compiled output', async () =>
@@ -206,13 +224,16 @@ describe('LgdLanguageService asynchronous lifecycle', () =>
         document.setText('String label = "ready";');
 
         await expect(service.updateDocument(document)).rejects.toThrow('JavaScript mirror');
+        await service.pendingUpdates.get(document.uri.toString());
+        expect(state.errors).toEqual([expect.objectContaining({ code: 'lgd.editor.failure' })]);
         expect(state.map).toBe(originalMap);
-        expect(setCalls).toHaveLength(1);
+        expect(setCalls).toHaveLength(2);
         expect(errors).toHaveLength(1);
 
         await service.updateDocument(document);
         expect(state.jsDocument.getText()).toContain('let label = "ready";');
-        expect(setCalls).toHaveLength(2);
+        expect(setCalls.at(-1).diagnostics).toEqual([]);
+        expect(state.errors).toEqual([]);
     });
 });
 

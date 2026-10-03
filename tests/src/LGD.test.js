@@ -120,6 +120,7 @@ jest.mock('vscode', () => ({
         showWarningMessage: jest.fn(),
         showInformationMessage: jest.fn()
     },
+    Uri: { file: filename => ({ scheme: 'file', fsPath: filename, toString: () => `file://${filename}` }) },
     DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2 },
     StatusBarAlignment: { Left: 1 },
     Range: jest.fn((line, character) => ({ start: { line: line, character: character } })),
@@ -566,6 +567,54 @@ describe('LGD compile on save', () =>
             getText: () => source
         });
     }
+
+    test('Saving the reported object inheritance shows Problems and preserves last-good output until repaired.', async () =>
+    {
+        const filename = path.join('workspace', 'reported.lgd');
+        fs.promises.readFile.mockRejectedValue(Object.assign(new Error('Missing sibling'), { code: 'ENOENT' }));
+        const source = await jest.requireActual('fs').promises.readFile(path.join(__dirname, '../fixtures/object-inheritance.lgd'), 'utf8');
+        const written = new Map();
+        FileIO.writeFileContents.mockImplementation((target, code) => Promise.resolve(written.set(target, code)));
+        saveLgdDocument(filename, 'const stable = 1;');
+        await nextTurn();
+        await nextTurn();
+        saveLgdDocument(filename, source);
+        await nextTurn();
+        await nextTurn();
+        expect(written.get(path.join('workspace', 'reported.js'))).toBe('const stable = 1;');
+        expect(lgd.lgdDiagnosticCollection.set.mock.calls.at(-1)[0].scheme).toBe('file');
+        expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
+        expect(getDiagnostics(filename)).toEqual(expect.arrayContaining([
+            expect.objectContaining({ code: 'inheritance', message: expect.stringContaining('class GoToAssignment : BaseClass') }),
+            expect.objectContaining({ message: 'Use GoToAssignment2(...) for the constructor.' })
+        ]));
+        const repaired = source.replace('constructor()', 'GoToAssignment2()').replace(' * @extends {BaseCommandType}', ' * Uses the BaseCommand lifecycle.');
+        saveLgdDocument(filename, repaired);
+        await nextTurn();
+        await nextTurn();
+        expect(FileIO.writeFileContents).toHaveBeenCalledTimes(2);
+        expect(getDiagnostics(filename)).toEqual([]);
+    });
+
+    test.each([ 'write', 'dependencies' ])('Saving reports unexpected %s failures in Problems.', async operation =>
+    {
+        const filename = path.join('workspace', 'failed.lgd');
+        if(operation === 'write')
+        {
+            FileIO.writeFileContents.mockRejectedValueOnce(new Error('Access denied'));
+        }
+        else
+        {
+            jest.spyOn(lgd.languageService, 'collectExternalTypes').mockRejectedValueOnce(new Error('Dependency read failed'));
+        }
+
+        saveLgdDocument(filename, 'Number count = 1;');
+        await nextTurn();
+        await nextTurn();
+        expect(getDiagnostics(filename)).toEqual([expect.objectContaining({ code: 'compilation', message: expect.stringContaining('Unable to update output:') })]);
+        expect(getOutput()).toContain('LGD error:');
+        expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+    });
 
     test.each([ 'Number = ;', 'void log() {}' ])('saving LGD with errors leaves the previous .js output untouched: %s', async source =>
     {

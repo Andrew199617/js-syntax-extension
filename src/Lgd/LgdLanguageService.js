@@ -3,6 +3,7 @@ const path = require('path');
 const LgdExportCache = require('./LgdExportCache');
 const { getContractMetadata, getTypedMembers, getInterfaceMembers, getRuntimeMembers, filterThisMembers, filterDeclaredMembers } = require('./LgdContractEditor');
 const createLgdDiagnostics = require('./LgdDiagnostics');
+const settleEditorUpdate = require('./LgdEditorFailures');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
 const { maskCode } = require('../Compilers/LgdInfer');
@@ -77,7 +78,7 @@ const LgdLanguageService = {
         const key = document.uri.toString();
         const pending = this.pendingUpdates.get(key) || Promise.resolve();
         const next = this.applyUpdate(document, this.states.get(key), { pending: pending, refreshDependents: refreshDependents });
-        this.pendingUpdates.set(key, this.trackSettled(next));
+        this.pendingUpdates.set(key, this.trackSettled(next, document));
         return next;
     },
 
@@ -107,22 +108,8 @@ const LgdLanguageService = {
         return result;
     },
 
-    /**
-     * @description Observes an update promise so the serialized chain continues after failures.
-     * @param {Promise<Object|null>} promise the update promise.
-     * @returns {Promise<void>} always resolves.
-     */
-    async trackSettled(promise)
-    {
-        try
-        {
-            await promise;
-        }
-        catch(error)
-        {
-            this.onError(error);
-        }
-    },
+    /** @description Reports rejected document or dependency updates while allowing later updates to run. */
+    trackSettled(promise, document) { return settleEditorUpdate(this, promise, document); },
 
     /**
      * @description Drops an LGD document and clears its diagnostics.
