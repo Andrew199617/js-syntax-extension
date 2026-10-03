@@ -83,7 +83,7 @@
             },
             {
                 "command": "lgd.fixAll",
-                "title": "Fix All\u2026",
+                "title": "Fix All…",
                 "category": "LGD",
                 "icon": "$(wand)"
             },
@@ -311,6 +311,7 @@
         "@babel/traverse": "^7.25.9",
         "@mavega/oloo": "^2.3.0",
         "globals": "^15.12.0",
+        "js-yaml": "^4.3.2",
         "path-browserify": "^1.0.1"
     },
     "devDependencies": {
