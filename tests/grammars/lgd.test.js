@@ -200,6 +200,47 @@ describe('LGD TextMate grammar.', () =>
         assert.ok(tokens.every(token => !token.scopes.includes(LgdKeywordFamilies.families.expression.scope)));
     });
 
+    test('preserves receiver scopes for this before semantic tokens arrive', () =>
+    {
+        const source = [
+            'class Counter {',
+            '    Counter() { this.current = 0; }',
+            '    read() { if (this.current) return this.current; return this; }',
+            '}',
+            'const holder = {',
+            '    read() { return this.current; },',
+            '    update(value) { this.current = value; },',
+            '    capture() { return () => this; }',
+            '};'
+        ].join('\n');
+        const tokens = tokenize(grammar, source);
+        const receivers = tokens.filter(token => token.text === 'this');
+        assert.strictEqual(receivers.length, source.match(/\bthis\b/g).length);
+        assert.ok(receivers.every(token => token.scopes.includes('variable.language.this.js')));
+        for(const word of [ 'if', 'return' ])
+        {
+            assertPartialScope(tokens, word, 'keyword.control');
+            assertNoScope(tokens, word, 'variable.language.this.js');
+        }
+    });
+
+    test('leaves this member names, strings, and comments outside receiver scopes', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'const holder = { this: 1 }; holder.this;',
+            'const methods = { this() {} }; methods.this();',
+            'const text = "this";',
+            'const template = `this`;',
+            'const pattern = /this/;',
+            '// this',
+            '/* this */'
+        ].join('\n'));
+        for(const token of tokens)
+        {
+            assert.ok(token.scopes.every(scope => !scope.startsWith('variable.language')));
+        }
+    });
+
     test('Highlights explicit return types separately from named methods.', () =>
     {
         const tokens = tokenize(grammar, 'class Counter {\n    Number count() { return 1; }\n    async void reset() {}\n}');

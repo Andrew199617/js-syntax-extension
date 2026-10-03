@@ -164,7 +164,7 @@
             },
             {
                 "id": "lgdExpressionKeyword",
-                "description": "An LGD base receiver or constructor initializer keyword."
+                "description": "An LGD this/base receiver or base constructor initializer keyword."
             }
         ],
         "semanticTokenScopes": [

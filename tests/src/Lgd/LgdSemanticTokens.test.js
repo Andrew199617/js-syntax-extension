@@ -238,6 +238,31 @@ describe('LgdSemanticTokensProvider', () =>
         expect(tokens.pushed.some(token => token.tokenType === 'lgdTypeKeyword')).toBe(false);
     });
 
+    test('gives this receivers in class and object methods the expression family', async () =>
+    {
+        const source = [
+            'class Counter {',
+            '    Counter() { this.current = 0; }',
+            '    read() { if (this.current) return this.current; return this; }',
+            '}',
+            'const holder = {',
+            '    read() { return this.current; },',
+            '    update(value) { this.current = value; },',
+            '    capture() { return () => this; }',
+            '};'
+        ].join('\n');
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const receivers = tokens.pushed.filter(token => tokenText(document, token) === 'this');
+        expect(receivers.map(token => document.offsetAt(token.range.start)))
+            .toEqual(Array.from(source.matchAll(/\bthis\b/g), match => match.index));
+        expect(receivers.every(token => token.tokenType === 'lgdExpressionKeyword')).toBe(true);
+        const controls = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        expect(controls).toEqual([ 'if', 'return', 'return', 'return', 'return' ]);
+    });
+
     test.each([ 'with', 'assert' ])('recognizes the existing JavaScript import %s clause as contextual syntax', async keyword =>
     {
         const source = `import settings from "settings.json" ${keyword} { type: "json" };`;
@@ -334,14 +359,14 @@ describe('LgdSemanticTokensProvider', () =>
     test('does not turn contextual identifiers, property names, literal values, or comment text into keywords', async () =>
     {
         const source = [
-            'const words = { class: 1, new: 1, async: 1, await: 1, void: 1, return: 1, virtual: 1, override: 1, readonly: 1, public: 1, sealed: 1, static: 1, as: 1 };',
+            'const words = { class: 1, new: 1, async: 1, await: 1, void: 1, return: 1, virtual: 1, override: 1, readonly: 1, public: 1, sealed: 1, static: 1, as: 1, this: 1 };',
             'const async = words.async, from = words.as, virtual = words.virtual;',
             'const base = { run() {}, base() {} }; base.run(); base.base();',
-            'words.class; words.new; words.return; words.await; words.public; words.sealed; words.static;',
-            'const methods = { async() {}, get() {}, set() {} };',
-            'const text = "class virtual new async await void return base";',
-            'const template = `readonly override await base`; // class async return base',
-            'const pattern = /class|return|await|base/;',
+            'words.class; words.new; words.return; words.await; words.public; words.sealed; words.static; words.this; words . this;',
+            'const methods = { async() {}, get() {}, set() {}, this() {} }; methods.this();',
+            'const text = "class virtual new async await void return base this";',
+            'const template = `readonly override await base this`; // class async return base this',
+            'const pattern = /class|return|await|base|this/;',
             'const literals = [true, false, null];'
         ].join('\n');
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
