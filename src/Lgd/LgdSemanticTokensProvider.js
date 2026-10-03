@@ -2,11 +2,12 @@ const vscode = require('vscode');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const { maskCode } = require('../Compilers/LgdInfer');
+const LgdKeywordFamilies = require('./LgdKeywordFamilies');
 
 /** @import { CancellationToken, SemanticTokens, TextDocument } from 'vscode' */
 
 /**
- * @description Provides standard type, parameter, and keyword semantic roles for LGD documents.
+ * @description Provides type, parameter, and theme-controlled keyword families for LGD documents.
  * Type references use the theme's class color. The TextMate grammar already colors the eight type
  * keywords in declaration position; this provider covers the spots it cannot see:
  * typed parameter types like vscode.TextDocument and JSDoc type tags like
@@ -14,8 +15,8 @@ const { maskCode } = require('../Compilers/LgdInfer');
  * @type {LgdSemanticTokensProviderType}
  */
 const LgdSemanticTokensProvider = {
-    /** @description Uses standard theme roles for types, parameters, and language keywords. */
-    legend: new vscode.SemanticTokensLegend([ 'class', 'parameter', 'keyword' ], []),
+    /** @description Keeps symbol roles standard and maps distinct keyword families through contributed theme scopes. */
+    legend: new vscode.SemanticTokensLegend([ 'class', 'parameter', ...LgdKeywordFamilies.tokenTypes ], []),
 
     /**
      * @description Creates a semantic tokens provider bound to the LGD language service.
@@ -94,7 +95,7 @@ const LgdSemanticTokensProvider = {
                 if(group.returnTypeName === 'void')
                 {
                     spans.push({ start: declaration.initializerStart + group.returnTypeStart,
-                        end: declaration.initializerStart + group.returnTypeEnd, tokenType: 'keyword' });
+                        end: declaration.initializerStart + group.returnTypeEnd, tokenType: LgdKeywordFamilies.get('void').tokenType });
                 }
             }
         }
@@ -110,11 +111,11 @@ const LgdSemanticTokensProvider = {
     {
         for(const declaration of declarations)
         {
-            const prefix = source.slice(declaration.headStart, declaration.typeStart);
+            const prefix = maskCode(source.slice(declaration.headStart, declaration.typeStart));
             for(const match of prefix.matchAll(/\b(?:export|readonly|abstract)\b/g))
             {
                 const start = declaration.headStart + match.index;
-                spans.push({ start: start, end: start + match[0].length, tokenType: 'keyword' });
+                spans.push({ start: start, end: start + match[0].length, tokenType: LgdKeywordFamilies.get(match[0]).tokenType });
             }
 
             if(declaration.kind !== 'class' && declaration.kind !== 'interface')
@@ -122,12 +123,14 @@ const LgdSemanticTokensProvider = {
                 continue;
             }
 
-            spans.push({ start: declaration.typeStart, end: declaration.typeStart + declaration.kind.length, tokenType: 'keyword' });
+            spans.push({ start: declaration.typeStart, end: declaration.typeStart + declaration.kind.length,
+                tokenType: LgdKeywordFamilies.get(declaration.kind).tokenType });
             for(const member of declaration.classMembers)
             {
                 for(const modifier of member.modifierSpans || [])
                 {
-                    spans.push({ ...modifier, tokenType: 'keyword' });
+                    const word = source.slice(modifier.start, modifier.end);
+                    spans.push({ ...modifier, tokenType: LgdKeywordFamilies.get(word).tokenType });
                 }
 
                 if(member.abstract && member.kind === 'property')
@@ -233,7 +236,16 @@ const LgdSemanticTokensProvider = {
             const syntaxWord = token.type.label === 'name' && contextual.has(token.value);
             if((reserved || syntaxWord) && !identifiers.has(token.start) && !literals.has(reserved))
             {
-                this.appendMappedSpan(context, token.start, token.end, 'keyword');
+                const word = reserved || token.value;
+                let family = LgdKeywordFamilies.get(word);
+
+                // Native JavaScript void is an operator; LGD return annotations are collected separately.
+                if(word === 'void')
+                {
+                    family = LgdKeywordFamilies.families.control;
+                }
+
+                this.appendMappedSpan(context, token.start, token.end, family.tokenType);
             }
         }
     },

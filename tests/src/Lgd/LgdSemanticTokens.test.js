@@ -3,6 +3,10 @@ const manifest = require('../../../package.json');
 const { makeTextDocument } = require('./fakeVscode');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
 const LgdSemanticTokensProvider = require('../../../src/Lgd/LgdSemanticTokensProvider');
+const LgdKeywordFamilies = require('../../../src/Lgd/LgdKeywordFamilies');
+
+/** @description Keyword roles independently expected from the extension's semantic legend. */
+const keywordTypes = [ 'keyword', 'lgdDeclarationKeyword', 'lgdModifierKeyword', 'lgdTypeKeyword' ];
 
 /** @description Uri of the LGD document used across semantic token tests. */
 const LGD_URI = 'file:///workspace/Typed.lgd';
@@ -100,14 +104,16 @@ describe('LgdSemanticTokensProvider', () =>
         expect(tokens.pushed.map(token => tokenText(document, token))).toEqual([ 'class', 'Counter', 'Number', 'return', 'void' ]);
     });
 
-    test('groups void with async as keywords rather than class/type tokens', async () =>
+    test('separates declaration, modifier, and void families from control flow', async () =>
     {
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
         const document = makeTextDocument(LGD_URI, 'class Command { async void execute() {} void reset() {} }');
         await service.openDocument(document);
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
-        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        const keywords = tokens.pushed.filter(token => keywordTypes.includes(token.tokenType)).map(token => tokenText(document, token));
         expect(keywords).toEqual([ 'class', 'async', 'void', 'void' ]);
+        expect(tokens.pushed.filter(token => keywordTypes.includes(token.tokenType)).map(token => token.tokenType))
+            .toEqual([ 'lgdDeclarationKeyword', 'lgdModifierKeyword', 'lgdTypeKeyword', 'lgdTypeKeyword' ]);
         expect(tokens.pushed.filter(token => token.tokenType === 'class').map(token => tokenText(document, token))).toEqual(['Command']);
     });
 
@@ -156,7 +162,7 @@ describe('LgdSemanticTokensProvider', () =>
         expect(offsets).toEqual(Array.from(source.matchAll(/commandName/g), match => match.index));
     });
 
-    test('uses one keyword role for declarations, control flow, operators, modules, and contextual syntax', async () =>
+    test('keeps native keyword coverage while separating declaration and modifier families', async () =>
     {
         const source = [
             'import fallback, { item as renamed } from "module";',
@@ -180,7 +186,7 @@ describe('LgdSemanticTokensProvider', () =>
         const document = makeTextDocument(LGD_URI, source);
         await service.openDocument(document);
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
-        const keywords = new Set(tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token)));
+        const keywords = new Set(tokens.pushed.filter(token => keywordTypes.includes(token.tokenType)).map(token => tokenText(document, token)));
         const expected = [ 'import',
             'as',
             'from',
@@ -223,6 +229,13 @@ describe('LgdSemanticTokensProvider', () =>
             'super',
             'instanceof' ];
         expect([...keywords].sort()).toEqual(expected.sort());
+        const declarations = tokens.pushed.filter(token => token.tokenType === 'lgdDeclarationKeyword');
+        expect([...new Set(declarations.map(token => tokenText(document, token)))].sort()).toEqual([ 'class', 'const', 'function', 'let', 'var' ]);
+        const modifiers = tokens.pushed.filter(token => token.tokenType === 'lgdModifierKeyword');
+        expect([...new Set(modifiers.map(token => tokenText(document, token)))].sort()).toEqual([ 'async', 'extends', 'static' ]);
+        const control = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        expect(control).toEqual(expect.arrayContaining([ 'return', 'if', 'else', 'throw', 'void' ]));
+        expect(tokens.pushed.some(token => token.tokenType === 'lgdTypeKeyword')).toBe(false);
     });
 
     test.each([ 'with', 'assert' ])('recognizes the existing JavaScript import %s clause as contextual syntax', async keyword =>
@@ -232,7 +245,7 @@ describe('LgdSemanticTokensProvider', () =>
         const document = makeTextDocument(LGD_URI, source);
         await service.openDocument(document);
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
-        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        const keywords = tokens.pushed.filter(token => keywordTypes.includes(token.tokenType)).map(token => tokenText(document, token));
         expect(keywords).toEqual([ 'import', 'from', keyword ]);
     });
 
@@ -243,8 +256,9 @@ describe('LgdSemanticTokensProvider', () =>
         const document = makeTextDocument(LGD_URI, source);
         await service.openDocument(document);
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
-        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        const keywords = tokens.pushed.filter(token => keywordTypes.includes(token.tokenType)).map(token => tokenText(document, token));
         expect(keywords).toEqual([ 'async', 'function', 'await', 'using', 'const' ]);
+        expect(tokens.pushed.map(token => token.tokenType)).toEqual([ 'lgdModifierKeyword', 'lgdDeclarationKeyword', 'keyword', 'lgdDeclarationKeyword', 'lgdDeclarationKeyword' ]);
     });
 
     test('restores erased LGD declaration and method keywords from their parsed source spans', async () =>
@@ -262,7 +276,7 @@ describe('LgdSemanticTokensProvider', () =>
         const state = await service.openDocument(document);
         expect(state.errors).toEqual([]);
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
-        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        const keywords = tokens.pushed.filter(token => keywordTypes.includes(token.tokenType)).map(token => tokenText(document, token));
         expect(keywords).toEqual([ 'export',
             'readonly',
             'class',
@@ -277,14 +291,20 @@ describe('LgdSemanticTokensProvider', () =>
             'void',
             'await',
             'base' ]);
+        const declarations = tokens.pushed.filter(token => token.tokenType === 'lgdDeclarationKeyword');
+        expect(declarations.map(token => tokenText(document, token))).toEqual([ 'class', 'class' ]);
+        const modifiers = tokens.pushed.filter(token => token.tokenType === 'lgdModifierKeyword');
+        expect(modifiers.map(token => tokenText(document, token))).toEqual([ 'readonly', 'virtual', 'async', 'override', 'async' ]);
+        const builtins = tokens.pushed.filter(token => token.tokenType === 'lgdTypeKeyword');
+        expect(builtins.map(token => tokenText(document, token))).toEqual([ 'void', 'void' ]);
     });
 
     test('does not turn contextual identifiers, property names, literal values, or comment text into keywords', async () =>
     {
         const source = [
-            'const words = { class: 1, new: 1, async: 1, await: 1, void: 1, return: 1, virtual: 1, override: 1, readonly: 1, as: 1 };',
+            'const words = { class: 1, new: 1, async: 1, await: 1, void: 1, return: 1, virtual: 1, override: 1, readonly: 1, public: 1, sealed: 1, static: 1, as: 1 };',
             'const async = words.async, from = words.as, virtual = words.virtual;',
-            'words.class; words.new; words.return; words.await;',
+            'words.class; words.new; words.return; words.await; words.public; words.sealed; words.static;',
             'const methods = { async() {}, get() {}, set() {} };',
             'const text = "class virtual new async await void return";',
             'const template = `readonly override await`; // class async return',
@@ -295,9 +315,33 @@ describe('LgdSemanticTokensProvider', () =>
         const document = makeTextDocument(LGD_URI, source);
         await service.openDocument(document);
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
-        const keywords = tokens.pushed.filter(token => token.tokenType === 'keyword').map(token => tokenText(document, token));
+        const keywords = tokens.pushed.filter(token => keywordTypes.includes(token.tokenType)).map(token => tokenText(document, token));
         expect(keywords.every(word => word === 'const')).toBe(true);
         expect(keywords).toHaveLength(source.split('const ').length - 1);
+    });
+
+    test('masks erased declaration prefix comments before assigning keyword families', () =>
+    {
+        const source = 'export /* readonly abstract */ readonly Number total = 1;';
+        const spans = [];
+        const declaration = { headStart: 0, typeStart: source.indexOf('Number'), kind: 'variable' };
+        LgdSemanticTokensProvider.collectErasedKeywords(source, [declaration], spans);
+        expect(spans.map(span => ({ text: source.slice(span.start, span.end), type: span.tokenType })))
+            .toEqual([ { text: 'export', type: 'keyword' }, { text: 'readonly', type: 'lgdModifierKeyword' } ]);
+    });
+
+    test('registers family fallback scopes without forcing theme colors or keyword inheritance', () =>
+    {
+        const contribution = manifest.contributes.semanticTokenScopes.find(entry => entry.language === 'lgd');
+        for(const family of Object.values(LgdKeywordFamilies.families))
+        {
+            expect(contribution.scopes[family.tokenType]).toEqual([family.scope]);
+            expect(LgdSemanticTokensProvider.legend.tokenTypes).toContain(family.tokenType);
+        }
+
+        expect(manifest.contributes.semanticTokenTypes.map(entry => entry.id)).toEqual(keywordTypes.slice(1));
+        expect(manifest.contributes.semanticTokenTypes.every(entry => entry.superType === undefined)).toBe(true);
+        expect(manifest.contributes.configurationDefaults['editor.semanticTokenColorCustomizations']).toBeUndefined();
     });
 
     test('returns null when the document is not open.', async () =>

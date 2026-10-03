@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const textmate = require('vscode-textmate');
 const oniguruma = require('vscode-oniguruma');
+const LgdKeywordFamilies = require('../../src/Lgd/LgdKeywordFamilies');
 
 // Repository root containing the syntax grammars.
 const root = path.resolve(__dirname, '../..');
@@ -17,7 +18,7 @@ const typeScope = 'storage.type.lgd';
 const nameScope = 'variable.other.definition.lgd';
 
 // Scope the LGD grammar assigns to the readonly modifier.
-const readonlyScope = 'keyword.control.lgd';
+const readonlyScope = LgdKeywordFamilies.families.modifier.scope;
 
 // Scope the LGD grammar assigns to the export modifier.
 const exportScope = 'keyword.control.lgd';
@@ -152,7 +153,7 @@ describe('LGD TextMate grammar.', () =>
     {
         const tokens = tokenize(grammar, 'class Counter {\n    Number count() { return 1; }\n    async void reset() {}\n}');
         assertScope(tokens, 'Number', typeScope);
-        assertScope(tokens, 'void', 'keyword.control.lgd');
+        assertScope(tokens, 'void', LgdKeywordFamilies.families.builtin.scope);
         assertScope(tokens, 'count', 'entity.name.function.js');
         assertScope(tokens, 'reset', 'entity.name.function.js');
         assertNoScope(tokens, 'count', nameScope);
@@ -180,7 +181,7 @@ describe('LGD TextMate grammar.', () =>
         }
     });
 
-    test('groups LGD declaration and modifier words as keywords while keeping types distinct', () =>
+    test('uses distinct declaration, modifier, and builtin keyword families while keeping type names distinct', () =>
     {
         const tokens = tokenize(grammar, [
             'export readonly Number total = 1;',
@@ -193,13 +194,55 @@ describe('LGD TextMate grammar.', () =>
         ].join('\n'));
         for(const word of [ 'export', 'readonly', 'class', 'virtual', 'override', 'async', 'void' ])
         {
-            assertScope(tokens, word, 'keyword.control.lgd');
+            assertScope(tokens, word, LgdKeywordFamilies.get(word).scope);
         }
 
         assertScope(tokens, 'Number', typeScope);
         assertScope(tokens, 'String', typeScope);
         assertScope(tokens, 'Base', 'entity.name.type.class.lgd');
         assertNoScope(tokens, 'title', 'keyword.control.lgd');
+    });
+
+    test('gives contextual public and sealed declaration heads modifier scopes without changing compiler support', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'public sealed class Command {',
+            '    public static async void execute() { if(ready) return; else throw new Error(); }',
+            '}'
+        ].join('\n'));
+        for(const word of [ 'public', 'sealed', 'static', 'async' ])
+        {
+            assertScope(tokens, word, readonlyScope);
+        }
+
+        assertScope(tokens, 'class', LgdKeywordFamilies.families.declaration.scope);
+        assertScope(tokens, 'void', LgdKeywordFamilies.families.builtin.scope);
+        assertScope(tokens, 'Command', 'entity.name.type.class.lgd');
+        for(const word of [ 'if', 'return', 'else', 'throw' ])
+        {
+            assertPartialScope(tokens, word, 'keyword.control');
+            assertNoScope(tokens, word, readonlyScope);
+        }
+    });
+
+    test('preserves keyword-like member names, identifiers, and literal text', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'const public = 1, sealed = 2, virtual = 3;',
+            'const words = { public() {}, sealed() {}, async() {}, static() {} };',
+            'words.public(); words.sealed(); words.virtual(); words.async(); words.static();',
+            'const text = "public sealed class Fake { async void run() {} }";',
+            'const template = `public sealed class Fake { async void run() {} }`;',
+            '// public sealed class Fake { async void run() {} }',
+            '/* public sealed class Fake { async void run() {} } */'
+        ].join('\n'));
+        for(const word of [ 'public', 'sealed', 'virtual', 'async', 'static' ])
+        {
+            assertNoScope(tokens, word, readonlyScope);
+        }
+
+        assert.ok(tokens.every(token => !token.scopes.includes('entity.name.type.class.lgd')));
+        assert.ok(tokens.every(token => !token.scopes.includes(LgdKeywordFamilies.families.builtin.scope)));
     });
 
     test('Does not highlight class-looking comments or strings as class declarations.', () =>
@@ -219,9 +262,9 @@ describe('LGD TextMate grammar.', () =>
             '    async override String describe(Number count) { return String(count); }',
             '}'
         ].join('\n'));
-        assertScope(tokens, 'virtual', 'keyword.control.lgd');
-        assertScope(tokens, 'override', 'keyword.control.lgd');
-        assertScope(tokens, 'void', 'keyword.control.lgd');
+        assertScope(tokens, 'virtual', readonlyScope);
+        assertScope(tokens, 'override', readonlyScope);
+        assertScope(tokens, 'void', LgdKeywordFamilies.families.builtin.scope);
         assertScope(tokens, 'String', typeScope);
         assertScope(tokens, 'executeCommand', 'entity.name.function.js');
         assertScope(tokens, 'describe', 'entity.name.function.js');

@@ -62,7 +62,7 @@
 					"name": "keyword.control.lgd"
 				},
 				"5": {
-					"name": "keyword.control.lgd"
+					"name": "storage.modifier.lgd"
 				},
 				"6": {
 					"name": "storage.type.lgd"
@@ -83,17 +83,22 @@
 		},
 		"class-declaration": {
 			"name": "meta.class.lgd",
-			"comment": "LGD class names and colon-style bases use theme class scopes; semantic tokens distinguish same-name constructors from methods.",
-			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?(?:(abstract)[ \\t]+)?(class|interface)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
+			"comment": "Declaration/modifier scopes also cover contextual public/sealed headers without enabling unsupported compiler syntax.",
+			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?((?:(?:abstract|sealed|public|protected|private|static)[ \\t]+)*)(class|interface)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
 			"beginCaptures": {
 				"2": {
 					"name": "keyword.control.lgd"
 				},
 				"3": {
-					"name": "keyword.control.lgd"
+					"patterns": [
+						{
+							"match": "\\b(?:abstract|sealed|public|protected|private|static)\\b",
+							"name": "storage.modifier.lgd"
+						}
+					]
 				},
 				"4": {
-					"name": "keyword.control.lgd"
+					"name": "storage.type.lgd"
 				},
 				"5": {
 					"name": "entity.name.type.class.lgd"
@@ -120,10 +125,10 @@
 			"match": "[ \\t]*\\b(?:(async)[ \\t]+)?(?:(void)|((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*))(?=[ \\t]+[$_a-zA-Z][\\w$]*[ \\t]*\\()",
 			"captures": {
 				"1": {
-					"name": "keyword.control.lgd"
+					"name": "storage.modifier.lgd"
 				},
 				"2": {
-					"name": "keyword.control.lgd"
+					"name": "keyword.type.lgd"
 				},
 				"3": {
 					"name": "storage.type.lgd"
@@ -140,11 +145,11 @@
 			}
 		},
 		"method-modifier": {
-			"comment": "Compile-only virtual and override modifiers; leave the signature to native method and LGD type rules.",
-			"match": "\\b(abstract|virtual|override)\\b(?=[ \\t]+(?:async[ \\t]+)?(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
+			"comment": "Contextual declaration modifiers are theme roles only; compiler support is unchanged.",
+			"match": "(?<![\\w$.])\\b(abstract|virtual|override|public|protected|private|sealed|static|async|readonly)\\b(?=[ \\t]+(?:(?:abstract|virtual|override|public|protected|private|sealed|static|async|readonly)[ \\t]+)*(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
 			"captures": {
 				"1": {
-					"name": "keyword.control.lgd"
+					"name": "storage.modifier.lgd"
 				}
 			}
 		}

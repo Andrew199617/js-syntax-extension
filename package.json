@@ -149,6 +149,39 @@
                 "editor.semanticHighlighting.enabled": true
             }
         },
+        "semanticTokenTypes": [
+            {
+                "id": "lgdDeclarationKeyword",
+                "description": "An LGD declaration keyword, distinct from control flow."
+            },
+            {
+                "id": "lgdModifierKeyword",
+                "description": "An LGD declaration or member modifier."
+            },
+            {
+                "id": "lgdTypeKeyword",
+                "description": "The LGD void return-type keyword."
+            }
+        ],
+        "semanticTokenScopes": [
+            {
+                "language": "lgd",
+                "scopes": {
+                    "keyword": [
+                        "keyword.control.lgd"
+                    ],
+                    "lgdDeclarationKeyword": [
+                        "storage.type.lgd"
+                    ],
+                    "lgdModifierKeyword": [
+                        "storage.modifier.lgd"
+                    ],
+                    "lgdTypeKeyword": [
+                        "keyword.type.lgd"
+                    ]
+                }
+            }
+        ],
         "grammars": [
             {
                 "scopeName": "source.lgd.jsdoc-import",
