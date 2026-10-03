@@ -274,6 +274,12 @@ describe('LgdHoverProvider typed function parameters', () =>
         expect(summary.params).toEqual([]);
     });
 
+    test('renders immutable LGD signatures with const instead of the legacy local modifier', () =>
+    {
+        const summary = { name: 'record', typeName: 'Function', readonly: true, members: [], params: [{ name: 'value', typeName: 'Number' }] };
+        expect(LgdHoverProvider.renderTypeSummary(summary)).toContain('const record: Function(Number value)');
+    });
+
     test('renders the typed signature as LGD hover markdown', async () =>
     {
         const { service, document } = await openTypedDocument();

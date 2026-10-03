@@ -15,20 +15,20 @@ function fixture(overrides = {})
 {
     const source = [
         'const { Oloo } = require("@mavega/oloo");',
-        'readonly Object Base = require("./Base");',
+        'const Object Base = require("./Base");',
         '/**',
         ' * @description Child documentation.',
         ' * @extends {BaseType}',
         ' */',
-        'readonly Object Child = {',
+        'const Object Child = {',
         '    /** @description Creates the child. */',
         '    create() {',
-        '        readonly Object child = Oloo.assign(Base.create("title"), Child);',
+        '        const Object child = Oloo.assign(Base.create("title"), Child);',
         '        return child;',
         '    },',
         '    /** @description Preserves the body. */',
         '    async run() {',
-        '        readonly Number count = 2;',
+        '        const Number count = 2;',
         '        return count;',
         '    }',
         '};',
@@ -100,7 +100,7 @@ describe('legacy object inheritance conversion', () =>
         expect(proposal).not.toBeNull();
         expect(proposal.newText).toContain('class Child : Base {');
         expect(proposal.newText).toContain('Child() : base("title") {}');
-        expect(proposal.newText).toContain('readonly Number count = 2;');
+        expect(proposal.newText).toContain('const Number count = 2;');
         expect(proposal.newText).toContain('@description Child documentation.');
         expect(proposal.newText).toContain('@description Creates the child.');
         const source = example.context.source.text;
@@ -117,8 +117,8 @@ describe('legacy object inheritance conversion', () =>
     {
         const original = fixture();
         const source = original.context.source.text.replace(
-            'readonly Number count = 2;',
-            'this.history.push(this.title);\r\n        readonly Number count = this.history.length;'
+            'const Number count = 2;',
+            'this.history.push(this.title);\r\n        const Number count = this.history.length;'
         );
         const baseSource = [
             '/** @type {BaseType} */',
@@ -357,7 +357,7 @@ describe('legacy object inheritance conversion', () =>
 
     test.each([
         [ 'return child;', 'throw child;' ],
-        [ 'readonly Object Child =', 'Object Child =' ],
+        [ 'const Object Child =', 'Object Child =' ],
         [ '* @extends {BaseType}', '* @extends {BaseType}\n * @augments {OtherType}' ]
     ])('rejects an unsafe lifecycle or declaration change: %s', async (before, after) =>
     {
@@ -369,7 +369,7 @@ describe('legacy object inheritance conversion', () =>
     test('does not introduce an eager reference to a base declared after the object', async () =>
     {
         const original = fixture();
-        const imported = 'readonly Object Base = require("./Base");';
+        const imported = 'const Object Base = require("./Base");';
         const source = `${original.context.source.text.replace(imported, '')}\r\n${imported}`;
         const example = fixture({ source: source });
         expect(await new ConvertObjectInheritanceFix().create(example.context, example.fix)).toBeNull();

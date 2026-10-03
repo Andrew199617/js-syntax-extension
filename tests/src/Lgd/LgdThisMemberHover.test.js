@@ -8,9 +8,9 @@ const LGD_URI = 'file:///workspace/BaseCommand.lgd';
 
 /** @description LGD source mirroring the OLOO builder pattern in BaseCommand.lgd. */
 const LGD_TEXT = [
-    'readonly Object BaseCommand = {',
+    'const Object BaseCommand = {',
     '    create(String commandName, String title) {',
-    '        readonly Object baseCommand = Object.create(BaseCommand);',
+    '        const Object baseCommand = Object.create(BaseCommand);',
     '',
     '        /** @type {vscode.Command} */',
     '        baseCommand.command = {',

@@ -112,7 +112,7 @@ const LgdSemanticTokensProvider = {
         for(const declaration of declarations)
         {
             const prefix = maskCode(source.slice(declaration.headStart, declaration.typeStart));
-            for(const match of prefix.matchAll(/\b(?:export|readonly|abstract)\b/g))
+            for(const match of prefix.matchAll(/\b(?:export|const|readonly|abstract)\b/g))
             {
                 const start = declaration.headStart + match.index;
                 spans.push({ start: start, end: start + match[0].length, tokenType: LgdKeywordFamilies.get(match[0]).tokenType });

@@ -1,3 +1,4 @@
+const ReplaceReadonlyLocalFix = require('./ReplaceReadonlyLocalFix');
 const ConvertObjectInheritanceFix = require('./ConvertObjectInheritanceFix');
 const ChangeParameterAndReturnTypeFix = require('./ChangeParameterAndReturnTypeFix');
 const ChangeReturnTypeFix = require('./ChangeReturnTypeFix');
@@ -11,7 +12,8 @@ const MoveVirtualModifierFix = require('./MoveVirtualModifierFix');
 /** @description Creates the diagnostic strategy registry; future fixes register one isolated handler here. */
 function createQuickFixRegistry()
 {
-    const handlers = [ new ConvertObjectInheritanceFix(),
+    const handlers = [ new ReplaceReadonlyLocalFix(),
+        new ConvertObjectInheritanceFix(),
         new AddOverrideFix(),
         new MakeBaseVirtualFix(),
         new RemoveExtraBaseArgumentsFix(),

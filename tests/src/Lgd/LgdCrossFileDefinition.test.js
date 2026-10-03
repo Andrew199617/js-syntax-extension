@@ -8,7 +8,7 @@ const LgdDefinitionProvider = require('../../../src/Lgd/LgdDefinitionProvider');
 const LgdReferenceProvider = require('../../../src/Lgd/LgdReferenceProvider');
 
 /** @description An exported LGD declaration with a comment before its source name. */
-const exportedText = '// Exported source\r\nreadonly Object Widget = { run() {} };\r\nmodule.exports = Widget;\r\n';
+const exportedText = '// Exported source\r\nconst Object Widget = { run() {} };\r\nmodule.exports = Widget;\r\n';
 let directory;
 
 /**
@@ -20,7 +20,7 @@ let directory;
 async function openImport(spec, suffix)
 {
     const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
-    const source = `readonly Object Imported = require('${spec}');\r\n${suffix}`;
+    const source = `const Object Imported = require('${spec}');\r\n${suffix}`;
     const document = makeTextDocument(`file://${path.join(directory, 'Main.lgd')}`, source);
     const state = await service.openDocument(document);
     return { service: service, document: document, state: state };
@@ -147,7 +147,7 @@ describe('LGD cross-file definitions', () =>
 
     test('does not treat an attached source docblock as an imported binding reference', async () =>
     {
-        const suffix = '/** Local documentation */\r\nreadonly Object Local = require("./Widget.js");';
+        const suffix = '/** Local documentation */\r\nconst Object Local = require("./Widget.js");';
         const { service, document } = await openImport('./Widget.js', suffix);
         const position = document.positionAt(document.getText().indexOf('Local documentation'));
 

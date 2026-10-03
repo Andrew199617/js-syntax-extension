@@ -246,7 +246,7 @@ const LgdHoverProvider = {
             return [ '```lgd', `${modifier}${summary.kind} ${summary.name}${base} {`, ...lines, '}', '```' ].join('\n');
         }
 
-        const modifier = summary.readonly ? 'readonly ' : '';
+        const modifier = summary.readonly ? 'const ' : '';
         if(summary.params.length > 0)
         {
             const params = summary.params

@@ -13,7 +13,7 @@ const LGD_URI = 'file:///workspace/Typed.lgd';
 
 /** @description LGD source with typed params and a JSDoc type tag. */
 const LGD_TEXT = [
-    'readonly Object Commands = {',
+    'const Object Commands = {',
     '    findNextChar(vscode.TextDocument document, Number line) {',
     '        return line;',
     '    },',
@@ -289,7 +289,7 @@ describe('LgdSemanticTokensProvider', () =>
     test('restores erased LGD declaration and method keywords from their parsed source spans', async () =>
     {
         const source = [
-            'export readonly Number total = 1;',
+            'export const Number total = 1;',
             'class Base { Base(String name) {} virtual async void run(String name) { await Promise.resolve(); } }',
             'class Derived : Base {',
             '    Derived(String name) : base(name) {}',
@@ -303,7 +303,7 @@ describe('LgdSemanticTokensProvider', () =>
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
         const keywords = tokens.pushed.filter(token => keywordTypes.includes(token.tokenType)).map(token => tokenText(document, token));
         expect(keywords).toEqual([ 'export',
-            'readonly',
+            'const',
             'class',
             'virtual',
             'async',
@@ -317,9 +317,9 @@ describe('LgdSemanticTokensProvider', () =>
             'await',
             'base' ]);
         const declarations = tokens.pushed.filter(token => token.tokenType === 'lgdDeclarationKeyword');
-        expect(declarations.map(token => tokenText(document, token))).toEqual([ 'class', 'class' ]);
+        expect(declarations.map(token => tokenText(document, token))).toEqual([ 'const', 'class', 'class' ]);
         const modifiers = tokens.pushed.filter(token => token.tokenType === 'lgdModifierKeyword');
-        expect(modifiers.map(token => tokenText(document, token))).toEqual([ 'readonly', 'virtual', 'async', 'override', 'async' ]);
+        expect(modifiers.map(token => tokenText(document, token))).toEqual([ 'virtual', 'async', 'override', 'async' ]);
         const builtins = tokens.pushed.filter(token => token.tokenType === 'lgdTypeKeyword');
         expect(builtins.map(token => tokenText(document, token))).toEqual([ 'void', 'void' ]);
         const expressions = tokens.pushed.filter(token => token.tokenType === 'lgdExpressionKeyword');
@@ -380,12 +380,12 @@ describe('LgdSemanticTokensProvider', () =>
 
     test('masks erased declaration prefix comments before assigning keyword families', () =>
     {
-        const source = 'export /* readonly abstract */ readonly Number total = 1;';
+        const source = 'export /* readonly abstract */ const Number total = 1;';
         const spans = [];
         const declaration = { headStart: 0, typeStart: source.indexOf('Number'), kind: 'variable' };
         LgdSemanticTokensProvider.collectErasedKeywords(source, [declaration], spans);
         expect(spans.map(span => ({ text: source.slice(span.start, span.end), type: span.tokenType })))
-            .toEqual([ { text: 'export', type: 'keyword' }, { text: 'readonly', type: 'lgdModifierKeyword' } ]);
+            .toEqual([ { text: 'export', type: 'keyword' }, { text: 'const', type: 'lgdDeclarationKeyword' } ]);
     });
 
     test('registers family fallback scopes without forcing theme colors or keyword inheritance', () =>

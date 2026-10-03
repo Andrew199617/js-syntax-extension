@@ -177,7 +177,7 @@ describe('LGD class cross-file metadata', () =>
         ].join('\n'));
 
         await fs.promises.writeFile(path.join(directory, 'Middle.lgd'), [
-            'readonly Object Root = require("./Root.js");',
+            'const Object Root = require("./Root.js");',
             'class Middle : Root {',
             '  Middle(String title) : base(title) {}',
             '  middle() {}',

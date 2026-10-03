@@ -69,14 +69,23 @@
 	},
 	"repository": {
 		"typed-declaration": {
-			"comment": "A full typed declaration head: [export] [readonly] Type name.",
-			"match": "^([ \\t]*)((export)[ \\t]+)?((readonly)[ \\t]+)?((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)([ \\t]+)([$_a-zA-Z][\\w$]*)(?![\\w$]|[ \\t]*\\()",
+			"comment": "A full typed declaration head: [export] [const] Type name; readonly is a legacy local spelling.",
+			"match": "^([ \\t]*)((export)[ \\t]+)?((const|readonly)[ \\t]+)?((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)([ \\t]+)([$_a-zA-Z][\\w$]*)(?![\\w$]|[ \\t]*\\()",
 			"captures": {
 				"3": {
 					"name": "keyword.control.lgd"
 				},
 				"5": {
-					"name": "storage.modifier.lgd"
+					"patterns": [
+						{
+							"match": "\\bconst\\b",
+							"name": "storage.type.lgd"
+						},
+						{
+							"match": "\\breadonly\\b",
+							"name": "storage.modifier.lgd"
+						}
+					]
 				},
 				"6": {
 					"name": "storage.type.lgd"
@@ -93,7 +102,7 @@
 				}
 			},
 			"comment": "A line starting with a type keyword that is not a full declaration: malformed, or a call like Number(\"5\").",
-			"match": "^[ \\t]*(?:export[ \\t]+)?(?:readonly[ \\t]+)?(Number|String|Boolean|BigInt|Symbol|Object|Array|Function)\\b(?![ \\t]*\\()"
+			"match": "^[ \\t]*(?:export[ \\t]+)?(?:(?:const|readonly)[ \\t]+)?(Number|String|Boolean|BigInt|Symbol|Object|Array|Function)\\b(?![ \\t]*\\()"
 		},
 		"class-declaration": {
 			"name": "meta.class.lgd",

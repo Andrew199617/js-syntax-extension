@@ -124,6 +124,17 @@ describe('LGD TextMate grammar.', () =>
         }
     });
 
+    test('highlights typed const locals, including their types and names inside methods', () =>
+    {
+        const tokens = tokenize(grammar, 'class Command {\n    execute() {\n        const Object editor = vscode.window.activeTextEditor;\n        const String textLine = editor.document.getText();\n    }\n}');
+        assertScope(tokens, 'const', LgdKeywordFamilies.families.declaration.scope);
+        assertScope(tokens, 'Object', typeScope);
+        assertScope(tokens, 'String', typeScope);
+        assertScope(tokens, 'editor', nameScope);
+        assertScope(tokens, 'textLine', nameScope);
+        assertNoScope(tokens, 'const', readonlyScope);
+    });
+
     test('Highlights a typed declaration head.', () =>
     {
         const tokens = tokenize(grammar, 'Number total = 0;');

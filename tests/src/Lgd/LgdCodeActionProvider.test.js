@@ -728,3 +728,28 @@ describe('LGD diagnostic quick fixes', () =>
         expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
     });
 });
+
+describe('Legacy readonly variable migration', () =>
+{
+    test('replaces only the verified modifier, refreshes its warning, and rejects a stale edit', async () =>
+    {
+        const source = '/** Keep readonly in this documentation. */\r\nexport readonly Number count = 1;';
+        const fixture = await openFixture(source);
+        const [action] = await actionsFor(fixture, 'lgd.declaration.readonly');
+        expect(action.title).toBe('Replace readonly with const');
+        await applyAction(fixture, action);
+        expect(fixture.document.getText()).toBe(source.replace('export readonly', 'export const'));
+        expect(fixture.service.getState(fixture.document.uri).errors).toEqual([]);
+        expect(await fixture.provider.applyFix(action.command.arguments[0])).toBe(false);
+    });
+
+    test('offers no migration when the original readonly binding has changed', async () =>
+    {
+        const fixture = await openFixture('readonly Number count = 1;');
+        const [action] = await actionsFor(fixture, 'lgd.declaration.readonly');
+        fixture.document.setText('const Number count = 1;');
+        fixture.document.version++;
+        expect(await fixture.provider.applyFix(action.command.arguments[0])).toBe(false);
+        expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
+    });
+});
