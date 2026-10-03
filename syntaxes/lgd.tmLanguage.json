@@ -56,7 +56,7 @@
 	"repository": {
 		"typed-declaration": {
 			"comment": "A full typed declaration head: [export] [readonly] Type name.",
-			"match": "^([ \\t]*)((export)[ \\t]+)?((readonly)[ \\t]+)?(Number|String|Boolean|BigInt|Symbol|Object|Array|Function)([ \\t]+)([$_a-zA-Z][\\w$]*)",
+			"match": "^([ \\t]*)((export)[ \\t]+)?((readonly)[ \\t]+)?((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)([ \\t]+)([$_a-zA-Z][\\w$]*)(?![\\w$]|[ \\t]*\\()",
 			"captures": {
 				"3": {
 					"name": "keyword.control.lgd"
@@ -122,7 +122,7 @@
 		},
 		"typed-method": {
 			"comment": "Color only the return prefix so native JavaScript rules still parse the method name and parameters.",
-			"match": "[ \\t]*\\b(?:(async)[ \\t]+)?(?:(void)|((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*))(?=[ \\t]+[$_a-zA-Z][\\w$]*[ \\t]*\\()",
+			"match": "[ \\t]*\\b(?:(async)[ \\t]+)?(?:(void)|((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??))(?=[ \\t]+[$_a-zA-Z][\\w$]*[ \\t]*\\()",
 			"captures": {
 				"1": {
 					"name": "storage.modifier.lgd"
@@ -137,7 +137,7 @@
 		},
 		"typed-parameter": {
 			"comment": "Parameter type fallback before semantic tokens arrive; leave names to JavaScript parameter scopes.",
-			"match": "\\b((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)(?=[ \\t]+[$_a-zA-Z][\\w$]*\\b)",
+			"match": "\\b((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)(?=[ \\t]+[$_a-zA-Z][\\w$]*\\b)",
 			"captures": {
 				"1": {
 					"name": "storage.type.lgd"
@@ -146,7 +146,7 @@
 		},
 		"method-modifier": {
 			"comment": "Contextual declaration modifiers are theme roles only; compiler support is unchanged.",
-			"match": "(?<![\\w$.])\\b(abstract|virtual|override|public|protected|private|sealed|static|async|readonly)\\b(?=[ \\t]+(?:(?:abstract|virtual|override|public|protected|private|sealed|static|async|readonly)[ \\t]+)*(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
+			"match": "(?<![\\w$.])\\b(abstract|virtual|override|public|protected|private|sealed|static|async|readonly)\\b(?=[ \\t]+(?:(?:abstract|virtual|override|public|protected|private|sealed|static|async|readonly)[ \\t]+)*(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
 			"captures": {
 				"1": {
 					"name": "storage.modifier.lgd"

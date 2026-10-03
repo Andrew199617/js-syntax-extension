@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { maskCode } = require('../Compilers/LgdInfer');
+const { baseTypeName } = require('../Compilers/LgdTypeMaps');
 const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
 const LgdOverrideChecker = require('../Compilers/LgdOverrideChecker');
 const LgdContractChecker = require('../Compilers/LgdContractChecker');
@@ -292,7 +293,7 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
     const exported = {
         name: declaration.name,
         typeName: declaration.typeName,
-        keyword: keywords.includes(declaration.typeName) ? declaration.typeName : 'Object',
+        keyword: keywords.includes(baseTypeName(declaration.typeName)) ? baseTypeName(declaration.typeName) : 'Object',
         kind: declaration.kind,
         enumValueType: declaration.enumValueType,
         baseName: declaration.baseName,

@@ -4,7 +4,7 @@ const DiagnosticQuickFix = require('./DiagnosticQuickFix');
 const LgdCompiler = require('../../Compilers/LgdCompiler');
 const LgdSourceMap = require('../../Compilers/LgdSourceMap');
 const LgdReturnChecker = require('../../Compilers/LgdReturnChecker');
-const { tsTypeMap } = require('../../Compilers/LgdTypeMaps');
+const { tsTypeMap, baseTypeName } = require('../../Compilers/LgdTypeMaps');
 
 /** @description Shares closed-signature and speculative-compilation guards across explicit type-change strategies. */
 class SignatureTypeFix extends DiagnosticQuickFix
@@ -170,7 +170,7 @@ class SignatureTypeFix extends DiagnosticQuickFix
         {
             function referencesType(type)
             {
-                return type === declaration.name || type?.startsWith(`${declaration.name}.`);
+                return baseTypeName(type) === declaration.name || type?.startsWith(`${declaration.name}.`);
             }
 
             const groups = [ ...candidate.typedParams ? [candidate.typedParams] : [], ...candidate.methodTypedParams || [] ];
@@ -187,7 +187,7 @@ class SignatureTypeFix extends DiagnosticQuickFix
             }
 
             const inheritedReference = candidate.heritage?.some(base => base.name === declaration.name);
-            return candidate.typeName === declaration.name || candidate.baseName === declaration.name || inheritedReference;
+            return baseTypeName(candidate.typeName) === declaration.name || candidate.baseName === declaration.name || inheritedReference;
         });
     }
 

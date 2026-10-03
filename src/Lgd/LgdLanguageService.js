@@ -7,6 +7,7 @@ const settleEditorUpdate = require('./LgdEditorFailures');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
 const { maskCode } = require('../Compilers/LgdInfer');
+const { baseTypeName } = require('../Compilers/LgdTypeMaps');
 const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
 const { parseTypedParams, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('../Compilers/LgdTypedParams');
 
@@ -516,7 +517,8 @@ const LgdLanguageService = {
 
         if(!declaration.baseName && !required && declaration.kind !== 'class')
         {
-            const nominal = context.declarations.find(candidate => candidate.name === declaration.typeName && (candidate.kind === 'class' || candidate.kind === 'interface'));
+            const typeName = baseTypeName(declaration.typeName);
+            const nominal = context.declarations.find(candidate => candidate.name === typeName && (candidate.kind === 'class' || candidate.kind === 'interface'));
             if(nominal)
             {
                 inherited = this.getDeclaredMembers(nominal, context, resolving);

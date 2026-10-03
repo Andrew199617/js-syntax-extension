@@ -64,6 +64,35 @@ describe('LGD interface and abstract editor contracts', () =>
         expect(document.getText(definitions[0].range)).toBe('IEmpty');
     });
 
+    test('preserves nullable interface type spans and definition targets in every annotation position', async () =>
+    {
+        const source = [
+            'interface IValue { Number? count { get; } }',
+            'class Holder { IValue? value = null; IValue? copy(IValue? item) { return item; } }',
+            'IValue? current = null;'
+        ].join('\n');
+        const document = makeTextDocument('file:///workspace/Nullable.lgd', source);
+        const service = createService();
+        const state = await service.openDocument(document);
+        expect(state.errors).toEqual([]);
+        const provider = LgdDefinitionProvider.create(service);
+        for(const match of source.matchAll(/IValue\?/g))
+        {
+            const definitions = await provider.provideDefinition(document, document.positionAt(match.index));
+            expect(definitions).toHaveLength(1);
+            expect(document.offsetAt(definitions[0].range.start)).toBe(source.indexOf('IValue'));
+            expect(document.getText(definitions[0].range)).toBe('IValue');
+        }
+
+        const spans = LgdSemanticTokensProvider.create(service).collectTypeSpans(source, state.declarations);
+        const types = spans.map(span => source.slice(span.start, span.end));
+        expect(types).toContain('Number?');
+        const memberTypeCount = 3;
+        expect(types.filter(type => type === 'IValue?')).toHaveLength(memberTypeCount);
+        const hover = await LgdHoverProvider.create(service).provideHover(document, document.positionAt(source.indexOf('IValue')));
+        expect(hover.contents).toContain('count: Number?');
+    });
+
     test('uses output settings for the in-memory mirror and changes models on recompile', async () =>
     {
         const options = { javascriptObjectModel: 'class' };

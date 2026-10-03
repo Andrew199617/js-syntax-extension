@@ -3,6 +3,7 @@ const vscode = require('vscode');
 const { parse } = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const { maskCode } = require('../Compilers/LgdInfer');
+const { baseTypeName } = require('../Compilers/LgdTypeMaps');
 const { collectScopes, collectBindings, visibleBindings } = require('../Compilers/LgdBaseChecker');
 
 /**
@@ -16,7 +17,7 @@ function isTypeReference(state, offset, name)
 {
     for(const declaration of state.declarations)
     {
-        if(declaration.typeName === name && offset >= declaration.typeStart && offset < declaration.typeEnd)
+        if(baseTypeName(declaration.typeName) === name && offset >= declaration.typeStart && offset < declaration.typeEnd)
         {
             return true;
         }
@@ -33,7 +34,7 @@ function isTypeReference(state, offset, name)
         {
             const propertyStart = declaration.initializerStart + member.propertyTypeStart;
             const propertyEnd = declaration.initializerStart + member.propertyTypeEnd;
-            if(member.propertyTypeName === name && offset >= propertyStart && offset < propertyEnd)
+            if(baseTypeName(member.propertyTypeName) === name && offset >= propertyStart && offset < propertyEnd)
             {
                 return true;
             }
@@ -49,7 +50,7 @@ function isTypeReference(state, offset, name)
 
             const returnStart = declaration.initializerStart + group.returnTypeStart;
             const returnEnd = declaration.initializerStart + group.returnTypeEnd;
-            if(group.returnTypeName === name && offset >= returnStart && offset < returnEnd)
+            if(baseTypeName(group.returnTypeName) === name && offset >= returnStart && offset < returnEnd)
             {
                 return true;
             }
@@ -58,7 +59,7 @@ function isTypeReference(state, offset, name)
             {
                 const start = declaration.initializerStart + parameter.typeStart;
                 const end = declaration.initializerStart + parameter.typeEnd;
-                if(parameter.typeName === name && offset >= start && offset < end)
+                if(baseTypeName(parameter.typeName) === name && offset >= start && offset < end)
                 {
                     return true;
                 }

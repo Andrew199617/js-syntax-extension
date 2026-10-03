@@ -279,6 +279,26 @@ describe('LGD TextMate grammar.', () =>
         assertScope(tokens, 'count', 'variable.parameter.js');
     });
 
+    test('Highlights qualified nullable declarations, returns and parameters without consuming JavaScript names.', () =>
+    {
+        const source = [
+            'vscode.Position? previous = null;',
+            'Number? count = null;',
+            'class Search {',
+            '    static vscode.Position? find(vscode.Position? position, Number? offset) { return position; }',
+            '}'
+        ].join('\n');
+        const tokens = tokenize(grammar, source);
+        assertScope(tokens, 'vscode.Position?', typeScope);
+        assertScope(tokens, 'Number?', typeScope);
+        assertScope(tokens, 'previous', nameScope);
+        assertScope(tokens, 'count', nameScope);
+        assertScope(tokens, 'static', readonlyScope);
+        assertScope(tokens, 'find', 'entity.name.function.js');
+        assertScope(tokens, 'position', 'variable.parameter.js');
+        assertScope(tokens, 'offset', 'variable.parameter.js');
+    });
+
     test('Highlights readonly, export, and string declarations.', () =>
     {
         const tokens = tokenize(grammar, 'export readonly String name = "Andrew";');

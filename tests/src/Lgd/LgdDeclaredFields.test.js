@@ -137,6 +137,22 @@ describe('Source-backed declared field hover', () =>
         expect(LgdClassMemberLookup.get(state, document.positionAt(source.indexOf('label;')))).toBeNull();
     });
 
+    test.each([ 'oloo', 'class' ])('keeps nullable field hovers and instance completions in %s output', async objectModel =>
+    {
+        const source = 'class Sample { Number? value = null; }\nSample? item = null;';
+        const { service, document, state } = await openSource(source, { javascriptObjectModel: objectModel });
+        expect(state.errors).toEqual([]);
+        const hover = await LgdHoverProvider.create(service).provideHover(document, document.positionAt(source.indexOf('value')));
+        expect(hover.contents).toContain('Number? Sample.value');
+        for(const receiver of [ 'item.', 'item?.' ])
+        {
+            document.setText(`${source}\n${receiver}`);
+            await service.updateDocument(document);
+            const items = await LgdCompletionProvider.create(service).provideCompletionItems(document, document.positionAt(document.getText().length));
+            expect(items.map(item => item.label)).toEqual(['value']);
+        }
+    });
+
     test('Uses declaring types for inherited imported fields and consumer aliases.', async () =>
     {
         const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lgd-field-hovers-'));
