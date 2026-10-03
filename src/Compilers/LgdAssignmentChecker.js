@@ -2,6 +2,7 @@ const traverse = require('@babel/traverse').default;
 const LgdReturnChecker = require('./LgdReturnChecker');
 const LgdTypeChecker = require('./LgdTypeChecker');
 const { NULL } = require('./LgdInfer');
+const { skipTrivia } = require('./LgdMethodSignature');
 
 /** @description Checks all writes against the annotation on their actual JavaScript lexical binding. */
 const LgdAssignmentChecker = {
@@ -105,10 +106,79 @@ const LgdAssignmentChecker = {
             {
                 const keyword = descriptor.kind === 'keyword' && scope.get(type)?.kind === 'keyword';
                 const display = keyword ? scope.get(type).keyword : type;
-                errors.push({ offset: context.map.toSource(reportNode.start), endOffset: context.map.toSource(reportNode.end),
-                    message: `Cannot assign ${display} to ${descriptor.typeName}.` });
+                const error = { offset: context.map.toSource(reportNode.start), endOffset: context.map.toSource(reportNode.end),
+                    code: 'lgd.assignment.typeMismatch', message: `Cannot assign ${display} to ${descriptor.typeName}.` };
+                const fix = this.parameterTypeFix(target, binding, context, { descriptor: descriptor, types: types, initializing: initializing });
+                if(fix)
+                {
+                    error.quickFix = { ...fix, assignmentStart: error.offset, assignmentEnd: error.endOffset };
+                }
+
+                errors.push(error);
             }
         }
+    },
+
+    /** @description Identifies one explicit parameter annotation through its exact lexical binding and source spans. */
+    parameterTypeFix(target, binding, context, options)
+    {
+        const { descriptor, types, initializing } = options;
+        const owner = binding.scope.path;
+        const assignment = target.parentPath;
+        const simpleWrite = assignment.isAssignmentExpression({ operator: '=' }) && assignment.node.left === target.node;
+        const ownParameter = binding.kind === 'param' && owner.isFunction() && target.getFunctionParent() === owner;
+        const stringMismatch = descriptor.typeName === 'Number' && new Set(types).size === 1 && types[0] === 'String';
+        const plainSingleParameter = owner.isFunction() && owner.node.params.length === 1 && owner.node.params[0] === binding.identifier;
+        if(initializing || owner.node.id || !ownParameter || !simpleWrite || !stringMismatch || !plainSingleParameter)
+        {
+            return null;
+        }
+
+        const signature = { declaration: {}, group: { params: [], async: false, assignment: true, returnTypeName: descriptor.typeName } };
+        for(const write of binding.constantViolations)
+        {
+            const directAssignment = write.isAssignmentExpression({ operator: '=' }) && write.get('left').isIdentifier({ name: binding.identifier.name });
+            if(!directAssignment || write.getFunctionParent() !== owner)
+            {
+                return null;
+            }
+
+            const writtenTypes = LgdReturnChecker.expressionTypes(write.get('right'), signature, context);
+            if(new Set(writtenTypes).size !== 1 || writtenTypes[0] !== 'String')
+            {
+                return null;
+            }
+        }
+
+        const nameOffset = context.map.toSource(binding.identifier.start);
+        for(const declaration of context.declarations)
+        {
+            const groups = [ ...declaration.typedParams ? [declaration.typedParams] : [], ...declaration.methodTypedParams || [] ];
+            for(const group of groups)
+            {
+                if(group.params.length !== 1 || group.accessor || group.generator || group.abstract)
+                {
+                    continue;
+                }
+
+                const parameter = group.params[0];
+                const offset = declaration.initializerStart + parameter.typeStart;
+                const endOffset = declaration.initializerStart + parameter.typeEnd;
+                const parameterOffset = skipTrivia(context.content, endOffset);
+                const sameParameter = parameter.name === binding.identifier.name && parameterOffset === nameOffset;
+                const plainNumber = parameter.typeName === 'Number' && !parameter.rest && parameter.defaultText === null;
+                if(!sameParameter || !plainNumber || context.content.slice(offset, endOffset) !== 'Number')
+                {
+                    continue;
+                }
+
+                return { kind: 'changeParameterType', declarationStart: declaration.headStart, groupStart: group.start,
+                    parameterName: parameter.name, parameterOffset: parameterOffset, offset: offset, endOffset: endOffset,
+                    oldTypeName: 'Number', newTypeName: 'String' };
+            }
+        }
+
+        return null;
     }
 };
 

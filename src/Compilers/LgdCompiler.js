@@ -71,7 +71,7 @@ const LgdCompiler = {
         const output = this.emitRange(content, backend, this.fullRange(content, parsed.declarations));
         const erased = LgdInterfaceErasure.apply(content, parsed.allDeclarations, externals, output);
         const emitted = LgdInterfaceTypes.apply(content, parsed.allDeclarations, externals, erased);
-        const validation = LgdGeneratedJsValidator.validate(emitted);
+        const validation = LgdGeneratedJsValidator.validate(emitted, content);
         if(!parsed.errors.some(error => error.severity !== 'warning'))
         {
             for(const error of validation.errors)
@@ -355,7 +355,7 @@ const LgdCompiler = {
             const duplicate = errors.some(error => error.offset === typeError.offset && error.message === typeError.message);
             if(!duplicate)
             {
-                errors.push(this.createError(content, typeError.offset, typeError.message, typeError.endOffset));
+                errors.push({ ...this.createError(content, typeError.offset, typeError.message, typeError.endOffset), ...typeError });
             }
         }
     },
