@@ -208,8 +208,8 @@ const LgdNativeClassEmitter = {
                 const statement = path.node;
                 const terminated = code[statement.end - 1] === ';';
                 const suffixStart = terminated ? statement.end - 1 : statement.end;
-                edits.push({ start: statement.start, end: statement.start + 'return'.length, text: 'void (' });
-                edits.push({ start: suffixStart, end: suffixStart, text: terminated ? '); return' : '); return;' });
+                edits.push({ start: statement.start, end: statement.start + 'return'.length, text: '{ void (' });
+                edits.push({ start: suffixStart, end: statement.end, text: '); return; }' });
             }
         });
         return LgdSourceMap.applyEdits(code, segments, edits);

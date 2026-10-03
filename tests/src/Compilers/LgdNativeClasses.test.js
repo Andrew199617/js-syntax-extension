@@ -136,6 +136,25 @@ describe('LGD native JavaScript class output.', () =>
         expect(result.code).toContain('// Preserve the end-of-line comment.');
     });
 
+    test('Preserves conditional early return control flow when a native constructor discards a value.', () =>
+    {
+        const Example = execute([
+            'class Example {',
+            '    Example(Boolean stop) {',
+            '        this.value = 1;',
+            '        if(stop) return (this.value = 2, { discarded: true });',
+            '        this.value = 3;',
+            '    }',
+            '}',
+            'module.exports = Example;'
+        ].join('\n'));
+        const stoppedValue = 2;
+        const continuedValue = 3;
+        expect(Example.create(true).value).toBe(stoppedValue);
+        expect(Example.create(false).value).toBe(continuedValue);
+        expect(Example.create(true).discarded).toBeUndefined();
+    });
+
     test('Reports native-only strict-mode syntax failures at original source positions.', () =>
     {
         const source = 'class Example { Example() { with ({ value: 2 }) { this.value = value; } } }';
