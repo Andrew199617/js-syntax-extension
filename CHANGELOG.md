@@ -4,6 +4,12 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.13
+
+- Enforce typed local and parameter assignments inside classes, constructors, object methods, top-level functions and nested callbacks using their actual lexical bindings.
+- Check return contracts against current values through assignments and control flow, including null, async suspension, destructuring and numeric updates.
+- Preserve shadowed names and conservatively handle values changed by unknown calls or JavaScript callbacks.
+
 # 2.7.12
 
 - Add typed LGD interfaces, abstract classes, inherited contracts, property accessor contracts and cross-file diagnostics.

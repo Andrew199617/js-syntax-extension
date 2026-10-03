@@ -128,6 +128,12 @@ The target language and the JavaScript object model are separate settings:
 
 Choose native classes deliberately: methods live on `.prototype`, instances use native class construction, and a base constructor's virtual method calls dispatch to the derived implementation during construction. OLOO keeps its existing base-factory lifecycle and object-level method API. Changing the setting refreshes open LGD mirrors; save the source to update its adjacent JavaScript file.
 
+## Typed assignments and lexical scopes
+
+Declared locals and typed parameters are checked in top-level `Function` initializers, ordinary JavaScript function bodies, object methods, classes, constructors and nested callbacks. Writes use the actual lexical binding, so a shadowing callback parameter or block local does not inherit an unrelated outer type. Compound assignments and known destructuring values are checked too; rest parameter bindings are arrays.
+
+Method return checks follow the current value through assignments and branches instead of treating its declared type as proof. Known `null` or `undefined` values cannot satisfy a non-void return contract. LGD still permits null and undefined in assignment positions; unknown calls and effects remain conservative.
+
 ## Explicit LGD method return types
 
 Class and object methods can declare their return type before the method name:
