@@ -1,3 +1,4 @@
+const LgdMemberTypeGraph = require('./LgdMemberTypeGraph');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const { collectContractBindings } = require('./LgdContractBindings');
@@ -22,6 +23,7 @@ const LgdClassMemberSemantics = {
         registry._tables = new Map();
         registry._memberTypes = new WeakMap();
         registry._declaringTypes = new WeakMap();
+        registry._externalTypes = LgdMemberTypeGraph.imports(context.externals || new Map());
         registry._memberTypeOffsets = new WeakMap();
         return registry;
     },
@@ -84,6 +86,7 @@ const LgdClassMemberSemantics = {
 
             if(member.accessor && this._declaringTypes.get(previous) === declaration)
             {
+                description.explicitAccessibility ||= previous.explicitAccessibility;
                 description.getterAccessibility ||= previous.getterAccessibility;
                 description.setterAccessibility ||= previous.setterAccessibility;
                 description.typeName ||= previous.typeName;
@@ -92,6 +95,7 @@ const LgdClassMemberSemantics = {
 
             const memberType = valueType && this._type(valueType, declaration.headStart);
             const previousType = previous && this._memberTypes.get(previous);
+            description.typeIdentity = LgdMemberTypeGraph.key(memberType || previousType);
             this._declaringTypes.set(description, declaration);
             this._memberTypes.set(description, memberType || previousType || null);
             this._memberTypeOffsets.set(description, declaration.headStart);
@@ -101,8 +105,9 @@ const LgdClassMemberSemantics = {
         if(declaration.kind === 'class')
         {
             const factory = { name: 'create', kind: 'method', static: true, typeName: declaration.name,
-                returnTypeName: declaration.name, declaringType: declaration.name, params: [],
+                returnTypeName: declaration.name, declaringType: declaration.name, params: declaration.constructorMember?.params || [],
                 accessibility: declaration.constructorMember?.accessibility || 'public',
+                explicitAccessibility: Number.isInteger(declaration.constructorMember?.accessibilityStart),
                 declaringNameStart: declaration.nameStart, declaringSourcePath: declaration.sourceIdentityPath || declaration.sourcePath || null,
                 declaringProjectId: declaration.projectId || null };
             this._declaringTypes.set(factory, declaration);
@@ -426,27 +431,6 @@ const LgdClassMemberSemantics = {
         }
 
         return null;
-    },
-
-    /** @description Resolves a nominal member annotation in its declaration scope, never in an access-site value shadow. */
-    memberType(resolved)
-    {
-        if(this._memberTypes.has(resolved.member))
-        {
-            return this._memberTypes.get(resolved.member);
-        }
-
-        // Imported annotations cannot safely borrow an unrelated namesake from the consumer's scope.
-        return null;
-    },
-
-    /** @description Carries the field annotation identity and lexical source scope into write compatibility. */
-    memberTypeOptions(resolved, value)
-    {
-        const inferred = typeof value === 'string' ? null : this.receiver(value);
-        return { expectedIdentity: this.memberType(resolved), inferredIdentity: inferred?.declaration,
-            typeOffset: this._memberTypeOffsets.get(resolved.member) ?? null,
-            unresolvedIdentity: !this._memberTypes.has(resolved.member) };
     },
 
     /** @description Resolves one fixed-name member access and retains invalid receiver-kind evidence for diagnostics. */

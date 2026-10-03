@@ -93,7 +93,7 @@ const LgdAccessibility = {
     /** @description Enforces public, project-internal, lexical-private, and C#-style protected receiver access. */
     allowed(accessibility, owner, context)
     {
-        const { registry, lexicalOwner, receiver, projectId, baseCall = false, constructor = false } = context;
+        const { registry, lexicalOwner, receiver, projectId, baseCall = false, isConstructor = false } = context;
         if(accessibility === 'public')
         {
             return true;
@@ -119,7 +119,7 @@ const LgdAccessibility = {
             return true;
         }
 
-        if(constructor)
+        if(isConstructor)
         {
             return false;
         }
@@ -185,7 +185,7 @@ const LgdAccessibility = {
                 const constructor = declaration.constructorMember;
                 const access = base.constructorAccessibility || this.visibility(base.constructorMember || {});
                 if(!this.allowed(access, base, { registry: registry, lexicalOwner: declaration,
-                    projectId: declaration.projectId, baseCall: true, constructor: true }))
+                    projectId: declaration.projectId, baseCall: true, isConstructor: true }))
                 {
                     const start = constructor?.baseArgumentsStart ?? declaration.baseStart;
                     const end = constructor?.baseArgumentsEnd ?? declaration.baseEnd;
@@ -279,6 +279,14 @@ const LgdAccessibility = {
                 return;
             }
 
+            const receiverType = resolved.receiver.declaration;
+            const typeAccess = this.visibility(receiverType);
+            if(!this.allowed(typeAccess, receiverType, { registry: registry, lexicalOwner: lexicalOwner, projectId: projectId }))
+            {
+                errors.push(this.diagnostic(offset, endOffset, receiverType.name || receiverType.exportName, typeAccess));
+                return;
+            }
+
             const writing = registry._isAssignmentTarget(path);
             const reading = !writing || parent.isUpdateExpression() || parent.isAssignmentExpression() && parent.node.operator !== '=';
             const accesses = [];
@@ -303,7 +311,7 @@ const LgdAccessibility = {
             {
                 const owner = this.memberOwner(member, registry);
                 if(!this.allowed(accessibility, owner, { registry: registry, lexicalOwner: lexicalOwner,
-                    receiver: resolved.receiver, projectId: projectId, baseCall: baseCall, constructor: member.name === 'create' }))
+                    receiver: resolved.receiver, projectId: projectId, baseCall: baseCall, isConstructor: member.name === 'create' }))
                 {
                     errors.push(this.diagnostic(offset, endOffset, member.name === 'create' ? `${member.declaringType} constructor` : member.name, accessibility));
                 }
@@ -337,7 +345,7 @@ const LgdAccessibility = {
                 const accessibility = member.getterAccessibility || this.visibility(member);
                 const owner = this.memberOwner(member, registry);
                 const lexicalOwner = this.lexicalOwner(offset, context.declarations);
-                if(!this.allowed(accessibility, owner, { registry: registry, lexicalOwner: lexicalOwner, receiver: receiver, projectId: projectId }))
+                if(!this.allowed(accessibility, owner, { registry: registry, lexicalOwner: lexicalOwner, receiver: receiver, projectId: projectId, isConstructor: member.name === 'create' }))
                 {
                     errors.push(this.diagnostic(offset, endOffset, name, accessibility));
                 }
@@ -383,7 +391,7 @@ const LgdAccessibility = {
                 const endOffset = context.map.toSource(path.node.callee.end);
                 const lexicalOwner = this.lexicalOwner(offset, context.declarations);
                 if(!this.allowed(accessibility, owner, { registry: registry, lexicalOwner: lexicalOwner,
-                    receiver: receiver, projectId: projectId, constructor: true }))
+                    receiver: receiver, projectId: projectId, isConstructor: true }))
                 {
                     errors.push(this.diagnostic(offset, endOffset, `${owner.name || owner.exportName} constructor`, accessibility));
                 }

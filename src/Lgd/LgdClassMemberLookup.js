@@ -18,10 +18,15 @@ const LgdClassMemberLookup = {
         const registry = LgdClassMemberSemantics.create(context);
         for(const declaration of state.declarations)
         {
-            const field = declaration.classMembers?.find(member => member.kind === 'field' && member.nameStart <= sourceOffset && sourceOffset < member.nameEnd);
-            if(field)
+            const member = declaration.classMembers?.find(candidate => candidate.nameStart <= sourceOffset && sourceOffset < candidate.nameEnd);
+            if(member)
             {
-                return registry.members(declaration).find(member => member.name === field.name) || null;
+                const name = member.isConstructor ? 'create' : member.name;
+                const detail = registry.members(declaration).find(candidate => candidate.name === name);
+                return { ...detail, name: member.name, nameStart: member.nameStart, nameEnd: member.nameEnd,
+                    kind: member.kind, isConstructor: member.isConstructor, accessorKind: member.accessorKind,
+                    accessibility: member.accessibility, explicitAccessibility: Number.isInteger(member.accessibilityStart),
+                    returnTypeName: member.returnTypeName, params: member.params || [], declaringType: declaration.name };
             }
         }
 

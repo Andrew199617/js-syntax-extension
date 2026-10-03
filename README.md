@@ -135,7 +135,36 @@ An instance readonly field can be assigned at its declaration or directly throug
 
 Known field types, writes, returns and receiver kinds are checked across relative LGD imports. Completion lists separate instance and static members. These remain compile-time checks: dynamic property names, reflection helpers such as `Object.assign`, external JavaScript, and aliases whose receiver type cannot be determined can bypass them. Use typed receiver annotations when values pass through untyped containers or other dynamic code.
 
-LGD members are accessible from other code by default; C# access-control defaults are not modeled. This field subset does not support access modifiers, `const` fields, static classes or constructors, constructor chaining with `this(...)`, or fields in interfaces. Same-named inherited instance fields and member collisions are diagnosed because JavaScript properties cannot represent C#'s separate base and derived field storage. Use a distinct field name instead. Declare an LGD base before its derived class; unresolved or later-declared bases cannot provide a verified field lifecycle. Native class output also reserves the static field name `prototype`. Use `const Type name = value;` for immutable local or top-level bindings. Legacy `readonly Type name = value;` declarations still compile with a migration warning and a quick fix to `const`.
+LGD members remain public by default. This field subset does not support `const` fields, static classes or constructors, constructor chaining with `this(...)`, or fields in interfaces. Same-named inherited instance fields and member collisions are diagnosed because JavaScript properties cannot represent C#'s separate base and derived field storage. Use a distinct field name instead. Declare an LGD base before its derived class; unresolved or later-declared bases cannot provide a verified field lifecycle. Native class output also reserves the static field name `prototype`. Use `const Type name = value;` for immutable local or top-level bindings. Legacy `readonly Type name = value;` declarations still compile with a migration warning and a quick fix to `const`.
+
+### Access modifiers and project boundaries
+
+Use `public`, `protected`, `private`, or `internal` on class fields, methods, constructors, and accessors:
+
+```lgd
+public class Player {
+    private Number health = 100;
+    internal static Number count = 0;
+
+    public Player() { Player.count++; }
+    protected Number readHealth() { return health; }
+    public Number get Health() { return health; }
+    private set Health(Number value) { health = value; }
+}
+```
+
+- `public`: available wherever the type is available. Omitting a modifier keeps this existing LGD default, including constructors.
+- `private`: available inside the declaring class, including an explicit receiver of that same class. Derived classes do not gain access.
+- `protected`: available in the declaring class and derived classes. In a derived class, an instance receiver must have that derived type or a subtype; a base-typed or sibling-typed receiver is not sufficient. `base.method()` remains valid. A protected constructor permits base initialization, not a separate base `.create()` call from derived code.
+- `internal`: available within the same LGD project, including files in different directories.
+
+An LGD project is rooted at its nearest `lgdconfig.json` or `package.json` file. A nested manifest starts a separate project. Add `lgdconfig.json` containing `{}` when a project has no package manifest. Files without either manifest are standalone; sharing a directory or editor workspace does not make them one project. Symlinked paths use the same underlying source/project identity. Manifest creation and removal refresh open-file checks.
+
+Classes, interfaces, and enums accept `public` or `internal`. Interface contracts remain public. Use one access modifier at a time; local variables and ordinary JavaScript object members do not take LGD access modifiers. Overrides retain their inherited accessibility, and public interfaces/public or protected class signatures cannot expose less-accessible types. A public class may implement an internal interface within its project.
+
+Getter and setter access is checked separately. Abstract property contracts can restrict one of two accessors, for example `public abstract Number Score { get; protected set; }`; their overrides must preserve that restriction. Private abstract or virtual members are invalid.
+
+Checks follow relative LGD imports, known aliases, inherited member owners, typed fields, and known method-result types. They also update after an imported member's visibility changes. Hovers show explicit visibility and completions omit inaccessible members. Both OLOO and native-class output erase the modifiers and retain ordinary JavaScript storage/dispatch. This is compile-time checking, not a runtime security boundary: dynamic property names, reflection, opaque values, and external JavaScript remain outside guaranteed enforcement.
 
 ## LGD interfaces and abstract classes
 
@@ -166,7 +195,7 @@ Property contracts use `String name { get; set; }`, with either or both accessor
 
 JavaScript output erases interface declarations, interface-only require bindings, and abstract member declarations. Editor-only JSDoc typedefs retain interface shapes. Abstract classes retain their concrete constructor and methods. Errors appear in Problems and prevent a save from replacing the last working `.js` file. These are editor/compiler checks; externally supplied JavaScript values remain dynamic, and emitted code does not install runtime abstract/interface guards.
 
-This initial contract syntax does not include overloaded methods, generic interfaces, static interface members, access modifiers, or interface field declarations. Use explicitly typed method/property contracts. Opaque external annotation identities remain conservative.
+This initial contract syntax does not include overloaded methods, generic interfaces, static interface members, non-public interface contracts, or interface field declarations. Use explicitly typed method/property contracts. Opaque external annotation identities remain conservative.
 
 ## LGD output choices
 

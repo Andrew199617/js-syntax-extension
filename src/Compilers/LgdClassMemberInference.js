@@ -4,6 +4,28 @@ const { tsTypeMap, baseTypeName, isNullableType } = require('./LgdTypeMaps');
 
 /** @description Infers member values conservatively from shared class identities and mapped lexical effects. */
 const LgdClassMemberInference = {
+    /** @description Resolves a nominal member annotation in its declaration scope, never in an access-site value shadow. */
+    memberType(resolved)
+    {
+        if(this._memberTypes.has(resolved.member))
+        {
+            return this._memberTypes.get(resolved.member);
+        }
+
+        // Imported annotations use defining-source identity, never a namesake in the consumer scope.
+        return this._externalTypes.get(resolved.member.typeIdentity) || null;
+    },
+
+    /** @description Carries the field annotation identity and lexical source scope into write compatibility. */
+    memberTypeOptions(resolved, value)
+    {
+        const inferred = typeof value === 'string' ? null : this.receiver(value);
+        return { expectedIdentity: this.memberType(resolved), inferredIdentity: inferred?.declaration,
+            typeOffset: this._memberTypeOffsets.get(resolved.member) ?? null,
+            unresolvedIdentity: !this.memberType(resolved) };
+    },
+
+
     /** @description Infers annotated fields, methods, and class construction without confusing type objects with instances. */
     expressionType(path, signature)
     {

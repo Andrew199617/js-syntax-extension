@@ -153,11 +153,15 @@ function memberContract(member, declaration)
         propertyTypeName: member.propertyTypeName || null,
         getter: Boolean(member.getter),
         setter: Boolean(member.setter),
+        getterAccessibility: member.getterAccessibility || member.accessibility || 'public',
+        setterAccessibility: member.setterAccessibility || member.accessibility || 'public',
         abstract: true,
         async: Boolean(member.async),
         generator: Boolean(member.generator),
         declaredIn: declaration.name || declaration.exportName,
-        originKind: declaration.kind
+        originKind: declaration.kind,
+        accessibility: member.accessibility || 'public',
+        declaringProjectId: declaration.projectId || null
     };
 }
 
@@ -735,6 +739,16 @@ function check(content, declarations, externals = new Map())
         const seen = new Set();
         for(const contract of table.contractSignatures)
         {
+            const internalGetter = contract.getter && contract.getterAccessibility === 'internal';
+            const internalSetter = contract.setter && contract.setterAccessibility === 'internal';
+            const internalMember = contract.accessibility === 'internal' || internalGetter || internalSetter;
+            const inaccessible = internalMember && contract.declaringProjectId && contract.declaringProjectId !== declaration.projectId;
+            if(inaccessible && contract.originKind === 'class' && !declaration.abstract)
+            {
+                addError(errors, declaration, `Class '${declaration.name}' cannot implement inaccessible internal abstract member '${contract.name}'.`, 'inaccessibleMember');
+                continue;
+            }
+
             const implementation = implementations.get(contract.name);
             const member = declaration.classMembers?.find(candidate => candidate.name === contract.name) || declaration;
             let mismatch;

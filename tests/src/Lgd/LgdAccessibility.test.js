@@ -4,6 +4,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
+const LgdCompletionProvider = require('../../../src/Lgd/LgdCompletionProvider');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
 
 let directory;
@@ -147,4 +148,124 @@ test('Does not confuse same-named exported classes when checking private ownersh
         'class Value { private Number count; test(Other other) { other.count; } }'
     ]);
     expect(accessErrors(state)).toHaveLength(1);
+});
+
+test('Checks chained member and method results using their defining-file type identities.', async () =>
+{
+    await write('Item.lgd', [
+        'class Item { private Number secret; public Number count; }',
+        'module.exports = Item;'
+    ]);
+
+    await write('Box.lgd', [
+        'const Item = require("./Item.js");',
+        'class Box { Item item = Item.create(); Item getItem() { return item; } }',
+        'module.exports = Box;'
+    ]);
+    const state = await open('Use.lgd', [
+        'const Box = require("./Box.js");',
+        'class Item { public Number secret; }',
+        'const box = Box.create();',
+        'box.item.secret; box.getItem().secret;',
+        'box.item.count;'
+    ]);
+    expect(accessErrors(state)).toHaveLength(2);
+    expect(accessErrors(state).every(error => error.message.includes('secret'))).toBe(true);
+    await write('Item.lgd', [ 'class Item { public Number secret; public Number count; }', 'module.exports = Item;' ]);
+    await service.invalidateFile(path.join(directory, 'Item.lgd'));
+    expect(accessErrors(state)).toEqual([]);
+});
+
+test('Offers only accessible instance and static completions at the cursor.', async () =>
+{
+    const state = await open('Use.lgd', [
+        'class Value { private Number secret; public Number count; private static Number hidden; public static Number total; }',
+        'Value value = Value.create();',
+        'value.count; Value.total;'
+    ]);
+    const provider = LgdCompletionProvider.create(service);
+    const source = state.document.getText();
+    const instanceOffset = source.indexOf('value.count') + 'value.'.length;
+    const typeOffset = source.indexOf('Value.total') + 'Value.'.length;
+    const instance = await provider.provideCompletionItems(state.document, state.document.positionAt(instanceOffset));
+    const type = await provider.provideCompletionItems(state.document, state.document.positionAt(typeOffset));
+    expect(instance.map(item => item.label)).toEqual(['count']);
+    expect(type.map(item => item.label)).toEqual(expect.arrayContaining([ 'total', 'create' ]));
+    expect(type.map(item => item.label)).not.toContain('hidden');
+});
+
+test('Keeps own private members in this completions while hiding private inherited members.', async () =>
+{
+    const state = await open('Use.lgd', [
+        'class Base { private Number hidden; protected Number shared; }',
+        'class Child : Base { private Number own; inspect() { this.own; } }'
+    ]);
+    const source = state.document.getText();
+    const offset = source.indexOf('this.own') + 'this.'.length;
+    const items = await LgdCompletionProvider.create(service).provideCompletionItems(state.document, state.document.positionAt(offset));
+    expect(items.map(item => item.label)).toEqual(expect.arrayContaining([ 'shared', 'own' ]));
+    expect(items.map(item => item.label)).not.toContain('hidden');
+});
+
+test('Rejects satisfying an inaccessible abstract obligation from a different project.', async () =>
+{
+    await write('library/lgdconfig.json', ['{}']);
+    await write('library/Base.lgd', [
+        'public abstract class Base { internal abstract Number read(); }',
+        'module.exports = Base;'
+    ]);
+    const state = await open('Use.lgd', [
+        'const Base = require("./library/Base.js");',
+        'class Derived : Base { public Number read() { return 1; } }'
+    ]);
+    expect(state.errors.some(error => error.message.includes('inaccessible internal abstract'))).toBe(true);
+});
+
+test.each([
+    'const IValue = require("./library/IValue.js");',
+    'const ordinary = 0, IValue = require("./library/IValue.js");',
+    'const IValue = (require("./library/IValue.js"));'
+])('Checks internal interface imports before type-only erasure: %s', async imported =>
+{
+    await write('library/lgdconfig.json', ['{}']);
+    await write('library/IValue.lgd', [ 'internal interface IValue { Number read(); }', 'module.exports = IValue;' ]);
+    const state = await open('Use.lgd', [
+        imported
+    ]);
+    expect(accessErrors(state)).toHaveLength(1);
+    const error = accessErrors(state)[0];
+    expect(state.document.getText().slice(error.offset, error.endOffset)).toBe('IValue');
+    expect(state.jsDocument.getText()).not.toContain('require(');
+});
+
+test('Rejects overriding an internal abstract accessor from another project.', async () =>
+{
+    await write('library/lgdconfig.json', ['{}']);
+    await write('library/Base.lgd', [
+        'public abstract class Base { public abstract Number Score { get; internal set; } }',
+        'module.exports = Base;'
+    ]);
+    const state = await open('Use.lgd', [
+        'const Base = require("./library/Base.js");',
+        'class Child : Base {',
+        '    public override get Number Score() { return 1; }',
+        '    internal override set Score(Number value) {}',
+        '}'
+    ]);
+    expect(state.errors.some(error => error.code === 'lgd.access.override')).toBe(true);
+    expect(state.errors.some(error => error.message.includes('inaccessible internal abstract'))).toBe(true);
+});
+
+test('Uses canonical declaring ownership when a protected base is imported through a symlink.', async () =>
+{
+    const basePath = await write('Base.lgd', [
+        'class Base { protected Number read() { return 1; } }',
+        'module.exports = Base;'
+    ]);
+    await fs.symlink(basePath, path.join(directory, 'Alias.lgd'));
+    const state = await open('Use.lgd', [
+        'const Base = require("./Alias.js");',
+        'class Child : Base { Number value() { return this.read(); } }'
+    ]);
+    expect(state.errors).toEqual([]);
 });

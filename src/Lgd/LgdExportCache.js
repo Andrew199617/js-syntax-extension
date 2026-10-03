@@ -1,6 +1,7 @@
 const fs = require('fs');
 const LgdProjectIdentity = require('../Compilers/LgdProjectIdentity');
 const LgdAccessibility = require('../Compilers/LgdAccessibility');
+const LgdMemberTypeGraph = require('../Compilers/LgdMemberTypeGraph');
 const LgdClassMemberSemantics = require('../Compilers/LgdClassMemberSemantics');
 const { maskCode } = require('../Compilers/LgdInfer');
 const { baseTypeName } = require('../Compilers/LgdTypeMaps');
@@ -127,7 +128,7 @@ function exportSignature(service, exported)
     return JSON.stringify({
         name: exported.name, typeName: exported.typeName, keyword: exported.keyword,
         accessibility: exported.accessibility, projectId: exported.projectId, ancestry: exported.ancestry,
-        constructorAccessibility: exported.constructorAccessibility,
+        constructorAccessibility: exported.constructorAccessibility, typeTable: exported.typeTable,
         kind: exported.kind, baseName: exported.baseName, abstract: exported.abstract,
         contractKind: exported.contractKind, interfaceNames: exported.interfaceNames,
         contractSignatures: exported.contractSignatures, contractsKnown: exported.contractsKnown,
@@ -291,18 +292,18 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
     }
 
     const document = { uri: { fsPath: sourcePath }, getText: () => targetText };
-    const hasHeritage = declaration.baseName || declaration.heritage?.length > 0;
-    const externals = hasHeritage ? await service.collectExternalTypes(document, resolving) : new Map();
+    const externals = await service.collectExternalTypes(document, resolving);
     if(service.exportCache.get(sourcePath) !== cached)
     {
         return service.readExportDeclaration(sourcePath, visited);
     }
 
-    const context = { declarations: parsed.allDeclarations, externals: externals, sourceText: targetText, sourcePath: sourcePath };
+    const context = { declarations: parsed.allDeclarations, externals: externals, sourceText: targetText, sourcePath: declaration.sourceIdentityPath || sourcePath };
     LgdContractChecker.classify(targetText, parsed.allDeclarations, externals);
     const methods = LgdOverrideChecker.describeMethods(targetText, parsed.allDeclarations, declaration, externals);
     const contracts = LgdContractChecker.describeContracts(targetText, parsed.allDeclarations, declaration, externals);
     const keywords = [ 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object', 'Array', 'Function' ];
+    const registry = LgdClassMemberSemantics.create({ content: targetText, declarations: parsed.allDeclarations, externals: externals });
     const exported = {
         name: declaration.name,
         typeName: declaration.typeName,
@@ -312,7 +313,8 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
         explicitAccessibility: declaration.accessibilityStart !== null,
         projectId: cached.projectId,
         constructorAccessibility: declaration.constructorMember?.accessibility || 'public',
-        ancestry: LgdAccessibility.ancestry(declaration, LgdClassMemberSemantics.create({ content: targetText, declarations: parsed.allDeclarations, externals: externals })),
+        ancestry: LgdAccessibility.ancestry(declaration, registry),
+        typeTable: LgdMemberTypeGraph.describe(registry),
         enumValueType: declaration.enumValueType,
         baseName: declaration.baseName,
         constructorParams: getConstructorParams(declaration),

@@ -71,7 +71,8 @@ const LgdCompiler = {
         backend.objectModel = resolved.options.javascriptObjectModel;
         const output = this.emitRange(content, backend, this.fullRange(content, parsed.declarations));
         const members = LgdClassMemberSemantics.rewrite(output, content, parsed.allDeclarations, externals);
-        const erased = LgdInterfaceErasure.apply(content, parsed.allDeclarations, externals, members);
+        const erased = LgdInterfaceErasure.apply(content, parsed.allDeclarations, externals, { ...members, projectId: parsed.projectId });
+        this.appendTypeErrors(content, parsed.errors, erased.errors || []);
         const emitted = LgdInterfaceTypes.apply(content, parsed.allDeclarations, externals, erased);
         const validation = LgdGeneratedJsValidator.validate(emitted, content);
         if(!parsed.errors.some(error => error.severity !== 'warning'))
@@ -171,6 +172,7 @@ const LgdCompiler = {
      */
     parse(content, externals = new Map(), options = {})
     {
+        options = { ...externals.sourceContext, ...options };
         const classes = LgdClassSyntax.parse(content, this);
         const enums = LgdEnumSyntax.parse(content, this);
         const found = [ ...classes.declarations, ...enums.declarations ];

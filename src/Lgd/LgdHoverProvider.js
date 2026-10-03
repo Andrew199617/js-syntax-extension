@@ -58,10 +58,15 @@ const LgdHoverProvider = {
         const wordRange = document.getWordRangeAtPosition(position);
         if(wordRange)
         {
-            const declaredField = LgdClassMemberLookup.get(state, position);
-            if(declaredField?.kind === 'field')
+            const declaredMember = LgdClassMemberLookup.get(state, position);
+            if(declaredMember?.kind === 'field')
             {
-                return new vscode.Hover(this.renderDeclaredField(declaredField), wordRange);
+                return new vscode.Hover(this.renderDeclaredField(declaredMember), wordRange);
+            }
+
+            if(declaredMember && this.hasExplicitVisibility(declaredMember))
+            {
+                return new vscode.Hover(this.renderDeclaredMember(declaredMember), wordRange);
             }
 
             const memberHover = this.provideThisMemberHover(document, position, wordRange);
@@ -179,10 +184,80 @@ const LgdHoverProvider = {
     /** @description Shows the declared field type and owner even when the JavaScript mirror cannot infer a default-only field. */
     renderDeclaredField(detail)
     {
-        const modifier = `${detail.static ? 'static ' : ''}${detail.readonly ? 'readonly ' : ''}`;
+        const modifier = `${this.visibilityPrefix(detail)}${detail.static ? 'static ' : ''}${detail.readonly ? 'readonly ' : ''}`;
         const owner = detail.declaringType ? `${detail.declaringType}.` : '';
         const type = detail.propertyTypeName || detail.typeName;
         return [ '```lgd', `${modifier}${type} ${owner}${detail.name}`, '```' ].join('\n');
+    },
+
+    /** @description Distinguishes written visibility and accessor restrictions from the unchanged public default. */
+    hasExplicitVisibility(detail)
+    {
+        return Boolean(detail.explicitAccessibility || this.hasMixedAccessorVisibility(detail));
+    },
+
+    /** @description Detects getter and setter access levels that need separate labels. */
+    hasMixedAccessorVisibility(detail)
+    {
+        return Boolean(detail.getterAccessibility && detail.setterAccessibility && detail.getterAccessibility !== detail.setterAccessibility);
+    },
+
+    /** @description Includes visibility only when it was written in the source declaration. */
+    visibilityPrefix(detail)
+    {
+        return detail.explicitAccessibility ? `${detail.accessibility} ` : '';
+    },
+
+    /** @description Formats accessor restrictions without treating a private setter as a private getter. */
+    accessorSuffix(detail)
+    {
+        const mixed = this.hasMixedAccessorVisibility(detail);
+        const accessors = [];
+        if(detail.getterAccessibility)
+        {
+            accessors.push(`${mixed ? `${detail.getterAccessibility} ` : ''}get;`);
+        }
+
+        if(detail.setterAccessibility)
+        {
+            accessors.push(`${mixed ? `${detail.setterAccessibility} ` : ''}set;`);
+        }
+
+        return accessors.length > 0 ? ` { ${accessors.join(' ')} }` : '';
+    },
+
+    /** @description Shows explicit source method, accessor, and constructor signatures before mirror fallbacks. */
+    renderDeclaredMember(detail)
+    {
+        const visibility = this.visibilityPrefix(detail);
+        const params = (detail.params || []).map(this.formatTypedParameter).join(', ');
+        if(detail.isConstructor)
+        {
+            return [ '```lgd', `${visibility}${detail.name}(${params})`, '```' ].join('\n');
+        }
+
+        const owner = detail.declaringType ? `${detail.declaringType}.` : '';
+        const modifier = `${visibility}${detail.static ? 'static ' : ''}${detail.async ? 'async ' : ''}`;
+        const type = detail.returnTypeName ? `${detail.returnTypeName} ` : '';
+        if(detail.accessorKind)
+        {
+            return [ '```lgd', `${modifier}${detail.accessorKind} ${type}${owner}${detail.name}(${params})`, '```' ].join('\n');
+        }
+
+        if(detail.accessor)
+        {
+            const mixed = this.hasMixedAccessorVisibility(detail);
+            let prefix = modifier;
+            if(mixed)
+            {
+                prefix = detail.static ? 'static ' : '';
+            }
+
+            const valueType = detail.propertyTypeName || detail.typeName;
+            return [ '```lgd', `${prefix}${valueType} ${owner}${detail.name}${this.accessorSuffix(detail)}`, '```' ].join('\n');
+        }
+
+        return [ '```lgd', `${modifier}${type}${owner}${detail.name}(${params})`, '```' ].join('\n');
     },
 
     /**
@@ -192,7 +267,7 @@ const LgdHoverProvider = {
      */
     renderMethodSummary(detail)
     {
-        return [ '```lgd', `(method) ${detail.name}()`, '```' ].join('\n');
+        return [ '```lgd', `(method) ${this.visibilityPrefix(detail)}${detail.name}()`, '```' ].join('\n');
     },
 
     /**
@@ -205,11 +280,11 @@ const LgdHoverProvider = {
         const type = detail.typeName ? `: ${detail.typeName}` : '';
         if(!detail.properties || detail.properties.length === 0)
         {
-            return [ '```lgd', `(property) ${detail.name}${type}`, '```' ].join('\n');
+            return [ '```lgd', `(property) ${this.visibilityPrefix(detail)}${detail.name}${type}`, '```' ].join('\n');
         }
 
         const lines = detail.properties.map(property => `    ${property},`);
-        return [ '```lgd', `(property) ${detail.name}${type} {`, ...lines, '}', '```' ].join('\n');
+        return [ '```lgd', `(property) ${this.visibilityPrefix(detail)}${detail.name}${type} {`, ...lines, '}', '```' ].join('\n');
     },
 
     /**
@@ -222,25 +297,28 @@ const LgdHoverProvider = {
         if(summary.kind === 'enum')
         {
             const lines = summary.members.map(member => `    ${member.name} = ${member.valueText},`);
-            return [ '```lgd', `enum ${summary.name} {`, ...lines, '}', '```' ].join('\n');
+            return [ '```lgd', `${this.visibilityPrefix(summary)}enum ${summary.name} {`, ...lines, '}', '```' ].join('\n');
         }
 
         if(summary.kind === 'class' || summary.kind === 'interface')
         {
             const heritage = [ summary.baseName, ...summary.interfaceNames || [] ].filter(Boolean);
             const base = heritage.length > 0 ? ` : ${heritage.join(', ')}` : '';
-            const modifier = summary.abstract && summary.kind === 'class' ? 'abstract ' : '';
+            const modifier = `${this.visibilityPrefix(summary)}${summary.abstract && summary.kind === 'class' ? 'abstract ' : ''}`;
             const constructorParams = (summary.constructorParams || []).map(this.formatTypedParameter).join(', ');
             const visibleMembers = summary.members.filter(member => !summary.abstract || member.name !== 'create');
             const lines = visibleMembers.map(member =>
             {
                 if(member.name === 'create')
                 {
-                    return `    create(${constructorParams}),`;
+                    return `    ${this.visibilityPrefix(member)}create(${constructorParams}),`;
                 }
 
                 const type = member.typeName ? `: ${member.typeName}` : '';
-                return `    ${member.name}${member.kind === 'method' ? '()' : type},`;
+                const mixed = this.hasMixedAccessorVisibility(member);
+                const visibility = mixed ? '' : this.visibilityPrefix(member);
+                const accessors = this.hasExplicitVisibility(member) && member.accessor ? this.accessorSuffix(member) : '';
+                return `    ${visibility}${member.name}${member.kind === 'method' ? '()' : type}${accessors},`;
             });
 
             return [ '```lgd', `${modifier}${summary.kind} ${summary.name}${base} {`, ...lines, '}', '```' ].join('\n');

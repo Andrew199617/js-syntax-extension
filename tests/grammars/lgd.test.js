@@ -382,6 +382,32 @@ describe('LGD TextMate grammar.', () =>
         }
     });
 
+    test('Highlights internal visibility on types, methods, fields, constructors, and accessors.', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'internal abstract class Sample {',
+            '    private Sample() {}',
+            '    protected readonly Number value;',
+            '    internal Number read() { return this.value; }',
+            '    public get Number score() { return 1; }',
+            '    private set score(Number next) {}',
+            '    public abstract Number Count { get; protected set; }',
+            '}'
+        ].join('\n'));
+        for(const word of [ 'internal', 'abstract', 'private', 'protected', 'readonly', 'public' ])
+        {
+            const matching = tokens.filter(token => token.text === word);
+            assert.ok(matching.length > 0);
+            assert.ok(matching.every(token => token.scopes.includes(readonlyScope)), JSON.stringify(matching));
+        }
+
+        assertScope(tokens, 'Number', typeScope);
+        assertScope(tokens, 'value', nameScope);
+        assertScope(tokens, 'Sample', 'entity.name.type.class.lgd');
+        const identifiers = tokenize(grammar, 'const internal = 1; const words = { internal() {} }; words.internal(); // internal');
+        assertNoScope(identifiers, 'internal', readonlyScope);
+    });
+
     test('preserves keyword-like member names, identifiers, and literal text', () =>
     {
         const tokens = tokenize(grammar, [

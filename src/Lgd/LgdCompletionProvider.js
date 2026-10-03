@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const LgdAccessibilityEditor = require('./LgdAccessibilityEditor');
 const { maskCode } = require('../Compilers/LgdInfer');
 
 /** @import { CompletionItem, Position, TextDocument } from 'vscode' */
@@ -44,9 +45,11 @@ const LgdCompletionProvider = {
             return null;
         }
 
+        const state = this.languageService.getState(document.uri);
         if(match.groups.objectName === 'this')
         {
-            const members = this.languageService.getThisMembers(document, position);
+            const candidates = this.languageService.getThisMembers(document, position);
+            const members = LgdAccessibilityEditor.filter(state, position, 'this', candidates);
             if(members.length === 0)
             {
                 return null;
@@ -61,7 +64,8 @@ const LgdCompletionProvider = {
             return null;
         }
 
-        const members = summary.kind === 'class' ? summary.members.filter(member => member.static) : summary.members;
+        const candidates = summary.kind === 'class' ? summary.members.filter(member => member.static) : summary.members;
+        const members = LgdAccessibilityEditor.filter(state, position, match.groups.objectName, candidates);
         return members.map(member => this.toCompletionItem(member));
     },
 

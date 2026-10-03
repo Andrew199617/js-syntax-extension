@@ -118,6 +118,20 @@ describe.each([ 'oloo', 'class' ])('LGD compile-time accessibility in %s output'
 
 describe('LGD visibility inheritance and syntax', () =>
 {
+    test('Locates rewritten implicit access and checks named destructuring reads.', () =>
+    {
+        const lines = [
+            'class Base { private Number secret; }',
+            'class Derived : Base { test() { secret; } }',
+            'const value = Base.create();',
+            'const { secret: copy } = value;',
+            'let count; ({ secret: count } = value);'
+        ];
+        const source = lines.join('\r\n');
+        const result = compile(lines);
+        expect(accessErrors(result).map(error => source.slice(error.offset, error.endOffset))).toEqual([ 'secret', 'secret', 'secret' ]);
+    });
+
     test('Allows protected access through derived receivers and rejects base and sibling receivers.', () =>
     {
         const result = compile([
@@ -132,6 +146,16 @@ describe('LGD visibility inheritance and syntax', () =>
             'Derived.create().score();'
         ]);
         expect(accessErrors(result)).toHaveLength([ 'first', 'second', 'third' ].length);
+    });
+
+    test('Distinguishes protected member destructuring from protected factory extraction.', () =>
+    {
+        const result = compile([
+            'class Base { protected Base() {} protected Number score() { return 1; } }',
+            'class Derived : Base { test(Derived other) { const { score } = other; const { create } = Base; } }'
+        ]);
+        expect(accessErrors(result)).toHaveLength(1);
+        expect(accessErrors(result)[0].message).toContain('create');
     });
 
     test('Allows protected base construction but rejects explicit base factories inside the derived class.', () =>

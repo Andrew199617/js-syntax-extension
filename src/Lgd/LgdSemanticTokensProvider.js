@@ -118,6 +118,12 @@ const LgdSemanticTokensProvider = {
                 spans.push({ start: start, end: start + match[0].length, tokenType: LgdKeywordFamilies.get(match[0]).tokenType });
             }
 
+            if(Number.isInteger(declaration.accessibilityStart))
+            {
+                spans.push({ start: declaration.accessibilityStart, end: declaration.accessibilityEnd,
+                    tokenType: LgdKeywordFamilies.get(declaration.accessibility).tokenType });
+            }
+
             if(declaration.kind !== 'class' && declaration.kind !== 'interface' && declaration.kind !== 'enum')
             {
                 continue;

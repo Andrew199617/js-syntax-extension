@@ -12,6 +12,13 @@ const categories = Object.freeze({
 /** @description Explicit diagnostic definitions link internal IDs to presentation and permitted fix strategies. */
 const definitions = Object.freeze({
     'lgd.jsdoc.returnType': { category: 'warning', proposalKind: 'removeReturnDocType', fixKinds: ['removeReturnDocType'] },
+    'lgd.syntax.declarationModifier': { category: 'syntax' },
+    'lgd.access.inaccessible': { category: 'type' },
+    'lgd.access.signature': { category: 'type' },
+    'lgd.access.override': { category: 'type' },
+    'lgd.access.privateVirtual': { category: 'type' },
+    'lgd.access.interfaceMember': { category: 'type' },
+    'lgd.access.accessor': { category: 'syntax' },
     'lgd.jsdoc.virtual': { category: 'warning', proposalKind: 'moveVirtualModifier', fixKinds: ['moveVirtualModifier'] },
     'lgd.declaration.readonly': { category: 'warning', proposalKind: 'replaceReadonlyLocal', fixKinds: ['replaceReadonlyLocal'] },
     'lgd.object.inheritance': { category: 'inheritance', proposalKind: 'convertObjectInheritance', fixKinds: [ 'convertObjectInheritance', 'prepareObjectInheritance' ] },

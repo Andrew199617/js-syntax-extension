@@ -134,6 +134,11 @@ const LgdEnumSyntax = {
         const edits = declaration.members.map(member => ({ start: member.equalsStart - declaration.start,
             end: member.equalsStart - declaration.start + 1, text: ':' }));
 
+        if(Number.isInteger(declaration.accessibilityStart))
+        {
+            edits.push({ start: declaration.accessibilityStart - declaration.start, end: declaration.accessibilityEnd - declaration.start, text: '' });
+        }
+
         edits.push({ start: declaration.typeStart - declaration.start, end: declaration.typeStart - declaration.start + 'enum'.length, text: 'const' });
         edits.push({ start: declaration.nameEnd - declaration.start, end: declaration.initializerStart - declaration.start, text: ' = Object.freeze(' });
         edits.push({ start: declaration.initializerEnd - declaration.start, end: declaration.end - declaration.start, text: ');' });

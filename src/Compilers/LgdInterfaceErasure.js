@@ -1,4 +1,5 @@
 const parser = require('@babel/parser');
+const LgdAccessibility = require('./LgdAccessibility');
 const traverse = require('@babel/traverse').default;
 const { maskCode } = require('./LgdInfer');
 const LgdBaseChecker = require('./LgdBaseChecker');
@@ -40,13 +41,14 @@ const LgdInterfaceErasure = {
             bindings: LgdBaseChecker.collectBindings({ content: content, masked: masked, declarations: declarations,
                 scopes: LgdBaseChecker.collectScopes(masked), externals: externals }),
             imports: new Set(),
+            projectId: emitted.projectId, errors: [],
             ranges: []
         };
         traverse(syntax, { VariableDeclaration: path => this.collectImports(path, context) });
         traverse(syntax, { ExpressionStatement: path => this.collectExport(path, context) });
         const edits = this.commentPreservingEdits(context.code, context.ranges, syntax.comments || []);
         const segments = emitted.segments.map(segment => ({ ...segment }));
-        return { code: this.rewrite(context.code, segments, edits), segments: segments };
+        return { code: this.rewrite(context.code, segments, edits), segments: segments, errors: context.errors };
     },
 
     /** @description Recognizes interface declarations and exported interface contract metadata. */
@@ -71,6 +73,19 @@ const LgdInterfaceErasure = {
         return directRequire && specifier.type === 'StringLiteral' && this.isInterface(context.externals.get(specifier.value));
     },
 
+    /** @description Validates actual interface import bindings before their code and call sites disappear. */
+    checkImportAccessibility(path, context)
+    {
+        const specifier = path.node.init.arguments[0];
+        const external = context.externals.get(specifier.value);
+        const internal = external.accessibility === 'internal';
+        if(internal && (!external.projectId || external.projectId !== context.projectId))
+        {
+            const name = path.node.id;
+            context.errors.push(LgdAccessibility.diagnostic(context.map.toSource(name.start), context.map.toSource(name.end), name.name, 'internal'));
+        }
+    },
+
     /** @description Records direct interface imports and removes only their declaration groups. */
     collectImports(path, context)
     {
@@ -81,6 +96,7 @@ const LgdInterfaceErasure = {
             if(selected[index])
             {
                 context.imports.add(declarators[index].scope.getBinding(declarators[index].node.id.name));
+                this.checkImportAccessibility(declarators[index], context);
             }
         }
 

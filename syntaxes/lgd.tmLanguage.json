@@ -12,6 +12,9 @@
 			"include": "#method-modifier"
 		},
 		{
+			"include": "#accessor-visibility"
+		},
+		{
 			"include": "#typed-method"
 		},
 		{
@@ -36,6 +39,9 @@
 				},
 				{
 					"include": "#method-modifier"
+				},
+				{
+					"include": "#accessor-visibility"
 				},
 				{
 					"include": "#typed-method"
@@ -112,8 +118,8 @@
 		},
 		"class-declaration": {
 			"name": "meta.class.lgd",
-			"comment": "Declaration/modifier scopes also cover contextual public/sealed headers without enabling unsupported compiler syntax.",
-			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?((?:(?:abstract|sealed|public|protected|private|static)[ \\t]+)*)(class|interface|enum)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
+			"comment": "Class, interface, and enum declaration heads retain their declaration and contextual modifier scopes.",
+			"begin": "^([ \\t]*)(?:(export)[ \\t]+)?((?:(?:abstract|sealed|public|protected|private|internal|static)[ \\t]+)*)(class|interface|enum)[ \\t]+([$_a-zA-Z][\\w$]*)(?:[ \\t]*(:)[ \\t]*([$_a-zA-Z][\\w$]*(?:\\.[_a-zA-Z$][\\w$]*)*))?",
 			"beginCaptures": {
 				"2": {
 					"name": "keyword.control.lgd"
@@ -121,7 +127,7 @@
 				"3": {
 					"patterns": [
 						{
-							"match": "\\b(?:abstract|sealed|public|protected|private|static)\\b",
+							"match": "\\b(?:abstract|sealed|public|protected|private|internal|static)\\b",
 							"name": "storage.modifier.lgd"
 						}
 					]
@@ -174,8 +180,8 @@
 			}
 		},
 		"method-modifier": {
-			"comment": "Contextual declaration modifiers are theme roles only; compiler support is unchanged.",
-			"match": "(?<![\\w$.])\\b(abstract|virtual|override|public|protected|private|sealed|static|async|readonly)\\b(?=[ \\t]+(?:(?:abstract|virtual|override|public|protected|private|sealed|static|async|readonly)[ \\t]+)*(?:\\*[ \\t]*)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
+			"comment": "Contextual modifiers before methods, accessors, and constructors retain their theme roles.",
+			"match": "(?<![\\w$.])\\b(abstract|virtual|override|public|protected|private|internal|sealed|static|async|readonly)\\b(?=[ \\t]+(?:(?:abstract|virtual|override|public|protected|private|internal|sealed|static|async|readonly)[ \\t]+)*(?:\\*[ \\t]*)?(?:(?:get|set)[ \\t]+)?(?:(?:void|(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)[ \\t]+)?[$_a-zA-Z][\\w$]*[ \\t]*\\()",
 			"captures": {
 				"1": {
 					"name": "storage.modifier.lgd"
@@ -193,13 +199,13 @@
 			"match": "(?<![\\w$.])\\bbase\\b(?=[ \\t]*\\.[ \\t]*[$_a-zA-Z][\\w$]*[ \\t]*\\()"
 		},
 		"typed-field": {
-			"comment": "Typed readonly and static fields keep modifier, type and name roles before semantic tokens arrive.",
-			"match": "^[ \\t]*((?:(?:static|readonly)[ \\t]+)+)((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)[ \\t]+([$_a-zA-Z][\\w$]*)(?=[ \\t]*[;=])",
+			"comment": "Modified fields and property contracts retain modifier, type, and name roles before semantic tokens arrive.",
+			"match": "^[ \\t]*((?:(?:static|readonly|abstract|override|public|protected|private|internal)[ \\t]+)+)((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*\\??)[ \\t]+([$_a-zA-Z][\\w$]*)(?=[ \\t]*[;={])",
 			"captures": {
 				"1": {
 					"patterns": [
 						{
-							"match": "\\b(?:static|readonly)\\b",
+							"match": "\\b(?:static|readonly|abstract|override|public|protected|private|internal)\\b",
 							"name": "storage.modifier.lgd"
 						}
 					]
@@ -209,6 +215,15 @@
 				},
 				"3": {
 					"name": "variable.other.definition.lgd"
+				}
+			}
+		},
+		"accessor-visibility": {
+			"comment": "Restricted signature-only accessors retain visibility scopes inside property contracts.",
+			"match": "(?<![\\w$.])\\b(public|protected|private|internal)\\b(?=[ \\t]+(?:get|set)[ \\t]*;)",
+			"captures": {
+				"1": {
+					"name": "storage.modifier.lgd"
 				}
 			}
 		}

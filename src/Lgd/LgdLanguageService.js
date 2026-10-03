@@ -2,7 +2,7 @@ const vscode = require('vscode');
 const path = require('path');
 const LgdProjectIdentity = require('../Compilers/LgdProjectIdentity');
 const LgdExportCache = require('./LgdExportCache');
-const { getContractMetadata, getTypedMembers, getInterfaceMembers, getRuntimeMembers, filterThisMembers, filterDeclaredMembers } = require('./LgdContractEditor');
+const { getTypeSummary, getContractMetadata, getTypedMembers, getInterfaceMembers, getRuntimeMembers, filterThisMembers, filterDeclaredMembers } = require('./LgdContractEditor');
 const createLgdDiagnostics = require('./LgdDiagnostics');
 const settleEditorUpdate = require('./LgdEditorFailures');
 const LgdCompiler = require('../Compilers/LgdCompiler');
@@ -167,7 +167,7 @@ const LgdLanguageService = {
             return null;
         }
 
-        const identity = await LgdProjectIdentity.resolve({ sourcePath: state.document.uri.fsPath });
+        const identity = externals.sourceContext || await LgdProjectIdentity.resolve({ sourcePath: state.document.uri.fsPath });
         const result = this.compiler.compileToJs(content, externals, { ...this.getOutputOptions(state.document), ...identity });
         const newline = this.compiler.detectNewline(content);
 
@@ -191,6 +191,7 @@ const LgdLanguageService = {
         state.compiledVersion = version;
         state.compiledText = content;
         state.externals = externals;
+        state.projectId = identity.projectId;
         this.publishDiagnostics(state);
         return state;
     },
@@ -303,6 +304,7 @@ const LgdLanguageService = {
     async collectExternalTypes(document, visited = new Set())
     {
         const externals = new Map();
+        externals.sourceContext = await LgdProjectIdentity.resolve({ sourcePath: document.uri.fsPath });
         const dependencies = new Set();
         const fromDir = path.dirname(document.uri.fsPath);
         const resolving = new Set(visited);
@@ -335,8 +337,10 @@ const LgdLanguageService = {
                     if(exported.keyword === 'Object')
                     {
                         entry.accessibility = exported.accessibility;
+                        entry.explicitAccessibility = exported.explicitAccessibility;
                         entry.projectId = exported.projectId;
                         entry.ancestry = exported.ancestry;
+                        entry.typeTable = exported.typeTable;
                         entry.constructorAccessibility = exported.constructorAccessibility;
                         entry.sourcePath = exported.sourcePath;
                         entry.sourceText = exported.sourceText;
@@ -386,67 +390,7 @@ const LgdLanguageService = {
         return exported;
     },
 
-    /**
-     * @description Describes a declared name for hover and completions: its type and members.
-     * Require initializers are followed into the sibling .lgd file they load.
-     * @param {Uri} uri the LGD document uri.
-     * @param {string} name the hovered or completed name.
-     * @returns {Promise<Object|null>} the {name, typeName, readonly, members, params} summary, or null.
-     */
-    async getTypeSummary(uri, name)
-    {
-        const state = this.getState(uri);
-        if(!state || !state.declarations)
-        {
-            return null;
-        }
-
-        const context = this.getMemberContext(state);
-        const declaration = state.declarations.find(candidate => candidate.name === name);
-        if(!declaration)
-        {
-            const imported = this.findImportedType(name, context);
-            return imported
-                ? {
-                    name: name, typeName: imported.keyword, kind: imported.kind, baseName: imported.baseName,
-                    abstract: imported.abstract, interfaceNames: imported.interfaceNames,
-                    readonly: true, members: imported.members || [], params: [],
-                    constructorParams: imported.constructorParams || []
-                }
-                : null;
-        }
-
-        let required = this.getRequiredType(declaration.initializerText || '', context.externals);
-        let members = this.getDeclaredMembers(declaration, context);
-        if(required || members.length === 0)
-        {
-            const target = await this.resolveRequireTarget(state.document, declaration);
-            if(target)
-            {
-                members = target.members;
-                required = target;
-            }
-        }
-
-        const summary = {
-            kind: required?.kind === 'enum' ? 'enum' : declaration.kind,
-            name: declaration.name,
-            typeName: declaration.typeName,
-            readonly: declaration.readonly,
-            members: members,
-            params: this.describeTypedParams(declaration.typedParams)
-        };
-        if(declaration.kind === 'class' || declaration.kind === 'interface' || required?.kind === 'class' || required?.kind === 'interface')
-        {
-            summary.kind = required?.kind || declaration.kind;
-            summary.abstract = declaration.abstract || required?.abstract;
-            summary.interfaceNames = declaration.interfaceNames || required?.interfaceNames || [];
-            summary.baseName = declaration.baseName || required?.baseName;
-            summary.constructorParams = getConstructorParams(declaration) || required?.constructorParams || [];
-        }
-
-        return summary;
-    },
+    getTypeSummary(uri, name) { return getTypeSummary(this, uri, name); },
 
     /** @description Collects the source and resolved imports used to describe inherited members. */
     getMemberContext(state)

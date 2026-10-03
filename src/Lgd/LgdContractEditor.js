@@ -1,5 +1,75 @@
+const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
 const LgdClassMemberSemantics = require('../Compilers/LgdClassMemberSemantics');
 const LgdContractChecker = require('../Compilers/LgdContractChecker');
+
+/**
+ * @description Describes a declared name for hover and completions: its type and members.
+ * Require initializers are followed into the sibling .lgd file they load.
+ * @param {Uri} uri the LGD document uri.
+ * @param {string} name the hovered or completed name.
+ * @returns {Promise<Object|null>} the {name, typeName, readonly, members, params} summary, or null.
+ */
+async function getTypeSummary(service, uri, name)
+{
+    const state = service.getState(uri);
+    if(!state || !state.declarations)
+    {
+        return null;
+    }
+
+    const context = service.getMemberContext(state);
+    const declaration = state.declarations.find(candidate => candidate.name === name);
+    if(!declaration)
+    {
+        const imported = service.findImportedType(name, context);
+        return imported
+            ? {
+                name: name, typeName: imported.keyword, kind: imported.kind, baseName: imported.baseName,
+                abstract: imported.abstract, interfaceNames: imported.interfaceNames,
+                accessibility: imported.accessibility, explicitAccessibility: imported.explicitAccessibility,
+                readonly: true, members: imported.members || [], params: [],
+                constructorParams: imported.constructorParams || []
+            }
+            : null;
+    }
+
+    let required = service.getRequiredType(declaration.initializerText || '', context.externals);
+    let members = service.getDeclaredMembers(declaration, context);
+    if(required || members.length === 0)
+    {
+        const target = await service.resolveRequireTarget(state.document, declaration);
+        if(target)
+        {
+            members = target.members;
+            required = target;
+        }
+    }
+
+    const summary = {
+        kind: required?.kind === 'enum' ? 'enum' : declaration.kind,
+        name: declaration.name,
+        typeName: declaration.typeName,
+        readonly: declaration.readonly,
+        members: members,
+        params: service.describeTypedParams(declaration.typedParams)
+    };
+    if([ 'class', 'interface', 'enum' ].includes(summary.kind))
+    {
+        summary.accessibility = required?.accessibility || declaration.accessibility;
+        summary.explicitAccessibility = required?.explicitAccessibility || Number.isInteger(declaration.accessibilityStart);
+    }
+
+    if(declaration.kind === 'class' || declaration.kind === 'interface' || required?.kind === 'class' || required?.kind === 'interface')
+    {
+        summary.kind = required?.kind || declaration.kind;
+        summary.abstract = declaration.abstract || required?.abstract;
+        summary.interfaceNames = declaration.interfaceNames || required?.interfaceNames || [];
+        summary.baseName = declaration.baseName || required?.baseName;
+        summary.constructorParams = getConstructorParams(declaration) || required?.constructorParams || [];
+    }
+
+    return summary;
+}
 
 /**
  * @description Copies source-independent interface and abstract metadata into imported type entries.
@@ -93,6 +163,6 @@ function filterDeclaredMembers(members, declaration, required)
     return declaration.kind !== 'class' && !required ? filterReceiverMembers(members, false) : members;
 }
 
-module.exports = { filterDeclaredMembers: filterDeclaredMembers,
+module.exports = { getTypeSummary: getTypeSummary, filterDeclaredMembers: filterDeclaredMembers,
     getRuntimeMembers: getRuntimeMembers, filterReceiverMembers: filterReceiverMembers, filterThisMembers: filterThisMembers,
     getContractMetadata: getContractMetadata, getTypedMembers: getTypedMembers, getInterfaceMembers: getInterfaceMembers };

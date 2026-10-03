@@ -440,12 +440,18 @@ function check(content, declarations, externals = new Map())
             }
 
             const candidate = methods.get(member.name);
-            const foreignInternal = candidate?.accessibility === 'internal' && candidate.declaringProjectId && candidate.declaringProjectId !== declaration.projectId;
-            const inaccessible = candidate?.accessibility === 'private' || foreignInternal;
+            const accessorAccess = member.accessorKind === 'get' ? candidate?.getterAccessibility : candidate?.setterAccessibility;
+            const candidateAccess = member.accessorKind ? accessorAccess || candidate?.accessibility : candidate?.accessibility;
+            const foreignInternal = candidateAccess === 'internal' && candidate.declaringProjectId && candidate.declaringProjectId !== declaration.projectId;
+            const inaccessible = candidateAccess === 'private' || foreignInternal;
             const baseMember = inaccessible ? null : candidate;
             if(!baseMember)
             {
-                if(member.override && inherited.methodsKnown)
+                if(member.override && inaccessible)
+                {
+                    addError(errors, member, `Cannot override inaccessible ${candidateAccess} member '${member.name}'.`, { code: 'lgd.access.override' });
+                }
+                else if(member.override && inherited.methodsKnown)
                 {
                     addError(errors, member, `Method '${member.name}' is marked override but no inherited method has that name.`);
                 }
