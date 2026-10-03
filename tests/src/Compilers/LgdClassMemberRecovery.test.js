@@ -61,6 +61,64 @@ describe('LGD class-member error locations and bounded recovery.', () =>
         expect(result.declarations[0].classMembers).toEqual([]);
     });
 
+    test('Locates a missing constructor opener after parameters and recovers past its object assignment.', () =>
+    {
+        const source = [
+            "readonly Object vscode = require('vscode');",
+            'class BaseCommand {',
+            '  BaseCommand(String commandName, String title)',
+            '    /** @type {vscode.Command} */',
+            '    this.command = { title: title, command: commandName };',
+            '  }',
+            '  Object command = {};',
+            '  get commandName() { return this.command.command; }',
+            '  void createCommand() { return vscode.commands.registerCommand(this.commandName, this.executeCommand, this); }',
+            '  void executeCommand() { throw new Error("Did not implement!"); }',
+            '  findNextChar() {}',
+            '  findPreviousChar() {}',
+            '}'
+        ].join('\n');
+        const result = parse(source);
+        const insertionOffset = source.indexOf('String title)') + 'String title)'.length;
+        expect(result.errors).toEqual([expect.objectContaining({
+            message: 'Expected "{" after constructor parameters.',
+            offset: insertionOffset, endOffset: insertionOffset, code: 'lgd.syntax.missingMemberBody'
+        })]);
+
+        expect(result.declarations[0].classMembers.map(member => member.name)).toEqual([
+            'command', 'commandName', 'createCommand', 'executeCommand', 'findNextChar', 'findPreviousChar'
+        ]);
+        expect(result.declarations[0].end).toBe(source.length);
+        expect(result.declarations[0].contractSyntaxComplete).toBe(false);
+        const broken = LgdCompiler.create().compileToJs(source);
+        expect(broken.errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'lgd.syntax.missingMemberBody' })]));
+        const repaired = `${source.slice(0, insertionOffset)} {${source.slice(insertionOffset)}`;
+        expect(parse(repaired).errors).toEqual([]);
+        const knownReturn = repaired.replace('return vscode.commands.registerCommand(this.commandName, this.executeCommand, this);', 'return 1;');
+        const compiled = LgdCompiler.create().compileToJs(knownReturn);
+        expect(compiled.errors).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'lgd.return.typeMismatch' })]));
+    });
+
+    test('Does not absorb a following top-level declaration after a missing opener.', () =>
+    {
+        const source = 'class First {\n First()\n this.value = {};\n}\nclass Second {\n good() {}\n}';
+        const result = parse(source);
+        expect(result.errors).toHaveLength(1);
+        expect(result.declarations.map(declaration => declaration.name)).toEqual([ 'First', 'Second' ]);
+        expect(result.declarations[0].classMembers).toEqual([]);
+        expect(result.declarations[1].classMembers.map(member => member.name)).toEqual(['good']);
+    });
+
+    test('Keeps a missing method opener at its signature rather than the following statement.', () =>
+    {
+        const source = 'class Example {\n run()\n return 1;\n}';
+        const result = parse(source);
+        const insertionOffset = source.indexOf('run()') + 'run()'.length;
+        expect(result.errors).toEqual([expect.objectContaining({
+            message: 'Expected "{" after method parameters.', offset: insertionOffset, endOffset: insertionOffset
+        })]);
+    });
+
     test('Keeps valid members and constructor syntax free of fallback errors.', () =>
     {
         const result = parse('class Example {\n Example() {}\n Number count;\n get value() { return this.count; }\n set value(Number next) { this.count = next; }\n async run() {}\n void finish() {}\n}');

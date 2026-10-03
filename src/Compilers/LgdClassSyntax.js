@@ -8,29 +8,7 @@ const LgdClassMemberRecovery = require('./LgdClassMemberRecovery');
 /** @description Reads LGD classes and interfaces and lowers runtime classes to prototype objects with create factories. */
 const LgdClassSyntax = {
     /** @description Finds balanced parentheses or braces in already-masked source. */
-    findClose(masked, start)
-    {
-        const open = masked[start];
-        const close = open === '(' ? ')' : '}';
-        let depth = 0;
-        for(let index = start; index < masked.length; index++)
-        {
-            if(masked[index] === open)
-            {
-                depth++;
-            }
-            else if(masked[index] === close)
-            {
-                depth--;
-                if(depth === 0)
-                {
-                    return index;
-                }
-            }
-        }
-
-        return -1;
-    },
+    findClose(masked, start) { return LgdClassMemberRecovery.findClose(masked, start); },
 
     /** @description Skips whitespace and masked comments. */
     skipSpace(masked, start)
@@ -340,7 +318,11 @@ const LgdClassSyntax = {
         {
             if(masked[cursor] !== '{')
             {
-                return { error: 'Expected an LGD method body.', offset: cursor };
+                return LgdClassMemberRecovery.missingBody({
+                    content: content, masked: masked, start: cursor, declaration: declaration, compiler: compiler, syntax: this,
+                    insertionOffset: baseArgumentsEnd === null ? paramClose + 1 : baseArgumentsEnd + 1,
+                    isConstructor: isConstructor, hasBaseInitializer: baseArgumentsEnd !== null, allowBodyRecovery: context.allowBodyRecovery
+                });
             }
 
             const close = this.findClose(masked, cursor);

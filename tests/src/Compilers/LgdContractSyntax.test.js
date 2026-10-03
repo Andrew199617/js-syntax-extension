@@ -116,7 +116,7 @@ describe('LGD interface and abstract syntax.', () =>
         [ 'abstract class Task { virtual abstract Number run(); }', 'cannot combine virtual' ],
         [ 'abstract class Task { abstract async Number run(); }', 'cannot be async' ],
         [ 'abstract class Task { abstract get String Name(); }', 'typed property contract' ],
-        [ 'abstract class Task { Number run(); }', 'Expected an LGD method body' ]
+        [ 'abstract class Task { Number run(); }', 'Expected "{" after method parameters.' ]
     ])('Rejects malformed or executable contracts: %s.', (source, message) =>
     {
         expect(parse(source).errors.some(error => error.message.includes(message))).toBe(true);
