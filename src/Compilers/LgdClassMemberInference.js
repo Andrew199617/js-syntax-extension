@@ -280,6 +280,11 @@ const LgdClassMemberInference = {
             return true;
         }
 
+        if(expected === 'void')
+        {
+            return false;
+        }
+
         if(expected.includes('.'))
         {
             return [ 'Object', 'Array', 'Function' ].includes(inferred);
