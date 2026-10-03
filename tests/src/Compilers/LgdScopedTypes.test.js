@@ -1,4 +1,7 @@
 const virtualMachine = require('vm');
+const traverse = require('@babel/traverse').default;
+const LgdAssignmentChecker = require('../../../src/Compilers/LgdAssignmentChecker');
+const LgdReturnChecker = require('../../../src/Compilers/LgdReturnChecker');
 const LgdCompiler = require('../../../src/Compilers/LgdCompiler');
 
 function compileErrors(source, objectModel = 'oloo')
@@ -257,7 +260,51 @@ describe.each([ 'object', 'class' ])('LGD scoped return values in %s methods.', 
     test('Keeps parameter assignments checked before a declared return can hide them.', () =>
     {
         const source = methodSource('value = "wrong";\nreturn value;', owner, 'Number read(Number value)');
-        expectSourceDiagnostic(source, { message: 'Cannot assign String to Number.', marker: '"wrong"' });
+        const errors = expectSourceDiagnostic(source, { message: 'Cannot assign String to Number.', marker: '"wrong"' });
+        expect(errors).toHaveLength(1);
+    });
+
+    test.each([
+        [ 'typed initializers', 'Number result = "wrong";\nreturn result;' ],
+        [ 'joined branches', 'if(ready) value = "wrong"; else value = 2;\nreturn value;' ],
+        [ 'loop writes', 'while(ready) { value = "wrong"; break; }\nreturn value;' ],
+        [ 'compound writes', 'value += "wrong";\nreturn value;' ],
+        [ 'logical writes', 'value &&= "wrong";\nreturn value;' ],
+        [ 'destructured writes', '[value] = ["wrong"];\nreturn value;' ],
+        [ 'restored Number values', 'value = "wrong";\nvalue = 2;\nreturn value;' ],
+        [ 'later compatible compound writes', 'value += "wrong";\nvalue += 1;\nreturn value;' ],
+        [ 'typed downstream initializers', 'value = "wrong";\nNumber copied = value;\nreturn copied;' ]
+    ])('Recovers %s only after retaining the diagnosed incompatible write.', (label, body) =>
+    {
+        const source = methodSource(body, owner, 'Number read(Number value)');
+        expect(compileErrors(source).map(error => error.message)).toEqual(['Cannot assign String to Number.']);
+    });
+
+    test.each([
+        [ 'mixed nullable write', 'value = ready ? "wrong" : null;\nreturn value;' ],
+        [ 'later allowed nullable write', 'value = "wrong";\nvalue = null;\nreturn value;' ]
+    ])('Preserves a nonnullable return diagnostic after a %s.', (label, body) =>
+    {
+        const source = methodSource(body, owner, 'Number read(Number value)');
+        expect(compileErrors(source).map(error => error.message)).toEqual([
+            'Cannot assign String to Number.', 'Cannot return null from a Number method.'
+        ]);
+    });
+
+    test('Keeps rejected compound origins separate from another binding and direct String returns.', () =>
+    {
+        const source = methodSource('value += "wrong";\nString copied = value;\nreturn "direct";', owner, 'Number read(Number value)');
+        expect(compileErrors(source).map(error => error.message)).toEqual([
+            'Cannot assign String to Number.', 'Cannot assign Number to String.', 'Cannot return String from a Number method.'
+        ]);
+    });
+
+    test('Does not recover a later unannotated binding or an unknown write from an earlier rejection.', () =>
+    {
+        const source = methodSource('value = "wrong";\nlet copied = value;\ncopied = "current";\nvalue = external();\nreturn copied;', owner, 'Number read(Number value)');
+        expect(compileErrors(source).map(error => error.message)).toEqual([
+            'Cannot assign String to Number.', 'Cannot return String from a Number method.'
+        ]);
     });
 
     test('Distinguishes a nullable parameter value from its declared return type.', () =>
@@ -303,6 +350,46 @@ describe.each([ 'object', 'class' ])('LGD scoped return values in %s methods.', 
     {
         const source = methodSource('values = [1, 2];\nreturn values;', owner, 'Array read(...Number values)');
         expect(compileErrors(source)).toEqual([]);
+    });
+});
+
+describe('LGD rejected-write recovery and strict runtime proof.', () =>
+{
+    test.each([ 'oloo', 'class' ])('keeps exactly the screenshot assignment blocker in the %s model', javascriptObjectModel =>
+    {
+        const source = 'export {};\r\nclass Counter { Number increment(Number value) { value = "wrong"; return value; } }';
+        const errors = compileErrors(source, javascriptObjectModel);
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toMatchObject({ code: 'lgd.assignment.typeMismatch', message: 'Cannot assign String to Number.' });
+        expect(source.slice(errors[0].offset, errors[0].endOffset)).toBe('"wrong"');
+    });
+
+    test('requires diagnosed assignment provenance before recovery and never uses it for String-only return proof', () =>
+    {
+        const source = 'export {};\r\nclass Counter { Number increment(Number value) { value = "wrong"; return value; } }';
+        const result = LgdCompiler.create().compileToJs(source, new Map(), { deferAnalysis: true });
+        const context = LgdReturnChecker.createContext(source, result.allDeclarations, { code: result.code, segments: result.mappings });
+        expect(LgdReturnChecker.check(context).map(error => error.code)).toEqual(['lgd.return.typeMismatch']);
+        expect(LgdAssignmentChecker.check(context).map(error => error.code)).toEqual(['lgd.assignment.typeMismatch']);
+        expect(LgdReturnChecker.check(context)).toEqual([]);
+        const signature = context.signatures[0];
+        const bodyStart = context.map.toOutput(signature.declaration.initializerStart + signature.group.bodyStart);
+        let provedString = false;
+        let provedNumber = false;
+        traverse(context.tree, {
+            /** @description Verifies actual-value proof on the exact method already checked with diagnostic recovery. */
+            Function: method =>
+            {
+                if(method.node.body.start === bodyStart)
+                {
+                    provedString = LgdReturnChecker.returnsOnly(method, signature, context, 'String');
+                    provedNumber = LgdReturnChecker.returnsOnly(method, signature, context, 'Number');
+                }
+            }
+        });
+        expect(provedString).toBe(true);
+        expect(provedNumber).toBe(false);
+        expect(LgdAssignmentChecker.check(context).map(error => error.code)).toEqual(['lgd.assignment.typeMismatch']);
     });
 });
 

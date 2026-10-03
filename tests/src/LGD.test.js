@@ -580,11 +580,14 @@ describe('LGD compile on save', () =>
         expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 error(s)');
     });
 
-    test('saving LGD with a type error leaves the previous .js output untouched', async () =>
+    test.each([
+        'Number total = "many";',
+        'export {};\r\nclass Counter { Number increment(Number value) { value = "wrong"; return value; } }'
+    ])('saving LGD with a type error leaves the previous .js output untouched: %s', async source =>
     {
         vscode.window.createStatusBarItem.mockClear();
 
-        saveLgdDocument(path.join('workspace', 'typed.lgd'), 'Number total = "many";');
+        saveLgdDocument(path.join('workspace', 'typed.lgd'), source);
         await nextTurn();
         await nextTurn();
 

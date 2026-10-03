@@ -424,7 +424,7 @@ const LgdReturnChecker = {
         }));
     },
 
-    /** @description Reads all reaching values of one binding at the current expression. */
+    /** @description Recovers diagnosed rejected writes for ordinary diagnostics while retaining runtime values for strict return proof. */
     currentBindingTypes(point, signature, context, visited)
     {
         const { path, binding } = point;
@@ -449,7 +449,23 @@ const LgdReturnChecker = {
                 return [declared || UNKNOWN];
             }
 
-            return typeof origin === 'string' ? [origin] : this.expressionTypes(origin, signature, context, visited);
+            const types = typeof origin === 'string' ? [origin] : this.expressionTypes(origin, signature, context, visited);
+            const key = typeof origin === 'string' ? origin : origin.node;
+            const rejected = !context.strictReturnProof && context.rejectedWrites?.get(binding)?.get(key);
+            if(!rejected)
+            {
+                return types;
+            }
+
+            return types.map(type =>
+            {
+                if(rejected.has(type))
+                {
+                    return declared;
+                }
+
+                return type;
+            });
         });
 
         if(declaration?.name === declaration?.typeName && declaration)

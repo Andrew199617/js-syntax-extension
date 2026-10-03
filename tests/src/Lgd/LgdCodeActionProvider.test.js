@@ -370,18 +370,19 @@ describe('LGD diagnostic quick fixes', () =>
         expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
     });
 
-    test('discloses and preserves the original Number return error after the parameter-only fix', async () =>
+    test('discloses the new Number return error before applying the parameter-only fix', async () =>
     {
         const source = 'export {};\nclass Counter { Number increment(Number value) { value = "wrong"; return value; } }';
         const fixture = await openFixture(source);
         const before = fixture.diagnostics.get(fixture.document.uri.toString());
-        expect(before).toHaveLength(2);
+        expect(before).toHaveLength(1);
         const [action] = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
-        expect(action.title).toContain('1 existing diagnostic remains');
+        expect(action.title).toContain('creates 1 return diagnostic');
         await applyAction(fixture, action);
         const after = fixture.diagnostics.get(fixture.document.uri.toString());
         expect(after).toHaveLength(1);
-        expect(after[0].message).toBe(before.find(diagnostic => diagnostic.message.startsWith('Cannot return')).message);
+        expect(before[0].message).toBe('Cannot assign String to Number.');
+        expect(after[0].message).toBe('Cannot return String from a Number method.');
         expect(fixture.document.getText()).toBe(source.replace('increment(Number value)', 'increment(String value)'));
     });
 
@@ -445,8 +446,8 @@ describe('LGD diagnostic quick fixes', () =>
         const actions = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
         expect(actions).toHaveLength(2);
         const parameter = actions.find(action => action.title.startsWith("Change parameter 'value' to"));
-        const combined = actions.find(action => action.title.includes('return'));
-        expect(parameter.title).toContain('1 existing diagnostic remains');
+        const combined = actions.find(action => action.title.includes('and return type'));
+        expect(parameter.title).toContain('creates 1 return diagnostic');
         expect(combined.isPreferred).toBe(false);
         await applyAction(fixture, combined);
         const sourceEdits = vscode.workspace.applyEdit.mock.calls.filter(([edit]) => edit.replacements.some(replacement => replacement.uri === fixture.document.uri));
@@ -486,7 +487,7 @@ describe('LGD diagnostic quick fixes', () =>
         {
             const fixture = await openFixture(source);
             const actions = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
-            expect(actions.some(action => action.title.includes('return'))).toBe(false);
+            expect(actions.some(action => action.title.includes('and return type'))).toBe(false);
         }
     });
 
@@ -495,14 +496,14 @@ describe('LGD diagnostic quick fixes', () =>
         const source = 'export {};\nclass Counter { Number increment(Number value) { value = "wrong"; return value; } }';
         const fixture = await openFixture(source);
         const actions = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
-        const combined = actions.find(action => action.title.includes('return'));
+        const combined = actions.find(action => action.title.includes('and return type'));
         fixture.document.setText(source.replace('"wrong"', '"changed"'));
         fixture.document.version++;
         expect(await fixture.provider.applyFix(combined.command.arguments[0])).toBe(false);
         expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
         await fixture.service.updateDocument(fixture.document);
         const nextActions = await actionsFor(fixture, 'lgd.assignment.typeMismatch');
-        const current = nextActions.find(action => action.title.includes('return'));
+        const current = nextActions.find(action => action.title.includes('and return type'));
         fixture.service.dependents.set(fixture.document.uri.fsPath, new Set(['/workspace/new-consumer.lgd']));
         expect(await fixture.provider.applyFix(current.command.arguments[0])).toBe(false);
     });

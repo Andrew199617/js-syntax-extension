@@ -340,7 +340,8 @@ const LgdCompiler = {
 
         if(context)
         {
-            const checked = [ ...LgdAssignmentChecker.check(context), ...LgdReturnChecker.check(context) ];
+            const assignmentErrors = LgdAssignmentChecker.check(context);
+            const checked = [ ...assignmentErrors, ...LgdReturnChecker.check(context) ];
             this.appendTypeErrors(content, parsed.errors, checked);
         }
 

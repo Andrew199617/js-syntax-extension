@@ -64,14 +64,17 @@ describe('LGD parameter-type assignment suggestions', () =>
         expect(LgdCompiler.create().compileToJs(previewText(current, proposal)).errors).toEqual([]);
     });
 
-    test('retains the existing screenshot return mismatch and discloses the residual diagnostic', async () =>
+    test('discloses the new return conflict caused by choosing the screenshot parameter-only edit', async () =>
     {
         const source = inModule('class Counter { Number increment(Number value) { value = "wrong"; return value; } }');
         const current = fixture(source);
         const proposal = await proposalFor(current);
-        expect(proposal.title).toBe("Change parameter 'value' to String (changes signature); 1 existing diagnostic remains");
+        expect(current.result.errors).toHaveLength(1);
+        expect(current.result.errors[0].code).toBe('lgd.assignment.typeMismatch');
+        expect(proposal.title).toBe("Change parameter 'value' to String (changes signature); creates 1 return diagnostic");
         const preview = LgdCompiler.create().compileToJs(previewText(current, proposal));
-        expect(preview.errors).toEqual([current.result.errors[1]]);
+        expect(preview.errors).toHaveLength(1);
+        expect(preview.errors[0]).toMatchObject({ code: 'lgd.return.typeMismatch', message: 'Cannot return String from a Number method.' });
         expect(previewText(current, proposal)).toContain('Number increment(String value) { value = "wrong"; return value; }');
     });
 

@@ -10,6 +10,7 @@ const LgdAssignmentChecker = {
     check(context)
     {
         const errors = [];
+        context.rejectedWrites = new Map();
         traverse(context.tree, {
             /** @description Checks every simple, compound, and destructuring assignment, including nested captures. */
             AssignmentExpression: path =>
@@ -115,8 +116,31 @@ const LgdAssignmentChecker = {
                 }
 
                 errors.push(error);
+                this.recordRejectedWrite(binding, value, type, context);
             }
         }
+    },
+
+    /** @description Recovers only the exact incompatible value types whose writes retain a blocking diagnostic. */
+    recordRejectedWrite(binding, value, type, context)
+    {
+        let origin = value;
+        if(typeof value !== 'string' && value.isAssignmentExpression() && [ '&&=', '||=', '??=' ].includes(value.node.operator))
+        {
+            origin = value.get('right');
+        }
+
+        const key = typeof origin === 'string' ? origin : origin.node;
+        let writes = context.rejectedWrites.get(binding);
+        if(!writes)
+        {
+            writes = new Map();
+            context.rejectedWrites.set(binding, writes);
+        }
+
+        const rejected = writes.get(key) || new Set();
+        rejected.add(type);
+        writes.set(key, rejected);
     },
 
     /** @description Identifies one explicit parameter annotation through its exact lexical binding and source spans. */

@@ -46,13 +46,13 @@ In a `.lgd` file, place the cursor on a diagnostic and open Quick Fix with `Ctrl
 - **Add override keyword** declares an override of a known inherited virtual method. If the child already uses `virtual`, **Replace virtual with override** repairs the modifier without changing its method body.
 - **Make Base.method virtual** updates the known LGD class declaration for a child explicitly marked `override`, including a base imported from another `.lgd` file.
 - **Remove extra arguments from base call** removes an extra primitive-literal suffix when the base constructor's parameter count is known.
-- **Change parameter to String** suggests an explicit annotation-only change for a proven module-private or nested-local Number parameter assigned String values. The action discloses its signature change and any existing diagnostics that remain.
+- **Change parameter to String** suggests an explicit annotation-only change for a proven module-private or nested-local Number parameter assigned String values. The action discloses its signature change, existing diagnostics that remain, and any new return diagnostic caused by keeping the original return contract.
 - **Change parameter and return type to String** updates both exact annotations in one edit when the complete method is proven to return only String and its contract is private and unreferenced.
 - **Change return type to String** is a separate followup suggestion when the remaining return mismatch has the same safety proof.
 
 Argument removal is an explicit choice. Calls, property reads, spreads, and comments in the removed suffix are preserved by leaving the diagnostic for you to resolve. Missing arguments are never filled with guessed values. Fixes check that the source and imported contracts are still current, support Undo, and refresh Problems after application.
 
-Parameter changes are suggestions, never Fix All or a preferred automatic action. They are withheld for script-global or exposed owners, known callers, exports, inherited/interface contracts, defaults, rest/destructured parameters, captures, mixed writes, unknown return values or a preview that adds errors. Merely having no references in the open file does not prove a global contract is unused. The assignment and return contract remain unchanged; changing only a parameter does not guarantee every error is fixed. A return contract changes only through the explicitly chosen safe combined or followup action.
+Parameter changes are suggestions, never Fix All or a preferred automatic action. They are withheld for script-global or exposed owners, known callers, exports, inherited/interface contracts, defaults, rest/destructured parameters, captures, mixed writes, unknown return values or a preview that adds unrelated errors. Merely having no references in the open file does not prove a global contract is unused. The source contracts remain unchanged until you choose an action. Changing only a parameter can create a return mismatch when the method still promises Number; the title warns you before applying it. A return contract changes only through the explicitly chosen safe combined or followup action.
 
 A missing assignment expression such as `const broken = ;` is reported as **Expected an expression after '='. Add a value.** at the semicolon. Add the intended value or expression before saving; the extension does not guess one.
 
@@ -149,7 +149,7 @@ JavaScript modules, CommonJS and JSX remain supported. Top-level returns are acc
 
 Declared locals and typed parameters are checked in top-level `Function` initializers, ordinary JavaScript function bodies, object methods, classes, constructors and nested callbacks. Writes use the actual lexical binding, so a shadowing callback parameter or block local does not inherit an unrelated outer type. Compound assignments and known destructuring values are checked too; rest parameter bindings are arrays.
 
-Method return checks follow the current value through assignments and branches instead of treating its declared type as proof. Known `null` or `undefined` values cannot satisfy a non-void return contract. LGD still permits null and undefined in assignment positions; unknown calls and effects remain conservative.
+Method return checks follow the current value through assignments and branches. After an incompatible write is rejected, later diagnostics retain the binding's declared type to avoid cascading errors; the assignment error still blocks saving generated JavaScript. Known `null` or `undefined` values cannot satisfy a non-void return contract. LGD still permits null and undefined in assignment positions; unknown calls and effects remain conservative.
 
 ## Explicit LGD method return types
 
