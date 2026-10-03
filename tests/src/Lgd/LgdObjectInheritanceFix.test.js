@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const virtualMachine = require('vm');
 const { Oloo } = require('@mavega/oloo');
 const vscode = require('vscode');
@@ -52,6 +54,7 @@ jest.mock('vscode', () =>
 {
     const api = require('./fakeVscode').createFakeVscode(jest);
 
+    api.window = { setStatusBarMessage: jest.fn() };
     api.CodeAction = jest.fn((title, kind) => ({ title: title, kind: kind }));
     api.CodeActionKind = { QuickFix: { value: 'quickfix' } };
     api.Uri = { file: filename => require('./fakeVscode').makeTextDocument(`file://${filename}`, '').uri };
@@ -60,9 +63,16 @@ jest.mock('vscode', () =>
 
 describe('legacy object inheritance conversion', () =>
 {
-    test('routes transported editor diagnostics through the registered native Quick Fix', async () =>
+    test.each([ false, true ])('routes transported editor diagnostics through the registered native Quick Fix (typed: %s)', async typed =>
     {
-        const example = fixture();
+        const original = fixture();
+        let source = original.context.source.text.replaceAll('Child', 'GoToLastMethod');
+        if(typed)
+        {
+            source = source.replace('async run()', 'async Number run()');
+        }
+
+        const example = fixture({ source: source });
         const diagnostics = new Map();
         const collection = { set: (uri, entries) => diagnostics.set(uri.toString(), entries), delete: uri => diagnostics.delete(uri.toString()) };
         const service = LgdLanguageService.create(collection, error =>
@@ -78,7 +88,9 @@ describe('legacy object inheritance conversion', () =>
         const actions = await provider.provideCodeActions(document, range, { diagnostics: editorDiagnostics }, {});
         expect(actions).toHaveLength(1);
         expect(actions[0].command.command).toBe('lgd.applyDiagnosticQuickFix');
-        expect(actions[0].title).toBe("Convert 'Child' to LGD class : Base");
+        expect(actions[0].title).toBe("Convert 'GoToLastMethod' to LGD class : Base");
+        expect(editorDiagnostics.find(diagnostic => diagnostic.message.includes('Object @extends')).message)
+            .toBe('Object @extends inheritance is not supported in LGD. Use class GoToLastMethod : BaseClass { ... } with a compatible base class or object.');
     });
 
     test('preserves methods, documentation, exports, readonly locals and the OLOO allocation arguments', async () =>
@@ -150,6 +162,179 @@ describe('legacy object inheritance conversion', () =>
         }
 
         expect(outcomes[1]).toEqual(outcomes[0]);
+    });
+
+    test.each([
+        [ '', '"title"', [] ],
+        [ 'String title = "default"', 'title', [] ],
+        [ '...String titles', '...titles', ['rest'] ]
+    ])('preserves direct-return factories and typed methods with parameters %s', async (parameters, argumentsText, callArguments) =>
+    {
+        const original = fixture();
+        const source = original.context.source.text
+            .replace('create()', `Object create(${parameters})`)
+            .replace(
+                'readonly Object child = Oloo.assign(Base.create("title"), Child);\r\n        return child;',
+                `return Oloo.assign(Base.create(${argumentsText}), Child);`
+            )
+            .replace('async run()', 'async Number run(Number amount = 2)')
+            .replace('readonly Number count = 2;', 'readonly Number count = amount;');
+        const example = fixture({ source: source });
+        const proposal = await new ConvertObjectInheritanceFix().create(example.context, example.fix);
+        expect(proposal).not.toBeNull();
+        expect(proposal.newText).toContain(`Child(${parameters}) : base(${argumentsText}) {}`);
+        expect(proposal.newText).toContain('async Number run(Number amount = 2)');
+        expect(proposal.newText).not.toContain('Object Child(');
+        const converted = source.slice(0, proposal.offset) + proposal.newText + source.slice(proposal.endOffset);
+        const outcomes = [];
+        for(const program of [ source, converted ])
+        {
+            const baseModule = { exports: {} };
+            virtualMachine.runInNewContext(example.base.getText(), { module: baseModule });
+            const childModule = { exports: {} };
+            const modules = new Map([ [ '@mavega/oloo', { Oloo: Oloo } ], [ './Base', baseModule.exports ] ]);
+            const compiled = LgdCompiler.create().compileToJs(program);
+            expect(compiled.errors.filter(error => error.code !== 'lgd.object.inheritance')).toEqual([]);
+            virtualMachine.runInNewContext(compiled.code, { module: childModule, require: specifier => modules.get(specifier) });
+            const instance = childModule.exports.create(...callArguments);
+            outcomes.push({ title: instance.title, count: await instance.run(10) });
+        }
+
+        expect(outcomes[1]).toEqual(outcomes[0]);
+        expect(outcomes[1].count).toBe(10);
+        const parsed = LgdCompiler.create().parse(converted);
+        const member = parsed.declarations.find(declaration => declaration.name === 'Child').classMembers.find(candidate => candidate.name === 'run');
+        expect(member).toMatchObject({ returnTypeName: 'Number', params: [expect.objectContaining({ name: 'amount', typeName: 'Number', defaultText: '2' })] });
+    });
+
+    test.each([ [ false, false ], [ true, false ], [ false, true ] ])('checks the reported GoToLastMethod migration (virtual: %s, incompatible: %s)', async (alreadyVirtual, incompatible) =>
+    {
+        const source = await fs.promises.readFile(path.join(__dirname, '../../fixtures/object-inheritance-go-to-last-method.lgd'), 'utf8');
+        const baseSource = [
+            'readonly Object GoToNextMethod = {',
+            '  create(String commandName = "next", String title = "Next") {',
+            '    readonly Object instance = Object.create(GoToNextMethod);',
+            '    instance.command = { command: commandName, title: title };',
+            '    instance.visits = [];',
+            '    instance.tabSize = this.getTabSize();',
+            '    return instance;',
+            '  },',
+            '  getTabSize() { return 2; },',
+            '  getMethod(String line, Number index) { this.visits.push(index); return line === "found"; },',
+            '  /**',
+            '   * @description Runs the next command.',
+            ...alreadyVirtual ? ['   * @virtual'] : [],
+            '   */',
+            `  async executeCommand(${incompatible ? 'Number value' : ''}) {}`,
+            '};',
+            'module.exports = GoToNextMethod;'
+        ].join('\r\n');
+        const document = makeTextDocument('file:///workspace/GoToLastMethod.lgd', source);
+        const base = makeTextDocument('file:///workspace/GoToNextMethod.lgd', baseSource);
+        document.version = 1;
+        base.version = 1;
+        const mirrorApi = require('./fakeVscode').createFakeVscode(jest);
+
+        vscode.workspace.openTextDocument.mockImplementation(uri =>
+        {
+            if(uri.fsPath === base.uri.fsPath)
+            {
+                return base;
+            }
+
+            return mirrorApi.workspace.openTextDocument(uri);
+        });
+
+        vscode.workspace.applyEdit.mockImplementation(mirrorApi.workspace.applyEdit);
+        const diagnostics = new Map();
+        const collection = { set: (uri, entries) => diagnostics.set(uri.toString(), entries), delete: uri => diagnostics.delete(uri.toString()) };
+        const service = LgdLanguageService.create(collection, error =>
+        {
+            throw error;
+        });
+
+        await service.openDocument(base);
+        const state = await service.openDocument(document);
+        expect(state.externals.get('./GoToNextMethod')).toMatchObject({ sourcePath: base.uri.fsPath, exportName: 'GoToNextMethod' });
+        const provider = LgdCodeActionProvider.create(service);
+        const range = new vscode.Range(document.positionAt(0), document.positionAt(source.length));
+        let actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()))) }, {});
+        if(incompatible)
+        {
+            expect(actions).toEqual([]);
+            return;
+        }
+
+        expect(actions).toHaveLength(1);
+        if(!alreadyVirtual)
+        {
+            expect(actions[0].title).toBe('Make GoToNextMethod.executeCommand virtual to enable class conversion');
+            const preparation = provider.proposals.get(actions[0].command.arguments[0]);
+            expect(preparation.target.document).toBe(base);
+            base.setText(`${baseSource}\r\n// unsaved change`);
+            base.version++;
+            vscode.workspace.applyEdit.mockClear();
+            expect(await provider.applyFix(actions[0].command.arguments[0])).toBe(false);
+            expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
+            await service.updateDocument(base);
+            await service.pendingDependencyUpdates;
+            await service.updateDocument(document);
+            actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()))) }, {});
+            vscode.workspace.applyEdit.mockImplementation(edit =>
+            {
+                const replacement = edit.replacements[0];
+                if(replacement.uri.fsPath !== base.uri.fsPath)
+                {
+                    return mirrorApi.workspace.applyEdit(edit);
+                }
+
+                expect(edit.replacements).toHaveLength(1);
+                const text = base.getText();
+                base.setText(text.slice(0, base.offsetAt(replacement.range.start)) + replacement.newText + text.slice(base.offsetAt(replacement.range.end)));
+                base.version++;
+                return true;
+            });
+
+            expect(await provider.applyFix(actions[0].command.arguments[0])).toBe(true);
+            expect(base.getText()).toContain('@description Runs the next command.');
+            expect(base.getText()).toContain('@virtual');
+            expect(base.getText()).toContain('// unsaved change');
+            expect(document.getText()).toBe(source);
+            expect(diagnostics.get(document.uri.toString())).toHaveLength(1);
+            actions = await provider.provideCodeActions(document, range, { diagnostics: JSON.parse(JSON.stringify(diagnostics.get(document.uri.toString()))) }, {});
+        }
+
+        expect(actions).toHaveLength(1);
+        expect(actions[0].title).toBe("Convert 'GoToLastMethod' to LGD class : GoToNextMethod");
+        const proposal = provider.proposals.get(actions[0].command.arguments[0]);
+        const converted = source.slice(0, proposal.offset) + proposal.newText + source.slice(proposal.endOffset);
+        expect(converted).toContain('GoToLastMethod() : base("lgd.goToLastMethod", "Go To Last Method") {}');
+        expect(converted).toContain('@returns {GoToLastMethodType}');
+        expect(converted).toContain('override async executeCommand()');
+        const externals = service.getState(document.uri).externals;
+        const compiled = LgdCompiler.create().compileToJs(converted, externals);
+        expect(compiled.errors).toEqual([]);
+        const results = [];
+        for(const program of [ source, converted ])
+        {
+            const baseModule = { exports: {} };
+            virtualMachine.runInNewContext(LgdCompiler.create().compileToJs(baseSource).code, { module: baseModule });
+            const childModule = { exports: {} };
+            const editor = { document: { getText: () => 'found\nmiss\ncurrent' }, selection: { active: { line: 2 } } };
+            const modules = new Map([ [ '@mavega/oloo', { Oloo: Oloo } ], [ 'vscode', { window: { activeTextEditor: editor } } ], [ './GoToNextMethod', baseModule.exports ] ]);
+            virtualMachine.runInNewContext(
+                LgdCompiler.create().compileToJs(program, externals).code,
+                { module: childModule, require: specifier => modules.get(specifier) }
+            );
+            const instance = childModule.exports.create();
+            await instance.executeCommand();
+            results.push({ command: { ...instance.command }, visits: Array.from(instance.visits), tabSize: instance.tabSize });
+        }
+
+        expect(results[1]).toEqual(results[0]);
+        expect(results[1]).toEqual({ command: { command: 'lgd.goToLastMethod', title: 'Go To Last Method' }, visits: [ 1, 0 ], tabSize: 2 });
+        base.setText(`${baseSource}\r\n// changed`);
+        expect(DiagnosticQuickFix.canApply(proposal)).toBe(false);
     });
 
     test.each([

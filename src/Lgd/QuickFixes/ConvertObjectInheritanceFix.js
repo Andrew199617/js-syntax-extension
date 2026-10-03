@@ -2,8 +2,10 @@ const path = require('path');
 const vscode = require('vscode');
 const { parse, parseExpression } = require('@babel/parser');
 const DiagnosticQuickFix = require('./DiagnosticQuickFix');
+const ObjectInheritanceContracts = require('./ObjectInheritanceContracts');
 const LgdCompiler = require('../../Compilers/LgdCompiler');
 const { maskCode } = require('../../Compilers/LgdInfer');
+const { typedParamGroups } = require('../../Compilers/LgdTypedParams');
 const { collectScopes, collectBindings, visibleBindings } = require('../../Compilers/LgdBaseChecker');
 
 /** @description Converts only the established OLOO allocation lifecycle without guessing JSDoc type aliases. */
@@ -42,15 +44,23 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
         }
 
         const snapshots = context.snapshots.slice();
-        if(!await this._knownBase(context, { parsed: parsed, declaration: declaration, baseName: shape.baseName, baseTypeName: fix.baseTypeName }, snapshots))
+        const base = await this._knownBase(context, { parsed: parsed, declaration: declaration, baseName: shape.baseName, baseTypeName: fix.baseTypeName }, snapshots);
+        if(!base)
         {
             return null;
         }
 
+        const contracts = ObjectInheritanceContracts.plan(context, base, shape);
+        if(!contracts)
+        {
+            return null;
+        }
+
+        shape.overrides = contracts.overrides;
         const newText = this._convert(source.text, declaration, shape);
         const previewText = source.text.slice(0, declaration.start) + newText + source.text.slice(declaration.end);
         const originalErrors = compiler.compileToJs(source.text, state.externals, options).errors;
-        const preview = compiler.compileToJs(previewText, state.externals, options);
+        const preview = compiler.compileToJs(previewText, contracts.externals, options);
         const delta = newText.length - (declaration.end - declaration.start);
         if(!this._validErrors(originalErrors, preview.errors, declaration, delta))
         {
@@ -58,6 +68,12 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
         }
 
         const signature = JSON.stringify(options);
+        if(contracts.preparation)
+        {
+            return { ...contracts.preparation, snapshots: snapshots,
+                validate: () => JSON.stringify(languageService.getOutputOptions(document)) === signature };
+        }
+
         return { title: `Convert '${declaration.name}' to LGD class : ${shape.baseName}`,
             target: source, snapshots: snapshots, offset: declaration.start, endOffset: declaration.end, newText: newText,
             validate: () => JSON.stringify(languageService.getOutputOptions(document)) === signature };
@@ -85,6 +101,7 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
             normalized = normalized.slice(0, headStart - start) + 'let '.padEnd(length) + normalized.slice(child.nameStart - start);
         }
 
+        normalized = this._eraseSignatureTypes(normalized, declaration, declarations);
         try
         {
             const object = parseExpression(normalized);
@@ -102,14 +119,15 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
             }
 
             const factory = methods.find(method => method.key.name === 'create');
-            if(!factory || factory.async || factory.params.some(parameter => parameter.type !== 'Identifier'))
+            if(!factory || factory.async || factory.params.some(parameter => !this._simpleParameter(parameter)))
             {
                 return null;
             }
 
             const statements = factory.body.body;
             const local = statements[0]?.declarations?.[0];
-            const call = local?.init;
+            const directReturn = statements.length === 1 && statements[0].type === 'ReturnStatement';
+            const call = directReturn ? statements[0].argument : local?.init;
             const baseCall = call?.arguments?.[0];
             const returned = statements[1]?.argument;
             const hasComments = object.comments?.some(comment => comment.start > factory.body.start && comment.end < factory.body.end);
@@ -121,7 +139,8 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
             const targetMatches = target?.type === 'Identifier' && target.name === declaration.name;
             const baseName = baseCall?.callee?.object?.name;
             const createsBase = typeof baseName === 'string' && this._memberCall(baseCall, baseName, 'create');
-            if(!allocation || !returnsLocal || !assignment || !targetMatches || !createsBase || hasComments)
+            const knownLifecycle = directReturn || allocation && returnsLocal;
+            if(!knownLifecycle || !assignment || !targetMatches || !createsBase || hasComments)
             {
                 return null;
             }
@@ -132,6 +151,60 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
         {
             return null;
         }
+    }
+
+    /** @description Masks compiler-recognized LGD signature types without moving source offsets or changing the replacement. */
+    _eraseSignatureTypes(normalized, declaration, declarations)
+    {
+        const ranges = [];
+        for(const current of [ declaration, ...declarations.filter(candidate => candidate !== declaration) ])
+        {
+            const start = current.initializerStart - declaration.initializerStart;
+            if(start < 0 || start >= normalized.length || current.kind)
+            {
+                continue;
+            }
+
+            for(const group of typedParamGroups(current))
+            {
+                if(group.returnTypeName)
+                {
+                    ranges.push({ start: start + group.returnTypeStart, end: start + group.returnTypeEnd });
+                }
+
+                for(const parameter of group.params)
+                {
+                    if(parameter.typeName)
+                    {
+                        ranges.push({ start: start + parameter.typeStart, end: start + parameter.typeEnd });
+                    }
+                }
+            }
+        }
+
+        for(const range of ranges)
+        {
+            const erased = normalized.slice(range.start, range.end).replace(/[^\n\r]/g, ' ');
+            normalized = normalized.slice(0, range.start) + erased + normalized.slice(range.end);
+        }
+
+        return normalized;
+    }
+
+    /** @description Retains simple identifier, defaulted and rest parameters exactly in the generated constructor. */
+    _simpleParameter(parameter)
+    {
+        if(parameter.type === 'Identifier')
+        {
+            return true;
+        }
+
+        if(parameter.type === 'AssignmentPattern')
+        {
+            return parameter.left.type === 'Identifier';
+        }
+
+        return parameter.type === 'RestElement' && parameter.argument.type === 'Identifier';
     }
 
     /** @description Recognizes an ordinary nonoptional call without computed member access. */
@@ -161,10 +234,15 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
             return false;
         }
 
+        if(base.sourcePath)
+        {
+            return this._knownLgdObject(base, baseName, baseTypeName, snapshots);
+        }
+
         if(base.initializerText?.trim().startsWith('{'))
         {
             const hasFactory = base.members.some(member => member.name === 'create' && member.kind === 'method');
-            return hasFactory && this._matchesType(baseName, baseTypeName, base.jsdoc);
+            return hasFactory && this._matchesType(baseName, baseTypeName, base.jsdoc) && { declaration: base, snapshot: context.source };
         }
 
         const required = (/^\s*require\(\s*(?<quote>["'])(?<specifier>\.[^"']*)\k<quote>\s*\)\s*$/).exec(base.initializerText || '');
@@ -215,6 +293,26 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
         }
     }
 
+    /** @description Validates a resolved LGD object export against the dependency snapshot already checked by the editor. */
+    _knownLgdObject(entry, baseName, baseTypeName, snapshots)
+    {
+        const snapshot = snapshots.find(candidate => candidate.document.uri.scheme === 'file' && candidate.document.uri.fsPath === entry.sourcePath);
+        if(!entry.sourcePath.endsWith('.lgd') || !snapshot || snapshot.text !== entry.sourceText)
+        {
+            return false;
+        }
+
+        const parsed = LgdCompiler.create().parse(snapshot.text);
+        const declaration = parsed.declarations.find(candidate => candidate.name === entry.exportName);
+        if(!declaration || declaration.kind || declaration.typeName !== 'Object' || !declaration.initializerText.trimStart().startsWith('{'))
+        {
+            return false;
+        }
+
+        const hasFactory = declaration.members.some(member => member.name === 'create' && member.kind === 'method');
+        return hasFactory && this._matchesType(baseName, baseTypeName, declaration.jsdoc) && { declaration: declaration, snapshot: snapshot, entry: entry };
+    }
+
     /** @description Excludes accessors, computed names, generators and property initializers. */
     _ordinaryMethod(method)
     {
@@ -252,8 +350,21 @@ class ConvertObjectInheritanceFix extends DiagnosticQuickFix
         const argumentsText = callTail.slice(open + 1, -1);
         const edits = [{ start: factory.start, end: factory.end,
             text: `${declaration.name}${parameters} : base(${argumentsText}) {}` }];
+        const factorySignature = declaration.methodTypedParams?.find(group => group.name === 'create');
+        if(factorySignature?.returnTypeName)
+        {
+            edits.push({ start: factorySignature.returnTypeStart, end: factorySignature.returnTypeEnd, text: '' });
+        }
+
         for(const method of object.properties)
         {
+            if(shape.overrides?.includes(method.key.name))
+            {
+                const signature = declaration.methodTypedParams?.find(group => group.name === method.key.name);
+                const offset = signature?.methodStart ?? method.start;
+                edits.push({ start: offset, end: offset, text: 'override ' });
+            }
+
             const tail = maskCode(source.slice(start + method.end, declaration.initializerEnd));
             const comma = (/^\s*,/).exec(tail);
             if(comma)

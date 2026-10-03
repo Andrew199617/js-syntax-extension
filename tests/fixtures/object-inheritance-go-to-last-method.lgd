@@ -1,0 +1,40 @@
+const { Oloo } = require('@mavega/oloo');
+readonly Object vscode = require('vscode');
+readonly Object GoToNextMethod = require('./GoToNextMethod');
+
+/**
+ * @description Command to navigate to the last method in a class or object.
+ * @extends {GoToNextMethod}
+ */
+readonly Object GoToLastMethod = {
+  /**
+   * @description Initialize an instance of GoToLastMethod.
+   * @returns {GoToLastMethodType}
+   */
+  create() {
+    readonly Object goToLastMethod = Oloo.assign(GoToNextMethod.create("lgd.goToLastMethod", "Go To Last Method"), GoToLastMethod);
+    return goToLastMethod;
+  },
+
+  async executeCommand() {
+    readonly Object editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return;
+    }
+    readonly Object document = editor.document;
+    readonly Object position = editor.selection.active;
+    readonly Number currentLine = position.line;
+    readonly Array lines = document.getText().split('\n');
+    for (let i = currentLine - 1; i >= 0; --i) {
+      if (this.getMethod(lines[i], i)) {
+        return;
+      }
+    }
+    for (let i = lines.length; i > currentLine + 1; --i) {
+      if (this.getMethod(lines[i], i)) {
+        return;
+      }
+    }
+  },
+};
+module.exports = GoToLastMethod;
