@@ -96,7 +96,7 @@ describe('LGD class editor integration', () =>
         const position = positionIn(document, 'this.command', 'this.'.length);
         const items = await LgdCompletionProvider.create(service).provideCompletionItems(document, position);
 
-        expect(items.map(item => item.label)).toEqual([ 'create', 'executeCommand', 'title', 'commandName', 'command' ]);
+        expect(items.map(item => item.label)).toEqual([ 'executeCommand', 'title', 'commandName', 'command' ]);
         const hover = await LgdHoverProvider.create(service).provideHover(document, position);
         expect(hover.contents).toContain('(property) command: vscode.Command');
         expect(hover.contents).toContain('command,');
@@ -147,7 +147,7 @@ describe('LGD class editor integration', () =>
         ].join('\n'));
         const members = service.getThisMembers(document, positionIn(document, 'this.title'));
 
-        expect(members.map(member => member.name)).toEqual([ 'create', 'execute', 'title' ]);
+        expect(members.map(member => member.name)).toEqual([ 'execute', 'title' ]);
         expect(members.find(member => member.name === 'title').typeName).toBe('String');
     });
 });

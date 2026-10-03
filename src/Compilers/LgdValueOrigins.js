@@ -32,7 +32,7 @@ const LgdValueOrigins = {
         return this._choice(path, nullish, new Set());
     },
 
-    /** @description Returns identifier targets and their projected values for a destructuring pattern. */
+    /** @description Returns assignment targets and their projected values for a destructuring pattern. */
     originsForTarget(pattern, origins)
     {
         const targets = [];
@@ -321,7 +321,7 @@ const LgdValueOrigins = {
             return;
         }
 
-        if(pattern.isIdentifier())
+        if(pattern.isIdentifier() || pattern.isMemberExpression())
         {
             targets.push({ target: pattern, origins: origins });
         }

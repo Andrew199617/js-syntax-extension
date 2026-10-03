@@ -81,15 +81,45 @@ class GoToAssignment : BaseCommand {
 const command = GoToAssignment.create();
 ```
 
-These declarations compile to OLOO objects, preserving the `.create()` API. Constructor assignments initialize each instance; ordinary methods, async methods, getters and setters stay on the linked objects. Derived classes use the existing `Oloo` binding to call `Oloo.assign(BaseCommand.create(...), GoToAssignment)`. Existing OLOO base objects continue to work, including `Oloo.base(this, "methodName")` dispatch.
+These declarations compile to OLOO objects, preserving the `.create()` API. Typed fields and constructor assignments initialize each instance; ordinary methods, async methods, getters and setters stay on the linked objects. LGD class bases initialize the same allocated instance, with derived field initializers running before base arguments and base constructor bodies. Inheritance still uses the existing `Oloo` binding. Existing OLOO base objects retain their factory lifecycle, including `Oloo.base(this, "methodName")` dispatch; declared instance fields require an LGD class base.
 
-Use typed parameters such as `String title` and `Number offset = 0` in constructors and methods. A missing constructor or base initializer calls the base's `.create()` with no arguments. Known base signatures are checked for argument counts and types; unresolved values remain conservative. Class names, base names and same-name constructors use your theme's class/type highlighting; ordinary methods keep method highlighting.
+Use typed parameters such as `String title` and `Number offset = 0` in constructors and methods. A missing constructor or base initializer initializes the LGD base with no arguments; an existing OLOO object base uses its `.create()` with no arguments. Known base signatures are checked for argument counts and types; unresolved values remain conservative. Class names, base names and same-name constructors use your theme's class/type highlighting; ordinary methods keep method highlighting.
 
 Declare overridable class methods with `virtual`, and use `override` when replacing an inherited virtual method. Replacing a known non-virtual method or omitting `override` is an error. Existing OLOO base methods can opt in with a JSDoc `@virtual` tag. Known parameter and explicit return-type mismatches are reported across local and imported bases. Modifiers are compile-time checks and do not change OLOO method dispatch.
 
-Call an inherited method with `base.method(arguments)` inside an LGD class method. The compiler uses the defining class's linked parent and preserves the current instance, arguments, return values, and `await`. This also works inside nested arrow callbacks. Constructor `: base(...)` continues to allocate through the base factory. Computed or optional base access, detached method references, getter access, and ordinary nested function callbacks are diagnosed instead of guessing their receiver.
+Call an inherited method with `base.method(arguments)` inside an LGD class method. The compiler uses the defining class's linked parent and preserves the current instance, arguments, return values, and `await`. This also works inside nested arrow callbacks. Constructor `: base(...)` supplies arguments to the base initializer on the same instance; existing OLOO object bases retain their factory allocation. Computed or optional base access, detached method references, getter access, and ordinary nested function callbacks are diagnosed instead of guessing their receiver.
 
-The constructor must use the class name. The `constructor` keyword, an explicit `create()` member, fields, static members and private members are not supported in LGD class declarations. Put instance initialization in the constructor. JavaScript files keep their existing class behavior.
+The constructor must use the class name. The `constructor` keyword and an explicit `create()` member are reserved. JavaScript files keep their existing class behavior.
+
+### Typed instance and static fields
+
+Fields next to the constructor belong to each instance by default. Use `static` explicitly for state shared by the class:
+
+```lgd
+class Player {
+    Number health = 100;
+    Array items = [];
+    static Number count = 0;
+
+    Player() { Player.count++; }
+    Number readHealth() { return health; }
+    static Number total() { return Player.count; }
+    static Number readOther(Player player) { return player.health; }
+}
+
+const first = Player.create();
+const second = Player.create();
+first.items.push("shield"); // second.items is still empty
+const total = Player.total(); // 2
+```
+
+Each instance gets its own writable data fields before constructor execution, including fresh mutable initializer values. Fields without an initializer default to `0` for `Number`, `false` for `Boolean`, `0n` for `BigInt`, and `null` for reference-like types such as `String`, `Object` and `Array`. Field initializers execute in source order. An initializer cannot use `this` or an implicit instance member; static members and explicitly named other objects are allowed.
+
+Static fields initialize once when the class declaration executes. Inherited reads and writes share the declaring class's storage, including `Derived.count++`; inherited static methods retain their declaring context. This eager initialization timing is LGD's JavaScript behavior; C# can defer initialization. Use `Player.count` or `Player.total()`: accessing a static member through `first` is an error, as is accessing an instance member through `Player`. Static methods cannot use `this` or implicit instance members, but may access an explicit instance parameter. Locals and parameters shadow implicit member names normally.
+
+Known field types, writes, returns and receiver kinds are checked across relative LGD imports. Completion lists separate instance and static members. These remain compile-time checks; arbitrary external JavaScript can bypass them.
+
+LGD members are accessible from other code by default; C# access-control defaults are not modeled. This field subset does not support access modifiers, `readonly`/`const` fields, static classes or constructors, constructor chaining with `this(...)`, or fields in interfaces. Same-named inherited instance fields and member collisions are diagnosed because JavaScript properties cannot represent C#'s separate base and derived field storage. Use a distinct field name instead. Declare an LGD base before its derived class; unresolved or later-declared bases cannot provide a verified field lifecycle. Native class output also reserves the static field name `prototype`. Existing top-level `readonly` declarations are unchanged.
 
 ## LGD interfaces and abstract classes
 
@@ -116,11 +146,11 @@ const runner = Runner.create();
 
 A concrete class must supply compatible implementations, including inherited implementations. Abstract classes may defer missing members. Abstract methods require an abstract class and have no body; implementing an inherited abstract member requires `override`. Interface inheritance, parameter counts, rest/default parameters, explicit types, return types, and property accessors are checked across relative `.lgd` imports. Abstract classes and interfaces cannot be instantiated directly. Interfaces have no runtime value.
 
-Property contracts use `String name { get; set; }`, with either or both accessors. In an abstract class, write `abstract String name { get; set; }`. Implement them with existing LGD accessors, such as `get String name() { return this._name; }` and `set name(String value) { this._name = value; }`; add `override` when implementing an inherited abstract property. Instance initialization remains in the class-name constructor.
+Property contracts use `String name { get; set; }`, with either or both accessors. In an abstract class, write `abstract String name { get; set; }`. Implement them with existing LGD accessors, such as `get String name() { return this._name; }` and `set name(String value) { this._name = value; }`; add `override` when implementing an inherited abstract property. Instance state can use typed class fields or the class-name constructor.
 
 JavaScript output erases interface declarations, interface-only require bindings, and abstract member declarations. Editor-only JSDoc typedefs retain interface shapes. Abstract classes retain their concrete constructor and methods. Errors appear in Problems and prevent a save from replacing the last working `.js` file. These are editor/compiler checks; externally supplied JavaScript values remain dynamic, and emitted code does not install runtime abstract/interface guards.
 
-This initial contract syntax does not include overloaded methods, generic interfaces, static interface members, access modifiers, or field declarations. Use explicitly typed method/property contracts. Opaque external annotation identities remain conservative.
+This initial contract syntax does not include overloaded methods, generic interfaces, static interface members, access modifiers, or interface field declarations. Use explicitly typed method/property contracts. Opaque external annotation identities remain conservative.
 
 ## LGD output choices
 
@@ -137,7 +167,7 @@ The target language and the JavaScript object model are separate settings:
 
 `javascriptObjectModel` supports `oloo` (the default) and `class`. Both preserve the source's `Name.create(...)` caller API. Native class output emits real JavaScript classes and requires class bases; known OLOO object bases and `Oloo.base` calls are diagnosed. Use `base.method(...)` for class inheritance calls.
 
-Choose native classes deliberately: methods live on `.prototype`, instances use native class construction, and a base constructor's virtual method calls dispatch to the derived implementation during construction. OLOO keeps its existing base-factory lifecycle and object-level method API. Changing the setting refreshes open LGD mirrors; save the source to update its adjacent JavaScript file.
+Choose native classes deliberately: methods live on `.prototype`, instances use native class construction, and a base constructor's virtual method calls dispatch to the derived implementation during construction. OLOO keeps its object-level method API and retains the base-factory lifecycle for existing OLOO object bases. Both output modes support root declared fields and static members. Native class output diagnoses inherited declared-instance-field hierarchies because JavaScript native construction cannot preserve LGD's C#-style field initialization order; select OLOO for those hierarchies. Changing the setting refreshes open LGD mirrors; save the source to update its adjacent JavaScript file.
 
 ## Generated JavaScript checks
 

@@ -104,7 +104,7 @@ describe('LGD interface and abstract syntax.', () =>
         [ 'interface Task { String Name {} }', 'at least one' ],
         [ 'interface Task { void Name { get; } }', 'value type' ],
         [ 'interface Task { override String Name { get; } }', 'cannot be override' ],
-        [ 'interface Task { Number field = 1; }', 'Fields' ],
+        [ 'interface Task { Number field = 1; }', 'data fields' ],
         [ 'interface Task : Named, {}', 'heritage list' ],
         [ 'abstract interface Task {}', 'already abstract' ],
         [ 'class Task { abstract Number run(); }', 'require an abstract' ],

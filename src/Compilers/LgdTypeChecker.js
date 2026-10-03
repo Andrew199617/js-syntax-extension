@@ -470,6 +470,11 @@ function checkTypes(content, declarations, externals = new Map())
     {
         const extendedScope = scopeAtOffset(scopeContext, declaration.headStart);
         const resolved = resolveDeclaredType(declaration, extendedScope, errors);
+        if(declaration.kind === 'class')
+        {
+            extendedScope.set(declaration.name, { keyword: 'Object', kind: 'self', typeName: declaration.name, ref: null });
+        }
+
         const initializer = content.slice(declaration.initializerStart, declaration.initializerEnd);
         let inferred = UNKNOWN;
         let valueOffset = declaration.initializerStart;

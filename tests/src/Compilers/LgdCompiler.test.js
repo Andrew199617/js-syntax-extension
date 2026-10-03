@@ -367,11 +367,22 @@ describe('LGD type checking.', () =>
         expect(check(source).errors).toEqual([]);
     });
 
-    test('Reports unsupported LGD fields without confusing them with outer variables.', () =>
+    test('Keeps commented type member and indexed accesses distinct from malformed typed declarations.', () =>
+    {
+        const source = [
+            'class Widget { static Number count = 0; }',
+            'Widget /* keep */ .count;',
+            'Widget /* keep */ ["count"];'
+        ].join('\n');
+        expect(check(source).errors).toEqual([]);
+        expect(check('String label;').errors.length).toBeGreaterThan(0);
+    });
+
+    test('Reports untyped LGD fields without confusing them with outer variables.', () =>
     {
         const errors = check('String label = "a";\nclass Widget { label = 5; }').errors;
         expect(errors).toHaveLength(1);
-        expect(errors[0].message).toContain('Fields, static, and private members are not supported');
+        expect(errors[0].message).toContain('Use a typed field');
     });
 });
 

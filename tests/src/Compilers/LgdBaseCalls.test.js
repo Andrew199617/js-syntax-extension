@@ -120,7 +120,7 @@ describe('Lexical LGD base method calls.', () =>
         expect((await instance.collect('label', 1)).items).toEqual([ 2, 1 ]);
     });
 
-    test('Leaves constructor base allocation unchanged and allows instance-bound constructor method calls.', () =>
+    test('Keeps one allocated receiver across LGD base construction and instance-bound constructor method calls.', () =>
     {
         const source = [
             'class Base {',
@@ -132,7 +132,7 @@ describe('Lexical LGD base method calls.', () =>
             '}',
             'module.exports = Derived;'
         ].join('\n');
-        expect(compile(source).code).toContain('Oloo.assign(Base.create(name), Derived)');
+        expect(compile(source).code).toContain('Oloo.assign(Object.create(Base), Derived)');
         const instance = execute(source).create('name');
         expect(instance.calls).toEqual(['name']);
     });

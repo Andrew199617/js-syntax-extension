@@ -4,6 +4,15 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.19
+
+- Add typed instance fields beside constructors, with zero/null defaults and fresh mutable initializers on each allocated instance.
+- Add explicit static fields and methods, shared declaring-type storage across inheritance, and C#-style receiver/static-context diagnostics.
+- Preserve derived-before-base field initialization, lexical initializer scope, constructor defaults, argument behavior, and early-return control flow.
+- Share field typing, completions, definitions and dependency invalidation across relative LGD imports.
+- Offer a guarded, nonpreferred native Quick Fix for proven static-member receiver mistakes; suppress uncertain or stale changes.
+- Document unsupported C# constructs and native inherited-field initialization boundaries instead of silently emitting different semantics.
+
 # 2.7.18
 
 - Preserve the declared type in downstream diagnostics after a proven incompatible write, avoiding cascading return errors while keeping the assignment blocker.

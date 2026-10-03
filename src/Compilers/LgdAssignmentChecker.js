@@ -42,6 +42,7 @@ const LgdAssignmentChecker = {
                 }
             }
         });
+        errors.push(...context.members.checkFieldInitializers(context, (path, signature) => LgdReturnChecker.expressionTypes(path, signature, context)));
         return errors;
     },
 
@@ -61,6 +62,12 @@ const LgdAssignmentChecker = {
                 }
             }
 
+            return;
+        }
+
+        if(target.isMemberExpression() || target.isOptionalMemberExpression())
+        {
+            this.checkMemberTarget(target, value, context, options);
             return;
         }
 
@@ -117,6 +124,48 @@ const LgdAssignmentChecker = {
 
                 errors.push(error);
                 this.recordRejectedWrite(binding, value, type, context);
+            }
+        }
+    },
+
+    /** @description Validates typed member writes through their resolved instance or static owner. */
+    checkMemberTarget(target, value, context, options)
+    {
+        const resolved = context.members.resolve(target);
+        if(!resolved?.valid || resolved.member.kind === 'method')
+        {
+            return;
+        }
+
+        const member = resolved.member;
+        const expected = member.propertyTypeName || member.typeName;
+        if(!expected)
+        {
+            return;
+        }
+
+        if(member.readonly && !options.initializing)
+        {
+            options.errors.push({ offset: context.map.toSource(target.node.start), endOffset: context.map.toSource(target.node.end),
+                code: 'lgd.member.readonly', message: `Cannot assign to readonly member '${member.name}'.` });
+            return;
+        }
+
+        const signature = { declaration: resolved.receiver.declaration, group: { params: [], async: false, assignment: true, returnTypeName: expected } };
+        const types = typeof value === 'string' ? [value] : LgdReturnChecker.expressionTypes(value, signature, context);
+        let reportNode = typeof value === 'string' ? target.node : value.node;
+        if(typeof value !== 'string' && value.isAssignmentExpression())
+        {
+            reportNode = value.node.right;
+        }
+
+        for(const type of new Set(types))
+        {
+            const compatibility = context.members.memberTypeOptions(resolved, value);
+            if(!context.members.compatible(expected, type, target, compatibility))
+            {
+                options.errors.push({ offset: context.map.toSource(reportNode.start), endOffset: context.map.toSource(reportNode.end),
+                    code: 'lgd.assignment.typeMismatch', message: `Cannot assign ${type} to ${expected} member '${member.name}'.` });
             }
         }
     },

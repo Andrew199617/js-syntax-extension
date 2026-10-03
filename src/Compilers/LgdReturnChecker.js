@@ -7,6 +7,7 @@ const { inferExpression, maskCode, UNKNOWN } = require('./LgdInfer');
 const { tsTypeMap } = require('./LgdTypeMaps');
 const LgdBindingFlow = require('./LgdBindingFlow');
 const LgdBindingTypes = require('./LgdBindingTypes');
+const LgdClassMemberSemantics = require('./LgdClassMemberSemantics');
 
 /** @description Checks explicit named return contracts against the mapped JavaScript function bodies. */
 const LgdReturnChecker = {
@@ -43,6 +44,7 @@ const LgdReturnChecker = {
         }
 
         context.bindings = LgdBindingTypes.create(context);
+        context.members = LgdClassMemberSemantics.create(context);
         return context;
     },
 
@@ -115,7 +117,10 @@ const LgdReturnChecker = {
                 const types = argument.node ? this.expressionTypes(argument, signature, context) : ['undefined'];
                 for(const type of new Set(types))
                 {
-                    if(!this.compatible(declared, type, group.opaqueReturn))
+                    const nonnullable = type !== 'null' && type !== 'undefined';
+                    const returnContract = { nullable: false, typeOffset: typeStart };
+                    const inheritedCompatible = nonnullable && context.members.compatible(declared, type, argument, returnContract);
+                    if(!this.compatible(declared, type, group.opaqueReturn) && !inheritedCompatible)
                     {
                         const node = argument.node || returned.node;
                         const error = {
@@ -264,6 +269,12 @@ const LgdReturnChecker = {
         }
 
         const node = path.node;
+        const memberType = context.members.expressionType(path, signature);
+        if(memberType)
+        {
+            return [memberType];
+        }
+
         const literals = { NumericLiteral: 'Number', StringLiteral: 'String', BooleanLiteral: 'Boolean',
             BigIntLiteral: 'BigInt', TemplateLiteral: 'String', ObjectExpression: 'Object', ArrayExpression: 'Array',
             FunctionExpression: 'Function', ArrowFunctionExpression: 'Function' };

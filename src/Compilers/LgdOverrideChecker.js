@@ -75,6 +75,7 @@ function methodSignature(member, declaration, inherited)
     return {
         name: member.name,
         kind: member.kind || 'method',
+        static: Boolean(member.static),
         virtual: Boolean(member.virtual || member.abstract || member.override && inherited?.virtual),
         abstract: Boolean(member.abstract),
         accessorKind: member.accessorKind || null,
@@ -419,7 +420,7 @@ function check(content, declarations, externals = new Map())
         const methods = new Map(inherited.methodSignatures.map(member => [ member.name, member ]));
         for(const member of declaration.classMembers || [])
         {
-            if(member.isConstructor)
+            if(member.isConstructor || member.kind === 'field' || member.static)
             {
                 continue;
             }

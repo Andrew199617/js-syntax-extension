@@ -196,8 +196,8 @@ describe('LGD class syntax lowering.', () =>
         const invalid = [
             'class Example { constructor() {} }',
             'class Example { create() {} }',
-            'class Example { static method() {} }',
-            'class Example { Number value = 1; }',
+            'class Example { static virtual method() {} }',
+            'class Example { Number value = ; }',
             'class Example { Example() {} Example() {} }',
             'class Example { async Example() {} }',
             'class Example { Example() : base() {} }',

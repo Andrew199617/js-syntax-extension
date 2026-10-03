@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const LgdClassMemberLookup = require('./LgdClassMemberLookup');
 
 /** @import { Hover, Position, TextDocument } from 'vscode' */
 
@@ -57,6 +58,12 @@ const LgdHoverProvider = {
         const wordRange = document.getWordRangeAtPosition(position);
         if(wordRange)
         {
+            const declaredField = LgdClassMemberLookup.get(state, position);
+            if(declaredField?.kind === 'field')
+            {
+                return new vscode.Hover(this.renderDeclaredField(declaredField), wordRange);
+            }
+
             const memberHover = this.provideThisMemberHover(document, position, wordRange);
             if(memberHover)
             {
@@ -167,6 +174,15 @@ const LgdHoverProvider = {
         }
 
         return new vscode.Hover(this.renderPropertySummary(detail), wordRange);
+    },
+
+    /** @description Shows the declared field type and owner even when the JavaScript mirror cannot infer a default-only field. */
+    renderDeclaredField(detail)
+    {
+        const modifier = detail.static ? 'static ' : '';
+        const owner = detail.declaringType ? `${detail.declaringType}.` : '';
+        const type = detail.propertyTypeName || detail.typeName;
+        return [ '```lgd', `${modifier}${type} ${owner}${detail.name}`, '```' ].join('\n');
     },
 
     /**

@@ -4,6 +4,7 @@ const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
 const LgdTypeChecker = require('./LgdTypeChecker');
 const LgdAssignmentChecker = require('./LgdAssignmentChecker');
+const LgdClassMemberSemantics = require('./LgdClassMemberSemantics');
 const LgdSourceMap = require('./LgdSourceMap');
 const LgdClassSyntax = require('./LgdClassSyntax');
 const LgdBaseChecker = require('./LgdBaseChecker');
@@ -28,7 +29,7 @@ const typeNamePattern = String.raw`(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*`;
 const declarationHeadPattern = new RegExp(`^(?<indent>[\\t ]*)(?<exportKeyword>export[\\t ]+)?(?<readonlyKeyword>readonly[\\t ]+)?(?<typeName>${typeNamePattern})[\\t ]+(?<variableName>[$A-Z_a-z][\\w$]*)[\\t ]*=`, 'gm');
 
 /** @description Matches malformed declaration heads: lines starting with a type name that never parsed as a declaration. */
-const typeNameLinePattern = new RegExp(`^[\\t ]*(?:export[\\t ]+)?(?:readonly[\\t ]+)?(?<typeName>${typeNamePattern})(?![\\w$.])(?![\\t ]*\\()`, 'gm');
+const typeNameLinePattern = new RegExp(`^[\\t ]*(?:export[\\t ]+)?(?:readonly[\\t ]+)?(?<typeName>${typeNamePattern})(?![\\w$.])(?![\\t ]*(?:\\(|\\[|\\.))`, 'gm');
 
 /** @description Length of the JSDoc opening marker. */
 const jsdocOpenLength = 3;
@@ -70,7 +71,8 @@ const LgdCompiler = {
         const backend = JsBackend.create(newline);
         backend.objectModel = resolved.options.javascriptObjectModel;
         const output = this.emitRange(content, backend, this.fullRange(content, parsed.declarations));
-        const erased = LgdInterfaceErasure.apply(content, parsed.allDeclarations, externals, output);
+        const members = LgdClassMemberSemantics.rewrite(output, content, parsed.allDeclarations, externals);
+        const erased = LgdInterfaceErasure.apply(content, parsed.allDeclarations, externals, members);
         const emitted = LgdInterfaceTypes.apply(content, parsed.allDeclarations, externals, erased);
         const validation = LgdGeneratedJsValidator.validate(emitted, content);
         if(!parsed.errors.some(error => error.severity !== 'warning'))
@@ -114,6 +116,7 @@ const LgdCompiler = {
     compileToTs(content, externals = new Map())
     {
         const parsed = this.parse(content, externals);
+        this.checkMemberTarget(content, parsed);
         const newline = this.detectNewline(content);
         const emitted = this.emitRange(content, TsBackend.create(newline), this.fullRange(content, parsed.declarations));
         return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
@@ -128,6 +131,7 @@ const LgdCompiler = {
     compileToCSharp(content, externals = new Map())
     {
         const parsed = this.parse(content, externals);
+        this.checkMemberTarget(content, parsed);
         const newline = this.detectNewline(content);
         for(const declaration of parsed.allDeclarations.filter(candidate => candidate.kind === 'enum'))
         {
@@ -145,6 +149,23 @@ const LgdCompiler = {
         const mappings = emitted.segments.map(segment => this.shiftSegment(segment, header.length));
 
         return { code: `${header}${body}`, mappings: mappings, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
+    },
+
+    /** @description Blocks newer class field/static semantics in legacy output backends. */
+    checkMemberTarget(content, parsed)
+    {
+        for(const declaration of parsed.allDeclarations)
+        {
+            const unsupported = declaration.classMembers?.some(member => member.kind === 'field' || member.static);
+            if(unsupported)
+            {
+                parsed.errors.push({ ...this.createError(
+                    content, declaration.nameStart,
+                    'Declared class fields and static members are supported only by the JavaScript OLOO and native-class output targets.', declaration.nameEnd
+                ),
+                code: 'lgd.output.memberTarget', category: 'compilation' });
+            }
+        }
     },
 
     /**
@@ -179,6 +200,18 @@ const LgdCompiler = {
             const head = headMatch.groups;
             const headStart = headMatch.index;
             const headEnd = headStart + headMatch[0].length;
+            const classField = classes.declarations.some(declaration => (declaration.classMembers || []).some(member =>
+            {
+                const inHeader = member.start <= headEnd && headEnd <= member.initializerStart;
+                return member.kind === 'field' && inHeader;
+            }));
+
+            if(classField)
+            {
+                headMatch = declarationHeadPattern.exec(masked);
+                continue;
+            }
+
             const jsdoc = this.findPrecedingJsdoc(content, headStart);
             const scan = this.scanInitializer(content, headEnd);
             if(scan.error)
@@ -246,6 +279,11 @@ const LgdCompiler = {
             });
         }
 
+        for(const memberError of LgdClassMemberSemantics.checkDeclarations(content, found, externals))
+        {
+            errors.push({ ...this.createError(content, memberError.offset, memberError.message, memberError.endOffset), ...memberError });
+        }
+
         for(const typeError of LgdTypeChecker.checkTypes(content, found, externals))
         {
             errors.push(this.createError(content, typeError.offset, typeError.message));
@@ -305,7 +343,8 @@ const LgdCompiler = {
 
         if(required && (!options.deferAnalysis || hasBaseCalls || standaloneCandidates))
         {
-            const emitted = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
+            const output = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
+            const emitted = LgdClassMemberSemantics.rewrite(output, content, found, externals);
             const standaloneErrors = LgdStandaloneReturnChecker.check(emitted);
             for(const standaloneError of standaloneErrors)
             {
@@ -349,7 +388,8 @@ const LgdCompiler = {
         if(context)
         {
             const assignmentErrors = LgdAssignmentChecker.check(context);
-            const checked = [ ...LgdEnumSyntax.check(context), ...assignmentErrors, ...LgdReturnChecker.check(context) ];
+            const memberErrors = context.members.check(context);
+            const checked = [ ...LgdEnumSyntax.check(context), ...assignmentErrors, ...memberErrors, ...LgdReturnChecker.check(context) ];
             this.appendTypeErrors(content, parsed.errors, checked);
         }
 

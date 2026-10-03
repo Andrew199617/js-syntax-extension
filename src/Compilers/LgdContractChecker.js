@@ -713,7 +713,7 @@ function check(content, declarations, externals = new Map())
         }
 
         const methods = describeMethods(content, declarations, declaration, externals);
-        const implementations = new Map(methods.methodSignatures.map(member => [ member.name, member ]));
+        const implementations = new Map(methods.methodSignatures.filter(member => !member.static).map(member => [ member.name, member ]));
         const seen = new Set();
         for(const contract of table.contractSignatures)
         {

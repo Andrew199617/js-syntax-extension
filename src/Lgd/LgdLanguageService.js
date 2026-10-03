@@ -1,7 +1,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const LgdExportCache = require('./LgdExportCache');
-const { getContractMetadata, getTypedMembers, getInterfaceMembers } = require('./LgdContractEditor');
+const { getContractMetadata, getTypedMembers, getInterfaceMembers, getRuntimeMembers, filterThisMembers, filterDeclaredMembers } = require('./LgdContractEditor');
 const createLgdDiagnostics = require('./LgdDiagnostics');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
@@ -452,11 +452,7 @@ const LgdLanguageService = {
         return summary;
     },
 
-    /**
-     * @description Collects the source and resolved imports used to describe inherited members.
-     * @param {Object} state the open document state.
-     * @returns {Object} the declaration and import context.
-     */
+    /** @description Collects the source and resolved imports used to describe inherited members. */
     getMemberContext(state)
     {
         return {
@@ -520,7 +516,7 @@ const LgdLanguageService = {
 
         const resolving = new Set(visited);
         resolving.add(declaration);
-        const members = this.getObjectMembers(declaration);
+        const members = getRuntimeMembers(declaration, context, candidate => this.getObjectMembers(candidate));
         const required = this.getRequiredType(declaration.initializerText || '', context.externals);
         let inherited = required?.members || [];
         if(declaration.baseName)
@@ -550,7 +546,7 @@ const LgdLanguageService = {
             }
         }
 
-        return members;
+        return filterDeclaredMembers(members, declaration, required);
     },
 
     /**
@@ -574,7 +570,8 @@ const LgdLanguageService = {
             return [];
         }
 
-        return this.getDeclaredMembers(declaration, this.getMemberContext(state));
+        const members = this.getDeclaredMembers(declaration, this.getMemberContext(state));
+        return filterThisMembers(members, declaration, document.offsetAt(position));
     },
 
     /**
@@ -626,7 +623,7 @@ const LgdLanguageService = {
         const found = members.find(member =>
         {
             const hasDetail = member.typeName || member.properties;
-            return member.name === name && member.kind === 'property' && hasDetail;
+            return member.name === name && [ 'property', 'field' ].includes(member.kind) && !member.static && hasDetail;
         });
 
         return found || null;

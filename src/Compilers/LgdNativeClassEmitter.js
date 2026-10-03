@@ -1,6 +1,7 @@
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const LgdClassSyntax = require('./LgdClassSyntax');
+const LgdClassFields = require('./LgdClassFields');
 const LgdBaseCalls = require('./LgdBaseCalls');
 const LgdBaseChecker = require('./LgdBaseChecker');
 const LgdSourceMap = require('./LgdSourceMap');
@@ -22,9 +23,22 @@ const LgdNativeClassEmitter = {
         const errors = [];
         for(const declaration of declarations)
         {
+            const prototypeField = declaration.classMembers?.find(member => member.kind === 'field' && member.static && member.name === 'prototype');
+            if(prototypeField)
+            {
+                errors.push({ offset: prototypeField.nameStart, endOffset: prototypeField.nameEnd, code: 'lgd.output.staticPrototype',
+                    message: 'Native class output reserves the static name prototype. Rename this field or select OLOO output.' });
+            }
+
             if(declaration.kind !== 'class' || !declaration.baseName)
             {
                 continue;
+            }
+
+            if(declaration.hasDeclaredInstanceFieldsInHierarchy)
+            {
+                errors.push({ offset: declaration.baseStart, endOffset: declaration.baseEnd, code: 'lgd.output.fieldInitializationOrder',
+                    message: 'Native class output cannot preserve C# declared instance-field initialization order across inheritance. Use OLOO output for this class hierarchy.' });
             }
 
             const visible = LgdBaseChecker.visibleBindings(bindings, declaration.headStart);
@@ -68,7 +82,7 @@ const LgdNativeClassEmitter = {
     /** @description Emits native class syntax while retaining typed documentation, nested declarations and source mappings. */
     emit(content, backend, declaration, compiler)
     {
-        const context = { content: content, backend: backend, declaration: declaration, compiler: compiler };
+        const context = { content: content, backend: backend, declaration: declaration, compiler: compiler, syntax: LgdClassSyntax };
         const output = { code: '', segments: [] };
         if(declaration.kind === 'interface')
         {
@@ -102,13 +116,17 @@ const LgdNativeClassEmitter = {
             {
                 LgdClassSyntax.appendGenerated(output, '', memberStart, { end: member.bodyEnd });
             }
+            else if(member.kind === 'field')
+            {
+                LgdClassSyntax.appendGenerated(output, '', memberStart);
+            }
             else if(member.isConstructor)
             {
                 this.emitConstructor(output, context, member);
             }
             else
             {
-                LgdClassSyntax.emitMethod(output, context, member);
+                LgdClassSyntax.emitMethod(output, context, { ...member, modifierSpans: member.modifierSpans.filter(span => span.start !== member.staticStart) });
             }
 
             cursor = member.bodyEnd;
@@ -119,8 +137,11 @@ const LgdNativeClassEmitter = {
             this.emitConstructor(output, context, null);
         }
 
+        LgdClassFields.emitInstanceInitializer(output, context);
         this.emitFactory(output, context);
         LgdClassSyntax.appendSource(output, context, cursor, declaration.initializerEnd);
+        LgdClassFields.emitRuntimeAliases(output, context);
+        LgdClassFields.emitStaticFields(output, context);
         if(declaration.baseCalls?.length > 0)
         {
             output.code = LgdBaseCalls.rewrite(declaration, output.code, output.segments);
@@ -172,6 +193,7 @@ const LgdNativeClassEmitter = {
             LgdClassSyntax.appendGenerated(output, `);${newline}`, anchor);
         }
 
+        LgdClassFields.emitInstanceInitializerCall(output, context, 'this');
         if(member)
         {
             LgdClassSyntax.appendSource(output, context, member.bodyStart + 1, member.bodyEnd - 1);

@@ -1,6 +1,8 @@
 const { maskCode } = require('./LgdInfer');
 const { parseTypedParams, parseMethodHead } = require('./LgdTypedParams');
 const LgdBaseCalls = require('./LgdBaseCalls');
+const LgdClassFields = require('./LgdClassFields');
+const LgdClassConstructorEmitter = require('./LgdClassConstructorEmitter');
 
 /** @description Reads LGD classes and interfaces and lowers runtime classes to prototype objects with create factories. */
 const LgdClassSyntax = {
@@ -48,6 +50,12 @@ const LgdClassSyntax = {
         const pattern = /^(?<indent>[\t ]*)(?<exportKeyword>export[\t ]+)?(?<abstractKeyword>abstract[\t ]+)?(?<declarationKind>class|interface)[\t ]+(?<name>[$A-Z_a-z][\w$]*)\b/gm;
         const declarations = [];
         const errors = [];
+        const unsupported = /^(?<indent>[\t ]*)(?<modifier>static|public|private|protected|internal|sealed|partial)[\t ]+(?:abstract[\t ]+)?(?:class|interface)\b/gm;
+        for(const invalid of masked.matchAll(unsupported))
+        {
+            errors.push(compiler.createError(content, invalid.index + invalid.groups.indent.length, `The '${invalid.groups.modifier}' declaration modifier is not supported in LGD.`));
+        }
+
         let match = pattern.exec(masked);
         while(match)
         {
@@ -121,6 +129,7 @@ const LgdClassSyntax = {
 
         const jsdoc = compiler.findPrecedingJsdoc(content, match.index);
         const declaration = {
+            ...LgdClassFields.runtimeNames(content, name),
             kind: kind,
             abstract: abstract,
             abstractStart: abstractStart,
@@ -163,7 +172,7 @@ const LgdClassSyntax = {
         let cursor = this.skipSpace(masked, declaration.initializerStart + 1);
         while(cursor < declaration.initializerEnd - 1)
         {
-            const parsed = this.parseMember(content, masked, cursor, declaration);
+            const parsed = this.parseMember(content, masked, cursor, { declaration: declaration, compiler: compiler });
             if(parsed.error)
             {
                 errors.push({ offset: parsed.offset, message: parsed.error });
@@ -200,12 +209,19 @@ const LgdClassSyntax = {
     },
 
     /** @description Parses a method signature, optional base initializer, and balanced body. */
-    parseMember(content, masked, start, declaration)
+    parseMember(content, masked, start, context)
     {
+        const { declaration, compiler } = context;
         const modifiers = this.readMethodModifiers(masked, start);
         if(modifiers.error)
         {
             return modifiers;
+        }
+
+        const field = LgdClassFields.parseField({ content: content, masked: masked, start: start, declaration: declaration, modifiers: modifiers, compiler: compiler });
+        if(field)
+        {
+            return field;
         }
 
         const property = this.parsePropertyContract(masked, start, declaration, modifiers);
@@ -217,10 +233,15 @@ const LgdClassSyntax = {
         const head = parseMethodHead(modifiers.head);
         if(!head)
         {
-            return { error: 'Expected a named LGD method or class-name constructor. Fields, static, and private members are not supported.', offset: start };
+            return { error: 'Expected a named LGD method or class-name constructor. Use a typed field or a supported named method; access modifiers are not supported.', offset: start };
         }
 
         const contract = declaration.kind === 'interface' || modifiers.abstractStart !== null;
+        if(modifiers.staticStart !== null && (contract || modifiers.virtualStart !== null || modifiers.overrideStart !== null || head.modifier === 'get' || head.modifier === 'set'))
+        {
+            return { error: 'An LGD static method cannot be abstract, virtual, override, or an accessor.', offset: modifiers.staticStart };
+        }
+
         if(modifiers.abstractStart !== null && declaration.kind !== 'interface' && !declaration.abstract)
         {
             return { error: 'Abstract members require an abstract LGD class.', offset: modifiers.abstractStart };
@@ -243,7 +264,7 @@ const LgdClassSyntax = {
 
         if(isConstructor && (head.modifier || head.generator || head.returnTypeName || modifiers.spans.length > 0))
         {
-            return { error: 'An LGD constructor cannot have a return type or be virtual, override, async, a generator, or an accessor.', offset: start };
+            return { error: 'An LGD constructor cannot have a return type or be static, virtual, override, async, a generator, or an accessor.', offset: start };
         }
 
         if(modifiers.virtualStart !== null && (head.modifier === 'get' || head.modifier === 'set'))
@@ -346,6 +367,9 @@ const LgdClassSyntax = {
             accessorKind: head.modifier === 'get' || head.modifier === 'set' ? head.modifier : null,
             getter: head.modifier === 'get',
             setter: head.modifier === 'set',
+            static: modifiers.staticStart !== null,
+            staticStart: modifiers.staticStart,
+            staticEnd: modifiers.staticStart === null ? null : modifiers.staticStart + 'static'.length,
             abstract: contract,
             abstractStart: modifiers.abstractStart,
             abstractEnd: modifiers.abstractStart === null ? null : modifiers.abstractStart + 'abstract'.length,
@@ -476,11 +500,17 @@ const LgdClassSyntax = {
         let virtualStart = null;
         let overrideStart = null;
         let abstractStart = null;
+        let staticStart = null;
         const seen = new Set();
-        let match = (/^(?<modifier>async|virtual|override|abstract)\b/).exec(masked.slice(cursor));
+        let match = (/^(?<modifier>async|virtual|override|abstract|static|readonly|public|private|protected|internal|new|const)\b/).exec(masked.slice(cursor));
         while(match)
         {
             const modifier = match.groups.modifier;
+            if([ 'readonly', 'public', 'private', 'protected', 'internal', 'new', 'const' ].includes(modifier))
+            {
+                return { error: `The '${modifier}' class-member modifier is not supported in LGD.`, offset: cursor };
+            }
+
             const end = cursor + modifier.length;
             const after = this.skipSpace(masked, end);
             if(masked[after] === '(')
@@ -511,6 +541,10 @@ const LgdClassSyntax = {
                 {
                     virtualStart = cursor;
                 }
+                else if(modifier === 'static')
+                {
+                    staticStart = cursor;
+                }
                 else
                 {
                     overrideStart = cursor;
@@ -521,10 +555,10 @@ const LgdClassSyntax = {
             }
 
             cursor = after;
-            match = (/^(?<modifier>async|virtual|override|abstract)\b/).exec(masked.slice(cursor));
+            match = (/^(?<modifier>async|virtual|override|abstract|static|readonly|public|private|protected|internal|new|const)\b/).exec(masked.slice(cursor));
         }
 
-        return { head: head, spans: spans, virtualStart: virtualStart, overrideStart: overrideStart, abstractStart: abstractStart };
+        return { head: head, spans: spans, virtualStart: virtualStart, overrideStart: overrideStart, abstractStart: abstractStart, staticStart: staticStart };
     },
 
     /** @description Exposes typed method groups using the existing backend and semantic-token contract. */
@@ -591,7 +625,7 @@ const LgdClassSyntax = {
     /** @description Emits a class as an object literal, retaining method descriptors and the create caller API. */
     emit(content, backend, declaration, compiler)
     {
-        const context = { content: content, backend: backend, declaration: declaration, compiler: compiler };
+        const context = { content: content, backend: backend, declaration: declaration, compiler: compiler, syntax: this };
         const output = { code: '', segments: [] };
         if(declaration.kind === 'interface')
         {
@@ -625,6 +659,13 @@ const LgdClassSyntax = {
                 continue;
             }
 
+            if(member.kind === 'field')
+            {
+                this.appendGenerated(output, '', memberStart);
+                cursor = member.bodyEnd;
+                continue;
+            }
+
             if(member.isConstructor)
             {
                 this.emitConstructor(output, context, member);
@@ -644,8 +685,16 @@ const LgdClassSyntax = {
             this.appendGenerated(output, ',', cursor);
         }
 
+        LgdClassFields.emitInstanceInitializer(output, context);
         this.appendSource(output, context, cursor, declaration.initializerEnd);
         this.appendGenerated(output, ';', declaration.end);
+        LgdClassFields.emitRuntimeAliases(output, context);
+        if(declaration.baseName)
+        {
+            this.appendGenerated(output, `${newline}${declaration.indent}Object.setPrototypeOf(${declaration.name}, ${declaration.baseName});`, declaration.end);
+        }
+
+        LgdClassFields.emitStaticFields(output, context);
         if(declaration.baseCalls?.length > 0)
         {
             output.code = LgdBaseCalls.rewrite(declaration, output.code, output.segments);
@@ -654,7 +703,10 @@ const LgdClassSyntax = {
             this.appendGenerated(output, helper, declaration.end);
         }
 
-        const runtimeDeclaration = { ...declaration, methodTypedParams: declaration.methodTypedParams.filter(group => !group.abstract) };
+        const protocolConstructor = !declaration.baseName || declaration.baseIsLgdClass;
+        const groups = declaration.methodTypedParams.filter(group => !group.abstract).map(group => LgdClassConstructorEmitter.runtimeGroup(group, protocolConstructor));
+
+        const runtimeDeclaration = { ...declaration, methodTypedParams: groups };
         output.code = backend.rewriteInitializer(runtimeDeclaration, output.code, output.segments);
         return output;
     },
@@ -676,6 +728,12 @@ const LgdClassSyntax = {
     /** @description Builds create() around base construction and runs the constructor body on its fresh instance. */
     emitConstructor(output, context, member)
     {
+        if(!context.declaration.baseName || context.declaration.baseIsLgdClass)
+        {
+            LgdClassConstructorEmitter.emit(output, context, member);
+            return;
+        }
+
         const declaration = context.declaration;
         const anchor = member ? member.nameStart : declaration.nameStart;
         const newline = context.compiler.detectNewline(context.content);
@@ -720,6 +778,7 @@ const LgdClassSyntax = {
             this.appendGenerated(output, `Object.create(${declaration.name});`, anchor);
         }
 
+        LgdClassFields.emitInstanceInitializerCall(output, context, instanceName);
         if(member)
         {
             this.appendGenerated(output, `${newline}${indent}    (function() {`, member.bodyStart, { end: member.bodyStart + 1 });

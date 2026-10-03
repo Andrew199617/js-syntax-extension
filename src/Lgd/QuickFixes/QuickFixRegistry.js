@@ -4,6 +4,7 @@ const ChangeParameterTypeFix = require('./ChangeParameterTypeFix');
 const AddOverrideFix = require('./AddOverrideFix');
 const MakeBaseVirtualFix = require('./MakeBaseVirtualFix');
 const RemoveExtraBaseArgumentsFix = require('./RemoveExtraBaseArgumentsFix');
+const UseStaticTypeReceiverFix = require('./UseStaticTypeReceiverFix');
 
 /** @description Creates the diagnostic strategy registry; future fixes register one isolated handler here. */
 function createQuickFixRegistry()
@@ -13,7 +14,8 @@ function createQuickFixRegistry()
         new RemoveExtraBaseArgumentsFix(),
         new ChangeParameterTypeFix(),
         new ChangeParameterAndReturnTypeFix(),
-        new ChangeReturnTypeFix() ];
+        new ChangeReturnTypeFix(),
+        new UseStaticTypeReceiverFix() ];
 
     return new Map(handlers.map(handler => [ handler.kind, handler ]));
 }

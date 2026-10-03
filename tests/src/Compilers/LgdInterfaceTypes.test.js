@@ -31,7 +31,7 @@ describe('editor-only interface type evidence', () =>
         const source = [
             'interface ILabel { String label(Number count); String name { get; set; } }',
             'class Reader { String read(ILabel item) { return item.label(1) + item.name; } }',
-            'Reader.read({ label(count) { return String(count); }, name: "ready" });'
+            'Reader.create().read({ label(count) { return String(count); }, name: "ready" });'
         ].join('\n');
         const result = LgdCompiler.create().compileToJs(source);
         expect(result.errors).toEqual([]);

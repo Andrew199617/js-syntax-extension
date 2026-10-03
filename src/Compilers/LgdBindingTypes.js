@@ -179,7 +179,8 @@ const LgdBindingTypes = {
         }
 
         const empty = { declaration: {}, group: { inherited: false } };
-        const type = this.type(binding, empty);
+        const importedClass = this._importedClass(binding);
+        const type = importedClass ? binding.identifier.name : this.type(binding, empty);
         if(!type)
         {
             return null;
@@ -194,7 +195,7 @@ const LgdBindingTypes = {
             descriptor.kind = 'keyword';
             descriptor.keyword = type;
         }
-        else if(declaration?.kind === 'class' || declaration?.name === declaration?.typeName && declaration)
+        else if(importedClass || declaration?.kind === 'class' || declaration?.name === declaration?.typeName && declaration)
         {
             descriptor.kind = 'self';
             descriptor.keyword = 'Object';
@@ -218,6 +219,26 @@ const LgdBindingTypes = {
         }
 
         return descriptor;
+    },
+
+    _importedClass(binding)
+    {
+        if(!binding.constant || !binding.path.isVariableDeclarator())
+        {
+            return null;
+        }
+
+        const initializer = binding.path.node.init;
+        const callee = initializer?.callee;
+        const directRequire = initializer?.type === 'CallExpression' && callee.type === 'Identifier' && callee.name === 'require';
+        if(!directRequire || binding.path.scope.getBinding('require'))
+        {
+            return null;
+        }
+
+        const specifier = initializer.arguments[0];
+        const external = specifier?.type === 'StringLiteral' && this._context.externals.get(specifier.value);
+        return external?.kind === 'class' ? external : null;
     },
 
     /** @description Resolves nominal assignment tokens only through currently visible lexical bindings. */

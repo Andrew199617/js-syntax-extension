@@ -1,3 +1,4 @@
+const LgdClassMemberLookup = require('./LgdClassMemberLookup');
 const vscode = require('vscode');
 const { parse } = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
@@ -149,6 +150,27 @@ function positionAt(text, offset)
     return new vscode.Position(lines.length - 1, lines[lines.length - 1].length);
 }
 
+/** @description Resolves known typed class members to their declaring source, including inherited imported fields. */
+async function resolveMemberDefinition(languageService, state, position)
+{
+    const target = LgdClassMemberLookup.get(state, position);
+    if(!Number.isInteger(target?.nameStart) || !Number.isInteger(target?.nameEnd))
+    {
+        return null;
+    }
+
+    const sourcePath = target.declaringSourcePath;
+    const entry = sourcePath ? await languageService.readSourceEntry(sourcePath) : null;
+    const content = sourcePath ? entry?.sourceText : state.document.getText();
+    if(!content)
+    {
+        return null;
+    }
+
+    const range = new vscode.Range(positionAt(content, target.nameStart), positionAt(content, target.nameEnd));
+    return new vscode.Location(sourcePath ? vscode.Uri.file(sourcePath) : state.document.uri, range);
+}
+
 /**
  * @description Resolves a direct imported binding or LGD type name to its exported LGD declaration.
  * Relative requires cannot resolve from untitled JavaScript mirrors, so this uses source metadata.
@@ -159,6 +181,12 @@ function positionAt(text, offset)
  */
 async function resolveImportedDefinition(languageService, state, position)
 {
+    const member = await resolveMemberDefinition(languageService, state, position);
+    if(member)
+    {
+        return member;
+    }
+
     const document = state.document;
     const wordRange = document.getWordRangeAtPosition(position);
     if(!wordRange)

@@ -118,7 +118,14 @@ function exportSignature(service, exported)
         contractKind: exported.contractKind, interfaceNames: exported.interfaceNames,
         contractSignatures: exported.contractSignatures, contractsKnown: exported.contractsKnown,
         constructorParams: constructors,
-        members: exported.members, methodSignatures: methods, methodsKnown: exported.methodsKnown
+        members: exported.members?.map(member =>
+        {
+            const signature = { ...member };
+            delete signature.nameStart;
+            delete signature.nameEnd;
+            delete signature.declaringSourcePath;
+            return signature;
+        }), methodSignatures: methods, methodsKnown: exported.methodsKnown
     });
 }
 
@@ -277,7 +284,7 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
         return service.readExportDeclaration(sourcePath, visited);
     }
 
-    const context = { declarations: parsed.allDeclarations, externals: externals, sourceText: targetText };
+    const context = { declarations: parsed.allDeclarations, externals: externals, sourceText: targetText, sourcePath: sourcePath };
     LgdContractChecker.classify(targetText, parsed.allDeclarations, externals);
     const methods = LgdOverrideChecker.describeMethods(targetText, parsed.allDeclarations, declaration, externals);
     const contracts = LgdContractChecker.describeContracts(targetText, parsed.allDeclarations, declaration, externals);

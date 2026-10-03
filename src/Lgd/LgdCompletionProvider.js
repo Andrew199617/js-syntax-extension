@@ -61,7 +61,8 @@ const LgdCompletionProvider = {
             return null;
         }
 
-        return summary.members.map(member => this.toCompletionItem(member));
+        const members = summary.kind === 'class' ? summary.members.filter(member => member.static) : summary.members;
+        return members.map(member => this.toCompletionItem(member));
     },
 
     /**
