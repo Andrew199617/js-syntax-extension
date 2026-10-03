@@ -1,3 +1,4 @@
+const RemoveReturnDocTypeFix = require('./RemoveReturnDocTypeFix');
 const ReplaceReadonlyLocalFix = require('./ReplaceReadonlyLocalFix');
 const ConvertObjectInheritanceFix = require('./ConvertObjectInheritanceFix');
 const ChangeParameterAndReturnTypeFix = require('./ChangeParameterAndReturnTypeFix');
@@ -21,7 +22,8 @@ function createQuickFixRegistry()
         new ChangeParameterAndReturnTypeFix(),
         new ChangeReturnTypeFix(),
         new UseStaticTypeReceiverFix(),
-        new MoveVirtualModifierFix() ];
+        new MoveVirtualModifierFix(),
+        new RemoveReturnDocTypeFix() ];
 
     return new Map(handlers.map(handler => [ handler.kind, handler ]));
 }

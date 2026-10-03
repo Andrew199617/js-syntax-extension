@@ -1,4 +1,5 @@
 const { maskCode } = require('./LgdInfer');
+const LgdDocComment = require('./LgdDocComment');
 
 /** @description Advises class methods to express virtual behavior in their LGD declaration. */
 const LgdVirtualDocChecker = {
@@ -57,37 +58,9 @@ const LgdVirtualDocChecker = {
     /** @description Recognizes directive lines without treating prose mentions or longer tag names as virtual tags. */
     tags(comment)
     {
-        const openingLength = '/**'.length;
-        const body = comment.slice(openingLength, -'*/'.length);
-        const tags = [];
-        let lineStart = openingLength;
-        let fence = null;
-        for(const line of body.split(/(?<=\n)/))
-        {
-            const prefix = (/^[\t ]*\*?[\t ]*/).exec(line)[0];
-            const text = line.slice(prefix.length);
-            const marker = (/^(?<marker>`{3,}|~{3,})/).exec(text)?.groups.marker;
-            if(marker)
-            {
-                if(!fence)
-                {
-                    fence = marker;
-                }
-                else if(marker[0] === fence[0] && marker.length >= fence.length && text.slice(marker.length).trim() === '')
-                {
-                    fence = null;
-                }
-            }
-            else if(!fence && (/^@virtual(?=\s|$)/).test(text))
-            {
-                const offset = lineStart + prefix.length;
-                tags.push({ offset: offset, endOffset: offset + '@virtual'.length });
-            }
-
-            lineStart += line.length;
-        }
-
-        return tags;
+        return LgdDocComment.lines(comment)
+            .filter(line => (/^@virtual(?=\s|$)/).test(line.text))
+            .map(line => ({ offset: line.offset, endOffset: line.offset + '@virtual'.length }));
     },
 
     /** @description Matches the nonblocking severity of redundant return-type documentation. */

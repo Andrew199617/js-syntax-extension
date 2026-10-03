@@ -1,4 +1,5 @@
 const { maskCode } = require('./LgdInfer');
+const LgdDocComment = require('./LgdDocComment');
 
 /** @description A redundant documentation type is advisory and never blocks LGD emission. */
 const message = 'Return type is already declared; the JSDoc type is not required.';
@@ -48,19 +49,53 @@ function typeEnd(text, start)
     return null;
 }
 
-/**
- * @description Warns only on attached source JSDoc types redundant with explicit named return syntax.
- * @param {string} content the original LGD source.
- * @param {Array} declarations the parsed LGD declarations.
- * @returns {Array} advisory diagnostics whose ranges cover only the braced JSDoc type.
- */
-function check(content, declarations)
+/** @description Separates redundant types from meaningful descriptions without matching fenced examples. */
+function returnTags(comment)
 {
-    const methods = declarations.flatMap(declaration => (declaration.methodTypedParams || [])
-        .filter(group => group.returnTypeName)
-        .map(group => declaration.initializerStart + group.methodStart));
+    const tags = [];
+    for(const line of LgdDocComment.lines(comment))
+    {
+        for(const tag of line.text.matchAll(/@returns?\b[\t ]*(?<open>{)/g))
+        {
+            const offset = line.offset + tag.index;
+            if(tags.length > 0 && offset < tags.at(-1).endOffset)
+            {
+                continue;
+            }
 
-    if(methods.length === 0)
+            const start = offset + tag[0].length - 1;
+            const end = typeEnd(comment, start);
+            if(end === null)
+            {
+                continue;
+            }
+
+            const trailing = comment.slice(end, -'*/'.length).split(/\s@[A-Za-z]/)[0];
+            const description = trailing.split(/\r?\n/).map(text => text.replace(/^[\t ]*\*?[\t ]*/, '')).join('').trim();
+            tags.push({ offset: offset, typeStart: start, endOffset: end, hasDescription: description.length > 0 });
+        }
+    }
+
+    return tags;
+}
+
+/** @description Finds attached documentation on explicit return methods and named class constructors. */
+function migrations(content, declarations)
+{
+    const members = declarations.flatMap(declaration =>
+    {
+        const methods = (declaration.methodTypedParams || [])
+            .filter(group => group.returnTypeName)
+            .map(group => ({ memberStart: declaration.initializerStart + group.methodStart, isConstructor: false }));
+        if(declaration.kind === 'class' && declaration.constructorMember)
+        {
+            methods.push({ memberStart: declaration.constructorMember.start, isConstructor: true });
+        }
+
+        return methods.map(member => ({ ...member, declarationStart: declaration.headStart }));
+    });
+
+    if(members.length === 0)
     {
         return [];
     }
@@ -68,10 +103,10 @@ function check(content, declarations)
     const comments = [];
     maskCode(content, true, comments);
     const byEnd = new Map(comments.map(comment => [ comment.end, comment ]));
-    const warnings = [];
-    for(const methodStart of methods)
+    const attached = [];
+    for(const member of members)
     {
-        let before = methodStart;
+        let before = member.memberStart;
         while(before > 0 && (/\s/).test(content[before - 1]))
         {
             before--;
@@ -83,20 +118,30 @@ function check(content, declarations)
             continue;
         }
 
-        const text = content.slice(comment.start, comment.end);
-        const tags = /@returns?\b[\t ]*(?<open>{)/g;
-        for(const tag of text.matchAll(tags))
+        const tags = returnTags(content.slice(comment.start, comment.end));
+        if(tags.length > 0)
         {
-            const start = tag.index + tag[0].length - 1;
-            const end = typeEnd(text, start);
-            if(end !== null)
-            {
-                warnings.push({ severity: 'warning', message: message, offset: comment.start + start, endOffset: comment.start + end });
-            }
+            attached.push({ ...member, commentStart: comment.start, commentEnd: comment.end, tags: tags });
         }
     }
 
-    return warnings;
+    return attached;
 }
 
-module.exports = { check: check };
+/** @description Warns on redundant return types while preserving descriptive documentation and compilation. */
+function check(content, declarations)
+{
+    return migrations(content, declarations).flatMap(migration =>
+    {
+        const quickFix = { kind: 'removeReturnDocType', declarationStart: migration.declarationStart,
+            memberStart: migration.memberStart, commentStart: migration.commentStart, commentEnd: migration.commentEnd };
+        const advisory = migration.isConstructor
+            ? 'The constructor already creates this class; remove the redundant JSDoc return type.'
+            : message;
+
+        return migration.tags.map(tag => ({ code: 'lgd.jsdoc.returnType', severity: 'warning', message: advisory,
+            offset: migration.commentStart + tag.typeStart, endOffset: migration.commentStart + tag.endOffset, quickFix: quickFix }));
+    });
+}
+
+module.exports = { check: check, migrations: migrations };

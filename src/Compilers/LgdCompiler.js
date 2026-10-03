@@ -326,9 +326,7 @@ const LgdCompiler = {
 
         for(const warning of LgdReturnDocChecker.check(content, found))
         {
-            const diagnostic = this.createError(content, warning.offset, warning.message, warning.endOffset);
-            diagnostic.severity = 'warning';
-            errors.push(diagnostic);
+            errors.push({ ...this.createError(content, warning.offset, warning.message, warning.endOffset), ...warning });
         }
 
         for(const warning of LgdVirtualDocChecker.check(content, found))
