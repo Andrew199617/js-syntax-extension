@@ -19,7 +19,7 @@ function createLgdDiagnostics(document, errors)
         const severity = error.severity === 'warning' ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error;
         const diagnostic = new vscode.Diagnostic(
             new vscode.Range(position, end),
-            `LGD: ${error.message}`,
+            error.message,
             severity
         );
         diagnostic.source = 'LGD';

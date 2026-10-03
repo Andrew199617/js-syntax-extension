@@ -74,7 +74,7 @@ const VscodeError = {
 
         const diagnosis = new vscode.Diagnostic(
             range,
-            this.message,
+            this.message.replace(/^LGD:\s*/, ''),
             SeverityConverter.getDiagnosticSeverity(this.severity)
         );
         diagnosis.source = 'LGD';
