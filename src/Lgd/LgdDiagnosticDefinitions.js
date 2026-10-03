@@ -22,12 +22,17 @@ const definitions = Object.freeze({
     'lgd.jsdoc.virtual': { category: 'warning', proposalKind: 'moveVirtualModifier', fixKinds: ['moveVirtualModifier'] },
     'lgd.declaration.readonly': { category: 'warning', proposalKind: 'replaceReadonlyLocal', fixKinds: ['replaceReadonlyLocal'] },
     'lgd.object.inheritance': { category: 'inheritance', proposalKind: 'convertObjectInheritance', fixKinds: [ 'convertObjectInheritance', 'prepareObjectInheritance' ] },
+    'lgd.class.inheritanceDoc': { category: 'inheritance', proposalKind: 'convertObjectInheritance', fixKinds: [ 'convertObjectInheritance', 'prepareObjectInheritance' ] },
+    'lgd.constructor.factory': { category: 'syntax', proposalKind: 'convertObjectInheritance', fixKinds: [ 'convertObjectInheritance', 'prepareObjectInheritance' ] },
+    'lgd.constructor.name': { category: 'syntax', proposalKind: 'renameClassConstructor', fixKinds: ['renameClassConstructor'] },
     'lgd.output.syntax': { category: 'syntax' },
     'lgd.output.nativeSyntax': { category: 'syntax' },
     'lgd.assignment.typeMismatch': { category: 'type', proposalKind: 'changeParameterType',
         fixKinds: [ 'changeParameterType', 'changeParameterAndReturnType' ] },
     'lgd.member.receiverKind': { category: 'type', proposalKind: 'useStaticTypeReceiver', fixKinds: ['useStaticTypeReceiver'] },
-    'lgd.constructor.returnValue': { category: 'syntax', proposalKind: 'replaceConstructorReturnThis', fixKinds: ['replaceConstructorReturnThis'] },
+    'lgd.constructor.returnValue': { category: 'syntax', proposalKind: 'replaceConstructorReturnThis',
+        proposalKinds: [ 'replaceConstructorReturnThis', 'convertObjectInheritance' ],
+        fixKinds: [ 'replaceConstructorReturnThis', 'convertObjectInheritance', 'prepareObjectInheritance' ] },
     'lgd.return.typeMismatch': { category: 'type', proposalKind: 'changeReturnType', fixKinds: ['changeReturnType'] },
     'lgd.base.argumentCount': { category: 'inheritance', proposalKind: 'removeExtraBaseArguments', fixKinds: ['removeExtraBaseArguments'] },
     'lgd.override.nonVirtual': { category: 'inheritance', proposalKind: 'makeBaseVirtual', fixKinds: ['makeBaseVirtual'] },
@@ -59,14 +64,14 @@ const LgdDiagnosticDefinitions = {
         }
 
         return { internalId: error.code, source: this.source, visibleCode: categories[category],
-            proposalKind: definition?.proposalKind, fixKinds: definition?.fixKinds?.slice() || [] };
+            proposalKind: definition?.proposalKind, proposalKinds: definition?.proposalKinds?.slice() || [], fixKinds: definition?.fixKinds?.slice() || [] };
     },
 
     /** @description Allows only the registered strategy kinds for authoritative compiler-provided proposal metadata. */
     fixKinds(error)
     {
         const definition = this.get(error);
-        if(!error.quickFix || error.quickFix.kind !== definition.proposalKind)
+        if(!error.quickFix || error.quickFix.kind !== definition.proposalKind && !definition.proposalKinds.includes(error.quickFix.kind))
         {
             return [];
         }

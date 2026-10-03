@@ -1,3 +1,4 @@
+const RenameClassConstructorFix = require('./RenameClassConstructorFix');
 const ReplaceConstructorReturnThisFix = require('./ReplaceConstructorReturnThisFix');
 const RemoveReturnDocTypeFix = require('./RemoveReturnDocTypeFix');
 const ReplaceReadonlyLocalFix = require('./ReplaceReadonlyLocalFix');
@@ -15,6 +16,7 @@ const MoveVirtualModifierFix = require('./MoveVirtualModifierFix');
 function createQuickFixRegistry()
 {
     const handlers = [
+        { handler: new RenameClassConstructorFix(), ruleId: 'class-constructor-name' },
         { handler: new ReplaceConstructorReturnThisFix(), ruleId: 'constructor-return-value', automatic: true },
         { handler: new ReplaceReadonlyLocalFix(), ruleId: 'readonly-variable-declaration', automatic: true },
         { handler: new RemoveReturnDocTypeFix(), ruleId: 'return-type-documentation', automatic: true },

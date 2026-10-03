@@ -46,4 +46,22 @@ describe('LGD legacy object inheritance diagnostics.', () =>
         ].join('\n');
         expect(LgdCompiler.create().compileToJs(source).errors.filter(error => error.code === 'lgd.object.inheritance')).toEqual([]);
     });
+
+    test('diagnoses class inheritance tags while ignoring fenced examples and prose', () =>
+    {
+        const source = [
+            '/**',
+            ' * @description Mention @extends here without declaring it.',
+            ' * ```lgd',
+            ' * @extends {ExampleOnly}',
+            ' * ```',
+            ' * @extends {Base}',
+            ' */',
+            'class Child {}'
+        ].join('\r\n');
+        const errors = LgdCompiler.create().parse(source).errors.filter(error => error.code === 'lgd.class.inheritanceDoc');
+        expect(errors).toHaveLength(1);
+        expect(source.slice(errors[0].offset, errors[0].endOffset)).toBe('@extends {Base}');
+        expect(errors[0].quickFix).toMatchObject({ kind: 'convertObjectInheritance', name: 'Child', baseTypeName: 'Base' });
+    });
 });

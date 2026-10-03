@@ -156,7 +156,9 @@ describe('LGD class syntax lowering.', () =>
     test.each([ 'constructor', 'create' ])('Explains the required LGD constructor spelling for %s without implementation details.', spelling =>
     {
         const result = compile(`class Example { ${spelling}() {} }`);
-        expect(result.errors.map(error => error.message)).toEqual(['Use Example(...) for the constructor.']);
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0].message).toContain('Use Example(...) for the constructor.');
+        expect(result.errors[0].quickFix.kind).toBe(spelling === 'create' ? 'convertObjectInheritance' : 'renameClassConstructor');
     });
 
     test('Maps class/base/constructor names and untouched body symbols back to exact source ranges.', () =>

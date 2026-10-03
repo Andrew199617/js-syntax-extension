@@ -14,7 +14,7 @@ const ObjectInheritanceContracts = {
             return plan;
         }
 
-        const described = LgdOverrideChecker.describeMethods(base.snapshot.text, [base.declaration], base.declaration);
+        const described = base.entry || LgdOverrideChecker.describeMethods(base.snapshot.text, [base.declaration], base.declaration);
         const inherited = new Map(described.methodSignatures.map(member => [ member.name, member ]));
         const pending = [];
         for(const member of shape.object.properties)
@@ -84,6 +84,29 @@ const ObjectInheritanceContracts = {
     _prepareBase(base, names)
     {
         const { snapshot, declaration } = base;
+        if(declaration.kind === 'class')
+        {
+            const members = names.map(name => declaration.classMembers.find(member =>
+            {
+                const ordinary = member.kind === 'method' && !member.static && !member.accessor;
+                return member.name === name && ordinary && !member.virtual && !member.override;
+            }));
+
+            if(members.some(member => !member))
+            {
+                return null;
+            }
+
+            let replacement = snapshot.text.slice(declaration.start, declaration.end);
+            for(const member of members.sort((left, right) => right.start - left.start))
+            {
+                const offset = member.start - declaration.start;
+                replacement = `${replacement.slice(0, offset)}virtual ${replacement.slice(offset)}`;
+            }
+
+            return { replacement: replacement, text: snapshot.text.slice(0, declaration.start) + replacement + snapshot.text.slice(declaration.end) };
+        }
+
         const compiler = LgdCompiler.create();
         const newline = compiler.detectNewline(snapshot.text);
         const edits = [];

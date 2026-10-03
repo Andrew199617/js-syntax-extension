@@ -113,7 +113,7 @@ test('reports the screenshot factory return without dropping the base factory ca
         '}' ].join('\r\n');
     const result = compile(source);
     expect(result.errors.map(error => error.code)).toEqual([ 'lgd.jsdoc.returnType', 'lgd.constructor.returnValue' ]);
-    expect(result.errors[1].quickFix).toBeUndefined();
+    expect(result.errors[1].quickFix).toMatchObject({ kind: 'convertObjectInheritance', name: 'GoToLastParagraph' });
     expect(source.slice(result.errors[1].offset, result.errors[1].endOffset)).toBe('goToLastParagraph');
 });
 

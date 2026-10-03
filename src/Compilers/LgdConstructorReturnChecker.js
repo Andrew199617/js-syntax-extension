@@ -1,3 +1,4 @@
+const LgdFactoryMigration = require('./LgdFactoryMigration');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const LgdSourceMap = require('./LgdSourceMap');
@@ -43,6 +44,7 @@ const LgdConstructorReturnChecker = {
 
         const map = LgdSourceMap.create(emitted.segments);
         const errors = [];
+        const migrations = new Map();
         traverse(tree, {
             noScope: true,
 
@@ -81,6 +83,21 @@ const LgdConstructorReturnChecker = {
                 {
                     error.quickFix = { kind: 'replaceConstructorReturnThis', declarationStart: record.declaration.headStart,
                         memberStart: record.member.start, offset: returnStart, endOffset: returnEnd };
+                }
+
+                if(!error.quickFix)
+                {
+                    if(!migrations.has(record.declaration))
+                    {
+                        migrations.set(record.declaration, LgdFactoryMigration.read(content, record.declaration, declarations));
+                    }
+
+                    const migration = migrations.get(record.declaration);
+                    if(migration?.factory?.key.name === record.declaration.name)
+                    {
+                        error.quickFix = { kind: 'convertObjectInheritance', declarationStart: record.declaration.start,
+                            memberStart: record.member.start, name: record.declaration.name };
+                    }
                 }
 
                 errors.push(error);

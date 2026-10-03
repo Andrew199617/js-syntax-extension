@@ -126,6 +126,9 @@
                 },
                 "constructor-return-value": {
                     "$ref": "#/definitions/rule"
+                },
+                "class-constructor-name": {
+                    "$ref": "#/definitions/rule"
                 }
             }
         },

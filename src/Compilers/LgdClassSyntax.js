@@ -1,6 +1,7 @@
 const LgdAccessibilitySyntax = require('./LgdAccessibilitySyntax');
 const { maskCode } = require('./LgdInfer');
 const { parseTypedParams, parseMethodHead } = require('./LgdTypedParams');
+const LgdObjectInheritance = require('./LgdObjectInheritance');
 const LgdBaseCalls = require('./LgdBaseCalls');
 const LgdClassFields = require('./LgdClassFields');
 const LgdClassConstructorEmitter = require('./LgdClassConstructorEmitter');
@@ -185,7 +186,7 @@ const LgdClassSyntax = {
             }
             else if(member.name === 'constructor' || member.name === 'create')
             {
-                errors.push({ offset: member.nameStart, message: `Use ${declaration.name}(...) for the constructor.` });
+                errors.push(LgdObjectInheritance.constructorError(declaration, member));
             }
             else
             {

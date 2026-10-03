@@ -1,0 +1,54 @@
+const { Oloo } = require('@mavega/oloo');
+const Object BaseCommand = require("./BaseCommand");
+const Object vscode = require('vscode');
+
+/**
+* @description Command to help navigate in a window.
+*/
+class GoToLastParagraph {
+  /**
+  * @description Initialize an instance of GoToLastParagraph.
+  * @returns {GoToLastParagraphType}
+  */
+  create() {
+    const Object goToLastParagraph = Oloo.assign(BaseCommand.create("lgd.goToLastParagraph", "Go To Last Paragraph"), GoToLastParagraph);
+    return goToLastParagraph;
+  }
+
+  async executeCommand() {
+    const Object editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return;
+    }
+
+    const Object document = editor.document;
+    const Object position = editor.selection.active;
+
+    Number line = position.line - 1;
+    Boolean foundWhitespace = false;
+    for (; line >= 0; line--) {
+      const Object textLine = document.lineAt(line);
+      if (textLine.isEmptyOrWhitespace) {
+        foundWhitespace = true;
+      }
+      else if (foundWhitespace && !textLine.isEmptyOrWhitespace) {
+        break;
+      }
+    }
+
+    for (; line >= 0; line--) {
+      const Object textLine = document.lineAt(line);
+      if (textLine.isEmptyOrWhitespace) {
+        const Number nextLine = line + 1;
+        const Object nextTextLine = document.lineAt(nextLine);
+        const Object newPosition = new vscode.Position(nextLine, nextTextLine.firstNonWhitespaceCharacterIndex);
+        editor.selection = new vscode.Selection(newPosition, newPosition);
+        editor.revealRange(new vscode.Range(newPosition, newPosition));
+        return;
+      }
+    }
+
+  }
+};
+
+module.exports = GoToLastParagraph;

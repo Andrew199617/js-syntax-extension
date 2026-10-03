@@ -151,6 +151,8 @@ The constructor must use the class name. The `constructor` keyword and an explic
 
 For a plain `return this;`, Quick Fix can replace the value return with `return;`, preserving the early exit. Other expressions and commented returns are left for review so a fix cannot discard calls, property reads, initialization, or comments. If an old factory constructs and returns another object, migrate that setup into the named constructor and `: base(...)` rather than merely deleting its return.
 
+Quick Fix can rename an ordinary `constructor()` and migrate a recognized `Oloo.assign(Base.create(...), ClassName)` factory in an existing class, including its documented `@extends` base. Migration preserves arguments, method bodies and documentation, and previews any required base-method `virtual` change as one atomic action. Factories with extra work, ambiguous bases or receiver-dependent arguments need manual migration. An LGD class base must have verified root initialization without constructor-time receiver calls or escapes: initialize `this` in the class-name constructor and pass base arguments with `: base(...)`. A recognized root `Object.create(ClassName)` factory with direct property initializers can also become `this` initialization; escaping aliases and extra control flow remain manual.
+
 ### Typed instance and static fields
 
 Fields next to the constructor belong to each instance by default. Use `static` explicitly for state shared by the class:
