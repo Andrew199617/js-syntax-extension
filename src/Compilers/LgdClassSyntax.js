@@ -3,6 +3,7 @@ const { parseTypedParams, parseMethodHead } = require('./LgdTypedParams');
 const LgdBaseCalls = require('./LgdBaseCalls');
 const LgdClassFields = require('./LgdClassFields');
 const LgdClassConstructorEmitter = require('./LgdClassConstructorEmitter');
+const LgdClassMemberRecovery = require('./LgdClassMemberRecovery');
 
 /** @description Reads LGD classes and interfaces and lowers runtime classes to prototype objects with create factories. */
 const LgdClassSyntax = {
@@ -69,7 +70,7 @@ const LgdClassSyntax = {
                 declarations.push(parsed.declaration);
                 for(const error of parsed.errors)
                 {
-                    errors.push(compiler.createError(content, error.offset, error.message));
+                    errors.push({ ...compiler.createError(content, error.offset, error.message, error.endOffset), ...error });
                 }
             }
 
@@ -175,8 +176,15 @@ const LgdClassSyntax = {
             const parsed = this.parseMember(content, masked, cursor, { declaration: declaration, compiler: compiler });
             if(parsed.error)
             {
-                errors.push({ offset: parsed.offset, message: parsed.error });
-                break;
+                const { error, recoveryOffset, ...diagnostic } = parsed;
+                errors.push({ ...diagnostic, message: error });
+                if(!Number.isInteger(recoveryOffset) || recoveryOffset <= cursor)
+                {
+                    break;
+                }
+
+                cursor = this.skipSpace(masked, recoveryOffset);
+                continue;
             }
 
             const member = parsed.member;
@@ -215,7 +223,7 @@ const LgdClassSyntax = {
         const modifiers = this.readMethodModifiers(masked, start);
         if(modifiers.error)
         {
-            return modifiers;
+            return { ...modifiers, recoveryOffset: LgdClassMemberRecovery.findBoundary(masked, start, declaration.initializerEnd - 1) };
         }
 
         const field = LgdClassFields.parseField({ content: content, masked: masked, start: start, declaration: declaration, modifiers: modifiers, compiler: compiler });
@@ -233,7 +241,7 @@ const LgdClassSyntax = {
         const head = parseMethodHead(modifiers.head);
         if(!head)
         {
-            return { error: 'Expected a named LGD method or class-name constructor. Use a typed field or a supported named method; access modifiers are not supported.', offset: start };
+            return LgdClassMemberRecovery.invalidHead(masked, start, modifiers.head, declaration);
         }
 
         const contract = declaration.kind === 'interface' || modifiers.abstractStart !== null;
@@ -508,7 +516,7 @@ const LgdClassSyntax = {
             const modifier = match.groups.modifier;
             if([ 'readonly', 'public', 'private', 'protected', 'internal', 'new', 'const' ].includes(modifier))
             {
-                return { error: `The '${modifier}' class-member modifier is not supported in LGD.`, offset: cursor };
+                return LgdClassMemberRecovery.modifierError(modifier, cursor);
             }
 
             const end = cursor + modifier.length;
