@@ -14,9 +14,10 @@ const catalog = [
     },
     {
         id: 'lgd.format.indentation', title: 'Indentation',
-        defaults: { style: 'space', size: 4, tabWidth: 4, continuation: 4, caseLabels: true, caseContents: true, caseBlocks: true, labels: 'preserve' },
+        defaults: { style: 'space', size: 4, tabWidth: 4, continuation: 4, constructorInitializer: 4, tabUsage: 'always', caseLabels: true, caseContents: true, caseBlocks: true, labels: 'preserve' },
         properties: {
             style: { enum: [ 'space', 'tab' ] }, size: { type: 'integer', minimum: 1, maximum: 16 }, tabWidth: { type: 'integer', minimum: 1, maximum: 16 }, continuation: { type: 'integer', minimum: 0, maximum: 32 },
+            constructorInitializer: { type: 'integer', minimum: 0, maximum: 32 }, tabUsage: { enum: [ 'indentation', 'continuation', 'always' ] },
             caseLabels: { type: 'boolean' }, caseContents: { type: 'boolean' }, caseBlocks: { type: 'boolean' }, labels: { enum: [ 'preserve', 'flushLeft', 'oneLess' ] }
         }
     },
@@ -35,10 +36,10 @@ const catalog = [
     },
     {
         id: 'lgd.format.lineBreaks', title: 'Block layout and blank lines',
-        defaults: { shortBlocks: 'never', shortFunctions: 'empty', shortLambdas: 'never', shortIfs: 'never', shortLoops: false, shortCases: false, objectMembers: 'preserve', separateDefinitions: 'preserve', maxEmptyLines: 1, emptyLinesAtBlockStart: false, emptyLinesAtBlockEnd: false },
+        defaults: { shortBlocks: 'never', shortFunctions: 'empty', shortLambdas: 'never', shortIfs: 'never', shortLoops: false, shortCases: false, preserveSingleLineBlocks: false, preserveSingleLineStatements: false, objectMembers: 'preserve', separateDefinitions: 'preserve', maxEmptyLines: 1, emptyLinesAtBlockStart: false, emptyLinesAtBlockEnd: false },
         properties: {
             shortBlocks: { enum: [ 'preserve', 'never', 'empty', 'always' ] }, shortFunctions: { enum: [ 'preserve', 'never', 'empty', 'inline', 'all' ] }, shortLambdas: { enum: [ 'preserve', 'never', 'empty', 'inline', 'all' ] },
-            shortIfs: { enum: [ 'preserve', 'never', 'withoutElse', 'all' ] }, shortLoops: { type: 'boolean' }, shortCases: { type: 'boolean' },
+            shortIfs: { enum: [ 'preserve', 'never', 'withoutElse', 'all' ] }, shortLoops: { type: 'boolean' }, shortCases: { type: 'boolean' }, preserveSingleLineBlocks: { type: 'boolean' }, preserveSingleLineStatements: { type: 'boolean' },
             objectMembers: { enum: [ 'preserve', 'onePerLine', 'singleLine' ] }, separateDefinitions: { enum: [ 'preserve', 'always', 'never' ] }, maxEmptyLines: { type: 'integer', minimum: 0, maximum: 10 }, emptyLinesAtBlockStart: { type: 'boolean' }, emptyLinesAtBlockEnd: { type: 'boolean' }
         }
     },
@@ -105,6 +106,63 @@ const LgdFormattingOptions = {
         }
 
         return merged;
+    },
+
+    /** @description Rejects invalid imported values before they can reach repeat counts or layout calculations. */
+    validate(options)
+    {
+        const valid = {};
+        const issues = [];
+        for(const [ group, entries ] of Object.entries(options || {}))
+        {
+            const rule = catalog.find(candidate => candidate.id === `lgd.format.${group}`);
+            if(!rule || !entries || typeof entries !== 'object' || Array.isArray(entries))
+            {
+                issues.push(`Unknown or invalid formatting option group ${group}.`);
+                continue;
+            }
+
+            valid[group] = {};
+            for(const [ option, value ] of Object.entries(entries))
+            {
+                if(this.validValue(value, rule.properties[option]))
+                {
+                    valid[group][option] = value;
+                }
+                else
+                {
+                    issues.push(`Invalid imported formatting value for ${group}.${option}.`);
+                }
+            }
+        }
+
+        return { options: valid, issues: issues };
+    },
+
+    /** @description Checks the small, declarative schema vocabulary used by the shared option catalog. */
+    validValue(value, schema)
+    {
+        if(!schema)
+        {
+            return false;
+        }
+
+        if(schema.enum)
+        {
+            return schema.enum.includes(value);
+        }
+
+        if(schema.type === 'boolean')
+        {
+            return typeof value === 'boolean';
+        }
+
+        if(schema.type === 'integer')
+        {
+            return Number.isInteger(value) && value >= schema.minimum && value <= schema.maximum;
+        }
+
+        return value && typeof value === 'object' && !Array.isArray(value) && Object.entries(value).every(([ key, child ]) => this.validValue(child, schema.properties[key]));
     },
 
     /** @description Applies native per-rule options after imported and document formatting settings. */

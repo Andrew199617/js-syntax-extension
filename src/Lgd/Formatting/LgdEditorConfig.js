@@ -32,6 +32,8 @@ const booleanMappings = Object.fromEntries([
     [ 'csharp_new_line_before_finally', [ 'braces', 'beforeFinally' ] ],
     [ 'csharp_indent_case_contents', [ 'indentation', 'caseContents' ] ],
     [ 'csharp_indent_case_contents_when_block', [ 'indentation', 'caseBlocks' ] ],
+    [ 'csharp_preserve_single_line_blocks', [ 'lineBreaks', 'preserveSingleLineBlocks' ] ],
+    [ 'csharp_preserve_single_line_statements', [ 'lineBreaks', 'preserveSingleLineStatements' ] ],
     [ 'trim_trailing_whitespace', [ 'whitespace', 'trimTrailingWhitespace' ] ]
 ]);
 
@@ -445,7 +447,8 @@ const LgdEditorConfig = {
                 continue;
             }
 
-            const separator = original.lastIndexOf(':');
+            const supportsSeverity = key.startsWith('csharp_') || key.startsWith('dotnet_style_');
+            const separator = supportsSeverity ? original.lastIndexOf(':') : -1;
             const value = (separator !== -1 ? original.slice(0, separator) : original).trim().toLowerCase();
             const severity = separator !== -1 ? original.slice(separator + 1).trim().toLowerCase() : null;
             const groups = this.mapProperty(result, key, value, normalized);
@@ -492,7 +495,6 @@ const LgdEditorConfig = {
             [ 'csharp_space_around_binary_operators', [ 'spacing', 'binaryOperators', Object.fromEntries([ [ 'before_and_after', 'both' ], [ 'none', 'none' ], [ 'ignore', 'preserve' ] ]) ] ],
             [ 'csharp_indent_labels', [ 'indentation', 'labels', Object.fromEntries([ [ 'no_change', 'preserve' ], [ 'flush_left', 'flushLeft' ], [ 'one_less_than_current', 'oneLess' ] ]) ] ],
             [ 'csharp_new_line_before_members_in_object_initializers', [ 'lineBreaks', 'objectMembers', { true: 'onePerLine', false: 'singleLine' } ] ],
-            [ 'csharp_preserve_single_line_blocks', [ 'lineBreaks', 'shortBlocks', { true: 'preserve', false: 'never' } ] ],
             [ 'csharp_prefer_braces', [ 'bracesRequired', 'mode', Object.fromEntries([ [ 'true', 'always' ], [ 'false', 'preserve' ], [ 'when_multiline', 'multiLine' ] ]) ] ],
             [ 'dotnet_style_allow_multiple_blank_lines_experimental', [ 'lineBreaks', 'maxEmptyLines', { false: 1 } ] ]
         ]);

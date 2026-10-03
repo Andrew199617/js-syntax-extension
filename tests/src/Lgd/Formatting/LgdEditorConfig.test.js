@@ -169,3 +169,11 @@ it('does not import project-specific naming or arbitrary analyzer settings as la
     expect(mapped.rules).toEqual({});
     expect(mapped.issues).toHaveLength(limits.projectSpecific);
 });
+
+it('does not treat severity suffixes as valid values for standard EditorConfig keys', () =>
+{
+    const mapped = LgdEditorConfig.map(Object.fromEntries([ [ 'indent_style', 'space:warning' ], [ 'insert_final_newline', 'true:error' ] ]));
+    expect(mapped.options).toEqual({});
+    expect(mapped.rules).toEqual({});
+    expect(mapped.issues).toHaveLength(2);
+});
