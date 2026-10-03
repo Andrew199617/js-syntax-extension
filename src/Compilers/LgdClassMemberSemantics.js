@@ -21,6 +21,7 @@ const LgdClassMemberSemantics = {
         registry._bindings = collectContractBindings(context.content, context.declarations, context.externals || new Map());
         registry._tables = new Map();
         registry._memberTypes = new WeakMap();
+        registry._declaringTypes = new WeakMap();
         registry._memberTypeOffsets = new WeakMap();
         return registry;
     },
@@ -85,6 +86,7 @@ const LgdClassMemberSemantics = {
 
             const memberType = valueType && this._type(valueType, declaration.headStart);
             const previousType = previous && this._memberTypes.get(previous);
+            this._declaringTypes.set(description, declaration);
             this._memberTypes.set(description, memberType || previousType || null);
             this._memberTypeOffsets.set(description, declaration.headStart);
             members.set(member.name, description);
@@ -228,6 +230,40 @@ const LgdClassMemberSemantics = {
         return found;
     },
 
+    /** @description Allows readonly initialization in the declaring instance constructor or static field initializer. */
+    canAssignReadonly(path, member)
+    {
+        const owner = this.enclosing(path);
+        if(!owner || this._declaringTypes.get(member) !== owner.declaration)
+        {
+            return false;
+        }
+
+        const offset = this._offset(path);
+        if(owner.member.kind === 'field')
+        {
+            // Lowering assigns the initializer to its own field; source writes remain checked separately.
+            if(offset === owner.member.nameStart && owner.member.name === member.name)
+            {
+                return true;
+            }
+
+            const callable = path.getFunctionParent();
+            const bodyOffset = callable && this._context.map.toSource(callable.node.body.start);
+            const nestedFunction = callable && owner.member.initializerStart <= bodyOffset && bodyOffset < owner.member.initializerEnd;
+            return member.static && owner.member.static && !nestedFunction;
+        }
+
+        if(member.static || !owner.member.isConstructor || !path.get('object').isThisExpression() || offset <= owner.member.bodyStart)
+        {
+            return false;
+        }
+
+        const callable = path.getFunctionParent();
+        const bodyOffset = callable && this._context.map.toSource(callable.node.body.start);
+        return callable && owner.member.start <= bodyOffset && bodyOffset <= owner.member.bodyStart;
+    },
+
     _bindingReceiver(binding, path, visited)
     {
         if(visited.has(binding))
@@ -267,6 +303,23 @@ const LgdClassMemberSemantics = {
             }
 
             return this.receiver(initializer, next);
+        }
+
+        const origins = this._context.flow?.origins(path, binding);
+        const receivers = origins?.map(origin =>
+        {
+            if(typeof origin === 'string')
+            {
+                return null;
+            }
+
+            return this.receiver(origin, next);
+        });
+
+        const receiver = receivers?.[0];
+        if(receiver && receivers.every(candidate => candidate?.declaration === receiver.declaration && candidate?.kind === receiver.kind))
+        {
+            return { ...receiver, reference: binding.identifier.name };
         }
 
         return null;
@@ -376,8 +429,8 @@ const LgdClassMemberSemantics = {
     /** @description Resolves one fixed-name member access and retains invalid receiver-kind evidence for diagnostics. */
     resolve(path, visited = new Set())
     {
-        const property = path.node.property;
-        const name = path.node.computed ? property.type === 'StringLiteral' && property.value : property.name;
+        const property = path.get('property');
+        const name = path.node.computed ? this._constantMemberName(property) : property.node.name;
         if(typeof name !== 'string')
         {
             return null;
@@ -392,6 +445,24 @@ const LgdClassMemberSemantics = {
 
         const valid = receiver.kind !== 'staticThis' && Boolean(member.static) === (receiver.kind === 'type');
         return { receiver: receiver, member: member, valid: valid };
+    },
+
+    _constantMemberName(path, visited = new Set())
+    {
+        if(path.isStringLiteral())
+        {
+            return path.node.value;
+        }
+
+        const binding = path.isIdentifier() && path.scope.getBinding(path.node.name);
+        if(!binding?.constant || !binding.path.isVariableDeclarator() || !binding.path.node.init || visited.has(binding))
+        {
+            return null;
+        }
+
+        const next = new Set(visited);
+        next.add(binding);
+        return this._constantMemberName(binding.path.get('init'), next);
     },
 
     _isAssignmentTarget(path)

@@ -211,6 +211,14 @@ const LgdClassSyntax = {
             return field;
         }
 
+        if(modifiers.readonlyStart !== null)
+        {
+            return { error: "The 'readonly' modifier applies only to typed data fields.",
+                offset: modifiers.readonlyStart, endOffset: modifiers.readonlyStart + 'readonly'.length,
+                code: 'lgd.syntax.readonlyMember', category: 'syntax',
+                recoveryOffset: LgdClassMemberRecovery.findBoundary(masked, start, declaration.initializerEnd - 1) };
+        }
+
         const property = this.parsePropertyContract(masked, start, declaration, modifiers);
         if(property)
         {
@@ -492,12 +500,13 @@ const LgdClassSyntax = {
         let overrideStart = null;
         let abstractStart = null;
         let staticStart = null;
+        let readonlyStart = null;
         const seen = new Set();
         let match = (/^(?<modifier>async|virtual|override|abstract|static|readonly|public|private|protected|internal|new|const)\b/).exec(masked.slice(cursor));
         while(match)
         {
             const modifier = match.groups.modifier;
-            if([ 'readonly', 'public', 'private', 'protected', 'internal', 'new', 'const' ].includes(modifier))
+            if([ 'public', 'private', 'protected', 'internal', 'new', 'const' ].includes(modifier))
             {
                 return LgdClassMemberRecovery.modifierError(modifier, cursor);
             }
@@ -511,7 +520,7 @@ const LgdClassSyntax = {
 
             if(seen.has(modifier))
             {
-                return { error: `Duplicate '${modifier}' method modifier.`, offset: cursor };
+                return { error: `Duplicate '${modifier}' member modifier.`, offset: cursor };
             }
 
             seen.add(modifier);
@@ -532,6 +541,10 @@ const LgdClassSyntax = {
                 {
                     virtualStart = cursor;
                 }
+                else if(modifier === 'readonly')
+                {
+                    readonlyStart = cursor;
+                }
                 else if(modifier === 'static')
                 {
                     staticStart = cursor;
@@ -549,7 +562,8 @@ const LgdClassSyntax = {
             match = (/^(?<modifier>async|virtual|override|abstract|static|readonly|public|private|protected|internal|new|const)\b/).exec(masked.slice(cursor));
         }
 
-        return { head: head, spans: spans, virtualStart: virtualStart, overrideStart: overrideStart, abstractStart: abstractStart, staticStart: staticStart };
+        return { head: head, spans: spans, virtualStart: virtualStart, overrideStart: overrideStart,
+            abstractStart: abstractStart, staticStart: staticStart, readonlyStart: readonlyStart };
     },
 
     /** @description Exposes typed method groups using the existing backend and semantic-token contract. */

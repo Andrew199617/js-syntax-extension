@@ -54,6 +54,7 @@ const LgdClassFields = {
             bodyStart: start, bodyEnd: scan.end + 1,
             isConstructor: false, returnTypeName: null,
             returnTypeStart: -1, returnTypeEnd: -1,
+            readonly: modifiers.readonlyStart !== null,
             static: modifiers.staticStart !== null, staticStart: modifiers.staticStart,
             staticEnd: modifiers.staticStart === null ? null : modifiers.staticStart + 'static'.length,
             abstract: false, virtual: false, override: false, modifierSpans: modifiers.spans,

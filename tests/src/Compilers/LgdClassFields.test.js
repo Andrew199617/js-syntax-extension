@@ -404,7 +404,6 @@ describe('LGD declared field inheritance and constructor lifecycle.', () =>
 describe('LGD field syntax and member diagnostics.', () =>
 {
     test.each([
-        [ 'readonly field', 'class Sample { readonly Number value = 1; }', 'not supported' ],
         [ 'public field', 'class Sample { public Number value = 1; }', 'not supported' ],
         [ 'private field', 'class Sample { private Number value = 1; }', 'not supported' ],
         [ 'protected field', 'class Sample { protected Number value = 1; }', 'not supported' ],

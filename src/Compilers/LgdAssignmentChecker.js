@@ -23,6 +23,18 @@ const LgdAssignmentChecker = {
             /** @description Checks numeric updates and readonly writes. */
             UpdateExpression: path => this.checkTarget(path.get('argument'), path, context, { errors: errors }),
 
+            /** @description Checks readonly member targets in for-in and for-of assignments. */
+            ForXStatement: path => this.checkTarget(path.get('left'), 'Unknown', context, { errors: errors }),
+
+            /** @description Rejects deletion of known readonly fields without freezing their referenced values. */
+            UnaryExpression: path =>
+            {
+                if(path.node.operator === 'delete')
+                {
+                    this.checkTarget(path.get('argument'), 'Unknown', context, { errors: errors, removing: true });
+                }
+            },
+
             /** @description Checks declared local values at their lexical program point. */
             VariableDeclarator: path =>
             {
@@ -153,10 +165,14 @@ const LgdAssignmentChecker = {
             return;
         }
 
-        if(member.readonly && !options.initializing)
+        if(member.readonly && (options.removing || !context.members.canAssignReadonly(target, member)))
         {
+            const initialization = member.static ? 'a static field initializer in the declaring type' : "its declaration or the declaring type's constructor";
+            const message = options.removing
+                ? `Cannot delete readonly field '${member.name}'.`
+                : `Cannot assign to readonly field '${member.name}' outside ${initialization}.`;
             options.errors.push({ offset: context.map.toSource(target.node.start), endOffset: context.map.toSource(target.node.end),
-                code: 'lgd.member.readonly', message: `Cannot assign to readonly member '${member.name}'.` });
+                code: 'lgd.member.readonly', message: message });
             return;
         }
 
