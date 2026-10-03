@@ -155,6 +155,31 @@ describe('LGD compiler.', () =>
         expect(templateResult.code).toContain(`let t = \`a${interpolationStart}x};b\`;`);
     });
 
+    test.each([ 'oloo', 'class' ])('Compiles consecutive same-line declarations inside a function with %s output.', objectModel =>
+    {
+        const source = 'Function read = () => {\n    Number first = 1;readonly Number second = 2; Number third = first + second; return third;\n};';
+        const result = LgdCompiler.create().compileToJs(source, new Map(), { javascriptObjectModel: objectModel });
+        expect(result.errors).toEqual([]);
+        expect(result.allDeclarations.map(declaration => declaration.name)).toEqual([ 'read', 'first', 'second', 'third' ]);
+        expect(result.code).toContain('const second = 2;');
+        expect(result.code).toContain('let third = first + second;');
+    });
+
+    test('Ignores semicolons inside literals and comments and leaves loop conditions unchanged.', () =>
+    {
+        const source = [
+            'String text = ";Number stringEntry = 1;";',
+            'String template = `;Number templateEntry = 1;`;',
+            'const pattern = /;Number regexEntry = 1;/;',
+            '/* ;Number commentEntry = 1; */',
+            'for(let index = 0; Number(index) < 2; index++) {}',
+            'Number first = 1; Number second = 2;'
+        ].join('\n');
+        const result = LgdCompiler.create().compileToJs(source);
+        expect(result.errors).toEqual([]);
+        expect(result.allDeclarations.map(declaration => declaration.name)).toEqual([ 'text', 'template', 'first', 'second' ]);
+    });
+
     test('Does not duplicate an existing @type tag.', () =>
     {
         const result = LgdCompiler.create().compileToJs('/** @type {number} */\nNumber x = 1;');
@@ -253,7 +278,7 @@ describe('LGD source mappings.', () =>
 
     test('Mappings survive nested declarations and readonly heads.', () =>
     {
-        const source = 'readonly Number outer = 1;\nFunction f = () => {\n  Number inner = 2;\n  return inner;\n};\n';
+        const source = 'readonly Number outer = 1;\nFunction f = () => {\n  Number first = 1; Number inner = 2;\n  return inner;\n};\n';
         const result = LgdCompiler.create().compileToJs(source);
         expect(result.errors).toEqual([]);
         const map = LgdSourceMap.create(result.mappings);
