@@ -147,7 +147,9 @@ Declare overridable class methods with `virtual`, and use `override` when replac
 
 Call an inherited method with `base.method(arguments)` inside an LGD class method. The compiler uses the defining class's linked parent and preserves the current instance, arguments, return values, and `await`. This also works inside nested arrow callbacks. Constructor `: base(...)` supplies arguments to the base initializer on the same instance; existing OLOO object bases retain their factory allocation. Computed or optional base access, detached method references, getter access, and ordinary nested function callbacks are diagnosed instead of guessing their receiver.
 
-The constructor must use the class name. The `constructor` keyword and an explicit `create()` member are reserved. JavaScript files keep their existing class behavior.
+The constructor must use the class name. The `constructor` keyword and an explicit `create()` member are reserved. Constructors initialize `this` and cannot return a value, including `this`, `null` or `undefined`. A bare `return;` is allowed for an early exit, after fields and the base have been initialized. Returns inside nested functions and callbacks belong to those functions and remain allowed. JavaScript files keep their existing class behavior.
+
+For a plain `return this;`, Quick Fix can replace the value return with `return;`, preserving the early exit. Other expressions and commented returns are left for review so a fix cannot discard calls, property reads, initialization, or comments. If an old factory constructs and returns another object, migrate that setup into the named constructor and `: base(...)` rather than merely deleting its return.
 
 ### Typed instance and static fields
 

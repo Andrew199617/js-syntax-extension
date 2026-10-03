@@ -123,6 +123,9 @@
                 },
                 "static-member-receiver": {
                     "$ref": "#/definitions/rule"
+                },
+                "constructor-return-value": {
+                    "$ref": "#/definitions/rule"
                 }
             }
         },

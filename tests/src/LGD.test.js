@@ -645,12 +645,11 @@ describe('LGD compile on save', () =>
         expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 error(s)');
     });
 
-    test.each([ 'oloo', 'class' ])('invalid passthrough JavaScript preserves last-good %s output and repair resumes saves', async javascriptObjectModel =>
+    test.each([ 'oloo', 'class' ].flatMap(model => [ 'const count = ;', 'class Sample { Sample() { return this; } }' ].map(invalid => [ model, invalid ])))('invalid syntax preserves last-good %s output and repair resumes saves: %s', async (javascriptObjectModel, invalid) =>
     {
         const filename = path.join('workspace', 'syntax.lgd');
         const outputPath = path.join('workspace', 'syntax.js');
         const original = 'const count = 1;';
-        const invalid = 'const count = ;';
         const repaired = 'const count = 2;';
         const written = new Map();
         FileIO.writeFileContents.mockImplementation((target, code) => Promise.resolve(written.set(target, code)));

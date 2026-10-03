@@ -62,14 +62,14 @@ describe('LGD native JavaScript class output.', () =>
         expect(compile(source).code).toContain('class Counter');
     });
 
-    test('Creates native instances with independent fields, descriptors, defaults, rest and ignored constructor returns.', () =>
+    test('Creates native instances with independent fields, descriptors, defaults, rest and constructor early exits.', () =>
     {
         const Counter = execute([
             'class Counter {',
             '    Counter(Number value = 1, ...String labels) {',
             '        this.value = value; this.items = []; this.labels = labels;',
             '        this.argumentCount = arguments.length; this.read = () => this.value;',
-            '        return { discarded: true };',
+            '        return;',
             '    }',
             '    increment() { this.value++; }',
             '    get label() { return String(this.value); }',
@@ -101,14 +101,14 @@ describe('LGD native JavaScript class output.', () =>
         expect(first.label).toBe('2');
     });
 
-    test('Discards parenthesized constructor returns with their side effects and leaves nested returns intact.', () =>
+    test('Preserves explicit constructor side effects before early exits and leaves nested returns intact.', () =>
     {
         const source = [
             'class Example {',
             '    Example() {',
             '        this.trace = [];',
             '        this.nested = function() { return { retained: true }; };',
-            '        try { return (this.trace.push("return"), { discarded: true }); }',
+            '        try { this.trace.push("return"); return; }',
             '        finally { this.trace.push("finally"); }',
             '    }',
             '    *labels(String label) { yield label; }',
@@ -116,7 +116,7 @@ describe('LGD native JavaScript class output.', () =>
             'class NoSemicolon {',
             '    NoSemicolon() {',
             '        this.value = 2;',
-            '        return ({ discarded: true }) // Preserve the end-of-line comment.',
+            '        return // Preserve the end-of-line comment.',
             '    }',
             '}',
             'module.exports = { Example, NoSemicolon };'
@@ -136,13 +136,13 @@ describe('LGD native JavaScript class output.', () =>
         expect(result.code).toContain('// Preserve the end-of-line comment.');
     });
 
-    test('Preserves conditional early return control flow when a native constructor discards a value.', () =>
+    test('Preserves conditional early return control flow in a native constructor.', () =>
     {
         const Example = execute([
             'class Example {',
             '    Example(Boolean stop) {',
             '        this.value = 1;',
-            '        if(stop) return (this.value = 2, { discarded: true });',
+            '        if(stop) { this.value = 2; return; }',
             '        this.value = 3;',
             '    }',
             '}',

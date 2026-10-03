@@ -10,7 +10,7 @@ function compile(source, objectModel)
 
 describe.each([ 'oloo', 'class' ])('LGD expression inference cycles with %s output.', objectModel =>
 {
-    test('Compiles the complete BaseCommand reproduction without losing its methods.', async () =>
+    test('Diagnoses the legacy BaseCommand constructor return without losing its methods.', async () =>
     {
         const source = await fs.promises.readFile(path.join(__dirname, '../../fixtures/basecommand.lgd'), 'utf8');
         const result = compile(source, objectModel);
@@ -20,7 +20,10 @@ describe.each([ 'oloo', 'class' ])('LGD expression inference cycles with %s outp
             expect.objectContaining({ code: 'lgd.jsdoc.returnType', severity: 'warning',
                 offset: returnTypeStart, endOffset: returnTypeStart + '{BaseCommandType}'.length }),
             expect.objectContaining({ code: 'lgd.jsdoc.virtual', severity: 'warning',
-                offset: virtualStart, endOffset: virtualStart + '@virtual'.length })
+                offset: virtualStart, endOffset: virtualStart + '@virtual'.length }),
+            expect.objectContaining({ code: 'lgd.constructor.returnValue', severity: 'error',
+                offset: source.indexOf('return baseCommand') + 'return '.length,
+                endOffset: source.indexOf('return baseCommand') + 'return baseCommand'.length })
         ]);
         const declaration = result.allDeclarations.find(candidate => candidate.name === 'BaseCommand');
         expect(declaration.classMembers.map(member => member.name)).toEqual([

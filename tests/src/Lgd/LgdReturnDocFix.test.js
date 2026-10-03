@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
 const LgdCodeActionProvider = require('../../../src/Lgd/LgdCodeActionProvider');
+const LgdHoverProvider = require('../../../src/Lgd/LgdHoverProvider');
 
 
 const LgdDiagnosticDefinitions = require('../../../src/Lgd/LgdDiagnosticDefinitions');
@@ -188,4 +189,48 @@ describe('Redundant constructor and method return documentation fixes', () =>
         expect(fixture.document.getText()).toBe('class Command { /** @returns Meaningful description. */ Command() {} }');
         expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
     });
+});
+
+describe('Constructor value-return error quick fixes', () =>
+{
+    test('shows an LGD syntax error and a guarded early-exit fix, then clears Problems', async () =>
+    {
+        const source = 'class Sample { Sample(Boolean stop) { if(stop) return this; this.value = 2; } Number later() { return 2; } }';
+        const fixture = await openFixture(source);
+        const [diagnostic] = fixture.diagnostics.get(fixture.document.uri.toString());
+        expect(diagnostic.code).toBe('syntax');
+        expect(diagnostic.severity).toBe(vscode.DiagnosticSeverity.Error);
+        expect(fixture.document.getText(diagnostic.range)).toBe('this');
+        const [action] = await actionsFor(fixture, 'lgd.constructor.returnValue');
+        expect(action.title).toBe('Replace return this with an early exit');
+        expect(action.isPreferred).toBe(true);
+        await applyAction(fixture, action);
+        expect(fixture.document.getText()).toBe(source.replace('return this;', 'return;'));
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
+
+    test('declines a stale fix after this becomes a side-effecting expression', async () =>
+    {
+        const source = 'class Sample { Sample() { return this; } }';
+        const fixture = await openFixture(source);
+        const [action] = await actionsFor(fixture, 'lgd.constructor.returnValue');
+        fixture.document.setText(source.replace('return this;', 'return initializeOther();'));
+        fixture.document.version++;
+        expect(await fixture.provider.applyFix(action.command.arguments[0])).toBe(false);
+        expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
+        await fixture.service.updateDocument(fixture.document);
+        expect(await actionsFor(fixture, 'lgd.constructor.returnValue')).toEqual([]);
+    });
+});
+
+test('keeps later member hover available after a constructor value-return error', async () =>
+{
+    const source = 'class Sample { Number value; Sample() { return {}; } Number later() { return this.value; } }';
+    const fixture = await openFixture(source);
+    const state = fixture.service.getState(fixture.document.uri);
+    expect(state.errors.map(error => error.code)).toEqual(['lgd.constructor.returnValue']);
+    const position = fixture.document.positionAt(source.lastIndexOf('this.value') + 'this.'.length);
+    const hover = await LgdHoverProvider.create(fixture.service).provideHover(fixture.document, position);
+    expect(hover.contents).toContain('Number Sample.value');
+    expect(fixture.document.getText(hover.range)).toBe('value');
 });

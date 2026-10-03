@@ -161,7 +161,7 @@ const LgdNativeClassEmitter = {
         return output;
     },
 
-    /** @description Builds a native constructor whose body retains LGD's ignored-return and arguments behavior. */
+    /** @description Builds a native constructor retaining LGD initialization order and arguments behavior. */
     emitConstructor(output, context, member)
     {
         const declaration = context.declaration;
@@ -203,7 +203,7 @@ const LgdNativeClassEmitter = {
         LgdClassSyntax.appendGenerated(output, `${indent}}`, member ? member.bodyEnd - 1 : anchor, { end: member ? member.bodyEnd : anchor });
     },
 
-    /** @description Evaluates and discards constructor return values without changing nested function returns or instance-field inference. */
+    /** @description Retains editor recovery for rejected constructor value returns without changing nested returns or instance-field inference. */
     rewriteConstructorReturns(code, segments)
     {
         let tree;

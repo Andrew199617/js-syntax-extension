@@ -205,7 +205,7 @@ describe.each([ 'oloo', 'class' ])('LGD declared fields with %s output.', object
             '        this.value = value;',
             '        this.labels = labels;',
             '        this.argumentCount = arguments.length;',
-            '        return { discarded: true };',
+            '        return;',
             '    }',
             '}',
             'module.exports = { Sample, defaults: () => defaults };'
@@ -377,7 +377,7 @@ describe('LGD declared field inheritance and constructor lifecycle.', () =>
             '}',
             'class Derived : Base {',
             '    Number value = 2;',
-            '    Derived() { events.push("derived"); return { discarded: true }; }',
+            '    Derived() { events.push("derived"); return; }',
             '}',
             'module.exports = { Derived, events };'
         ].join('\n'));

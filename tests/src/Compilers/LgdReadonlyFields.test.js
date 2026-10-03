@@ -42,7 +42,7 @@ describe.each([ 'oloo', 'class' ])('Readonly fields with %s output', objectModel
             '    Sample(Boolean early) {',
             '        this.value = 1; this.value += 2; ++this.value;',
             '        [this.value] = [5]; ({ next: this.value } = { next: 6 });',
-            '        if(early) return this.items.push("early");',
+            '        if(early) { this.items.push("early"); return; }',
             '        value = 7;',
             '    }',
             '    append() { this.items.push("later"); this.items[0] = "changed"; }',

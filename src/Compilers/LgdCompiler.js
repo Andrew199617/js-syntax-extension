@@ -18,6 +18,7 @@ const LgdInterfaceErasure = require('./LgdInterfaceErasure');
 const LgdInterfaceTypes = require('./LgdInterfaceTypes');
 const LgdReturnChecker = require('./LgdReturnChecker');
 const LgdReturnDocChecker = require('./LgdReturnDocChecker');
+const LgdConstructorReturnChecker = require('./LgdConstructorReturnChecker');
 const LgdVirtualDocChecker = require('./LgdVirtualDocChecker');
 const LgdStandaloneReturnChecker = require('./LgdStandaloneReturnChecker');
 const LgdBaseCalls = require('./LgdBaseCalls');
@@ -329,6 +330,7 @@ const LgdCompiler = {
         const declarations = this.buildTree(found);
         const hasBaseCalls = LgdBaseCalls.hasCalls(content, found);
         const standaloneCandidates = LgdStandaloneReturnChecker.hasCandidates(content);
+        const constructorReturns = LgdConstructorReturnChecker.hasCandidates(content, found);
         const parsed = { declarations: declarations, allDeclarations: found, errors: errors, projectId: options.projectId || null };
         const importedEnums = [...externals.values()].some(entry => entry.kind === 'enum');
         const hasConstBindings = (/\bconst\s+(?:[$A-Z_a-z]|[[{])/).test(masked);
@@ -338,10 +340,12 @@ const LgdCompiler = {
             parsed.analysis = { inherited: inheritedReturnSignatures, required: required };
         }
 
-        if(required && (!options.deferAnalysis || hasBaseCalls || standaloneCandidates))
+        if(required && (!options.deferAnalysis || hasBaseCalls || standaloneCandidates || constructorReturns))
         {
             const output = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
             const emitted = LgdClassMemberSemantics.rewrite(output, content, found, externals);
+            const returnErrors = constructorReturns ? LgdConstructorReturnChecker.check(content, found, emitted) : [];
+            this.appendTypeErrors(content, errors, returnErrors);
             const standaloneErrors = LgdStandaloneReturnChecker.check(emitted);
             for(const standaloneError of standaloneErrors)
             {
