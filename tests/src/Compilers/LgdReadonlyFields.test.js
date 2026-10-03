@@ -126,11 +126,38 @@ describe.each([ 'oloo', 'class' ])('Readonly fields with %s output', objectModel
         'static change() { Sample.value = 2; }',
         'Number other = (Sample.value = 2);',
         'static Function later = () => { Sample.value = 2; };',
-        'static Number next = (() => { Sample.value = 2; return 1; })();'
+        'static Number next = (() => { Sample.value = 2; return 1; })();',
+        'static Function Nested = class { value = (Sample.value = 2); };',
+        'static Function Nested = class { static value = (Sample.value = 2); };',
+        'static Function Nested = class { static { Sample.value = 2; } };'
     ])('Rejects static readonly writes from %s', body =>
     {
         const errors = compile(`class Sample { static readonly Number value; ${body} }`, objectModel).errors;
         expect(errors.filter(error => error.code === 'lgd.member.readonly')).toHaveLength(1);
+    });
+
+    test('Does not assign an outer LGD receiver to this inside a nested native class.', () =>
+    {
+        const source = [
+            'class Sample {',
+            '    readonly Number value;',
+            '    Sample() { const Nested = class { value = (this.value = 2); }; }',
+            '    static Function Nested = class { value = (this.value = 2); };',
+            '}'
+        ].join('\n');
+        expect(compile(source, objectModel).errors).toEqual([]);
+    });
+
+    test('Keeps immediately evaluated native class heritage and field names in the initializer context.', () =>
+    {
+        const result = execute([
+            'class Sample {',
+            '    static readonly Number value = 0;',
+            '    static Function Nested = class extends (Sample.value = 1, Object) { [Sample.value += 1] = 0; };',
+            '}',
+            'module.exports = Sample.value;'
+        ].join('\n'), objectModel);
+        expect(result).toBe(2);
     });
 
     test('Retains typed initializer and constructor-write diagnostics.', () =>
@@ -138,6 +165,25 @@ describe.each([ 'oloo', 'class' ])('Readonly fields with %s output', objectModel
         const result = compile('class Sample { readonly Number value = "wrong"; Sample() { this.value = "wrong"; } }', objectModel);
         expect(result.errors.filter(error => error.code === 'lgd.assignment.typeMismatch')).toHaveLength(2);
         expect(result.errors.some(error => error.code === 'lgd.member.readonly')).toBe(false);
+    });
+
+    test.each([ false, true ])('Keeps implicit static writes on their declaring type despite a nested namesake (inherited: %s).', inherited =>
+    {
+        const owner = inherited ? 'Leaf' : 'Sample';
+        const source = [
+            'class Sample { static readonly Number value = 1;',
+            inherited ? '}\nclass Leaf : Sample {' : '',
+            '    static change() {',
+            '        class Sample { static Number value = 2; }',
+            '        value = 2; return Sample.value;',
+            '    }',
+            '}',
+            `module.exports = ${owner};`
+        ].join('\n');
+        expect(compile(source, objectModel).errors.filter(error => error.code === 'lgd.member.readonly')).toHaveLength(1);
+        const mutable = execute(source.replace('readonly ', ''), objectModel);
+        expect(mutable.change()).toBe(2);
+        expect(mutable.value).toBe(2);
     });
 
     test('Distinguishes same-named lexical class declarations and mutable shadowed locals.', () =>

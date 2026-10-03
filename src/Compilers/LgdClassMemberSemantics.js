@@ -215,6 +215,13 @@ const LgdClassMemberSemantics = {
 
         for(let current = path.parentPath; current; current = current.parentPath)
         {
+            const nativeField = current.isClassProperty() || current.isClassPrivateProperty();
+            const inFieldValue = nativeField && current.node.value && current.node.value.start <= path.node.start;
+            if(inFieldValue || current.isStaticBlock())
+            {
+                return null;
+            }
+
             if(current.isFunction() && !current.isArrowFunctionExpression())
             {
                 const bodyOffset = this._context.map.toSource(current.node.body.start);
@@ -691,7 +698,7 @@ const LgdClassMemberSemantics = {
     _declaringReference(resolved, path)
     {
         const { member, receiver } = resolved;
-        if(member.declaringType === (receiver.declaration.name || receiver.declaration.exportName))
+        if(this._declaresMember(receiver.declaration, member))
         {
             return receiver.reference;
         }
@@ -700,16 +707,25 @@ const LgdClassMemberSemantics = {
         {
             const candidate = this._bindingReceiver(binding, path, new Set());
             const declaration = candidate?.declaration;
-            if(candidate?.kind === 'type' && (declaration.name || declaration.exportName) === member.declaringType)
+            if(candidate?.kind === 'type' && this._declaresMember(declaration, member))
             {
-                if(!member.declaringSourcePath || declaration.sourcePath === member.declaringSourcePath)
-                {
-                    return name;
-                }
+                return name;
             }
         }
 
         return receiver.reference;
+    },
+
+    _declaresMember(declaration, member)
+    {
+        const local = this._declaringTypes.get(member);
+        if(local)
+        {
+            return declaration === local;
+        }
+
+        const sameName = (declaration.name || declaration.exportName) === member.declaringType;
+        return sameName && (!member.declaringSourcePath || declaration.sourcePath === member.declaringSourcePath);
     },
 
     _needsRewrite(content, declarations, externals)

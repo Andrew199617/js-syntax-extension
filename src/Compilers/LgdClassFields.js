@@ -119,16 +119,16 @@ const LgdClassFields = {
         }
     },
 
-    /** @description Chooses stable generated type references that cannot collide with any source binding. */
-    runtimeNames(content, name)
+    /** @description Chooses declaration-unique type references that cannot collide with source bindings or nested namesakes. */
+    runtimeNames(content, name, offset)
     {
-        let runtimeClassName = `_lgdClass${name}`;
+        let runtimeClassName = `_lgdClass${name}_${offset}`;
         while(content.includes(runtimeClassName))
         {
             runtimeClassName += '$';
         }
 
-        let runtimeBaseName = `_lgdBaseClass${name}`;
+        let runtimeBaseName = `_lgdBaseClass${name}_${offset}`;
         while(content.includes(runtimeBaseName))
         {
             runtimeBaseName += '$';

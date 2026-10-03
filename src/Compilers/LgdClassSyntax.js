@@ -109,7 +109,7 @@ const LgdClassSyntax = {
 
         const jsdoc = compiler.findPrecedingJsdoc(content, match.index);
         const declaration = {
-            ...LgdClassFields.runtimeNames(content, name),
+            ...LgdClassFields.runtimeNames(content, name, nameStart),
             kind: kind,
             abstract: abstract,
             abstractStart: abstractStart,
