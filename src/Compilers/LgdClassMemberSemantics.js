@@ -374,65 +374,6 @@ const LgdClassMemberSemantics = {
         return null;
     },
 
-    /** @description Resolves type objects and instances through actual bindings, factories, constructors, and typed fields. */
-    receiver(path, visited = new Set())
-    {
-        if(path.findParent(parent => parent.isWithStatement()))
-        {
-            return null;
-        }
-
-        if(path.isIdentifier())
-        {
-            const binding = path.scope.getBinding(path.node.name);
-            return binding ? this._bindingReceiver(binding, path, visited) : null;
-        }
-
-        if(path.isThisExpression())
-        {
-            const owner = this.enclosing(path);
-            return owner ? { declaration: owner.declaration, kind: owner.member.static ? 'staticThis' : 'instance', reference: 'this' } : null;
-        }
-
-        if(path.isNewExpression())
-        {
-            const constructor = this.receiver(path.get('callee'), visited);
-            return constructor?.kind === 'type' ? { ...constructor, kind: 'instance' } : null;
-        }
-
-        if(path.isCallExpression() || path.isOptionalCallExpression())
-        {
-            const callee = path.get('callee');
-            if(callee.isIdentifier({ name: 'require' }) && !path.scope.getBinding('require'))
-            {
-                const specifier = path.node.arguments[0];
-                const external = specifier?.type === 'StringLiteral' && this._context.externals.get(specifier.value);
-                return external?.kind === 'class' ? { declaration: external, kind: 'type' } : null;
-            }
-
-            if(callee.isMemberExpression() || callee.isOptionalMemberExpression())
-            {
-                const resolved = this.resolve(callee, visited);
-                if(resolved?.valid && !this._methodChanged(resolved) && resolved.member.name === 'create' && resolved.receiver.kind === 'type')
-                {
-                    return { ...resolved.receiver, kind: 'instance' };
-                }
-
-                const type = resolved?.valid && !this._methodChanged(resolved) && this.memberType(resolved);
-                return type ? { declaration: type, kind: 'instance' } : null;
-            }
-        }
-
-        if(path.isMemberExpression() || path.isOptionalMemberExpression())
-        {
-            const resolved = this.resolve(path, visited);
-            const type = resolved?.valid && this.memberType(resolved);
-            return type ? { declaration: type, kind: 'instance' } : null;
-        }
-
-        return null;
-    },
-
     /** @description Resolves one fixed-name member access and retains invalid receiver-kind evidence for diagnostics. */
     resolve(path, visited = new Set())
     {

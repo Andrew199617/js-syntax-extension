@@ -1,5 +1,7 @@
 const LgdAccessibility = require('./LgdAccessibility');
 const LgdConstructorCallChecker = require('./LgdConstructorCallChecker');
+const LgdCastSyntax = require('./LgdCastSyntax');
+const LgdCastChecker = require('./LgdCastChecker');
 const LgdEnumSyntax = require('./LgdEnumSyntax');
 const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
@@ -71,7 +73,7 @@ const LgdCompiler = {
         const newline = this.detectNewline(content);
         const backend = JsBackend.create(newline);
         backend.objectModel = resolved.options.javascriptObjectModel;
-        const output = this.emitRange(content, backend, this.fullRange(content, parsed.declarations));
+        const output = LgdCastSyntax.emit(this, content, backend, { parsed: parsed, externals: externals });
         const members = LgdClassMemberSemantics.rewrite(output, content, parsed.allDeclarations, externals);
         const erased = LgdInterfaceErasure.apply(content, parsed.allDeclarations, externals, { ...members, projectId: parsed.projectId });
         this.appendTypeErrors(content, parsed.errors, erased.errors || []);
@@ -106,7 +108,8 @@ const LgdCompiler = {
             }
         }
 
-        return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
+        return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations,
+            casts: parsed.casts || [], errors: parsed.errors };
     },
 
     /**
@@ -120,8 +123,9 @@ const LgdCompiler = {
         const parsed = this.parse(content, externals);
         this.checkMemberTarget(content, parsed);
         const newline = this.detectNewline(content);
-        const emitted = this.emitRange(content, TsBackend.create(newline), this.fullRange(content, parsed.declarations));
-        return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
+        const emitted = LgdCastSyntax.emit(this, content, TsBackend.create(newline), { parsed: parsed, externals: externals, typescript: true });
+        return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations,
+            casts: parsed.casts || [], errors: parsed.errors };
     },
 
     /**
@@ -150,7 +154,8 @@ const LgdCompiler = {
             + `using System.Collections.Generic;${newline}`;
         const mappings = emitted.segments.map(segment => this.shiftSegment(segment, header.length));
 
-        return { code: `${header}${body}`, mappings: mappings, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
+        return { code: `${header}${body}`, mappings: mappings, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations,
+            casts: parsed.casts || [], errors: parsed.errors };
     },
 
     checkMemberTarget(content, parsed) { LgdOutputOptions.checkMemberTarget(this, content, parsed); },
@@ -335,7 +340,7 @@ const LgdCompiler = {
         const parsed = { declarations: declarations, allDeclarations: found, errors: errors, projectId: options.projectId || null };
         const importedEnums = [...externals.values()].some(entry => entry.kind === 'enum');
         const hasConstBindings = (/\bconst\s+(?:[$A-Z_a-z]|[[{])/).test(masked);
-        const required = found.length > 0 || hasBaseCalls || standaloneCandidates || importedEnums || hasConstBindings || externals.size > 0;
+        const required = found.length > 0 || hasBaseCalls || standaloneCandidates || importedEnums || hasConstBindings || externals.size > 0 || LgdCastSyntax.hasHeads(masked);
         if(options.deferAnalysis)
         {
             parsed.analysis = { inherited: inheritedReturnSignatures, required: required };
@@ -343,7 +348,7 @@ const LgdCompiler = {
 
         if(required && (!options.deferAnalysis || hasBaseCalls || standaloneCandidates || constructorReturns))
         {
-            const output = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
+            const output = LgdCastSyntax.emit(this, content, JsBackend.create(this.detectNewline(content)), { parsed: parsed, externals: externals });
             const emitted = LgdClassMemberSemantics.rewrite(output, content, found, externals);
             const returnErrors = constructorReturns ? LgdConstructorReturnChecker.check(content, found, emitted) : [];
             this.appendTypeErrors(content, errors, returnErrors);
@@ -376,7 +381,7 @@ const LgdCompiler = {
         let context;
         try
         {
-            context = LgdReturnChecker.createContext(content, parsed.allDeclarations, emitted, { ...options, projectId: parsed.projectId });
+            context = LgdReturnChecker.createContext(content, parsed.allDeclarations, emitted, { ...options, projectId: parsed.projectId, casts: parsed.casts });
         }
         catch(error)
         {
@@ -392,7 +397,8 @@ const LgdCompiler = {
             const assignmentErrors = LgdAssignmentChecker.check(context);
             const memberErrors = context.members.check(context);
             const constructorErrors = LgdConstructorCallChecker.check(context);
-            const checked = [ ...constructorErrors,
+            const castErrors = LgdCastChecker.check(context);
+            const checked = [ ...constructorErrors, ...castErrors,
                 ...LgdAccessibility.check(context),
                 ...LgdEnumSyntax.check(context),
                 ...assignmentErrors,

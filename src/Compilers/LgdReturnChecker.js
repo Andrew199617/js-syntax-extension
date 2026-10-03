@@ -1,4 +1,5 @@
 const parser = require('@babel/parser');
+const LgdCastSyntax = require('./LgdCastSyntax');
 const LgdEnumSyntax = require('./LgdEnumSyntax');
 const traverse = require('@babel/traverse').default;
 const LgdSourceMap = require('./LgdSourceMap');
@@ -28,6 +29,7 @@ const LgdReturnChecker = {
         const tree = options.tree || parser.parse(emitted.code, { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true });
         const context = {
             content: content,
+            casts: options.casts || [],
             projectId: options.projectId || null,
             declarations: declarations,
             code: emitted.code,
@@ -290,6 +292,12 @@ const LgdReturnChecker = {
     /** @description Infers one expression with branch-local cycle protection for binding origins. */
     _expressionTypes(path, signature, context, visited)
     {
+        const cast = LgdCastSyntax.forPath(path, context);
+        if(cast)
+        {
+            return [cast.typeName];
+        }
+
         if(path.isIdentifier() && LgdEnumSyntax.receiver(path, context))
         {
             return ['Object'];

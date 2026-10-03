@@ -1,4 +1,5 @@
 const { baseTypeName, isNullableType } = require('./LgdTypeMaps');
+const LgdCastSyntax = require('./LgdCastSyntax');
 const { maskCode } = require('./LgdInfer');
 const { visibleBindings } = require('./LgdBaseChecker');
 const { collectContractBindings } = require('./LgdContractBindings');
@@ -587,6 +588,11 @@ function checkInterfaceConflicts(declaration, table, context, errors)
 /** @description Allows compile-only interface identifiers in declarations, type annotations and CommonJS exports. */
 function interfaceTypePosition(context, offset, name)
 {
+    if(LgdCastSyntax.isTypePosition(context, offset))
+    {
+        return true;
+    }
+
     for(const declaration of context.declarations)
     {
         if(declaration.kind === 'interface' && declaration.start <= offset && offset < declaration.end)
