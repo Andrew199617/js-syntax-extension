@@ -16,13 +16,14 @@
  * Checked: initializer expressions against the declared type, later assignments to
  * declared variables, and assignments to readonly variables.
  *
- * Never an error in v1: null and undefined assigned to any type (nullable Type?
- * syntax is planned), unknowable expressions (calls, member access, unbound
- * identifiers), Object as a top type, and unknowable values. Assignment bindings
- * are resolved by the emitted JavaScript scope checker.
+ * Legacy declarations permit null and undefined assignments; explicit Type?
+ * annotations permit null only. Unknowable values remain permissive, and Object
+ * stays a top type. Assignment bindings are resolved by the emitted JavaScript
+ * scope checker.
  */
 
 const { UNKNOWN, NULL, inferExpression, maskCode } = require('./LgdInfer');
+const { baseTypeName, isNullableType } = require('./LgdTypeMaps');
 
 /** @description The eight LGD type keywords; anything else in type position is a name or dotted type. */
 const typeKeywords = [ 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object', 'Array', 'Function' ];
@@ -53,9 +54,10 @@ const requireCallPattern = /\brequire\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)
 function resolveDeclaredType(declaration, scope, errors)
 {
     const typeName = declaration.typeName;
-    if(typeKeywords.includes(typeName))
+    const baseType = baseTypeName(typeName);
+    if(typeKeywords.includes(baseType))
     {
-        return { kind: 'keyword', keyword: typeName, ref: null, typeName: typeName };
+        return { kind: 'keyword', keyword: baseType, ref: null, typeName: typeName };
     }
 
     if(typeName.includes('.'))
@@ -70,19 +72,19 @@ function resolveDeclaredType(declaration, scope, errors)
         return { kind: 'opaque', keyword: 'Object', ref: null, typeName: typeName };
     }
 
-    if(typeName === declaration.name)
+    if(baseType === declaration.name)
     {
         return { kind: 'self', keyword: null, ref: null, typeName: typeName };
     }
 
-    const target = scope.get(typeName);
+    const target = scope.get(baseType);
     if(!target)
     {
         errors.push({ message: `Unknown type '${typeName}'.`, offset: declaration.typeStart });
         return { kind: 'unknown', keyword: UNKNOWN, ref: null, typeName: typeName };
     }
 
-    return { kind: 'nominal', keyword: target.keyword, ref: typeName, typeName: typeName };
+    return { kind: 'nominal', keyword: target.keyword, ref: baseType, typeName: typeName };
 }
 
 /**
@@ -100,9 +102,10 @@ function resolveParamType(typeName, scope, errors, offset)
         return { keyword: UNKNOWN, readonly: false, kind: 'keyword', typeName: UNKNOWN, ref: null };
     }
 
-    if(typeKeywords.includes(typeName))
+    const baseType = baseTypeName(typeName);
+    if(typeKeywords.includes(baseType))
     {
-        return { keyword: typeName, readonly: false, kind: 'keyword', typeName: typeName, ref: null };
+        return { keyword: baseType, readonly: false, kind: 'keyword', typeName: typeName, ref: null };
     }
 
     if(typeName.includes('.'))
@@ -117,14 +120,14 @@ function resolveParamType(typeName, scope, errors, offset)
         return { keyword: 'Object', readonly: false, kind: 'opaque', typeName: typeName, ref: null };
     }
 
-    const target = scope.get(typeName);
+    const target = scope.get(baseType);
     if(!target)
     {
         errors.push({ message: `Unknown type '${typeName}'.`, offset: offset });
         return { keyword: UNKNOWN, readonly: false, kind: 'unknown', typeName: typeName, ref: null };
     }
 
-    return { keyword: target.keyword || 'Object', readonly: false, kind: 'nominal', typeName: typeName, ref: typeName };
+    return { keyword: target.keyword || 'Object', readonly: false, kind: 'nominal', typeName: typeName, ref: baseType };
 }
 
 /**
@@ -168,6 +171,16 @@ function isAssignableTo(resolved, inferred, scope, externalsByName)
         return true;
     }
 
+    if(inferred === 'undefined')
+    {
+        return !isNullableType(resolved.typeName);
+    }
+
+    if(isNullableType(inferred))
+    {
+        return isAssignableTo(resolved, baseTypeName(inferred), scope, externalsByName);
+    }
+
     const entry = scope.get(inferred) || externalsByName.get(inferred) || null;
     if(resolved.kind === 'keyword')
     {
@@ -181,7 +194,7 @@ function isAssignableTo(resolved, inferred, scope, externalsByName)
 
     if(resolved.kind === 'opaque' || resolved.kind === 'self')
     {
-        if(inferred === resolved.typeName)
+        if(inferred === baseTypeName(resolved.typeName))
         {
             return true;
         }

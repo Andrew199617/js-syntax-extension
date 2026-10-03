@@ -4,7 +4,7 @@ const traverse = require('@babel/traverse').default;
 const LgdSourceMap = require('./LgdSourceMap');
 const LgdReturnFlow = require('./LgdReturnFlow');
 const { inferExpression, maskCode, UNKNOWN } = require('./LgdInfer');
-const { tsTypeMap } = require('./LgdTypeMaps');
+const { tsTypeMap, baseTypeName, isNullableType } = require('./LgdTypeMaps');
 const LgdBindingFlow = require('./LgdBindingFlow');
 const LgdBindingTypes = require('./LgdBindingTypes');
 const LgdClassMemberSemantics = require('./LgdClassMemberSemantics');
@@ -88,12 +88,13 @@ const LgdReturnChecker = {
         }
 
         const declared = group.returnTypeName;
-        const root = declared.split('.')[0];
+        const baseType = baseTypeName(declared);
+        const root = baseType.split('.')[0];
         const binding = path.parentPath.scope.getBinding(root);
-        const builtin = Object.hasOwn(tsTypeMap, declared) || declared === 'void';
+        const builtin = Object.hasOwn(tsTypeMap, baseType) || declared === 'void';
         const nominal = !declared.includes('.') && binding && context.bindings.descriptor(binding);
         const external = declared.includes('.') && binding;
-        const erased = !builtin && !nominal && context.bindings.erasedType(declared, typeStart);
+        const erased = !builtin && !nominal && context.bindings.erasedType(baseType, typeStart);
         const knownType = builtin || nominal || external || erased || group.opaqueReturn;
         if(!knownType)
         {
@@ -231,9 +232,15 @@ const LgdReturnChecker = {
 
         if(inferred === 'undefined' || inferred === 'null')
         {
-            return false;
+            return inferred === 'null' && isNullableType(declared);
         }
 
+        if(isNullableType(inferred))
+        {
+            return isNullableType(declared) && this.compatible(declared, baseTypeName(inferred), opaque);
+        }
+
+        declared = baseTypeName(declared);
         if(declared === 'Object')
         {
             return true;
@@ -264,7 +271,19 @@ const LgdReturnChecker = {
 
         const next = new Set(visited);
         next.add(path.node);
-        return this._expressionTypes(path, signature, context, next);
+        const types = this._expressionTypes(path, signature, context, next);
+        const expanded = types.flatMap(type =>
+        {
+            if(isNullableType(type))
+            {
+                return [ baseTypeName(type), 'null' ];
+            }
+
+            return [type];
+        });
+
+        const binding = path.isIdentifier() && path.scope.getBinding(path.node.name);
+        return binding ? context.flow.narrowTypes(path, binding, expanded) : expanded;
     },
 
     /** @description Infers one expression with branch-local cycle protection for binding origins. */
@@ -310,7 +329,7 @@ const LgdReturnChecker = {
                 return [node.callee.name];
             }
 
-            const expected = signature.group.returnTypeName;
+            const expected = baseTypeName(signature.group.returnTypeName);
             const primitive = [ 'void', 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object' ].includes(expected);
             return [primitive ? 'Object' : UNKNOWN];
         }
@@ -323,7 +342,7 @@ const LgdReturnChecker = {
         if(node.type === 'ThisExpression')
         {
             const owner = signature.declaration.name;
-            return [signature.group.returnTypeName === owner ? owner : 'Object'];
+            return [baseTypeName(signature.group.returnTypeName) === owner ? owner : 'Object'];
         }
 
         if(node.type === 'UpdateExpression')
@@ -504,7 +523,7 @@ const LgdReturnChecker = {
             });
         });
 
-        if(declaration?.name === declaration?.typeName && declaration)
+        if(declaration?.name === baseTypeName(declaration?.typeName) && declaration)
         {
             return inferred.map(type =>
             {

@@ -1,3 +1,4 @@
+const { baseTypeName, isNullableType } = require('./LgdTypeMaps');
 const { maskCode } = require('./LgdInfer');
 const { visibleBindings } = require('./LgdBaseChecker');
 const { collectContractBindings } = require('./LgdContractBindings');
@@ -195,7 +196,7 @@ function ownContractsKnown(declaration, context)
         }
 
         const annotations = [ member.returnTypeName, member.propertyTypeName, ...member.params.map(parameter => parameter.typeName) ];
-        if(annotations.some(typeName => typeName && !builtinTypes.has(typeName) && !visible.has(typeName.split('.')[0])))
+        if(annotations.some(typeName => typeName && !builtinTypes.has(baseTypeName(typeName)) && !visible.has(baseTypeName(typeName).split('.')[0])))
         {
             return false;
         }
@@ -321,6 +322,7 @@ function typeIdentity(typeName, signature, declaration, context)
         return null;
     }
 
+    typeName = baseTypeName(typeName);
     if(builtinTypes.has(typeName))
     {
         return typeName;
@@ -343,6 +345,11 @@ function differentTypes(expected, actual, evidence)
     if(!expected || !actual || expected === actual)
     {
         return false;
+    }
+
+    if(isNullableType(expected) !== isNullableType(actual))
+    {
+        return true;
     }
 
     const expectedIdentity = typeIdentity(expected, contract, declaration, context);
@@ -397,7 +404,7 @@ function bodySignatures(content, declarations, externals = new Map())
             {
                 const typeName = parameter.typeName || implemented.params[index]?.typeName || required.params[index]?.typeName || null;
                 const inheritedType = parameter.typeStart === -1 && typeName;
-                const opaqueType = Boolean(inheritedType && !builtinTypes.has(typeName) && !typeIdentity(typeName, required, declaration, context));
+                const opaqueType = Boolean(inheritedType && !builtinTypes.has(baseTypeName(typeName)) && !typeIdentity(typeName, required, declaration, context));
                 return { ...parameter, typeName: typeName, opaqueType: opaqueType };
             });
 
@@ -417,7 +424,7 @@ function bodySignatures(content, declarations, externals = new Map())
                 generator: member.generator,
                 accessor: member.accessor,
                 inherited: true,
-                opaqueReturn: !builtinTypes.has(returnTypeName) && !typeIdentity(returnTypeName, required, declaration, context),
+                opaqueReturn: !builtinTypes.has(baseTypeName(returnTypeName)) && !typeIdentity(returnTypeName, required, declaration, context),
                 reportStart: member.nameStart,
                 reportEnd: member.nameEnd
             };
@@ -666,7 +673,7 @@ function checkContractTypes(declaration, context, errors)
             start: declaration.initializerStart + member.propertyTypeStart, end: declaration.initializerStart + member.propertyTypeEnd });
         for(const annotation of annotations)
         {
-            if(annotation.name && !builtinTypes.has(annotation.name) && !visible.has(annotation.name.split('.')[0]))
+            if(annotation.name && !builtinTypes.has(baseTypeName(annotation.name)) && !visible.has(baseTypeName(annotation.name).split('.')[0]))
             {
                 addError(errors, annotation, `Unknown contract type '${annotation.name}'.`, 'unknownType');
             }

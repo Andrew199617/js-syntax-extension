@@ -1,6 +1,6 @@
 const traverse = require('@babel/traverse').default;
 const { UNKNOWN, maskCode } = require('./LgdInfer');
-const { tsTypeMap } = require('./LgdTypeMaps');
+const { tsTypeMap, baseTypeName, isNullableType } = require('./LgdTypeMaps');
 
 /** @description Infers member values conservatively from shared class identities and mapped lexical effects. */
 const LgdClassMemberInference = {
@@ -27,6 +27,12 @@ const LgdClassMemberInference = {
                 if(resolved.member.kind === 'method')
                 {
                     return 'Function';
+                }
+
+                const declaredType = resolved.member.propertyTypeName || resolved.member.typeName;
+                if(isNullableType(declaredType))
+                {
+                    return declaredType;
                 }
 
                 const defaultType = this._nullFieldType(resolved);
@@ -275,7 +281,24 @@ const LgdClassMemberInference = {
     compatible(expected, inferred, path, options = {})
     {
         const { nullable = true, typeOffset = null, expectedIdentity = null, inferredIdentity = null, unresolvedIdentity = false } = options;
-        if(inferred === UNKNOWN || nullable && [ 'null', 'undefined' ].includes(inferred) || expected === 'Object' || expected === inferred)
+        if(inferred === UNKNOWN)
+        {
+            return true;
+        }
+
+        if(inferred === 'null' || inferred === 'undefined')
+        {
+            return isNullableType(expected) ? inferred === 'null' : nullable;
+        }
+
+        if(isNullableType(inferred))
+        {
+            const acceptsNull = isNullableType(expected) || nullable;
+            return acceptsNull && this.compatible(expected, baseTypeName(inferred), path, options);
+        }
+
+        expected = baseTypeName(expected);
+        if(expected === 'Object' || expected === inferred)
         {
             return true;
         }

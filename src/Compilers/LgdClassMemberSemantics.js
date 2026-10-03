@@ -4,7 +4,7 @@ const { collectContractBindings } = require('./LgdContractBindings');
 const { visibleBindings } = require('./LgdBaseChecker');
 const { maskCode } = require('./LgdInfer');
 const LgdClassMemberInference = require('./LgdClassMemberInference');
-const { tsTypeMap } = require('./LgdTypeMaps');
+const { tsTypeMap, baseTypeName } = require('./LgdTypeMaps');
 const LgdSourceMap = require('./LgdSourceMap');
 const { skipTrivia } = require('./LgdMethodSignature');
 const LgdInterfaceErasure = require('./LgdInterfaceErasure');
@@ -142,7 +142,7 @@ const LgdClassMemberSemantics = {
 
                 const fieldType = member.propertyTypeName;
                 const visible = visibleBindings(registry._bindings, declaration.headStart);
-                const unknownField = member.kind === 'field' && !Object.hasOwn(tsTypeMap, fieldType) && !visible.has(fieldType.split('.')[0]);
+                const unknownField = member.kind === 'field' && !Object.hasOwn(tsTypeMap, baseTypeName(fieldType)) && !visible.has(baseTypeName(fieldType).split('.')[0]);
                 if(unknownField)
                 {
                     const typeStart = declaration.initializerStart + member.propertyTypeStart;
@@ -181,7 +181,7 @@ const LgdClassMemberSemantics = {
     _type(name, offset, excluded = null)
     {
         const bindings = excluded ? this._bindings.filter(binding => binding.declaration !== excluded) : this._bindings;
-        const declaration = visibleBindings(bindings, offset).get(name);
+        const declaration = visibleBindings(bindings, offset).get(baseTypeName(name));
         return declaration?.kind === 'class' ? declaration : null;
     },
 

@@ -2,12 +2,12 @@ const { collectScopes, collectBindings } = require('./LgdBaseChecker');
 const { maskCode } = require('./LgdInfer');
 const LgdContractChecker = require('./LgdContractChecker');
 const LgdSourceMap = require('./LgdSourceMap');
-const { tsTypeMap } = require('./LgdTypeMaps');
+const { toTsType, isNullableType } = require('./LgdTypeMaps');
 
 /** @description Converts an explicit LGD contract annotation into a JavaScript documentation type. */
 function annotationType(typeName)
 {
-    return typeName === 'void' ? 'void' : tsTypeMap[typeName] || typeName || 'unknown';
+    return toTsType(typeName) || 'unknown';
 }
 
 /** @description Formats one contract method parameter for a documentation function type. */
@@ -17,7 +17,8 @@ function parameterType(parameter, index)
     const type = annotationType(parameter.typeName);
     if(parameter.rest)
     {
-        return `...${name}: ${type}[]`;
+        const elementType = isNullableType(parameter.typeName) ? `(${type})` : type;
+        return `...${name}: ${elementType}[]`;
     }
 
     const optional = parameter.optional || parameter.defaultText !== null && parameter.defaultText !== undefined;

@@ -4,9 +4,10 @@ const LgdClassSyntax = require('./LgdClassSyntax');
 const LgdSourceMap = require('./LgdSourceMap');
 const { parseMethodHead } = require('./LgdMethodSignature');
 const { maskCode } = require('./LgdInfer');
+const { typeNamePattern } = require('./LgdTypeMaps');
 
 /** @description Finds return-first heads without mistaking ordinary named JavaScript methods for annotations. */
-const headPattern = /\b(?:async[\t ]+)?(?:void|(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*)[\t ]+[$A-Z_a-z][\w$]*\s*\(/g;
+const headPattern = new RegExp(`\\b(?:async[\\t ]+)?(?:void|${typeNamePattern})[\\t ]+[$A-Z_a-z][\\w$]*\\s*\\(`, 'g');
 
 /** @description Rejects unsupported standalone return-first functions without extending the function grammar. */
 const LgdStandaloneReturnChecker = {

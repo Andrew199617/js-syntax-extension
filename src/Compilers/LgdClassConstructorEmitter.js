@@ -35,10 +35,11 @@ const LgdClassConstructorEmitter = {
 
         const tuple = (member?.params || []).map(parameter =>
         {
-            const type = typeMaps.tsTypeMap[parameter.typeName] || parameter.typeName || 'any';
+            const type = typeMaps.toTsType(parameter.typeName) || 'any';
             if(parameter.rest)
             {
-                return `...${parameter.name}: ${type}[]`;
+                const elementType = typeMaps.isNullableType(parameter.typeName) ? `(${type})` : type;
+                return `...${parameter.name}: ${elementType}[]`;
             }
 
             const optional = parameter.defaultText !== null && parameter.defaultText !== undefined ? '?' : '';
@@ -71,8 +72,9 @@ const LgdClassConstructorEmitter = {
         {
             const parameters = member.params.filter(parameter => parameter.typeName).map(parameter =>
             {
-                const type = typeMaps.tsTypeMap[parameter.typeName] || parameter.typeName;
-                const annotated = parameter.rest ? `...${type}` : type;
+                const type = typeMaps.toTsType(parameter.typeName);
+                const elementType = typeMaps.isNullableType(parameter.typeName) ? `(${type})` : type;
+                const annotated = parameter.rest ? `...${elementType}` : type;
                 return `${indent} * @param {${annotated}} ${parameter.name}`;
             });
 

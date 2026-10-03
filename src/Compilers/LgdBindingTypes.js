@@ -1,6 +1,6 @@
 const LgdEnumSyntax = require('./LgdEnumSyntax');
 const traverse = require('@babel/traverse').default;
-const { tsTypeMap } = require('./LgdTypeMaps');
+const { tsTypeMap, baseTypeName } = require('./LgdTypeMaps');
 const { UNKNOWN } = require('./LgdInfer');
 const { skipTrivia } = require('./LgdMethodSignature');
 const { collectContractBindings } = require('./LgdContractBindings');
@@ -188,14 +188,15 @@ const LgdBindingTypes = {
 
         const offset = context.map.toSource(binding.identifier.start);
         const declaration = context.declarations.find(candidate => candidate.nameStart === offset);
+        const baseType = baseTypeName(type);
         const descriptor = { keyword: UNKNOWN, readonly: Boolean(declaration?.readonly), kind: 'unknown', typeName: type, ref: null };
         this._entries.set(binding, descriptor);
-        if(Object.hasOwn(tsTypeMap, type))
+        if(Object.hasOwn(tsTypeMap, baseType))
         {
             descriptor.kind = 'keyword';
-            descriptor.keyword = type;
+            descriptor.keyword = baseType;
         }
-        else if(importedClass || declaration?.kind === 'class' || declaration?.name === declaration?.typeName && declaration)
+        else if(importedClass || declaration?.kind === 'class' || declaration?.name === baseTypeName(declaration?.typeName) && declaration)
         {
             descriptor.kind = 'self';
             descriptor.keyword = 'Object';
@@ -208,13 +209,13 @@ const LgdBindingTypes = {
         else
         {
             const typeScope = binding.kind === 'param' ? binding.scope.parent : binding.scope;
-            const typeBinding = typeScope?.getBinding(type);
+            const typeBinding = typeScope?.getBinding(baseType);
             const target = typeBinding && this.descriptor(typeBinding);
             if(target)
             {
                 descriptor.kind = 'nominal';
                 descriptor.keyword = target.keyword;
-                descriptor.ref = target.enumIdentity || type;
+                descriptor.ref = target.enumIdentity || baseType;
             }
         }
 

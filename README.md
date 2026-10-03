@@ -179,7 +179,7 @@ JavaScript modules, CommonJS and JSX remain supported. Top-level returns are acc
 
 Declared locals and typed parameters are checked in top-level `Function` initializers, ordinary JavaScript function bodies, object methods, classes, constructors and nested callbacks. Writes use the actual lexical binding, so a shadowing callback parameter or block local does not inherit an unrelated outer type. Compound assignments and known destructuring values are checked too; rest parameter bindings are arrays.
 
-Method return checks follow the current value through assignments and branches. After an incompatible write is rejected, later diagnostics retain the binding's declared type to avoid cascading errors; the assignment error still blocks saving generated JavaScript. Known `null` or `undefined` values cannot satisfy a non-void return contract. LGD still permits null and undefined in assignment positions; unknown calls and effects remain conservative.
+Method return checks follow the current value through assignments and branches. After an incompatible write is rejected, later diagnostics retain the binding's declared type to avoid cascading errors; the assignment error still blocks saving generated JavaScript. Known `null` values require a nullable return annotation; `undefined` requires `void`. Existing unsuffixed annotations still permit null and undefined in assignment positions; unknown calls and effects remain conservative.
 
 ## Explicit LGD method return types
 
@@ -195,6 +195,19 @@ class Counter {
 ```
 
 `void` means `undefined`: falling through, `return;`, and `return undefined;` are allowed, while known returned values and `null` are rejected. Non-void methods must return a compatible value on every normal completion path; throwing is also allowed. Async methods declare their resolved value type, so `async Number` returns a `Promise<number>` and `async void` returns a `Promise<undefined>`.
+
+Append `?` to a value type to include `null`: `vscode.Position?` means `vscode.Position | null`, and `Number?` means `number | null`. Nullable annotations work on supported method returns, parameters, local declarations, class fields and interface contracts. Nullable fields without an initializer default to `null`. They do not include `undefined`; a nullable-returning method must still return a value or `null` on every normal path. For example:
+
+```lgd
+readonly Object vscode = require("vscode");
+
+class PositionSearch {
+    vscode.Position? findPreviousChar(vscode.TextDocument document, vscode.Position position, String char, Number offset = 0) {
+        // Return a matching vscode.Position when found.
+        return null;
+    }
+}
+```
 
 Constructors keep their implicit instance result through `.create()`. Existing methods without return annotations remain supported. Annotations on accessors and generators are currently rejected; arrow and standalone function return syntax is not introduced by this feature. Checks remain conservative when an expression's type cannot be determined. Generated JavaScript removes the type syntax and documents the return contract without inserting return statements.
 

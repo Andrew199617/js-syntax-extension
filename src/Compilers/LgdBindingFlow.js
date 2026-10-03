@@ -1,6 +1,7 @@
 const traverse = require('@babel/traverse').default;
 const { VISITOR_KEYS } = require('@babel/types');
 const LgdValueOrigins = require('./LgdValueOrigins');
+const LgdBindingRefinements = require('./LgdBindingRefinements');
 
 /** @description Tracks the values reaching each lexical binding without re-parsing generated JavaScript. */
 const LgdBindingFlow = {
@@ -10,6 +11,7 @@ const LgdBindingFlow = {
         const flow = Object.create(this);
         flow._values = LgdValueOrigins.create(flow);
         flow._snapshots = new WeakMap();
+        flow._refinements = LgdBindingRefinements.create(flow);
         flow._reachable = new WeakSet();
         flow._overriddenReturns = new WeakSet();
         flow._locals = new Map();
@@ -21,6 +23,7 @@ const LgdBindingFlow = {
             /** @description Collects lexical owners and their existing Babel bindings. */
             enter: path =>
             {
+                flow._refinements.recordDynamicScope(path);
                 if(path.isProgram() || path.isFunction())
                 {
                     roots.push(path);
@@ -82,6 +85,9 @@ const LgdBindingFlow = {
         const environment = this._snapshots.get(path.node);
         return environment?.has(binding) ? [...environment.get(binding)] : null;
     },
+
+    /** @description Applies proven immutable null guards at one expression point. */
+    narrowTypes(path, binding, types) { return this._refinements.narrowTypes(path, binding, types); },
 
     /** @description Identifies executed paths and returns whose result survives any enclosing finally block. */
     reachable(path)
@@ -162,7 +168,7 @@ const LgdBindingFlow = {
             this._record(parameter, environment);
             if(parameter.isAssignmentPattern())
             {
-                const defaulted = this._expression(parameter.get('right'), new Map(environment));
+                const defaulted = this._expression(parameter.get('right'), this._refinements.clone(environment));
                 environment = this._replace(environment, this._join([ environment, defaulted ]));
                 this._assignPattern(parameter.get('left'), [ '__declared__', parameter.get('right') ], environment);
             }
@@ -177,6 +183,7 @@ const LgdBindingFlow = {
             target.set(binding, origins);
         }
 
+        this._refinements.copy(source, target);
         return target;
     },
 
@@ -198,27 +205,11 @@ const LgdBindingFlow = {
             joined.set(binding, [...origins]);
         }
 
+        this._refinements.join(environments, joined, bindings);
         return joined;
     },
 
-    _same(left, right)
-    {
-        if(left.size !== right.size)
-        {
-            return false;
-        }
-
-        for(const [ binding, origins ] of left)
-        {
-            const other = right.get(binding);
-            if(!other || origins.length !== other.length || origins.some(origin => !other.includes(origin)))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    },
+    _same(left, right) { return this._refinements.same(left, right); },
 
     _record(path, environment)
     {
@@ -229,7 +220,7 @@ const LgdBindingFlow = {
 
         this._reachable.add(path.node);
         const previous = this._snapshots.get(path.node);
-        const snapshot = previous ? this._join([ previous, environment ]) : new Map(environment);
+        const snapshot = previous ? this._join([ previous, environment ]) : this._refinements.clone(environment);
         this._snapshots.set(path.node, snapshot);
         this._observe(environment);
     },
@@ -238,7 +229,7 @@ const LgdBindingFlow = {
     {
         for(const observed of this._observers)
         {
-            observed.push(new Map(environment));
+            observed.push(this._refinements.clone(environment));
         }
     },
 
@@ -348,11 +339,11 @@ const LgdBindingFlow = {
         if(chosen !== null)
         {
             const selected = chosen ? 'consequent' : 'alternate';
-            return this._statement(path.get(selected), tested);
+            return this._statement(path.get(selected), this._refinements.refine(path.get('test'), tested, chosen));
         }
 
-        const consequent = this._statement(path.get('consequent'), new Map(tested));
-        const alternate = this._statement(path.get('alternate'), new Map(tested));
+        const consequent = this._statement(path.get('consequent'), this._refinements.refine(path.get('test'), tested, true));
+        const alternate = this._statement(path.get('alternate'), this._refinements.refine(path.get('test'), tested, false));
         return this._mergeOutcomes(consequent, alternate);
     },
 
@@ -382,15 +373,15 @@ const LgdBindingFlow = {
             }
         }
 
-        const initial = new Map(environment);
-        let head = new Map(initial);
+        const initial = this._refinements.clone(environment);
+        let head = this._refinements.clone(initial);
         let outcomes = new Map();
         let exited;
         let lastNext = null;
         let repeats = true;
         while(repeats)
         {
-            let entered = new Map(head);
+            let entered = this._refinements.clone(head);
             if(test && !path.isDoWhileStatement())
             {
                 entered = this._expression(test, entered);
@@ -401,7 +392,7 @@ const LgdBindingFlow = {
                 return new Map([[ 'normal', entered ]]);
             }
 
-            exited = new Map(entered);
+            exited = this._refinements.clone(entered);
             if(iteration)
             {
                 this._values.invalidateEffects(path, entered);
@@ -497,9 +488,9 @@ const LgdBindingFlow = {
 
     _tryStatement(path, environment)
     {
-        const observed = [new Map(environment)];
+        const observed = [this._refinements.clone(environment)];
         this._observers.push(observed);
-        const outcomes = this._statement(path.get('block'), new Map(environment));
+        const outcomes = this._statement(path.get('block'), this._refinements.clone(environment));
         this._observers.pop();
         const handler = path.get('handler');
         if(handler.node && this._values.canThrow(path.get('block')))
@@ -521,7 +512,7 @@ const LgdBindingFlow = {
         let canResume = false;
         for(const [ completion, completed ] of outcomes)
         {
-            const finalized = this._statement(finalizer, new Map(completed));
+            const finalized = this._statement(finalizer, this._refinements.clone(completed));
             const normal = finalized.get('normal');
             if(normal)
             {
@@ -567,7 +558,7 @@ const LgdBindingFlow = {
         const tested = this._expression(path.get('discriminant'), environment);
         const cases = path.get('cases');
         const outcomes = new Map();
-        let unmatched = new Map(tested);
+        let unmatched = this._refinements.clone(tested);
         for(const branch of cases)
         {
             this._record(branch, unmatched);
@@ -577,7 +568,7 @@ const LgdBindingFlow = {
         const choices = this._values.switchCases(path);
         if(choices.canMiss)
         {
-            outcomes.set('normal', new Map(unmatched));
+            outcomes.set('normal', this._refinements.clone(unmatched));
         }
 
         for(const index of choices.indices)
@@ -631,7 +622,7 @@ const LgdBindingFlow = {
                 return environment;
             }
 
-            const before = new Map(environment);
+            const before = this._refinements.clone(environment);
             environment = this._expression(path.get('right'), environment);
             const origins = path.node.operator === '=' || logical ? [path.get('right')] : [path];
             this._assignPattern(left, origins, environment, left.isPattern());
@@ -653,12 +644,12 @@ const LgdBindingFlow = {
             const selected = this.truth(path.get('test'));
             if(selected !== null)
             {
-                return this._expression(path.get(selected ? 'consequent' : 'alternate'), environment);
+                return this._expression(path.get(selected ? 'consequent' : 'alternate'), this._refinements.refine(path.get('test'), environment, selected));
             }
 
             return this._join([
-                this._expression(path.get('consequent'), new Map(environment)),
-                this._expression(path.get('alternate'), new Map(environment))
+                this._expression(path.get('consequent'), this._refinements.refine(path.get('test'), environment, true)),
+                this._expression(path.get('alternate'), this._refinements.refine(path.get('test'), environment, false))
             ]);
         }
 
@@ -671,7 +662,7 @@ const LgdBindingFlow = {
                 return environment;
             }
 
-            const right = this._expression(path.get('right'), new Map(environment));
+            const right = this._expression(path.get('right'), this._refinements.clone(environment));
             return chosen === null ? this._join([ environment, right ]) : right;
         }
 
@@ -722,7 +713,7 @@ const LgdBindingFlow = {
             return origins;
         }
 
-        const defaulted = this._expression(path.get('right'), new Map(environment));
+        const defaulted = this._expression(path.get('right'), this._refinements.clone(environment));
         this._replace(environment, defaults.definite ? defaulted : this._join([ environment, defaulted ]));
         return defaults.origins;
     },

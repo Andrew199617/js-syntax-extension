@@ -23,14 +23,13 @@ const LgdGeneratedJsValidator = require('./LgdGeneratedJsValidator');
 const { parseTypedParams, parseObjectMethodParams, parseMethodHead, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
 const { maskCode } = require('./LgdInfer');
 
-/** @description Matches a declaration type name: Number, a declared name (GoToNextParagraph), or a dotted type (vscode.Command); the final segment must be capitalized. */
-const typeNamePattern = String.raw`(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*`;
+const { typeNamePattern } = require('./LgdTypeMaps');
 
 /** @description Matches a typed declaration head at a line start or after a statement semicolon through the '='. */
 const declarationHeadPattern = new RegExp(`(?:^|(?<=;))(?<indent>[\\t ]*)(?<exportKeyword>export[\\t ]+)?(?<readonlyKeyword>readonly[\\t ]+)?(?<typeName>${typeNamePattern})[\\t ]+(?<variableName>[$A-Z_a-z][\\w$]*)[\\t ]*=`, 'gm');
 
 /** @description Matches malformed declaration heads: lines starting with a type name that never parsed as a declaration. */
-const typeNameLinePattern = new RegExp(`^[\\t ]*(?:export[\\t ]+)?(?:readonly[\\t ]+)?(?<typeName>${typeNamePattern})(?![\\w$.])(?![\\t ]*(?:\\(|\\[|\\.))`, 'gm');
+const typeNameLinePattern = new RegExp(`^[\\t ]*(?:export[\\t ]+)?(?:readonly[\\t ]+)?(?<typeName>${typeNamePattern})(?![\\w$.?])(?![\\t ]*(?:\\(|\\[|\\.))`, 'gm');
 
 /** @description Length of the JSDoc opening marker. */
 const jsdocOpenLength = 3;

@@ -1,3 +1,4 @@
+const { typeTokenPattern, baseTypeName } = require('./LgdTypeMaps');
 const { maskCode } = require('./LgdInfer');
 const { parseTypedParams, parseMethodHead } = require('./LgdTypedParams');
 const LgdBaseCalls = require('./LgdBaseCalls');
@@ -376,7 +377,7 @@ const LgdClassSyntax = {
     /** @description Reads a typed signature-only property with one or both accessor contracts. */
     parsePropertyContract(masked, start, declaration, modifiers)
     {
-        const head = (/^\s*(?<type>[$A-Z_a-z][\w$]*(?:\.[$A-Z_a-z][\w$]*)*)\s+(?<name>[$A-Z_a-z][\w$]*)\s*{/).exec(modifiers.head);
+        const head = new RegExp(`^\\s*(?<type>${typeTokenPattern})\\s+(?<name>[$A-Z_a-z][\\w$]*)\\s*{`).exec(modifiers.head);
         if(!head)
         {
             return null;
@@ -388,7 +389,7 @@ const LgdClassSyntax = {
             return { error: 'Signature-only properties require an interface or an abstract member in an abstract class.', offset: start };
         }
 
-        if(modifiers.virtualStart !== null || head.groups.type === 'void')
+        if(modifiers.virtualStart !== null || baseTypeName(head.groups.type) === 'void')
         {
             return { error: 'A property contract must have a value type and cannot explicitly be virtual.', offset: start };
         }

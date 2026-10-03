@@ -28,7 +28,7 @@ const TsBackend = {
     {
         const kind = declaration.readonly ? 'const' : 'let';
         const exportKeyword = declaration.exported ? 'export ' : '';
-        const tsType = typeMaps.tsTypeMap[declaration.typeName] || declaration.typeName;
+        const tsType = typeMaps.toTsType(declaration.typeName);
         const commentPrefix = declaration.jsdoc ? `${declaration.jsdoc}${this.newline}` : '';
         const namePrefix = `${commentPrefix}${declaration.indent}${exportKeyword}${kind} `;
         const text = `${namePrefix}${declaration.name}: ${tsType} =`;
@@ -62,11 +62,12 @@ const TsBackend = {
                 return parameter.raw;
             }
 
-            const tsType = parameter.typeName ? typeMaps.tsTypeMap[parameter.typeName] || parameter.typeName : null;
+            const tsType = parameter.typeName ? typeMaps.toTsType(parameter.typeName) : null;
             const defaultText = parameter.defaultText === null ? '' : ` = ${parameter.defaultText}`;
             if(parameter.rest)
             {
-                return `...${parameter.name}${tsType ? `: ${tsType}[]` : ''}${defaultText}`;
+                const elementType = typeMaps.isNullableType(parameter.typeName) ? `(${tsType})` : tsType;
+                return `...${parameter.name}${elementType ? `: ${elementType}[]` : ''}${defaultText}`;
             }
 
             return `${parameter.name}${tsType ? `: ${tsType}` : ''}${defaultText}`;
@@ -76,7 +77,7 @@ const TsBackend = {
         let returnAnnotation = '';
         if(group.returnTypeName)
         {
-            const declared = group.returnTypeName === 'void' ? 'undefined' : typeMaps.tsTypeMap[group.returnTypeName] || group.returnTypeName;
+            const declared = group.returnTypeName === 'void' ? 'undefined' : typeMaps.toTsType(group.returnTypeName);
             const type = group.async ? `Promise<${declared}>` : declared;
             returnAnnotation = `: ${type}`;
             edits.push({ start: group.returnTypeStart, end: group.returnTypeEnd, text: '' });

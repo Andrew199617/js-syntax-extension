@@ -1,4 +1,5 @@
 const { skipTrivia, parseMethodHead } = require('./LgdMethodSignature');
+const { parseTypeName } = require('./LgdTypeMaps');
 
 /*
  * Typed parameter parsing for LGD function initializers.
@@ -382,15 +383,15 @@ function parseParamChunk(chunk)
     }
 
     const typeStart = index;
-    const typeMatch = (/^(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*/).exec(text.slice(index));
+    const typeMatch = parseTypeName(text, index);
     let typeName = null;
     if(typeMatch)
     {
-        const typeEnd = index + typeMatch[0].length;
+        const typeEnd = typeMatch.end;
         const nameStart = skipTrivia(text, typeEnd);
         if(nameStart > typeEnd && (/^[$A-Z_a-z]/).test(text.slice(nameStart)))
         {
-            typeName = typeMatch[0];
+            typeName = typeMatch.typeName;
             index = nameStart;
         }
     }

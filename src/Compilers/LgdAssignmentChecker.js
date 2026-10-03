@@ -2,6 +2,7 @@ const traverse = require('@babel/traverse').default;
 const LgdReturnChecker = require('./LgdReturnChecker');
 const LgdTypeChecker = require('./LgdTypeChecker');
 const { NULL } = require('./LgdInfer');
+const { isNullableType } = require('./LgdTypeMaps');
 const { skipTrivia } = require('./LgdMethodSignature');
 
 /** @description Checks all writes against the annotation on their actual JavaScript lexical binding. */
@@ -108,8 +109,9 @@ const LgdAssignmentChecker = {
         const types = typeof value === 'string' ? [value] : LgdReturnChecker.expressionTypes(value, signature, context);
         for(const type of new Set(types))
         {
-            // LGD v1 permits null/undefined in assignment positions, but return contracts remain nonnullable.
-            const inferred = type === 'null' || type === 'undefined' ? NULL : type;
+            // Preserve legacy undefined assignments while keeping explicit Type? contracts precise.
+            const legacyUndefined = type === 'undefined' && !isNullableType(descriptor.typeName);
+            const inferred = type === 'null' || legacyUndefined ? NULL : type;
             if(!LgdTypeChecker.isAssignableTo(descriptor, inferred, scope, context.externalsByName))
             {
                 const keyword = descriptor.kind === 'keyword' && scope.get(type)?.kind === 'keyword';

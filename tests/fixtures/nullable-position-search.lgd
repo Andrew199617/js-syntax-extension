@@ -1,0 +1,33 @@
+readonly Object vscode = require('vscode');
+
+class PositionSearch {
+    /**
+     * @description Finds the previous occurrence of a character.
+     * @param document
+     * @param position
+     * @param char The char to find.
+     * @param offset The offset to put the cursor. 0 for behind of char, 1 for in front of char.
+     */
+    vscode.Position? findPreviousChar(vscode.TextDocument document, vscode.Position position, String char, Number offset = 0) {
+        if(position.character - 1 + offset > 0) {
+            readonly String textLine = document.lineAt(position.line).text;
+            readonly Number closeBracketIndex = textLine.lastIndexOf(char, position.character - 1 - offset);
+            if (closeBracketIndex !== -1) {
+                return new vscode.Position(position.line, Math.max(0, closeBracketIndex + offset));
+            }
+        }
+
+        for (let line = position.line - 1; line >= 0; line--) {
+            readonly String textLine = document.lineAt(line).text;
+            readonly Number closeBracketIndex = textLine.lastIndexOf(char, textLine.length);
+
+            if (closeBracketIndex !== -1) {
+                return new vscode.Position(line, Math.max(0, closeBracketIndex + offset));
+            }
+        }
+
+        return null;
+    }
+}
+
+module.exports = PositionSearch;

@@ -1,3 +1,5 @@
+const { parseTypeName, isNullableType } = require('./LgdTypeMaps');
+
 /**
  * @description Skips leading whitespace and comments, returning the offset of the first code character.
  * Object members often carry JSDoc blocks; the method name and parameter list follow them.
@@ -61,13 +63,13 @@ function parseMethodHead(text)
     }
 
     const firstStart = index;
-    const first = (/^[$A-Z_a-z][\w$]*(?:\.[$A-Z_a-z][\w$]*)*/).exec(text.slice(index));
+    const first = parseTypeName(text, index, { allowVoid: true, allowUncapitalized: true });
     if(!first)
     {
         return null;
     }
 
-    let name = first[0];
+    let name = first.typeName;
     let nameStart = index;
     let returnTypeName = null;
     index = skipTrivia(text, index + name.length);
@@ -85,7 +87,7 @@ function parseMethodHead(text)
         index = skipTrivia(text, index + name.length);
     }
 
-    if(text[index] !== '(' || name.includes('.'))
+    if(text[index] !== '(' || name.includes('.') || isNullableType(name))
     {
         return null;
     }

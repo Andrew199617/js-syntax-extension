@@ -173,7 +173,7 @@ const JsBackend = {
             return jsdoc;
         }
 
-        const declared = group.returnTypeName === 'void' ? 'undefined' : typeMaps.tsTypeMap[group.returnTypeName] || group.returnTypeName;
+        const declared = group.returnTypeName === 'void' ? 'undefined' : typeMaps.toTsType(group.returnTypeName);
         const type = group.async ? `Promise<${declared}>` : declared;
         const tag = /@returns?(?:[\t ]+{[^\n\r}]*})?/;
         if(tag.test(jsdoc))
@@ -228,8 +228,13 @@ const JsBackend = {
      */
     parameterJsdocType(parameter)
     {
-        const type = typeMaps.tsTypeMap[parameter.typeName] || parameter.typeName;
-        return parameter.rest ? `...${type}` : type;
+        const type = typeMaps.toTsType(parameter.typeName);
+        if(!parameter.rest)
+        {
+            return type;
+        }
+
+        return typeMaps.isNullableType(parameter.typeName) ? `...(${type})` : `...${type}`;
     },
 
     /**
@@ -248,7 +253,7 @@ const JsBackend = {
             return declaration.jsdoc || '';
         }
 
-        const tsType = typeMaps.tsTypeMap[declaration.typeName] || declaration.typeName;
+        const tsType = typeMaps.toTsType(declaration.typeName);
         const params = this.paramTags(declaration);
         if(!declaration.jsdoc)
         {
@@ -291,7 +296,7 @@ const JsBackend = {
 
         return typedParams.params
             .filter(parameter => parameter.name && parameter.typeName)
-            .map(parameter => ` * @param {${typeMaps.tsTypeMap[parameter.typeName] || parameter.typeName}} ${parameter.name}`);
+            .map(parameter => ` * @param {${this.parameterJsdocType(parameter)}} ${parameter.name}`);
     }
 };
 

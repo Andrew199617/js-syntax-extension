@@ -7,7 +7,7 @@ const LgdClassFields = {
     parseField(context)
     {
         const { content, masked, start, declaration, modifiers, compiler } = context;
-        const head = (/^\s*(?<type>[$A-Z_a-z][\w$]*(?:\.[$A-Z_a-z][\w$]*)*)\s+(?<name>[$A-Z_a-z][\w$]*)\s*(?<terminator>[;=])/).exec(modifiers.head);
+        const head = new RegExp(`^\\s*(?<type>${typeMaps.typeTokenPattern})\\s+(?<name>[$A-Z_a-z][\\w$]*)\\s*(?<terminator>[;=])`).exec(modifiers.head);
         if(!head)
         {
             return null;
@@ -18,7 +18,7 @@ const LgdClassFields = {
             return { error: 'LGD data fields cannot be interface contracts, abstract, virtual, or override.', offset: start };
         }
 
-        if(head.groups.type === 'void' || !(/(?:^|\.)[A-Z][\w$]*$/).test(head.groups.type))
+        if(head.groups.type === 'void' || !typeMaps.parseTypeName(head.groups.type))
         {
             return { error: 'An LGD field requires a supported capitalized value type.', offset: start };
         }
@@ -99,7 +99,7 @@ const LgdClassFields = {
         const fields = context.declaration.classMembers.filter(member => member.kind === 'field' && !member.static);
         for(const field of fields)
         {
-            const type = typeMaps.tsTypeMap[field.propertyTypeName] || field.propertyTypeName;
+            const type = typeMaps.toTsType(field.propertyTypeName);
             context.syntax.appendGenerated(output, `${newline}${indent}/** @type {${type}} */${newline}${indent}Object.defineProperty(${receiver}, "`, field.start);
             this.appendName(output, context, field);
             context.syntax.appendGenerated(output, '", { value: ', field.nameEnd, { end: field.initializerStart ?? field.bodyEnd });
@@ -201,7 +201,7 @@ const LgdClassFields = {
             }
 
             field.staticStorageName = cell;
-            const type = typeMaps.tsTypeMap[field.propertyTypeName] || field.propertyTypeName;
+            const type = typeMaps.toTsType(field.propertyTypeName);
             context.syntax.appendGenerated(output, `${newline}${declaration.indent}/** @type {${type}} */${newline}${declaration.indent}let ${cell} = ${this.fieldDefault(field)};`
                 + `${newline}${declaration.indent}Object.defineProperty(${declaration.name}, "`, field.start);
             this.appendName(output, context, field);
