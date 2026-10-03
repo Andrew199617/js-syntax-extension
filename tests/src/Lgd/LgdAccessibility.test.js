@@ -4,6 +4,8 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
+const LgdCompiler = require('../../../src/Compilers/LgdCompiler');
+const ObjectInheritanceContracts = require('../../../src/Lgd/QuickFixes/ObjectInheritanceContracts');
 const LgdCompletionProvider = require('../../../src/Lgd/LgdCompletionProvider');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
 
@@ -268,4 +270,30 @@ test('Uses canonical declaring ownership when a protected base is imported throu
         'class Child : Base { Number value() { return this.read(); } }'
     ]);
     expect(state.errors).toEqual([]);
+});
+
+test('Preserves project identity when an inheritance quick fix clones imported contracts.', () =>
+{
+    const source = 'const Object Base = { create() { return {}; }, Number run() { return 1; } };';
+    const declaration = LgdCompiler.create().parse(source).declarations[0];
+    const entry = { sourcePath: '/project/Base.lgd', exportName: 'Base' };
+    const externals = new Map([[ './Base', entry ]]);
+    externals.sourceContext = { sourcePath: '/project/Use.lgd', projectId: 'compilation' };
+    const context = { state: { externals: externals }, source: {} };
+    const base = { declaration: declaration, snapshot: { text: source }, entry: entry };
+    const shape = { baseName: 'Base', object: { properties: [{ key: { name: 'run' } }] } };
+    const plan = ObjectInheritanceContracts.plan(context, base, shape);
+    expect(plan).not.toBeNull();
+    expect(plan.externals.sourceContext).toBe(externals.sourceContext);
+});
+
+test('Checks known classes returned directly by require and chained factory aliases.', async () =>
+{
+    await write('Value.lgd', [ 'class Value { private Number secret; }', 'module.exports = Value;' ]);
+    const state = await open('Use.lgd', [
+        'require("./Value.js").create().secret;',
+        'const value = require("./Value.js").create(); value.secret;',
+        'function ordinary(require) { return require("./Value.js").create().secret; }'
+    ]);
+    expect(accessErrors(state)).toHaveLength(2);
 });

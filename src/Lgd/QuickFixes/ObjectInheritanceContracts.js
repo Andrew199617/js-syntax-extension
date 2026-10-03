@@ -63,6 +63,7 @@ const ObjectInheritanceContracts = {
         const declaration = parsed.declarations.find(candidate => candidate.name === base.declaration.name);
         const methods = LgdOverrideChecker.describeMethods(prepared.text, parsed.allDeclarations, declaration);
         plan.externals = new Map(context.state.externals);
+        plan.externals.sourceContext = context.state.externals.sourceContext;
         for(const [ specifier, entry ] of plan.externals)
         {
             if(entry.sourcePath === base.entry.sourcePath)

@@ -320,17 +320,8 @@ const LgdClassMemberSemantics = {
         if(binding.constant && binding.path.isVariableDeclarator() && binding.path.node.init)
         {
             const initializer = binding.path.get('init');
-            if(initializer.isCallExpression() && initializer.get('callee').isIdentifier({ name: 'require' }) && !initializer.scope.getBinding('require'))
-            {
-                const specifier = initializer.node.arguments[0];
-                const external = specifier?.type === 'StringLiteral' && this._context.externals.get(specifier.value);
-                if(external?.kind === 'class')
-                {
-                    return { declaration: external, kind: 'type', reference: binding.identifier.name };
-                }
-            }
-
-            return this.receiver(initializer, next);
+            const receiver = this.receiver(initializer, next);
+            return receiver?.kind === 'type' ? { ...receiver, reference: binding.identifier.name } : receiver;
         }
 
         const origins = this._context.flow?.origins(path, binding);
@@ -410,6 +401,13 @@ const LgdClassMemberSemantics = {
         if(path.isCallExpression() || path.isOptionalCallExpression())
         {
             const callee = path.get('callee');
+            if(callee.isIdentifier({ name: 'require' }) && !path.scope.getBinding('require'))
+            {
+                const specifier = path.node.arguments[0];
+                const external = specifier?.type === 'StringLiteral' && this._context.externals.get(specifier.value);
+                return external?.kind === 'class' ? { declaration: external, kind: 'type' } : null;
+            }
+
             if(callee.isMemberExpression() || callee.isOptionalMemberExpression())
             {
                 const resolved = this.resolve(callee, visited);
