@@ -177,3 +177,19 @@ it('does not treat severity suffixes as valid values for standard EditorConfig k
     expect(mapped.rules).toEqual({});
     expect(mapped.issues).toHaveLength(2);
 });
+
+it('imports independent experimental blank-line rules with their severities', () =>
+{
+    const imported = LgdEditorConfig.map(Object.fromEntries([
+        [ 'csharp_style_allow_blank_lines_between_consecutive_braces_experimental', 'false:warning' ],
+        [ 'dotnet_style_allow_statement_immediately_after_block_experimental', 'false:error' ],
+        [ 'csharp_style_allow_blank_line_after_colon_in_constructor_initializer_experimental', 'false:warning' ],
+        [ 'csharp_style_allow_blank_line_after_token_in_conditional_expression_experimental', 'false:warning' ],
+        [ 'csharp_style_allow_blank_line_after_arrow_expression_clause_experimental', 'false:warning' ]
+    ]));
+
+    expect(imported.options.lineBreaks).toEqual({ blankLinesBetweenClosingBraces: false, statementImmediatelyAfterBlock: false,
+        blankLineAfterConstructorColon: false, blankLineAfterConditionalToken: false, blankLineAfterArrow: false });
+    expect(imported.rules['lgd.format.lineBreaks.statementImmediatelyAfterBlock'].severity).toBe('error');
+    expect(imported.issues).toHaveLength(0);
+});

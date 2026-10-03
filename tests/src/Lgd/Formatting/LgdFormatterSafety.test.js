@@ -132,3 +132,59 @@ it('preserves label indentation bytes for the no-change policy, including hard t
     expect(formatted).toContain('\n\tlabel:');
     expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
 });
+
+it.each([
+    [ 'blankLineAfterConditionalToken', 'const value = ok ?\n\n1 :\n\n2;' ],
+    [ 'blankLineAfterArrow', 'const callback = () =>\n\n1;' ],
+    [ 'blankLineAfterConstructorColon', 'class Value : Base { Value() :\n\nbase() {} }' ],
+    [ 'blankLinesBetweenClosingBraces', 'if(ok) { if(ready) { act(); }\n\n}' ]
+])('removes blank lines only at the configured %s boundary', (option, source) =>
+{
+    const configuration = { options: { lineBreaks: { [option]: false } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).not.toBe(source);
+    expect(formatted).not.toContain('\n\n');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});
+
+it('allows existing blank lines between closing blocks independently of general block-end spacing', () =>
+{
+    const source = 'if(ok) { if(ready) { act(); }\n\n}';
+    const configuration = { options: { lineBreaks: { blankLinesBetweenClosingBraces: true } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('}\n\n}');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});
+
+it('separates a statement after a block while preserving actual control continuations', () =>
+{
+    const source = 'if(ok) { act(); } else { other(); } next(); do { act(); } while(ready);';
+    const configuration = { options: { lineBreaks: { statementImmediatelyAfterBlock: false } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('}\n\nnext();');
+    expect(formatted).toContain('}\nelse');
+    expect(formatted).toContain('} while(ready);');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});
+
+it.each([ 'respectPrecedence', 'onePerLine' ])('wraps parsed binary operations with %s and stable evaluation', mode =>
+{
+    const source = 'const result = firstValue + secondValue * thirdValue - fourthValue;';
+    const configuration = { options: { wrapping: { binaryOperations: mode, binaryOperators: 'beforeNonAssignment', columnLimit: 25 } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('\n    + secondValue');
+    expect(formatted).toContain('\n    - fourthValue');
+    expect(formatted.includes('\n    * thirdValue')).toBe(mode === 'onePerLine');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+    const values = { firstValue: 2, secondValue: 3, thirdValue: 4, fourthValue: 5 };
+    expect(virtualMachine.runInNewContext(`${formatted} result;`, { ...values })).toBe(virtualMachine.runInNewContext(`${source} result;`, { ...values }));
+});
+
+it('leaves comments and opaque expression contents unchanged during precedence wrapping', () =>
+{
+    const source = 'const result = firstValue + /* keep exactly */ secondValue * thirdValue;';
+    const configuration = { options: { wrapping: { binaryOperations: 'respectPrecedence', columnLimit: 15 } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('+ /* keep exactly */ secondValue');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});

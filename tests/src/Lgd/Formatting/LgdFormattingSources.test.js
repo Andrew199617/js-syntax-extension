@@ -154,3 +154,12 @@ describe('snapshot-aware style source precedence', () =>
         expect(() => LgdFormattingSources.directories('/other/main.lgd', '/project')).toThrow('inside its workspace');
     });
 });
+
+it.each([
+    [ 'Never', 'preserve' ], [ 'RespectPrecedence', 'respectPrecedence' ], [ 'OnePerLine', 'onePerLine' ]
+])('imports the %s binary-expression layout mode', (external, native) =>
+{
+    const imported = LgdClangFormat.parse(`BreakBinaryOperations: ${external}`);
+    expect(imported.options.wrapping.binaryOperations).toBe(native);
+    expect(imported.issues).toHaveLength(0);
+});

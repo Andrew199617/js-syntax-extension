@@ -258,6 +258,11 @@ const LgdClangFormat = {
             const values = { None: 'after', NonAssignment: 'beforeNonAssignment', All: 'before' };
             set('wrapping', 'binaryOperators', values[value]);
         }
+        else if(key === 'BreakBinaryOperations')
+        {
+            const values = { Never: 'preserve', RespectPrecedence: 'respectPrecedence', OnePerLine: 'onePerLine' };
+            set('wrapping', 'binaryOperations', values[value]);
+        }
         else if(key === 'BreakConstructorInitializers')
         {
             const values = { BeforeColon: 'beforeColon', AfterColon: 'afterColon' };

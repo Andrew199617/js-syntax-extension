@@ -500,3 +500,15 @@ describe('bounded LGD configuration globs', () =>
         expect(LgdFixGlob.isValidPattern(pattern)).toBe(false);
     });
 });
+
+test('configuration schema exposes every native formatting option with its exact constraints', () =>
+{
+    const catalog = require('../../../src/Lgd/Formatting/LgdFormattingOptions').catalog;
+
+    for(const rule of catalog)
+    {
+        const group = rule.id.slice('lgd.format.'.length);
+        expect(configurationSchema.properties.formatting.properties.options.properties[group].properties).toEqual(rule.properties);
+        expect(configurationSchema.definitions.rules.properties[rule.id].properties.options.properties).toEqual(rule.properties);
+    }
+});

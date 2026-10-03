@@ -311,7 +311,7 @@ const LgdFormatter = {
         const next = gap.next;
         const options = context.options.indentation;
         let level = 0;
-        let continuation = false;
+        let continuation = context.binaryWraps.get(next.start) === context.newline;
         let parent = next.parent;
         while(parent)
         {

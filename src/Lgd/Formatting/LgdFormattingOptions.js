@@ -36,18 +36,18 @@ const catalog = [
     },
     {
         id: 'lgd.format.lineBreaks', title: 'Block layout and blank lines',
-        defaults: { shortBlocks: 'never', shortFunctions: 'empty', shortLambdas: 'never', shortIfs: 'never', shortLoops: false, shortCases: false, preserveSingleLineBlocks: false, preserveSingleLineStatements: false, objectMembers: 'preserve', separateDefinitions: 'preserve', maxEmptyLines: 1, emptyLinesAtBlockStart: false, emptyLinesAtBlockEnd: false },
+        defaults: { shortBlocks: 'never', shortFunctions: 'empty', shortLambdas: 'never', shortIfs: 'never', shortLoops: false, shortCases: false, preserveSingleLineBlocks: false, preserveSingleLineStatements: false, objectMembers: 'preserve', separateDefinitions: 'preserve', blankLinesBetweenClosingBraces: false, statementImmediatelyAfterBlock: true, blankLineAfterConstructorColon: true, blankLineAfterConditionalToken: true, blankLineAfterArrow: true, maxEmptyLines: 1, emptyLinesAtBlockStart: false, emptyLinesAtBlockEnd: false },
         properties: {
             shortBlocks: { enum: [ 'preserve', 'never', 'empty', 'always' ] }, shortFunctions: { enum: [ 'preserve', 'never', 'empty', 'inline', 'all' ] }, shortLambdas: { enum: [ 'preserve', 'never', 'empty', 'inline', 'all' ] },
             shortIfs: { enum: [ 'preserve', 'never', 'withoutElse', 'all' ] }, shortLoops: { type: 'boolean' }, shortCases: { type: 'boolean' }, preserveSingleLineBlocks: { type: 'boolean' }, preserveSingleLineStatements: { type: 'boolean' },
-            objectMembers: { enum: [ 'preserve', 'onePerLine', 'singleLine' ] }, separateDefinitions: { enum: [ 'preserve', 'always', 'never' ] }, maxEmptyLines: { type: 'integer', minimum: 0, maximum: 10 }, emptyLinesAtBlockStart: { type: 'boolean' }, emptyLinesAtBlockEnd: { type: 'boolean' }
+            objectMembers: { enum: [ 'preserve', 'onePerLine', 'singleLine' ] }, separateDefinitions: { enum: [ 'preserve', 'always', 'never' ] }, blankLinesBetweenClosingBraces: { type: 'boolean' }, statementImmediatelyAfterBlock: { type: 'boolean' }, blankLineAfterConstructorColon: { type: 'boolean' }, blankLineAfterConditionalToken: { type: 'boolean' }, blankLineAfterArrow: { type: 'boolean' }, maxEmptyLines: { type: 'integer', minimum: 0, maximum: 10 }, emptyLinesAtBlockStart: { type: 'boolean' }, emptyLinesAtBlockEnd: { type: 'boolean' }
         }
     },
     {
         id: 'lgd.format.wrapping', title: 'Argument and expression wrapping',
-        defaults: { columnLimit: 120, arguments: 'preserve', parameters: 'preserve', alignAfterOpenBracket: false, allowAllArgumentsOnNextLine: false, allowAllParametersOnNextLine: false, binaryOperators: 'preserve', constructorInitializer: 'preserve' },
+        defaults: { columnLimit: 120, arguments: 'preserve', parameters: 'preserve', alignAfterOpenBracket: false, allowAllArgumentsOnNextLine: false, allowAllParametersOnNextLine: false, binaryOperators: 'preserve', binaryOperations: 'preserve', constructorInitializer: 'preserve' },
         properties: {
-            columnLimit: { type: 'integer', minimum: 0, maximum: 1000 }, arguments: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, parameters: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, alignAfterOpenBracket: { type: 'boolean' }, allowAllArgumentsOnNextLine: { type: 'boolean' }, allowAllParametersOnNextLine: { type: 'boolean' }, binaryOperators: { enum: [ 'preserve', 'before', 'after', 'beforeNonAssignment' ] }, constructorInitializer: { enum: [ 'preserve', 'beforeColon', 'afterColon' ] }
+            columnLimit: { type: 'integer', minimum: 0, maximum: 1000 }, arguments: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, parameters: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, alignAfterOpenBracket: { type: 'boolean' }, allowAllArgumentsOnNextLine: { type: 'boolean' }, allowAllParametersOnNextLine: { type: 'boolean' }, binaryOperators: { enum: [ 'preserve', 'before', 'after', 'beforeNonAssignment' ] }, binaryOperations: { enum: [ 'preserve', 'respectPrecedence', 'onePerLine' ] }, constructorInitializer: { enum: [ 'preserve', 'beforeColon', 'afterColon' ] }
         }
     },
     {

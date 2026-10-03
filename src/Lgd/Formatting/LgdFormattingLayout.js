@@ -253,6 +253,8 @@ const LgdFormattingLayout = {
 
         this.statementGap(context, gap);
         this.wrapGap(context, gap);
+        this.binaryGap(context, gap);
+        this.blankLineGap(context, gap);
         if((/[\r\n]/u).test(gap.text))
         {
             const maximum = context.options.lineBreaks.maxEmptyLines + 1;
@@ -262,6 +264,63 @@ const LgdFormattingLayout = {
                 gap.text = context.newline.repeat(maximum);
                 gap.rule = 'lineBreaks.maxEmptyLines';
             }
+        }
+    },
+
+    /** @description Applies independent blank-line policies only at verified syntax boundaries. */
+    blankLineGap(context, gap)
+    {
+        const { previous, next } = gap;
+        const options = context.options.lineBreaks;
+        const breaks = gap.original.match(/\r\n|\r|\n/gu)?.length || 0;
+        if(previous.text === '}' && next.text === '}')
+        {
+            const previousOpen = context.model.codeTokens[previous.open];
+            const nextOpen = context.model.codeTokens[next.open];
+            const blocks = [ previousOpen, nextOpen ].map(token => context.model.braces.get(token?.start));
+            if(blocks.every(block => block && !block.object) && breaks > 1)
+            {
+                gap.text = context.newline.repeat(options.blankLinesBetweenClosingBraces ? breaks : 1);
+                gap.rule = 'lineBreaks.blankLinesBetweenClosingBraces';
+            }
+        }
+
+        if(previous.text === '}' && !options.statementImmediatelyAfterBlock)
+        {
+            const open = context.model.codeTokens[previous.open];
+            const block = context.model.braces.get(open?.start);
+            const nextStatement = context.model.nodes.some(record =>
+            {
+                const statement = record.node.type.endsWith('Statement') || record.node.type.endsWith('Declaration');
+                return record.start === next.start && statement;
+            });
+
+            const continuation = [ 'else', 'catch', 'finally' ].includes(next.text) || context.model.doWhileKeywords.has(next.start);
+            if(block && !block.object && block.location !== 'lambdas' && nextStatement && !continuation)
+            {
+                gap.text = context.newline.repeat(2);
+                gap.rule = 'lineBreaks.statementImmediatelyAfterBlock';
+            }
+        }
+
+        let option;
+        if(context.model.constructorColons.has(previous.start))
+        {
+            option = 'blankLineAfterConstructorColon';
+        }
+        else if(context.model.conditionalTokens.has(previous.start))
+        {
+            option = 'blankLineAfterConditionalToken';
+        }
+        else if(previous.text === '=>')
+        {
+            option = 'blankLineAfterArrow';
+        }
+
+        if(option && !options[option] && breaks > 1)
+        {
+            gap.text = context.newline;
+            gap.rule = `lineBreaks.${option}`;
         }
     },
 
@@ -307,6 +366,8 @@ const LgdFormattingLayout = {
     /** @description Plans wrapping at top-level argument separators, leaving nested expressions and literal text intact. */
     describeWrapping(context)
     {
+        context.binaryWraps = new Map();
+        this.describeBinaryWrapping(context);
         context.wraps = new Map();
         const options = context.options.wrapping;
         for(const [ start, kind ] of context.model.parens)
@@ -370,6 +431,68 @@ const LgdFormattingLayout = {
                 context.wraps.set(next.start, { text: newline ? context.newline : ' ', rule: rule });
                 column = newline ? context.options.indentation.continuation + length : column + length + 2;
             }
+        }
+    },
+
+    /** @description Wraps long expression trees at their outer precedence without rewriting any operand. */
+    describeBinaryWrapping(context)
+    {
+        const options = context.options.wrapping;
+        if(options.binaryOperations === 'preserve')
+        {
+            return;
+        }
+
+        const expressions = context.model.nodes.filter(record => [ 'BinaryExpression', 'LogicalExpression' ].includes(record.node.type));
+        const records = new Map(expressions.map(record => [ record.node, record ]));
+        const precedence = [ [ '||', '??' ], ['&&'], ['|'], ['^'], ['&'], [ '==', '!=', '===', '!==' ], [ '<', '>', '<=', '>=', 'in', 'instanceof' ], [ '<<', '>>', '>>>' ], [ '+', '-' ], [ '*', '/', '%' ], ['**'] ];
+        for(const record of expressions)
+        {
+            let root = record;
+            while(records.has(root.parent))
+            {
+                root = records.get(root.parent);
+            }
+
+            const rootOperators = precedence.find(group => group.includes(root.node.operator));
+            if(options.binaryOperations === 'respectPrecedence' && !rootOperators?.includes(record.node.operator))
+            {
+                continue;
+            }
+
+            const original = context.source.slice(root.start, root.end);
+            const width = this.column(context.source, root.start) + original.length;
+            const wrapped = (/[\r\n]/u).test(original);
+            if(!wrapped && (options.columnLimit === 0 || width <= options.columnLimit))
+            {
+                continue;
+            }
+
+            const left = LgdFormattingModel.range(context.model, record.node.left);
+            const right = LgdFormattingModel.range(context.model, record.node.right);
+            const operator = left && right && context.model.codeTokens.find(token => token.start >= left.end && token.end <= right.start && token.text === record.node.operator);
+            if(!operator || context.model.tokens.some(token => token.comment && token.start >= left.end && token.end <= right.start))
+            {
+                continue;
+            }
+
+            const index = context.model.byStart.get(operator.start);
+            const next = context.model.codeTokens[index + 1];
+            const before = options.binaryOperators === 'before' || options.binaryOperators === 'beforeNonAssignment';
+            context.binaryWraps.set(operator.start, before ? context.newline : ' ');
+            context.binaryWraps.set(next.start, before ? ' ' : context.newline);
+        }
+    },
+
+    /** @description Applies planned expression breaks after generic relocation of preexisting line breaks. */
+    binaryGap(context, gap)
+    {
+        if(context.binaryWraps.has(gap.next.start))
+        {
+            gap.text = context.binaryWraps.get(gap.next.start);
+            gap.rule = 'wrapping.binaryOperations';
+            gap.contributors.add('lgd.format.wrapping.binaryOperators');
+            gap.contributors.add('lgd.format.wrapping.columnLimit');
         }
     },
 

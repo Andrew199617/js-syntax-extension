@@ -20,7 +20,7 @@ const LgdFormattingModel = {
             const model = {
                 source: source, parsed: parsed, emitted: emitted, tree: tree, map: LgdSourceMap.create(emitted.segments),
                 protected: [], nodes: [], braces: new Map(), parens: new Map(), controls: [], cases: [], labels: new Set(),
-                heritageColons: new Set(), constructorColons: new Set(), functionParens: new Set(), doWhileKeywords: new Set()
+                heritageColons: new Set(), constructorColons: new Set(), functionParens: new Set(), doWhileKeywords: new Set(), conditionalTokens: new Set()
             };
             this.collectNodes(model, tree, null, '');
             model.tokens = this.tokenize(model);
@@ -345,6 +345,19 @@ const LgdFormattingModel = {
             if(keyword)
             {
                 model.doWhileKeywords.add(keyword.start);
+            }
+        }
+
+        if(node.type === 'ConditionalExpression')
+        {
+            for(const [ branch, punctuation ] of [ [ 'consequent', '?' ], [ 'alternate', ':' ] ])
+            {
+                const span = this.range(model, node[branch]);
+                const token = span && model.codeTokens.findLast(candidate => candidate.end <= span.start && candidate.start >= start);
+                if(token?.text === punctuation)
+                {
+                    model.conditionalTokens.add(token.start);
+                }
             }
         }
 

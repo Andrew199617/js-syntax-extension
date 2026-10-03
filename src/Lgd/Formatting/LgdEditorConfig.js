@@ -34,6 +34,11 @@ const booleanMappings = Object.fromEntries([
     [ 'csharp_indent_case_contents_when_block', [ 'indentation', 'caseBlocks' ] ],
     [ 'csharp_preserve_single_line_blocks', [ 'lineBreaks', 'preserveSingleLineBlocks' ] ],
     [ 'csharp_preserve_single_line_statements', [ 'lineBreaks', 'preserveSingleLineStatements' ] ],
+    [ 'csharp_style_allow_blank_lines_between_consecutive_braces_experimental', [ 'lineBreaks', 'blankLinesBetweenClosingBraces' ] ],
+    [ 'dotnet_style_allow_statement_immediately_after_block_experimental', [ 'lineBreaks', 'statementImmediatelyAfterBlock' ] ],
+    [ 'csharp_style_allow_blank_line_after_colon_in_constructor_initializer_experimental', [ 'lineBreaks', 'blankLineAfterConstructorColon' ] ],
+    [ 'csharp_style_allow_blank_line_after_token_in_conditional_expression_experimental', [ 'lineBreaks', 'blankLineAfterConditionalToken' ] ],
+    [ 'csharp_style_allow_blank_line_after_arrow_expression_clause_experimental', [ 'lineBreaks', 'blankLineAfterArrow' ] ],
     [ 'trim_trailing_whitespace', [ 'whitespace', 'trimTrailingWhitespace' ] ]
 ]);
 

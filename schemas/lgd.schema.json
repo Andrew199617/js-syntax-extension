@@ -503,6 +503,21 @@
                                         "never"
                                     ]
                                 },
+                                "blankLinesBetweenClosingBraces": {
+                                    "type": "boolean"
+                                },
+                                "statementImmediatelyAfterBlock": {
+                                    "type": "boolean"
+                                },
+                                "blankLineAfterConstructorColon": {
+                                    "type": "boolean"
+                                },
+                                "blankLineAfterConditionalToken": {
+                                    "type": "boolean"
+                                },
+                                "blankLineAfterArrow": {
+                                    "type": "boolean"
+                                },
                                 "maxEmptyLines": {
                                     "type": "integer",
                                     "minimum": 0,
@@ -554,6 +569,13 @@
                                         "before",
                                         "after",
                                         "beforeNonAssignment"
+                                    ]
+                                },
+                                "binaryOperations": {
+                                    "enum": [
+                                        "preserve",
+                                        "respectPrecedence",
+                                        "onePerLine"
                                     ]
                                 },
                                 "constructorInitializer": {
@@ -1151,6 +1173,21 @@
                                         "never"
                                     ]
                                 },
+                                "blankLinesBetweenClosingBraces": {
+                                    "type": "boolean"
+                                },
+                                "statementImmediatelyAfterBlock": {
+                                    "type": "boolean"
+                                },
+                                "blankLineAfterConstructorColon": {
+                                    "type": "boolean"
+                                },
+                                "blankLineAfterConditionalToken": {
+                                    "type": "boolean"
+                                },
+                                "blankLineAfterArrow": {
+                                    "type": "boolean"
+                                },
                                 "maxEmptyLines": {
                                     "type": "integer",
                                     "minimum": 0,
@@ -1226,6 +1263,13 @@
                                         "before",
                                         "after",
                                         "beforeNonAssignment"
+                                    ]
+                                },
+                                "binaryOperations": {
+                                    "enum": [
+                                        "preserve",
+                                        "respectPrecedence",
+                                        "onePerLine"
                                     ]
                                 },
                                 "constructorInitializer": {
@@ -3220,6 +3264,144 @@
                     "type": "object",
                     "additionalProperties": false,
                     "title": "Block layout and blank lines: preserveSingleLineStatements",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.blankLinesBetweenClosingBraces": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: blankLinesBetweenClosingBraces",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.statementImmediatelyAfterBlock": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: statementImmediatelyAfterBlock",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.blankLineAfterConstructorColon": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: blankLineAfterConstructorColon",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.blankLineAfterConditionalToken": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: blankLineAfterConditionalToken",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.lineBreaks.blankLineAfterArrow": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Block layout and blank lines: blankLineAfterArrow",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.wrapping.binaryOperations": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Argument and expression wrapping: binaryOperations",
                     "properties": {
                         "fix": {
                             "type": "string",
