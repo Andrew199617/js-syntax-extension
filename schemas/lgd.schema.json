@@ -1,0 +1,148 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "LGD project fix configuration",
+    "description": "Strict JSON settings for .vscode/lgd.json. The nearest configuration defines the project root. Invalid settings disable all configured fixes.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "version"
+    ],
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Configuration format version."
+        },
+        "autoFix": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable supported automatic rules on save. A rule also needs fix: automatic; unsafe rules remain review-only."
+        },
+        "extends": {
+            "description": "Relative ./ or ../ JSON files resolved from this file, inside the workspace including symlink targets. Parents merge in order before this file. Maximum 10 levels and 100 files; all globs use this project root.",
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/relativeJsonPath"
+                },
+                {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                        "$ref": "#/definitions/relativeJsonPath"
+                    }
+                }
+            ]
+        },
+        "rules": {
+            "$ref": "#/definitions/rules"
+        },
+        "ignores": {
+            "$ref": "#/definitions/patterns",
+            "description": "Additional project-root-relative files to exclude. Inherited ignores accumulate. Built-in exclusions cannot be overridden."
+        },
+        "overrides": {
+            "type": "array",
+            "maxItems": 100,
+            "description": "Apply matching rule settings in order. Each override ignores entry excludes only that override.",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "files"
+                ],
+                "properties": {
+                    "files": {
+                        "allOf": [
+                            {
+                                "$ref": "#/definitions/patterns"
+                            },
+                            {
+                                "minItems": 1
+                            }
+                        ]
+                    },
+                    "ignores": {
+                        "$ref": "#/definitions/patterns"
+                    },
+                    "rules": {
+                        "$ref": "#/definitions/rules"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "relativeJsonPath": {
+            "type": "string",
+            "maxLength": 512,
+            "pattern": "^\\.{1,2}/[^\\\\:*?\\u0000-\\u001F]*\\.json$"
+        },
+        "patterns": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+            },
+            "description": "Project-root-relative slash-separated globs: * and ? within a segment; ** as a whole segment. A trailing / includes descendants. No negation, braces, character classes, extglobs, absolute paths, or .. segments. Example: src/**/*.lgd"
+        },
+        "rules": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "readonly-variable-declaration": {
+                    "$ref": "#/definitions/rule"
+                },
+                "return-type-documentation": {
+                    "$ref": "#/definitions/rule"
+                },
+                "virtual-documentation": {
+                    "$ref": "#/definitions/rule"
+                },
+                "object-inheritance": {
+                    "$ref": "#/definitions/rule"
+                },
+                "missing-override": {
+                    "$ref": "#/definitions/rule"
+                },
+                "nonvirtual-base": {
+                    "$ref": "#/definitions/rule"
+                },
+                "extra-base-arguments": {
+                    "$ref": "#/definitions/rule"
+                },
+                "parameter-type": {
+                    "$ref": "#/definitions/rule"
+                },
+                "return-type": {
+                    "$ref": "#/definitions/rule"
+                },
+                "static-member-receiver": {
+                    "$ref": "#/definitions/rule"
+                }
+            }
+        },
+        "rule": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "fix"
+            ],
+            "properties": {
+                "fix": {
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "manual",
+                        "automatic"
+                    ],
+                    "description": "off disables the rule; manual includes it in explicitly requested fixes; automatic also permits safe on-save fixes when autoFix is true."
+                }
+            }
+        }
+    }
+}
