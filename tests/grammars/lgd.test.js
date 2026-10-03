@@ -271,6 +271,34 @@ describe('LGD TextMate grammar.', () =>
         }
     });
 
+    test('colors C-style type names without consuming their nullable suffix or operand', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'const Number count = (Number)this.commandName;',
+            'const location = (vscode.Position?)input;',
+            'function read(value) { return (Number)value; }'
+        ].join('\n'));
+        assertScope(tokens, 'Number', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'vscode.Position', 'entity.name.type.class.lgd');
+        assertScope(tokens, '?', 'keyword.operator.nullable.lgd');
+        assertNoScope(tokens, 'this', 'entity.name.type.class.lgd');
+    });
+
+    test('does not treat grouped values, call arguments, arrows, or literal cast text as type casts', () =>
+    {
+        const tokens = tokenize(grammar, [
+            'const grouped = (Number);',
+            'read(Number);',
+            'const arrow = (Number) => Number;',
+            'const text = "(Number)input";',
+            'const template = `(Number)input`;',
+            String.raw`const pattern = /\(Number\)input/;`,
+            '// (Number)input',
+            '/* (Number)input */'
+        ].join('\n'));
+        assert.ok(tokens.every(token => !token.scopes.includes('entity.name.type.class.lgd')));
+    });
+
     test('preserves new construction scopes before semantic tokens arrive', () =>
     {
         const source = [

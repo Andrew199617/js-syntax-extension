@@ -149,6 +149,7 @@ const LgdLanguageService = {
         state.map = LgdSourceMap.create(result.mappings);
         state.errors = result.errors;
         state.declarations = result.allDeclarations;
+        state.casts = result.casts || [];
     },
 
     /**

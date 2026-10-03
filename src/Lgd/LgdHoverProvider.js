@@ -55,6 +55,18 @@ const LgdHoverProvider = {
             return null;
         }
 
+        const offset = document.offsetAt(position);
+        const cast = state.compiledVersion === document.version && state.casts?.find(candidate => candidate.typeStart <= offset && offset < candidate.typeEnd);
+        if(cast)
+        {
+            const numeric = !cast.target && (cast.typeName === 'Number' || cast.typeName === 'Number?');
+            const detail = numeric
+                ? 'Converts the value using JavaScript Number. Invalid numeric input can produce NaN.'
+                : 'Asserts the expression type for LGD. JavaScript keeps the original value; no runtime check is performed.';
+            const markdown = [ '```lgd', `(${cast.typeName}) expression`, '```', detail ].join('\n');
+            return new vscode.Hover(markdown, new vscode.Range(document.positionAt(cast.typeStart), document.positionAt(cast.typeEnd)));
+        }
+
         const wordRange = document.getWordRangeAtPosition(position);
         if(wordRange)
         {

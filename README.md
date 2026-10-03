@@ -653,3 +653,21 @@ export enum DownloadState {
 ```
 
 `export` is optional. Both JavaScript output modes emit an equivalent `Object.freeze` object. Hover and completion show the members, and known invalid members or direct writes are diagnosed. Members require explicit values of one primitive type; implicit numbering and full C# enum semantics are not included. String-valued LGD enums are not C# enums.
+
+## C-style casts
+
+Use `(Number)value` for JavaScript numeric conversion. Other casts such as `(BaseCommand)value`, `(vscode.Position)value`, or `(String)value` tell LGD the expression's type without converting or rebuilding the value. Type names, including qualified and nullable targets, are highlighted and explain their behavior on hover.
+
+```lgd
+const Number count = (Number)"12";
+const Number? optionalCount = (Number?)maybeText;
+const BaseCommand command = (BaseCommand)unknownCommand;
+```
+
+- `Number` uses JavaScript's standard `Number` conversion: empty/whitespace strings and `null` become `0`, invalid numeric strings and `undefined` produce `NaN`, and converting a `Symbol` throws JavaScript's normal error. There is no extra validation, and normal JavaScript object coercion rules apply.
+- `Number?` preserves `null`; other values use the same numeric conversion. Operands, including getters and calls, are evaluated once.
+- Class and interface casts preserve the same object and its prototype chain in both OLOO and native-class output. Known unrelated classes and provably incompatible primitive casts are diagnosed. Unknown values and related downcasts are trusted at compile time and can still be wrong at runtime.
+- Other primitive targets do not introduce conversions: for example, `(Boolean)"false"` is a type error. Use an explicit JavaScript conversion function when that behavior is wanted.
+- The target grammar matches LGD annotations: a capitalized type name, an optional namespace, and an optional `?`. Array/generic type spellings are not part of that grammar. Ordinary grouped values, function calls, and arrow parameters retain their JavaScript meaning; when a known type is followed by a grouped operand, `(Number)(expression)` is a cast. A namespace alone does not identify a grouped call as a cast; `(namespace.Type)value` is unambiguous, while `(namespace.Type)(value)` keeps its ordinary call meaning unless that type is known.
+
+These are LGD JavaScript rules, not a promise that every numeric conversion can be copied unchanged into C#. Future backends must preserve the conversion semantics explicitly.

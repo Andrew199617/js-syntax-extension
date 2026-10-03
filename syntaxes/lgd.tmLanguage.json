@@ -6,6 +6,9 @@
 	"name": "LGD",
 	"patterns": [
 		{
+			"include": "#type-cast"
+		},
+		{
 			"include": "#class-declaration"
 		},
 		{
@@ -34,6 +37,9 @@
 		"L:source.lgd -comment -string": {
 			"comment": "Apply LGD declaration rules inside nested JavaScript blocks, excluding comments and strings.",
 			"patterns": [
+				{
+					"include": "#type-cast"
+				},
 				{
 					"include": "#class-declaration"
 				},
@@ -224,6 +230,24 @@
 			"captures": {
 				"1": {
 					"name": "storage.modifier.lgd"
+				}
+			}
+		},
+		"type-cast": {
+			"comment": "Conservative immediate type color for unambiguous cast heads; semantic tokens handle symbol-aware grouped operands.",
+			"match": "(?<=[=(:,\\[!~?;{]|^return|[^\\w$.]return|^throw|[^\\w$.]throw|^)\\s*(\\()[ \\t]*((?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*)(\\?)?[ \\t]*(\\))(?=[ \\t]*(?!in\\b|instanceof\\b)[$\\w'\"!~{])",
+			"captures": {
+				"1": {
+					"name": "punctuation.section.cast.begin.lgd"
+				},
+				"2": {
+					"name": "entity.name.type.class.lgd"
+				},
+				"3": {
+					"name": "keyword.operator.nullable.lgd"
+				},
+				"4": {
+					"name": "punctuation.section.cast.end.lgd"
 				}
 			}
 		}

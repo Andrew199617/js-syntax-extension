@@ -100,6 +100,12 @@ const LgdSemanticTokensProvider = {
             }
         }
 
+        for(const cast of state.casts || [])
+        {
+            const end = cast.typeName.endsWith('?') ? cast.typeEnd - 1 : cast.typeEnd;
+            spans.push({ start: cast.typeStart, end: end, tokenType: 'class' });
+        }
+
         this.collectErasedKeywords(source, state.declarations, spans);
         spans.push(...this.collectBindingSpans(source, state));
         spans.sort((first, second) => first.start - second.start || first.end - second.end);
