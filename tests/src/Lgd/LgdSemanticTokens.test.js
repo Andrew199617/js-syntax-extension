@@ -366,7 +366,10 @@ describe('LgdSemanticTokensProvider', () =>
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
         const document = makeTextDocument(LGD_URI, source);
         const state = await service.openDocument(document);
-        expect(state.errors).toEqual([expect.objectContaining({ code: 'lgd.declaration.readonly', severity: 'warning' })]);
+        expect(state.errors).toEqual([
+            expect.objectContaining({ code: 'lgd.declaration.readonly', severity: 'warning' }),
+            expect.objectContaining({ code: 'lgd.jsdoc.returnType', severity: 'warning' })
+        ]);
         const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
         const baseTokens = tokens.pushed.filter(token => tokenText(document, token) === 'base');
         expect(baseTokens).toHaveLength(1);
