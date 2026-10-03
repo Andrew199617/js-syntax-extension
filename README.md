@@ -118,6 +118,44 @@ Configuration uses strict JSON. Unknown rules/settings, invalid values, broken i
 
 Patterns support `*`, `?`, and whole-segment `**` with `/` separators, plus a trailing `/` for descendants. Negation, braces, character classes, extglobs, absolute paths, and `..` segments are not supported. Generated/vendor directories (`node_modules`, `.git`, `dist`, `build`, `coverage`, `vendor`, `generated`, `typings`), parser fixtures (`tests/mocks`, `tests/__mocks__`), and `*.generated.lgd` are always excluded. Cross-file edits cannot escape the selected scope or edit an excluded target.
 
+
+## Configurable LGD formatting
+
+Enable built-in style diagnostics and fixes in `.vscode/lgd.json`:
+
+```json
+{
+    "version": 1,
+    "formatting": {
+        "enabled": true,
+        "sources": ["editorconfig", "clang-format", "eslint"],
+        "options": {
+            "braces": {
+                "style": "allman",
+                "wrapping": { "methods": "sameLine", "controlBlocks": "nextLine" }
+            },
+            "spacing": { "afterControlKeywords": true },
+            "whitespace": { "endOfLine": "crlf" }
+        }
+    },
+    "rules": {
+        "lgd.format.braces": { "fix": "manual", "severity": "warning" },
+        "lgd.format.braces.methods": { "fix": "off" },
+        "lgd.format.spacing.afterComma": { "fix": "automatic" }
+    }
+}
+```
+
+Formatting is disabled until explicitly enabled. Each family and individual option can set `fix` to `off`, `manual`, or `automatic`, independently of diagnostic `severity` (`off`, `warning`, or `error`). An automatic rule also requires the existing `autoFix: true` opt-in and an explicit Fix All/save action. Disabling one option prevents a combined edit that would change it. Use the existing **LGD: Fix All…** command or individual lightbulb fixes; changes remain undoable and unsaved.
+
+Brace presets include Allman, attached, Stroustrup, Linux, Mozilla, WebKit, GNU, Whitesmiths and custom. Override classes, interfaces, enums, constructors, methods, accessors, functions, lambdas, control/switch/case blocks, try/else/catch/finally blocks, object literals and destructuring independently. Indentation, spacing, short bodies, blank lines, argument/expression wrapping, required control braces and line endings have separate options. The configuration schema provides completions and accepted values.
+
+Imported preferences are read as data in the listed low-to-high priority order; explicit LGD options and rule settings take precedence. EditorConfig sections must match the LGD file: `[*.cs]` does not apply to `.lgd`. The clang-format adapter imports supported YAML settings. The ESLint adapter reads supported rules from `.eslintrc.json`, including matching overrides; it never executes JavaScript configurations, plugins or `extends` packages. Unrecognized and incompatible preferences are reported, not silently enforced.
+
+A soft column limit guides supported argument and binary-expression wrapping; it does not guarantee every string, comment or source line fits. Import grouping only adjusts blank lines, never import order. A file header requires explicitly configured `whitespace.fileHeader` text and is added as line comments without replacing an existing license. Malformed sources, stale source/configuration snapshots and edits that would change runtime behavior are rejected. Comments, literals and `// lgd-format off` / `// lgd-format on` regions remain protected.
+
+See [the option catalog and compatibility audit](docs/lgd-formatting-compatibility.md) for exact mappings, supported subsets and remaining semantic-style work.
+
 ## LGD classes with OLOO instances
 
 In `.lgd` files, use `class`, a colon for inheritance, and the class name for its constructor:
