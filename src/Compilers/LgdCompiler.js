@@ -17,6 +17,7 @@ const LgdInterfaceErasure = require('./LgdInterfaceErasure');
 const LgdInterfaceTypes = require('./LgdInterfaceTypes');
 const LgdReturnChecker = require('./LgdReturnChecker');
 const LgdReturnDocChecker = require('./LgdReturnDocChecker');
+const LgdVirtualDocChecker = require('./LgdVirtualDocChecker');
 const LgdStandaloneReturnChecker = require('./LgdStandaloneReturnChecker');
 const LgdBaseCalls = require('./LgdBaseCalls');
 const LgdGeneratedJsValidator = require('./LgdGeneratedJsValidator');
@@ -332,6 +333,11 @@ const LgdCompiler = {
             const diagnostic = this.createError(content, warning.offset, warning.message, warning.endOffset);
             diagnostic.severity = 'warning';
             errors.push(diagnostic);
+        }
+
+        for(const warning of LgdVirtualDocChecker.check(content, found))
+        {
+            errors.push({ ...this.createError(content, warning.offset, warning.message, warning.endOffset), ...warning });
         }
 
         const inheritedReturnSignatures = LgdContractChecker.bodySignatures(content, found, externals);

@@ -14,7 +14,9 @@ describe.each([ 'oloo', 'class' ])('LGD expression inference cycles with %s outp
     {
         const source = await fs.promises.readFile(path.join(__dirname, '../../fixtures/basecommand.lgd'), 'utf8');
         const result = compile(source, objectModel);
-        expect(result.errors).toEqual([]);
+        const virtualStart = source.indexOf('@virtual');
+        expect(result.errors).toEqual([expect.objectContaining({ code: 'lgd.jsdoc.virtual', severity: 'warning',
+            offset: virtualStart, endOffset: virtualStart + '@virtual'.length })]);
         const declaration = result.allDeclarations.find(candidate => candidate.name === 'BaseCommand');
         expect(declaration.classMembers.map(member => member.name)).toEqual([
             'BaseCommand', 'commandName', 'createCommand', 'executeCommand', 'findNextChar', 'findPreviousChar'
