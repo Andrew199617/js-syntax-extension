@@ -2,6 +2,8 @@ const traverse = require('@babel/traverse').default;
 const { tsTypeMap } = require('./LgdTypeMaps');
 const { UNKNOWN } = require('./LgdInfer');
 const { skipTrivia } = require('./LgdMethodSignature');
+const { collectContractBindings } = require('./LgdContractBindings');
+const { visibleBindings } = require('./LgdBaseChecker');
 
 /** @description Native objects whose known behavior is used by expression inference. */
 const inferredNatives = [ 'Array', 'Function', 'Promise' ];
@@ -35,6 +37,20 @@ const LgdBindingTypes = {
     {
         const changed = this._changedMethods.get(owner);
         return Boolean(changed?.has(name) || changed?.has('*'));
+    },
+
+    /** @description Resolves erased interface names through the existing compile-time lexical binding table. */
+    erasedType(name, offset)
+    {
+        if(!this._sourceBindings)
+        {
+            const context = this._context;
+            this._sourceBindings = collectContractBindings(context.content, context.declarations, context.externals);
+        }
+
+        const declaration = visibleBindings(this._sourceBindings, offset).get(name);
+        const interfaceType = declaration?.kind === 'interface' || declaration?.contractKind === 'interface';
+        return interfaceType ? declaration : null;
     },
 
     /** @description Retains native behavior only when no explicit mutation or escape can invalidate it. */
@@ -180,7 +196,8 @@ const LgdBindingTypes = {
         }
         else
         {
-            const typeBinding = binding.scope.getBinding(type);
+            const typeScope = binding.kind === 'param' ? binding.scope.parent : binding.scope;
+            const typeBinding = typeScope?.getBinding(type);
             const target = typeBinding && this.descriptor(typeBinding);
             if(target)
             {
@@ -200,6 +217,11 @@ const LgdBindingTypes = {
         const scope = new Map(context.externalsByName);
         for(const [ name, binding ] of Object.entries(path.scope.getAllBindings()))
         {
+            if(Object.hasOwn(tsTypeMap, name))
+            {
+                continue;
+            }
+
             const entry = this.descriptor(binding);
             if(entry)
             {

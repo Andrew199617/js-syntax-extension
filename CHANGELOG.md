@@ -10,6 +10,7 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 - Report malformed ordinary JavaScript and unsupported leftover syntax at their original LGD source locations; preserve the last working .js file until repaired.
 - Reuse the validated syntax tree for scoped assignments and returns instead of parsing the same final output again.
 - Keep native-result inference conservative after explicit replacements or supported aliases/escapes, fixing a false assignment alarm.
+- Preserve erased interface and inherited return types using their annotation scope; keep dotted parameter copies and primitive markers compatible.
 - Avoid native-class semantic work for files that contain no LGD classes.
 - Retain JavaScript/JSX module support and Node/CommonJS wrapper returns without permitting ES-module or class-static-block returns.
 

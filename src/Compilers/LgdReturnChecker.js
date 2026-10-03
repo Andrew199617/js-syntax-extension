@@ -86,11 +86,12 @@ const LgdReturnChecker = {
 
         const declared = group.returnTypeName;
         const root = declared.split('.')[0];
-        const binding = path.scope.getBinding(root);
+        const binding = path.parentPath.scope.getBinding(root);
         const builtin = Object.hasOwn(tsTypeMap, declared) || declared === 'void';
         const nominal = !declared.includes('.') && binding && context.bindings.descriptor(binding);
         const external = declared.includes('.') && binding;
-        const knownType = builtin || nominal || external || group.opaqueReturn;
+        const erased = !builtin && !nominal && context.bindings.erasedType(declared, typeStart);
+        const knownType = builtin || nominal || external || erased || group.opaqueReturn;
         if(!knownType)
         {
             report(`Unknown return type '${declared}'.`);
@@ -386,7 +387,7 @@ const LgdReturnChecker = {
             });
         }
 
-        if(signature.group.assignment && declaration)
+        if(signature.group.assignment && declaration && !Object.hasOwn(tsTypeMap, declaration.name))
         {
             const entry = context.bindings.descriptor(binding);
             return inferred.map(type =>

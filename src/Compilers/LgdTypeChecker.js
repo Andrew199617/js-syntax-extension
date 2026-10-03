@@ -181,6 +181,11 @@ function isAssignableTo(resolved, inferred, scope, externalsByName)
 
     if(resolved.kind === 'opaque' || resolved.kind === 'self')
     {
+        if(inferred === resolved.typeName)
+        {
+            return true;
+        }
+
         if(entry)
         {
             return entry.kind !== 'keyword' || referenceKinds.includes(entry.keyword);
