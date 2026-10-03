@@ -266,3 +266,24 @@ test('a manifest-only project identity change invalidates a prepared fix', async
     expect(await fixes.applyBatch(batch, false)).toBe(false);
     expect(document.getText()).toBe('readonly Number value = 1;');
 });
+
+test.each([
+    [ 'class-constructor-name', 'class Example { constructor() { this.value = 1; } }' ],
+    [ 'object-inheritance', 'class Example {\r\n    Example() {\r\n        const Object instance = Object.create(Example);\r\n        instance.value = 1;\r\n        return instance;\r\n    }\r\n}' ]
+])('keeps %s migrations manual even with automatic configuration', async (ruleId, source) =>
+{
+    const { fixes, document } = await fixture(source, { autoFix: true, rules: { [ruleId]: { fix: 'automatic' } } });
+    expect((await fixes.plan([document], { automatic: true })).plan.entries).toHaveLength(0);
+    expect((await fixes.plan([document], { automatic: false })).plan.entries).toHaveLength(1);
+    expect(document.getText()).toBe(source);
+});
+
+test('allows the narrowly safe return-this fix without enabling factory migration automatically', async () =>
+{
+    const source = 'class Example { Example() { this.value = 1; return this; } }';
+    const { fixes, document } = await fixture(source, { autoFix: true, rules: { 'constructor-return-value': { fix: 'automatic' } } });
+    const batch = await fixes.plan([document], { automatic: true });
+    expect(batch.plan.entries).toHaveLength(1);
+    expect(batch.plan.entries[0].proposal.newText).toBe('return;');
+    expect(document.getText()).toBe(source);
+});

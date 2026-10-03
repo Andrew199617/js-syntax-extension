@@ -14,7 +14,7 @@ const ObjectInheritanceContracts = {
             return plan;
         }
 
-        const described = base.entry || LgdOverrideChecker.describeMethods(base.snapshot.text, [base.declaration], base.declaration);
+        const described = Array.isArray(base.entry?.methodSignatures) ? base.entry : LgdOverrideChecker.describeMethods(base.snapshot.text, [base.declaration], base.declaration);
         const inherited = new Map(described.methodSignatures.map(member => [ member.name, member ]));
         const pending = [];
         for(const member of shape.object.properties)
