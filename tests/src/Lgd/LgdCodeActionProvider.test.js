@@ -605,4 +605,126 @@ describe('LGD diagnostic quick fixes', () =>
             await fs.promises.rm(directory, { recursive: true, force: true });
         }
     });
+
+    test.each([ '\n', '\r\n' ])('moves the user virtual tag into the method and removes its empty docblock with %j newlines', async newline =>
+    {
+        const source = [ 'class Command {',
+            '  /** ',
+            '   * @virtual ',
+            '   */ ',
+            '  void executeCommand() {',
+            '    throw new Error(\'Did not implement!\');',
+            '  }',
+            '}' ].join(newline);
+        const fixture = await openFixture(source);
+        const [diagnostic] = fixture.diagnostics.get(fixture.document.uri.toString());
+        expect(diagnostic.source).toBe('LGD');
+        expect(diagnostic.code).toBe('warning');
+        expect(diagnostic.severity).toBe(vscode.DiagnosticSeverity.Warning);
+        expect(fixture.document.getText(diagnostic.range)).toBe('@virtual');
+        const [action] = await actionsFor(fixture, 'lgd.jsdoc.virtual');
+        expect(action.title).toBe('Move @virtual to the method declaration');
+        expect(action.isPreferred).toBe(true);
+        await applyAction(fixture, action);
+        expect(fixture.document.getText()).toBe([ 'class Command {',
+            '  virtual void executeCommand() {',
+            '    throw new Error(\'Did not implement!\');',
+            '  }',
+            '}' ].join(newline));
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+        for(const objectModel of [ 'oloo', 'class' ])
+        {
+            const result = fixture.service.compiler.compileToJs(fixture.document.getText(), new Map(), { javascriptObjectModel: objectModel });
+            expect(result.errors).toEqual([]);
+            expect(result.allDeclarations[0].classMembers[0].virtual).toBe(true);
+        }
+
+        expect(await fixture.provider.provideCodeActions(fixture.document, diagnostic.range, { diagnostics: [diagnostic] }, {})).toEqual([]);
+        expect(await fixture.provider.applyFix(action.command.arguments[0])).toBe(false);
+    });
+
+    test.each([
+        [ '/** @virtual */', '' ],
+        [ '/**@virtual*/', '' ],
+        [ '/** @virtual Runs the command. */', '/** Runs the command. */\n    ' ],
+        [ '/**\n     * Runs the command.\n     * @virtual\n     * @deprecated Use execute instead.\n     */',
+            '/**\n     * Runs the command.\n     * @deprecated Use execute instead.\n     */\n    ' ],
+        [ '/**\n     * @virtual This description stays.\n     * @param {string} value The value.\n     */',
+            '/**\n     * This description stays.\n     * @param {string} value The value.\n     */\n    ' ]
+    ])('preserves meaningful documentation while removing %s', async (comment, expected) =>
+    {
+        const fixture = await openFixture(`class Command {\n    ${comment}\n    void run(String value) {}\n}`);
+        const [action] = await actionsFor(fixture, 'lgd.jsdoc.virtual');
+        await applyAction(fixture, action);
+        expect(fixture.document.getText()).toBe(`class Command {\n    ${expected}virtual void run(String value) {}\n}`);
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
+
+    test('deduplicates repeated tag fixes without adding a second existing virtual modifier', async () =>
+    {
+        const source = 'class Command {\n    /**\n     * @virtual\n     * @virtual\n     */\n    virtual void run() {}\n}';
+        const fixture = await openFixture(source);
+        const diagnostics = fixture.diagnostics.get(fixture.document.uri.toString());
+        const range = new vscode.Range(fixture.document.positionAt(0), fixture.document.positionAt(source.length));
+        const actions = await fixture.provider.provideCodeActions(fixture.document, range, { diagnostics: diagnostics }, {});
+        expect(actions).toHaveLength(1);
+        expect(actions[0].diagnostics).toHaveLength(2);
+        expect(actions[0].title).toBe('Remove redundant @virtual JSDoc tag');
+        await applyAction(fixture, actions[0]);
+        expect(fixture.document.getText()).toBe('class Command {\n    virtual void run() {}\n}');
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
+
+    test('preserves inline layout and declines a stale virtual migration after a modifier changes', async () =>
+    {
+        const source = 'class Command { /** @virtual */ void run() {} }';
+        const fixture = await openFixture(source);
+        const [action] = await actionsFor(fixture, 'lgd.jsdoc.virtual');
+        fixture.document.setText(source.replace('void run', 'static void run'));
+        fixture.document.version++;
+        expect(await fixture.provider.applyFix(action.command.arguments[0])).toBe(false);
+        expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
+        fixture.document.setText(source);
+        fixture.document.version++;
+        await fixture.service.updateDocument(fixture.document);
+        const [current] = await actionsFor(fixture, 'lgd.jsdoc.virtual');
+        await applyAction(fixture, current);
+        expect(fixture.document.getText()).toBe('class Command { virtual void run() {} }');
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
+
+    test('keeps CRLF, tabs, descriptions and other tags byte-for-byte', async () =>
+    {
+        const source = [ 'class Command {',
+            '\t/**',
+            '\t * Runs the command.  ',
+            '\t * @virtual ',
+            '\t * @returns Finishes the command.',
+            '\t */',
+            '\tvoid run() {}',
+            '}' ].join('\r\n');
+        const fixture = await openFixture(source);
+        const [action] = await actionsFor(fixture, 'lgd.jsdoc.virtual');
+        await applyAction(fixture, action);
+        const expected = source.replace('\t * @virtual \r\n', '').replace('\tvoid run()', '\tvirtual void run()');
+        expect(fixture.document.getText()).toBe(expected);
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
+
+    test('preserves example fence content while migrating a real virtual directive', async () =>
+    {
+        const comment = [ '/**',
+            '     * @example',
+            '     * ```lgd',
+            '     * @virtual',
+            '     * ```',
+            '     * @virtual ',
+            '     */' ].join('\n');
+        const source = `class Command {\n    ${comment}\n    void run() {}\n}`;
+        const fixture = await openFixture(source);
+        const [action] = await actionsFor(fixture, 'lgd.jsdoc.virtual');
+        await applyAction(fixture, action);
+        expect(fixture.document.getText()).toBe(source.replace('     * @virtual \n', '').replace('    void run()', '    virtual void run()'));
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
 });
