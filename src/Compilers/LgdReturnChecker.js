@@ -188,7 +188,8 @@ const LgdReturnChecker = {
 
         if(node.type === 'NewExpression')
         {
-            const nativeConstructor = node.callee.type === 'Identifier' && !path.scope.getBinding(node.callee.name);
+            const constructorName = node.callee.type === 'Identifier' ? node.callee.name : null;
+            const nativeConstructor = constructorName && !path.scope.getBinding(constructorName) && context.bindings.nativeUnchanged(constructorName);
             if(nativeConstructor && [ 'Array', 'Function' ].includes(node.callee.name))
             {
                 return [node.callee.name];
@@ -272,7 +273,7 @@ const LgdReturnChecker = {
 
         if(node.type === 'CallExpression')
         {
-            if(this.isPromiseResolve(path))
+            if(this.isPromiseResolve(path, context))
             {
                 if(!signature.group.async)
                 {
@@ -474,7 +475,7 @@ const LgdReturnChecker = {
     },
 
     /** @description Recognizes the built-in Promise.resolve without assuming a shadowed Promise is native. */
-    isPromiseResolve(path)
+    isPromiseResolve(path, context)
     {
         const callee = path.node.callee;
         if(callee.type !== 'MemberExpression' || callee.computed || callee.object.type !== 'Identifier')
@@ -482,7 +483,7 @@ const LgdReturnChecker = {
             return false;
         }
 
-        const nativePromise = callee.object.name === 'Promise' && !path.scope.getBinding('Promise');
+        const nativePromise = callee.object.name === 'Promise' && !path.scope.getBinding('Promise') && context.bindings.nativeUnchanged('Promise');
         return nativePromise && callee.property.name === 'resolve';
     },
 

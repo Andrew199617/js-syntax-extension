@@ -3,6 +3,12 @@ const { tsTypeMap } = require('./LgdTypeMaps');
 const { UNKNOWN } = require('./LgdInfer');
 const { skipTrivia } = require('./LgdMethodSignature');
 
+/** @description Native objects whose known behavior is used by expression inference. */
+const inferredNatives = [ 'Array', 'Function', 'Promise' ];
+
+/** @description Unshadowed global namespaces can expose those same native objects. */
+const globalNamespaces = [ 'globalThis', 'global', 'window', 'self' ];
+
 /** @description Resolves declared types and method identities through actual JavaScript lexical bindings. */
 const LgdBindingTypes = {
     /** @description Builds a registry for one mapped JavaScript analysis. */
@@ -12,9 +18,14 @@ const LgdBindingTypes = {
         registry._context = context;
         registry._entries = new WeakMap();
         registry._changedMethods = new Map();
+        registry._changedNatives = new Set();
         traverse(context.tree, {
             AssignmentExpression: path => registry.recordMutation(path.get('left')),
-            UpdateExpression: path => registry.recordMutation(path.get('argument'))
+            UpdateExpression: path => registry.recordMutation(path.get('argument')),
+            CallExpression: path => registry.recordNativeArguments(path.get('arguments')),
+            OptionalCallExpression: path => registry.recordNativeArguments(path.get('arguments')),
+            TaggedTemplateExpression: path => registry.recordNativeArguments(path.get('quasi').get('expressions')),
+            NewExpression: path => registry.recordNativeArguments(path.get('arguments'))
         });
         return registry;
     },
@@ -26,10 +37,82 @@ const LgdBindingTypes = {
         return Boolean(changed?.has(name) || changed?.has('*'));
     },
 
+    /** @description Retains native behavior only when no explicit mutation or escape can invalidate it. */
+    nativeUnchanged(name)
+    {
+        return !this._changedNatives.has(name);
+    },
+
+    /** @description Passing a native object to an unknown call can allow its behavior to change. */
+    recordNativeArguments(argumentsPaths)
+    {
+        for(const argument of argumentsPaths)
+        {
+            this._recordNative(this._nativeReference(argument));
+        }
+    },
+
+    _recordNative(name)
+    {
+        if(inferredNatives.includes(name))
+        {
+            this._changedNatives.add(name);
+        }
+        else if(globalNamespaces.includes(name) || name === '*')
+        {
+            for(const native of inferredNatives)
+            {
+                this._changedNatives.add(native);
+            }
+        }
+    },
+
+    _nativeReference(path, visited = new Set())
+    {
+        if(path.isMemberExpression() || path.isOptionalMemberExpression())
+        {
+            const receiver = this._nativeReference(path.get('object'), visited);
+            if(!globalNamespaces.includes(receiver))
+            {
+                return receiver;
+            }
+
+            const property = path.node.property;
+            const name = path.node.computed ? property.value : property.name;
+            if(name === undefined)
+            {
+                return '*';
+            }
+
+            return inferredNatives.includes(name) ? name : null;
+        }
+
+        if(!path.isIdentifier())
+        {
+            return null;
+        }
+
+        const binding = path.scope.getBinding(path.node.name);
+        if(!binding)
+        {
+            return inferredNatives.includes(path.node.name) || globalNamespaces.includes(path.node.name) ? path.node.name : null;
+        }
+
+        if(binding.constant && binding.path.isVariableDeclarator() && binding.path.node.init && !visited.has(binding))
+        {
+            const next = new Set(visited);
+            next.add(binding);
+            return this._nativeReference(binding.path.get('init'), next);
+        }
+
+        return null;
+    },
+
     /** @description Records writes to known method properties without assuming immutable object identity. */
     recordMutation(target)
     {
         const context = this._context;
+        this._recordNative(this._nativeReference(target));
         if(!target.isMemberExpression() && !target.isOptionalMemberExpression())
         {
             return;
