@@ -4,6 +4,8 @@ const LgdSourceMap = require('./LgdSourceMap');
 const LgdReturnFlow = require('./LgdReturnFlow');
 const { inferExpression, maskCode, UNKNOWN } = require('./LgdInfer');
 const { tsTypeMap } = require('./LgdTypeMaps');
+const LgdBindingFlow = require('./LgdBindingFlow');
+const LgdBindingTypes = require('./LgdBindingTypes');
 
 /** @description Checks explicit named return contracts against the mapped JavaScript function bodies. */
 const LgdReturnChecker = {
@@ -17,34 +19,41 @@ const LgdReturnChecker = {
         return [ ...explicit, ...inherited ];
     },
 
-    /** @description Validates explicit return annotations using syntax-aware function boundaries. */
-    check(content, declarations, emitted, inherited = [])
+    /** @description Builds one shared syntax and lexical-value analysis for assignments and returns. */
+    createContext(content, declarations, emitted, options = {})
     {
-        const signatures = this.signatures(declarations, inherited);
-        if(signatures.length === 0)
+        const { inherited = [], externals = new Map() } = options;
+        const tree = parser.parse(emitted.code, { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true });
+        const context = {
+            content: content,
+            declarations: declarations,
+            code: emitted.code,
+            map: LgdSourceMap.create(emitted.segments),
+            errors: [],
+            signatures: this.signatures(declarations, inherited),
+            tree: tree,
+            flow: LgdBindingFlow.create(tree),
+            externalsByName: new Map(),
+            externals: externals
+        };
+        for(const info of externals.values())
         {
-            return [];
+            context.externalsByName.set(info.exportName, { keyword: info.keyword, kind: 'external' });
         }
 
-        const map = LgdSourceMap.create(emitted.segments);
-        const errors = [];
-        const context = { content: content, declarations: declarations, code: emitted.code, map: map, errors: errors, signatures: signatures };
-        const byBody = new Map(signatures.map(signature => [
-            map.toOutput(signature.declaration.initializerStart + signature.group.bodyStart), signature
+        context.bindings = LgdBindingTypes.create(context);
+        return context;
+    },
+
+    /** @description Validates explicit return annotations using shared syntax-aware function boundaries. */
+    check(context)
+    {
+        const byBody = new Map(context.signatures.map(signature => [
+            context.map.toOutput(signature.declaration.initializerStart + signature.group.bodyStart), signature
         ]));
 
-        let tree;
-        try
-        {
-            tree = parser.parse(emitted.code, { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true });
-        }
-        catch(error)
-        {
-            const offset = map.toSource(error.pos || 0);
-            return [{ offset: offset, message: `Cannot validate return annotations: ${error.message}` }];
-        }
-
-        traverse(tree, {
+        context.errors = [];
+        traverse(context.tree, {
             /** @description Matches a generated function to its explicit source signature. */
             Function: path =>
             {
@@ -55,7 +64,7 @@ const LgdReturnChecker = {
                 }
             }
         });
-        return errors;
+        return context.errors;
     },
 
     /** @description Validates one named method and its directly owned return statements. */
@@ -79,7 +88,7 @@ const LgdReturnChecker = {
         const root = declared.split('.')[0];
         const binding = path.scope.getBinding(root);
         const builtin = Object.hasOwn(tsTypeMap, declared) || declared === 'void';
-        const nominal = context.declarations.some(declaration => declaration.name === declared);
+        const nominal = !declared.includes('.') && binding && context.bindings.descriptor(binding);
         const external = declared.includes('.') && binding;
         const knownType = builtin || nominal || external || group.opaqueReturn;
         if(!knownType)
@@ -94,6 +103,11 @@ const LgdReturnChecker = {
             /** @description Checks only returns belonging to this method. */
             ReturnStatement: returned =>
             {
+                if(!context.flow.reachable(returned))
+                {
+                    return;
+                }
+
                 const argument = returned.get('argument');
                 const types = argument.node ? this.expressionTypes(argument, signature, context) : ['undefined'];
                 for(const type of new Set(types))
@@ -159,6 +173,14 @@ const LgdReturnChecker = {
     expressionTypes(path, signature, context, visited = new Set())
     {
         const node = path.node;
+        const literals = { NumericLiteral: 'Number', StringLiteral: 'String', BooleanLiteral: 'Boolean',
+            BigIntLiteral: 'BigInt', TemplateLiteral: 'String', ObjectExpression: 'Object', ArrayExpression: 'Array',
+            FunctionExpression: 'Function', ArrowFunctionExpression: 'Function' };
+        if(literals[node.type])
+        {
+            return [literals[node.type]];
+        }
+
         if(node.type === 'NullLiteral')
         {
             return ['null'];
@@ -188,9 +210,35 @@ const LgdReturnChecker = {
             return [signature.group.returnTypeName === owner ? owner : 'Object'];
         }
 
-        if(node.type === 'AssignmentExpression' && node.operator === '=')
+        if(node.type === 'UpdateExpression')
         {
-            return this.expressionTypes(path.get('right'), signature, context, visited);
+            const types = this.expressionTypes(path.get('argument'), signature, context, visited);
+            const scope = context.bindings.scope(path);
+            return types.map(inferred =>
+            {
+                const type = Object.hasOwn(tsTypeMap, inferred) ? inferred : scope.get(inferred)?.keyword || inferred;
+                if(type === 'BigInt' || type === UNKNOWN)
+                {
+                    return type;
+                }
+
+                return 'Number';
+            });
+        }
+
+        if(node.type === 'AssignmentExpression')
+        {
+            if(node.operator === '=')
+            {
+                return this.expressionTypes(path.get('right'), signature, context, visited);
+            }
+
+            return this.operatorTypes(path, signature, context, visited);
+        }
+
+        if(node.type === 'BinaryExpression' || node.type === 'LogicalExpression')
+        {
+            return this.operatorTypes(path, signature, context, visited);
         }
 
         if(node.type === 'UnaryExpression' && node.operator === 'void')
@@ -200,6 +248,12 @@ const LgdReturnChecker = {
 
         if(node.type === 'ConditionalExpression')
         {
+            const truth = context.flow.truth(path.get('test'));
+            if(truth !== null)
+            {
+                return this.expressionTypes(path.get(truth ? 'consequent' : 'alternate'), signature, context, visited);
+            }
+
             return [ ...this.expressionTypes(path.get('consequent'), signature, context, visited),
                 ...this.expressionTypes(path.get('alternate'), signature, context, visited) ];
         }
@@ -212,7 +266,8 @@ const LgdReturnChecker = {
 
         if(node.type === 'AwaitExpression')
         {
-            return this.expressionTypes(path.get('argument'), signature, context, visited);
+            const awaited = { ...signature, group: { ...signature.group, async: true } };
+            return this.expressionTypes(path.get('argument'), awaited, context, visited);
         }
 
         if(node.type === 'CallExpression')
@@ -239,11 +294,9 @@ const LgdReturnChecker = {
         const scope = new Map();
         for(const [ name, binding ] of Object.entries(path.scope.getAllBindings()))
         {
-            const type = this.bindingType(binding, signature, context);
-            if(type)
-            {
-                scope.set(name, { keyword: type });
-            }
+            const types = this.currentBindingTypes({ path: path, binding: binding }, signature, context, visited);
+            const unique = new Set(types);
+            scope.set(name, { keyword: unique.size === 1 ? types[0] : UNKNOWN });
         }
 
         const expression = context.code.slice(node.start, node.end);
@@ -251,10 +304,115 @@ const LgdReturnChecker = {
         return [scope.has(inferred) ? scope.get(inferred).keyword : inferred];
     },
 
+    /** @description Evaluates operator results from current operand values, not declaration labels. */
+    operatorTypes(path, signature, context, visited)
+    {
+        const operator = path.isAssignmentExpression() ? path.node.operator.slice(0, -1) : path.node.operator;
+        const left = this.expressionTypes(path.get('left'), signature, context, visited);
+        const right = this.expressionTypes(path.get('right'), signature, context, visited);
+        if([ '&&', '||', '??' ].includes(operator))
+        {
+            const fact = operator === '??' ? context.flow.nullish(path.get('left')) : context.flow.truth(path.get('left'));
+            if(fact !== null)
+            {
+                const takeRight = operator === '||' ? !fact : fact;
+                return takeRight ? right : left;
+            }
+
+            const retained = operator === '??' ? left.filter(type => type !== 'null' && type !== 'undefined') : left;
+            return [ ...retained, ...right ];
+        }
+
+        return left.flatMap(leftType => right.map(rightType =>
+        {
+            const scope = context.bindings.scope(path);
+            const first = Object.hasOwn(tsTypeMap, leftType) ? leftType : scope.get(leftType)?.keyword || leftType;
+            const second = Object.hasOwn(tsTypeMap, rightType) ? rightType : scope.get(rightType)?.keyword || rightType;
+            const numeric = [ 'Number', 'String', 'Boolean', 'null', 'undefined' ];
+            const arithmetic = [ '-', '*', '/', '%', '**', '|', '&', '^', '<<', '>>', '>>>' ].includes(operator);
+            if(arithmetic && numeric.includes(first) && numeric.includes(second))
+            {
+                return 'Number';
+            }
+
+            const operands = new Map([
+                [ 'leftValue', { keyword: first === 'null' || first === 'undefined' ? 'Null' : first } ],
+                [ 'rightValue', { keyword: second === 'null' || second === 'undefined' ? 'Null' : second } ]
+            ]);
+            const inferred = inferExpression(`leftValue ${operator} rightValue`, operands, new Map());
+            return operands.has(inferred) ? operands.get(inferred).keyword : inferred;
+        }));
+    },
+
+    /** @description Reads all reaching values of one binding at the current expression. */
+    currentBindingTypes(point, signature, context, visited)
+    {
+        const { path, binding } = point;
+        const declared = context.bindings.type(binding, signature);
+        const offset = context.map.toSource(binding.identifier.start);
+        const declaration = context.declarations.find(candidate => candidate.nameStart === offset);
+        if(declaration?.kind === 'class')
+        {
+            return [declared];
+        }
+
+        const origins = context.flow.origins(path, binding);
+        if(!origins)
+        {
+            return [declared || UNKNOWN];
+        }
+
+        const inferred = origins.flatMap(origin =>
+        {
+            if(origin === '__declared__')
+            {
+                return [declared || UNKNOWN];
+            }
+
+            return typeof origin === 'string' ? [origin] : this.expressionTypes(origin, signature, context, visited);
+        });
+
+        if(declaration?.name === declaration?.typeName && declaration)
+        {
+            return inferred.map(type =>
+            {
+                if([ 'Object', 'Array', 'Function' ].includes(type))
+                {
+                    return declaration.name;
+                }
+
+                return type;
+            });
+        }
+
+        if(signature.group.assignment && declaration)
+        {
+            const entry = context.bindings.descriptor(binding);
+            return inferred.map(type =>
+            {
+                if(type === entry.keyword)
+                {
+                    return entry.ref || declaration.name;
+                }
+
+                return type;
+            });
+        }
+
+        return inferred;
+    },
+
     /** @description Resolves calls to annotated methods on the current or a directly bound object. */
     methodCallType(path, signature, context)
     {
         const callee = path.node.callee;
+        if(callee.type === 'Identifier' && callee.name === 'require' && !path.scope.getBinding('require'))
+        {
+            const specifier = path.node.arguments[0];
+            const external = specifier?.type === 'StringLiteral' && context.externals.get(specifier.value);
+            return external ? external.exportName : UNKNOWN;
+        }
+
         if(callee.type !== 'MemberExpression' || callee.computed)
         {
             return UNKNOWN;
@@ -270,12 +428,28 @@ const LgdReturnChecker = {
             const binding = path.scope.getBinding(callee.object.name);
             if(binding)
             {
+                if(binding.constantViolations.length > 0)
+                {
+                    return UNKNOWN;
+                }
+
                 const offset = context.map.toSource(binding.identifier.start);
                 owner = context.declarations.find(declaration => declaration.nameStart === offset);
+                const origins = context.flow.origins(path, binding);
+                const initial = binding.path.isVariableDeclarator() && binding.path.node.init;
+                if(origins?.some(origin => typeof origin === 'string' || origin.node !== initial))
+                {
+                    return UNKNOWN;
+                }
             }
         }
 
         if(!owner)
+        {
+            return UNKNOWN;
+        }
+
+        if(context.bindings.methodChanged(owner, callee.property.name))
         {
             return UNKNOWN;
         }
@@ -321,65 +495,14 @@ const LgdReturnChecker = {
             return [path.node.name === 'undefined' ? 'undefined' : UNKNOWN];
         }
 
-        const declared = this.bindingType(binding, signature, context);
-        if(declared)
+        if(visited.has(path.node))
         {
-            const parameter = signature.group.params.find(candidate => candidate.name === binding.identifier.name);
-            const inheritedParameter = signature.group.inherited && binding.kind === 'param' && parameter?.typeStart === -1;
-            if(inheritedParameter && !visited.has(binding))
-            {
-                const next = new Set(visited);
-                next.add(binding);
-                const assignedTypes = binding.constantViolations.flatMap(violation =>
-                {
-                    if(violation.isAssignmentExpression() && violation.node.operator === '=')
-                    {
-                        return this.expressionTypes(violation.get('right'), signature, context, next);
-                    }
-
-                    return [UNKNOWN];
-                });
-
-                return [ declared, ...assignedTypes ];
-            }
-
-            return [declared];
+            return [UNKNOWN];
         }
 
-        if(binding.constant && binding.path.isVariableDeclarator() && binding.path.node.init && !visited.has(binding))
-        {
-            const next = new Set(visited);
-            next.add(binding);
-            return this.expressionTypes(binding.path.get('init'), signature, context, next);
-        }
-
-        return [UNKNOWN];
-    },
-
-    /** @description Maps local and parameter bindings to their explicit LGD types. */
-    bindingType(binding, signature, context)
-    {
-        const offset = context.map.toSource(binding.identifier.start);
-        const declaration = context.declarations.find(candidate => candidate.nameStart === offset);
-        if(declaration)
-        {
-            return declaration.kind === 'class' ? declaration.name : declaration.typeName;
-        }
-
-        const group = signature.group;
-        const relative = offset - signature.declaration.initializerStart;
-        if(relative >= group.start && relative < group.end)
-        {
-            const parameter = group.params.find(candidate => candidate.name === binding.identifier.name);
-            if(parameter && parameter.rest)
-            {
-                return 'Array';
-            }
-
-            return parameter ? parameter.typeName : null;
-        }
-
-        return null;
+        const next = new Set(visited);
+        next.add(path.node);
+        return this.currentBindingTypes({ path: path, binding: binding }, signature, context, next);
     }
 };
 

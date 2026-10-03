@@ -2,6 +2,8 @@ const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
 const CSharpBackend = require('./CSharpBackend');
 const LgdTypeChecker = require('./LgdTypeChecker');
+const LgdAssignmentChecker = require('./LgdAssignmentChecker');
+const LgdSourceMap = require('./LgdSourceMap');
 const LgdClassSyntax = require('./LgdClassSyntax');
 const LgdBaseChecker = require('./LgdBaseChecker');
 const LgdOverrideChecker = require('./LgdOverrideChecker');
@@ -269,7 +271,7 @@ const LgdCompiler = {
         const inheritedReturnSignatures = LgdContractChecker.bodySignatures(content, found, externals);
         const declarations = this.buildTree(found);
         const hasBaseCalls = LgdBaseCalls.hasCalls(content, found);
-        if(hasBaseCalls || LgdReturnChecker.signatures(found, inheritedReturnSignatures).length > 0 || LgdStandaloneReturnChecker.hasCandidates(content))
+        if(found.length > 0 || hasBaseCalls || LgdStandaloneReturnChecker.hasCandidates(content))
         {
             const emitted = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
             const standaloneErrors = LgdStandaloneReturnChecker.check(emitted);
@@ -286,13 +288,44 @@ const LgdCompiler = {
                 }
             }
 
-            for(const returnError of LgdReturnChecker.check(content, found, emitted, inheritedReturnSignatures))
+            if(standaloneErrors.length === 0)
             {
-                errors.push(this.createError(content, returnError.offset, returnError.message, returnError.endOffset));
+                let context;
+                try
+                {
+                    context = LgdReturnChecker.createContext(content, found, emitted, { inherited: inheritedReturnSignatures, externals: externals });
+                }
+                catch(error)
+                {
+                    const map = LgdSourceMap.create(emitted.segments);
+                    if(errors.length === 0)
+                    {
+                        errors.push(this.createError(content, map.toSource(error.pos || 0), `Cannot validate declared types: ${error.message}`));
+                    }
+                }
+
+                if(context)
+                {
+                    const checked = [ ...LgdAssignmentChecker.check(context), ...LgdReturnChecker.check(context) ];
+                    this.appendTypeErrors(content, errors, checked);
+                }
             }
         }
 
         return { declarations: declarations, allDeclarations: found, errors: errors };
+    },
+
+    /** @description Appends mapped lexical diagnostics while preserving earlier contract diagnostics. */
+    appendTypeErrors(content, errors, checked)
+    {
+        for(const typeError of checked)
+        {
+            const duplicate = errors.some(error => error.offset === typeError.offset && error.message === typeError.message);
+            if(!duplicate)
+            {
+                errors.push(this.createError(content, typeError.offset, typeError.message, typeError.endOffset));
+            }
+        }
     },
 
     /**
