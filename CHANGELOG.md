@@ -4,6 +4,12 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.18
+
+- Preserve the declared type in downstream diagnostics after a proven incompatible write, avoiding cascading return errors while keeping the assignment blocker.
+- Retain real value flow for untyped, unknown and nullable paths, and strict runtime proof for signature suggestions.
+- Disclose a newly introduced return diagnostic before a parameter-only annotation change; keep proven parameter-and-return repairs atomic.
+
 # 2.7.17
 
 - Separate control-flow keywords from declaration, modifier and void-return keyword families using theme-controlled scopes.
