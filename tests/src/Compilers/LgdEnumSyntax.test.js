@@ -131,6 +131,26 @@ describe('explicit LGD enum syntax', () =>
         ]);
     });
 
+    test('checks optional reads, known numeric keys and destructuring writes', () =>
+    {
+        const source = [
+            "enum State { Ready = 'ready' }",
+            'console.log(State?.Missing);',
+            'console.log(State[1]);',
+            "[State.Ready] = ['bad'];",
+            "({ current: State.Ready } = { current: 'bad' });",
+            "for(State.Ready of ['bad']) {}",
+            'console.log({ current: State.Ready });'
+        ].join('\n');
+        expect(compile(source).errors.map(error => error.message)).toEqual([
+            "Enum 'State' has no member 'Missing'.",
+            "Enum 'State' has no member '1'.",
+            "Cannot modify frozen enum 'State'.",
+            "Cannot modify frozen enum 'State'.",
+            "Cannot modify frozen enum 'State'."
+        ]);
+    });
+
     test('does not infer a computed identifier as a literal member name', () =>
     {
         const result = compile("enum State { Ready = 'ready' }\nconst key = 'Ready';\nconst result = State[key];");

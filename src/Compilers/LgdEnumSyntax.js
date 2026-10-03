@@ -182,14 +182,67 @@ const LgdEnumSyntax = {
     /** @description Identifies a proven enum member value for shared assignment and return checks. */
     memberType(path, context)
     {
-        if(!path.isMemberExpression())
+        if(!path.isMemberExpression() && !path.isOptionalMemberExpression())
         {
             return null;
         }
 
         const declaration = this.receiver(path.get('object'), context);
-        const name = path.node.computed ? path.node.property.value : path.node.property.name;
+        const name = this.memberName(path.node);
         return declaration?.members.some(member => member.name === name) ? declaration.name : null;
+    },
+
+    /** @description Reads only statically known property keys using JavaScript key coercion. */
+    memberName(node)
+    {
+        if(!node.computed)
+        {
+            return node.property.name;
+        }
+
+        const literal = node.property;
+        if([ 'StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'BigIntLiteral' ].includes(literal.type))
+        {
+            return String(literal.value);
+        }
+
+        return null;
+    },
+
+    /** @description Recognizes direct and destructuring writes without treating reads on the right side as writes. */
+    isWrite(path)
+    {
+        let target = path;
+        while(target.parentPath)
+        {
+            const owner = target.parentPath;
+            if(owner.isAssignmentExpression())
+            {
+                return owner.node.left === target.node;
+            }
+
+            if(owner.isForInStatement() || owner.isForOfStatement())
+            {
+                return owner.node.left === target.node;
+            }
+
+            if(owner.isUpdateExpression() || owner.isUnaryExpression({ operator: 'delete' }))
+            {
+                return true;
+            }
+
+            const pattern = owner.isArrayPattern() || owner.isObjectPattern() || owner.isRestElement();
+            const property = owner.isObjectProperty() && owner.node.value === target.node && owner.parentPath.isObjectPattern();
+            const defaultTarget = owner.isAssignmentPattern() && owner.node.left === target.node;
+            if(!pattern && !property && !defaultTarget)
+            {
+                return false;
+            }
+
+            target = owner;
+        }
+
+        return false;
     },
 
     /** @description Diagnoses unknown literal members and direct writes to frozen enum members. */
@@ -211,7 +264,7 @@ const LgdEnumSyntax = {
             },
 
             /** @description Validates direct enum member access. */
-            MemberExpression: path =>
+            'MemberExpression|OptionalMemberExpression': path =>
             {
                 const declaration = this.receiver(path.get('object'), context);
                 if(!declaration)
@@ -219,9 +272,8 @@ const LgdEnumSyntax = {
                     return;
                 }
 
-                const name = path.node.computed ? path.node.property.value : path.node.property.name;
-                const owner = path.parentPath;
-                const written = owner.isAssignmentExpression() && owner.node.left === path.node || owner.isUpdateExpression() || owner.isUnaryExpression({ operator: 'delete' });
+                const name = this.memberName(path.node);
+                const written = this.isWrite(path);
                 let message;
                 if(written)
                 {
