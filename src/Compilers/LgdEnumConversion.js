@@ -23,6 +23,11 @@ const LgdEnumConversion = {
             return { code: content, converted: converted, skipped: [...requested], errors: [error.message] };
         }
 
+        if(this.hasUncertainNative(tree))
+        {
+            return { code: content, converted: [], skipped: [...requested], errors: [] };
+        }
+
         const masked = maskCode(content, true);
         traverse(tree, {
             /** @description Recognizes the exact runtime form emitted by the LGD enum compiler. */
@@ -110,6 +115,34 @@ const LgdEnumConversion = {
         }
 
         return { code: code, converted: converted, skipped: skipped, errors: [] };
+    },
+
+    /** @description Preserves source when native Object is replaced, mutated, or exposed through an unknown alias. */
+    hasUncertainNative(tree)
+    {
+        let uncertain = false;
+        traverse(tree, {
+            /** @description Identifies unshadowed native receivers without following arbitrary user code. */
+            Identifier: path =>
+            {
+                const nativeObject = path.node.name === 'Object' && !path.scope.getBinding('Object');
+                const globalObject = [ 'globalThis', 'global', 'window', 'self' ].includes(path.node.name) && !path.scope.getBinding(path.node.name);
+                if(!nativeObject && !globalObject || !path.isReferencedIdentifier() && !path.isBindingIdentifier())
+                {
+                    return;
+                }
+
+                const receiver = path.parentPath;
+                const nativeMember = nativeObject && receiver.isMemberExpression() && !receiver.node.computed && receiver.node.object === path.node;
+                const directCall = nativeMember && receiver.parentPath.isCallExpression() && receiver.parentPath.node.callee === receiver.node;
+                if(!directCall)
+                {
+                    uncertain = true;
+                    path.stop();
+                }
+            }
+        });
+        return uncertain;
     },
 
     /** @description Accepts only plain identifier keys and homogeneous literal values in Object.freeze. */

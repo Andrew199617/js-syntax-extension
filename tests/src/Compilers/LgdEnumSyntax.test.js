@@ -257,7 +257,10 @@ describe('bounded JavaScript to LGD enum conversion', () =>
         "const State = Object.freeze({ Ready: 'a', Ready: 'b' });",
         "function run(Object) { const State = Object.freeze({ Ready: 'ready' }); }",
         "const State = Object.freeze({ Ready: 'ready' }); State = replacement;",
-        "const /* preserve wrapper comment */ State = Object.freeze({ Ready: 'ready' });"
+        "const /* preserve wrapper comment */ State = Object.freeze({ Ready: 'ready' });",
+        "Object.freeze = identity;\nconst State = Object.freeze({ Ready: 'ready' });",
+        "const NativeObject = Object;\nconst State = Object.freeze({ Ready: 'ready' });",
+        "globalThis.Object.freeze = identity;\nconst State = Object.freeze({ Ready: 'ready' });"
     ])('preserves uncertain source unchanged: %s', source =>
     {
         const result = LgdEnumConversion.toLgd(source, ['State']);
