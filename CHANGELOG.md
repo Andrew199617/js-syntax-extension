@@ -4,6 +4,15 @@ All notable changes to the "js-syntax-extension" extension will be documented in
 
 # Version 2
 
+# 2.7.15
+
+- Remove the duplicated LGD label from diagnostic messages while preserving source labels, diagnostic codes and ranges.
+- Suggest a guarded Number-to-String parameter annotation change without altering assignments, callers or return contracts.
+- Keep signature-changing suggestions explicit and nonpreferred; disclose remaining diagnostics and withhold unsafe contract edits.
+- Separate LGD quick-fix handlers behind a shared base, registry and source/dependency context; retain Undo and apply-time freshness checks.
+- Reject stale transitive base contracts and newly discovered consumers before applying retained fixes.
+- Explain missing assignment expressions at their source location and retain parser details for other syntax failures.
+
 # 2.7.14
 
 - Validate completed JavaScript output in a separate syntax-checking module for both OLOO and native class output.

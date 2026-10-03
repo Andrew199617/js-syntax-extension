@@ -46,8 +46,13 @@ In a `.lgd` file, place the cursor on a diagnostic and open Quick Fix with `Ctrl
 - **Add override keyword** declares an override of a known inherited virtual method. If the child already uses `virtual`, **Replace virtual with override** repairs the modifier without changing its method body.
 - **Make Base.method virtual** updates the known LGD class declaration for a child explicitly marked `override`, including a base imported from another `.lgd` file.
 - **Remove extra arguments from base call** removes an extra primitive-literal suffix when the base constructor's parameter count is known.
+- **Change parameter to String** suggests an explicit annotation-only change for an isolated Number parameter assigned String values. The action says that it changes the signature and shows any existing diagnostics that remain.
 
 Argument removal is an explicit choice. Calls, property reads, spreads, and comments in the removed suffix are preserved by leaving the diagnostic for you to resolve. Missing arguments are never filled with guessed values. Fixes check that the source and imported contracts are still current, support Undo, and refresh Problems after application.
+
+Parameter changes are suggestions, never Fix All or a preferred automatic action. They are withheld for known callers, exports, inherited/interface contracts, defaults, rest/destructured parameters, captures, mixed writes, or a preview that adds errors. The assignment and return contract remain unchanged; changing a parameter does not guarantee every error is fixed.
+
+A missing assignment expression such as `const broken = ;` is reported as **Expected an expression after '='.** at the semicolon. Add the intended value or expression before saving; the extension does not guess one.
 
 ## LGD classes with OLOO instances
 
