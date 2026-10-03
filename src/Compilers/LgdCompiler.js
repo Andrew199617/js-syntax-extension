@@ -49,10 +49,7 @@ const LgdCompiler = {
      * @description Creates a compiler instance.
      * @returns {LgdCompilerType}
      */
-    create()
-    {
-        return Object.create(LgdCompiler);
-    },
+    create() { return Object.create(LgdCompiler); },
 
     /**
      * @description Compiles LGD source to JavaScript.
@@ -396,9 +393,8 @@ const LgdCompiler = {
         {
             const assignmentErrors = LgdAssignmentChecker.check(context);
             const memberErrors = context.members.check(context);
-            const constructorErrors = LgdConstructorCallChecker.check(context);
-            const castErrors = LgdCastChecker.check(context);
-            const checked = [ ...constructorErrors, ...castErrors,
+            const checked = [ ...LgdConstructorCallChecker.check(context),
+                ...LgdCastChecker.check(context),
                 ...LgdAccessibility.check(context),
                 ...LgdEnumSyntax.check(context),
                 ...assignmentErrors,
