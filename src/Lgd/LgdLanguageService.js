@@ -1,5 +1,6 @@
 const vscode = require('vscode');
 const path = require('path');
+const LgdProjectIdentity = require('../Compilers/LgdProjectIdentity');
 const LgdExportCache = require('./LgdExportCache');
 const { getContractMetadata, getTypedMembers, getInterfaceMembers, getRuntimeMembers, filterThisMembers, filterDeclaredMembers } = require('./LgdContractEditor');
 const createLgdDiagnostics = require('./LgdDiagnostics');
@@ -166,7 +167,8 @@ const LgdLanguageService = {
             return null;
         }
 
-        const result = this.compiler.compileToJs(content, externals, this.getOutputOptions(state.document));
+        const identity = await LgdProjectIdentity.resolve({ sourcePath: state.document.uri.fsPath });
+        const result = this.compiler.compileToJs(content, externals, { ...this.getOutputOptions(state.document), ...identity });
         const newline = this.compiler.detectNewline(content);
 
         // Keep the in-memory mirror safe while giving tsserver its real module-resolution directory.
@@ -183,7 +185,7 @@ const LgdLanguageService = {
         const cached = this.exportCache.get(state.document.uri.fsPath);
         if(!cached || cached.sourceText !== content)
         {
-            this.exportCache.set(state.document.uri.fsPath, { sourceText: content, parsed: result });
+            this.exportCache.set(state.document.uri.fsPath, { sourceText: content, parsed: result, projectId: identity.projectId });
         }
 
         state.compiledVersion = version;
@@ -274,6 +276,8 @@ const LgdLanguageService = {
         return `${candidate}.lgd`;
     },
 
+    refreshProjectIdentities() { return LgdExportCache.refreshProjectIdentities(this); },
+
     readSourceEntry(sourcePath) { return LgdExportCache.readSourceEntry(this, sourcePath); },
 
     replaceDependencies(sourcePath, dependencies) { return LgdExportCache.replaceDependencies(this, sourcePath, dependencies); },
@@ -330,6 +334,10 @@ const LgdLanguageService = {
                     const entry = { exportName: exported.name, keyword: exported.keyword };
                     if(exported.keyword === 'Object')
                     {
+                        entry.accessibility = exported.accessibility;
+                        entry.projectId = exported.projectId;
+                        entry.ancestry = exported.ancestry;
+                        entry.constructorAccessibility = exported.constructorAccessibility;
                         entry.sourcePath = exported.sourcePath;
                         entry.sourceText = exported.sourceText;
                         entry.kind = exported.kind;

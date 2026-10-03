@@ -446,6 +446,17 @@ function requiredParameter(parameter)
 function signatureMismatch(contract, implementation, declaration, context)
 {
     const evidence = { contract: contract, implementation: implementation, declaration: declaration, context: context };
+    if(contract.originKind === 'interface')
+    {
+        const getter = contract.getter && (implementation.getterAccessibility || implementation.accessibility || 'public') !== 'public';
+        const setter = contract.setter && (implementation.setterAccessibility || implementation.accessibility || 'public') !== 'public';
+        const method = contract.kind === 'method' && (implementation.accessibility || 'public') !== 'public';
+        if(getter || setter || method)
+        {
+            return 'must be public';
+        }
+    }
+
     if(contract.kind !== implementation.kind)
     {
         return `must be a ${contract.kind}`;

@@ -45,6 +45,8 @@ const LgdClassFields = {
 
         return { member: {
             name: head.groups.name, kind: 'field', start: start,
+            accessibility: modifiers.accessibility, accessibilityStart: modifiers.accessibilityStart,
+            accessibilityEnd: modifiers.accessibilityStart === null ? null : modifiers.accessibilityStart + modifiers.accessibility.length,
             nameStart: nameStart, nameEnd: nameStart + head.groups.name.length,
             propertyTypeName: head.groups.type,
             propertyTypeStart: typeStart - declaration.initializerStart,

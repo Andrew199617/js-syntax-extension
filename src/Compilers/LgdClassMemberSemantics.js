@@ -73,13 +73,19 @@ const LgdClassMemberSemantics = {
                 propertyTypeName: member.propertyTypeName || null, returnTypeName: member.returnTypeName || null,
                 defaultNull: defaultNull, static: Boolean(member.static), readonly: Boolean(member.readonly), async: Boolean(member.async),
                 accessor: Boolean(member.accessor), declaringType: declaration.name,
+                accessibility: member.accessibility || 'public', explicitAccessibility: member.accessibilityStart !== null,
+                getterAccessibility: member.getter ? member.getterAccessibility || member.accessibility : null,
+                setterAccessibility: member.setter ? member.setterAccessibility || member.accessibility : null,
+                declaringNameStart: declaration.nameStart, declaringProjectId: declaration.projectId || null,
                 declaringSourcePath: declaration.sourcePath || null, nameStart: member.nameStart, nameEnd: member.nameEnd,
                 params: (member.params || []).map(parameter => ({ name: parameter.name, typeName: parameter.typeName,
                     rest: Boolean(parameter.rest), optional: Boolean(parameter.optional), defaultText: parameter.defaultText ?? null }))
             };
 
-            if(member.accessor && previous?.declaringType === declaration.name)
+            if(member.accessor && this._declaringTypes.get(previous) === declaration)
             {
+                description.getterAccessibility ||= previous.getterAccessibility;
+                description.setterAccessibility ||= previous.setterAccessibility;
                 description.typeName ||= previous.typeName;
                 description.returnTypeName ||= previous.returnTypeName;
             }
@@ -94,8 +100,13 @@ const LgdClassMemberSemantics = {
 
         if(declaration.kind === 'class')
         {
-            members.set('create', { name: 'create', kind: 'method', static: true, typeName: declaration.name,
-                returnTypeName: declaration.name, declaringType: declaration.name, params: [] });
+            const factory = { name: 'create', kind: 'method', static: true, typeName: declaration.name,
+                returnTypeName: declaration.name, declaringType: declaration.name, params: [],
+                accessibility: declaration.constructorMember?.accessibility || 'public',
+                declaringNameStart: declaration.nameStart, declaringSourcePath: declaration.sourceIdentityPath || declaration.sourcePath || null,
+                declaringProjectId: declaration.projectId || null };
+            this._declaringTypes.set(factory, declaration);
+            members.set('create', factory);
         }
 
         const result = [...members.values()];
@@ -106,6 +117,11 @@ const LgdClassMemberSemantics = {
     /** @description Resolves an immediate base using the declaration's own lexical source scope. */
     base(declaration)
     {
+        if(!this._context.declarations.includes(declaration))
+        {
+            return null;
+        }
+
         return visibleBindings(this._bindings, declaration.headStart ?? declaration.start).get(declaration.baseName) || null;
     },
 

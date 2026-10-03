@@ -442,8 +442,8 @@ describe('LGD imported-file invalidation', () =>
 {
     test.each([ 'onDidChange', 'onDidCreate', 'onDidDelete' ])('routes %s only for known dependencies or open documents', event =>
     {
-        const registrations = vscode.workspace.createFileSystemWatcher.mock.results;
-        const watcher = registrations[registrations.length - 1].value;
+        const watcherIndex = vscode.workspace.createFileSystemWatcher.mock.calls.findLastIndex(call => call[0] === '**/*.lgd');
+        const watcher = vscode.workspace.createFileSystemWatcher.mock.results[watcherIndex].value;
         const invalidate = jest.spyOn(lgd.languageService, 'invalidateFile').mockResolvedValue();
         const dependency = { fsPath: path.join('workspace', 'Base.lgd') };
         const opened = { fsPath: path.join('workspace', 'Open.lgd') };
@@ -456,7 +456,7 @@ describe('LGD imported-file invalidation', () =>
         callback(opened);
 
         expect(invalidate.mock.calls).toEqual([ [dependency.fsPath], [opened.fsPath] ]);
-        expect(vscode.workspace.createFileSystemWatcher).toHaveBeenLastCalledWith('**/*.lgd');
+        expect(vscode.workspace.createFileSystemWatcher).toHaveBeenCalledWith('**/*.lgd');
     });
 });
 

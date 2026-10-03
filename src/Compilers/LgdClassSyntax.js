@@ -1,4 +1,4 @@
-const { typeTokenPattern, baseTypeName } = require('./LgdTypeMaps');
+const LgdAccessibilitySyntax = require('./LgdAccessibilitySyntax');
 const { maskCode } = require('./LgdInfer');
 const { parseTypedParams, parseMethodHead } = require('./LgdTypedParams');
 const LgdBaseCalls = require('./LgdBaseCalls');
@@ -8,6 +8,8 @@ const LgdClassMemberRecovery = require('./LgdClassMemberRecovery');
 
 /** @description Reads LGD classes and interfaces and lowers runtime classes to prototype objects with create factories. */
 const LgdClassSyntax = {
+    ...LgdAccessibilitySyntax,
+
     /** @description Finds balanced parentheses or braces in already-masked source. */
     findClose(masked, start) { return LgdClassMemberRecovery.findClose(masked, start); },
 
@@ -27,22 +29,16 @@ const LgdClassSyntax = {
     parse(content, compiler)
     {
         const masked = maskCode(content);
-        const pattern = /^(?<indent>[\t ]*)(?<exportKeyword>export[\t ]+)?(?<abstractKeyword>abstract[\t ]+)?(?<declarationKind>class|interface)[\t ]+(?<name>[$A-Z_a-z][\w$]*)\b/gm;
+        const pattern = /^(?<indent>[\t ]*)(?<exportKeyword>export[\t ]+)?(?<declarationModifiers>(?:(?:abstract|public|private|protected|internal|static|sealed|partial)[\t ]+)*)(?<declarationKind>class|interface)[\t ]+(?<name>[$A-Z_a-z][\w$]*)\b/gm;
         const declarations = [];
         const errors = [];
-        const unsupported = /^(?<indent>[\t ]*)(?<modifier>static|public|private|protected|internal|sealed|partial)[\t ]+(?:abstract[\t ]+)?(?:class|interface)\b/gm;
-        for(const invalid of masked.matchAll(unsupported))
-        {
-            errors.push(compiler.createError(content, invalid.index + invalid.groups.indent.length, `The '${invalid.groups.modifier}' declaration modifier is not supported in LGD.`));
-        }
-
         let match = pattern.exec(masked);
         while(match)
         {
             const parsed = this.parseDeclaration(content, masked, match, compiler);
             if(parsed.error)
             {
-                errors.push(compiler.createError(content, parsed.offset, parsed.error));
+                errors.push({ ...compiler.createError(content, parsed.offset, parsed.error, parsed.endOffset), code: parsed.code });
             }
             else
             {
@@ -67,8 +63,15 @@ const LgdClassSyntax = {
         const nameStart = nameEnd - name.length;
         let cursor = this.skipSpace(masked, nameEnd);
         const kind = match.groups.declarationKind;
-        const abstract = Boolean(match.groups.abstractKeyword);
-        const abstractStart = abstract ? match.index + match.groups.indent.length + (match.groups.exportKeyword || '').length : null;
+        const modifierStart = match.index + match.groups.indent.length + (match.groups.exportKeyword || '').length;
+        const modifiers = this.readDeclarationModifiers(match.groups.declarationModifiers, modifierStart);
+        if(modifiers.error)
+        {
+            return modifiers;
+        }
+
+        const abstract = modifiers.abstractStart !== null;
+        const abstractStart = modifiers.abstractStart;
         if(kind === 'interface' && abstract)
         {
             return { error: 'An LGD interface is already abstract; do not add the abstract declaration modifier.', offset: abstractStart };
@@ -111,11 +114,12 @@ const LgdClassSyntax = {
         const declaration = {
             ...LgdClassFields.runtimeNames(content, name, nameStart),
             kind: kind,
+            ...this.accessibilityMetadata(modifiers),
             abstract: abstract,
             abstractStart: abstractStart,
             abstractEnd: abstractStart === null ? null : abstractStart + 'abstract'.length,
             typeName: 'Object',
-            typeStart: match.index + match.groups.indent.length + (match.groups.exportKeyword || '').length + (match.groups.abstractKeyword || '').length,
+            typeStart: modifierStart + match.groups.declarationModifiers.length,
             typeEnd: nameStart - 1,
             name: name,
             nameStart: nameStart,
@@ -257,7 +261,7 @@ const LgdClassSyntax = {
             return { error: 'LGD interfaces cannot declare constructors or create factories.', offset: start + head.nameStart };
         }
 
-        if(isConstructor && (head.modifier || head.generator || head.returnTypeName || modifiers.spans.length > 0))
+        if(isConstructor && (head.modifier || head.generator || head.returnTypeName || modifiers.spans.some(span => span.start !== modifiers.accessibilityStart)))
         {
             return { error: 'An LGD constructor cannot have a return type or be static, virtual, override, async, a generator, or an accessor.', offset: start };
         }
@@ -345,6 +349,7 @@ const LgdClassSyntax = {
 
         return { member: {
             name: name,
+            ...this.accessibilityMetadata(modifiers),
             kind: head.modifier === 'get' || head.modifier === 'set' ? 'property' : 'method',
             start: start,
             nameStart: nameEnd - name.length,
@@ -382,114 +387,6 @@ const LgdClassSyntax = {
         } };
     },
 
-    /** @description Reads a typed signature-only property with one or both accessor contracts. */
-    parsePropertyContract(masked, start, declaration, modifiers)
-    {
-        const head = new RegExp(`^\\s*(?<type>${typeTokenPattern})\\s+(?<name>[$A-Z_a-z][\\w$]*)\\s*{`).exec(modifiers.head);
-        if(!head)
-        {
-            return null;
-        }
-
-        const contract = declaration.kind === 'interface' || modifiers.abstractStart !== null;
-        if(!contract || declaration.kind !== 'interface' && !declaration.abstract)
-        {
-            return { error: 'Signature-only properties require an interface or an abstract member in an abstract class.', offset: start };
-        }
-
-        if(modifiers.virtualStart !== null || baseTypeName(head.groups.type) === 'void')
-        {
-            return { error: 'A property contract must have a value type and cannot explicitly be virtual.', offset: start };
-        }
-
-        if(declaration.kind === 'interface' && modifiers.overrideStart !== null)
-        {
-            return { error: 'An interface property contract cannot be override.', offset: modifiers.overrideStart };
-        }
-
-        const bodyStart = start + head[0].length - 1;
-        const close = this.findClose(masked, bodyStart);
-        if(close === -1 || close >= declaration.initializerEnd - 1)
-        {
-            return { error: 'Unclosed LGD property contract.', offset: bodyStart };
-        }
-
-        const accessors = {};
-        let cursor = this.skipSpace(masked, bodyStart + 1);
-        while(cursor < close)
-        {
-            const accessor = (/^(?<kind>get|set)\b/).exec(masked.slice(cursor));
-            if(!accessor)
-            {
-                return { error: 'A property contract supports only "get;" and "set;" accessors without bodies.', offset: cursor };
-            }
-
-            const accessorKind = accessor.groups.kind;
-            if(accessors[accessorKind])
-            {
-                return { error: `Duplicate '${accessorKind}' property accessor.`, offset: cursor };
-            }
-
-            accessors[accessorKind] = { start: cursor, end: cursor + accessorKind.length };
-            cursor = this.skipSpace(masked, cursor + accessorKind.length);
-            if(masked[cursor] !== ';')
-            {
-                return { error: 'Property contract accessors must end with ";" and cannot have bodies.', offset: cursor };
-            }
-
-            cursor = this.skipSpace(masked, cursor + 1);
-        }
-
-        if(!accessors.get && !accessors.set)
-        {
-            return { error: 'A property contract requires at least one get or set accessor.', offset: bodyStart };
-        }
-
-        const nameEnd = masked.slice(0, bodyStart).trimEnd().length;
-        const typeStart = start + head[0].indexOf(head.groups.type);
-        return { member: {
-            name: head.groups.name,
-            kind: 'property',
-            start: start,
-            nameStart: nameEnd - head.groups.name.length,
-            nameEnd: nameEnd,
-            paramStart: nameEnd,
-            paramEnd: nameEnd,
-            params: [],
-            bodyStart: bodyStart,
-            bodyEnd: close + 1,
-            baseArgumentsStart: null,
-            baseArgumentsEnd: null,
-            isConstructor: false,
-            returnTypeName: null,
-            returnTypeStart: -1,
-            returnTypeEnd: -1,
-            propertyTypeName: head.groups.type,
-            propertyTypeStart: typeStart - declaration.initializerStart,
-            propertyTypeEnd: typeStart + head.groups.type.length - declaration.initializerStart,
-            async: false,
-            generator: false,
-            accessor: true,
-            accessorKind: null,
-            getter: Boolean(accessors.get),
-            setter: Boolean(accessors.set),
-            getterStart: accessors.get ? accessors.get.start : null,
-            getterEnd: accessors.get ? accessors.get.end : null,
-            setterStart: accessors.set ? accessors.set.start : null,
-            setterEnd: accessors.set ? accessors.set.end : null,
-            abstract: true,
-            abstractStart: modifiers.abstractStart,
-            abstractEnd: modifiers.abstractStart === null ? null : modifiers.abstractStart + 'abstract'.length,
-            virtual: true,
-            override: modifiers.overrideStart !== null,
-            virtualStart: null,
-            virtualEnd: null,
-            overrideStart: modifiers.overrideStart,
-            overrideEnd: modifiers.overrideStart === null ? null : modifiers.overrideStart + 'override'.length,
-            modifierSpans: modifiers.spans
-        } };
-    },
-
     /** @description Reads compile-only abstract/virtual/override modifiers while keeping every signature offset unchanged. */
     readMethodModifiers(masked, start)
     {
@@ -501,12 +398,14 @@ const LgdClassSyntax = {
         let abstractStart = null;
         let staticStart = null;
         let readonlyStart = null;
+        let accessibility = 'public';
+        let accessibilityStart = null;
         const seen = new Set();
         let match = (/^(?<modifier>async|virtual|override|abstract|static|readonly|public|private|protected|internal|new|const)\b/).exec(masked.slice(cursor));
         while(match)
         {
             const modifier = match.groups.modifier;
-            if([ 'public', 'private', 'protected', 'internal', 'new', 'const' ].includes(modifier))
+            if([ 'new', 'const' ].includes(modifier))
             {
                 return LgdClassMemberRecovery.modifierError(modifier, cursor);
             }
@@ -520,7 +419,7 @@ const LgdClassSyntax = {
 
             if(seen.has(modifier))
             {
-                return { error: `Duplicate '${modifier}' member modifier.`, offset: cursor };
+                return { error: `Duplicate '${modifier}' member modifier.`, offset: cursor, endOffset: end, code: 'lgd.syntax.memberModifier' };
             }
 
             seen.add(modifier);
@@ -533,7 +432,17 @@ const LgdClassSyntax = {
                     return { error: 'An LGD member cannot combine virtual with abstract or override.', offset: cursor };
                 }
 
-                if(modifier === 'abstract')
+                if([ 'public', 'private', 'protected', 'internal' ].includes(modifier))
+                {
+                    if(accessibilityStart !== null)
+                    {
+                        return { error: 'Use exactly one accessibility modifier on an LGD member.', offset: cursor, endOffset: end, code: 'lgd.syntax.memberModifier' };
+                    }
+
+                    accessibility = modifier;
+                    accessibilityStart = cursor;
+                }
+                else if(modifier === 'abstract')
                 {
                     abstractStart = cursor;
                 }
@@ -563,7 +472,8 @@ const LgdClassSyntax = {
         }
 
         return { head: head, spans: spans, virtualStart: virtualStart, overrideStart: overrideStart,
-            abstractStart: abstractStart, staticStart: staticStart, readonlyStart: readonlyStart };
+            abstractStart: abstractStart, staticStart: staticStart, readonlyStart: readonlyStart,
+            accessibility: accessibility, accessibilityStart: accessibilityStart };
     },
 
     /** @description Exposes typed method groups using the existing backend and semantic-token contract. */

@@ -1,3 +1,4 @@
+const LgdAccessibility = require('./LgdAccessibility');
 const LgdEnumSyntax = require('./LgdEnumSyntax');
 const JsBackend = require('./JsBackend');
 const TsBackend = require('./TsBackend');
@@ -59,7 +60,7 @@ const LgdCompiler = {
     compileToJs(content, externals = new Map(), options = {})
     {
         const resolved = LgdOutputOptions.resolve(options);
-        const parsed = this.parse(content, externals, { deferAnalysis: true });
+        const parsed = this.parse(content, externals, { ...options, deferAnalysis: true });
         for(const error of resolved.errors)
         {
             parsed.errors.push({ ...this.createError(content, 0, error.message), ...error });
@@ -149,22 +150,7 @@ const LgdCompiler = {
         return { code: `${header}${body}`, mappings: mappings, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations, errors: parsed.errors };
     },
 
-    /** @description Blocks newer class field/static semantics in legacy output backends. */
-    checkMemberTarget(content, parsed)
-    {
-        for(const declaration of parsed.allDeclarations)
-        {
-            const unsupported = declaration.classMembers?.some(member => member.kind === 'field' || member.static);
-            if(unsupported)
-            {
-                parsed.errors.push({ ...this.createError(
-                    content, declaration.nameStart,
-                    'Declared class fields and static members are supported only by the JavaScript OLOO and native-class output targets.', declaration.nameEnd
-                ),
-                code: 'lgd.output.memberTarget', category: 'compilation' });
-            }
-        }
-    },
+    checkMemberTarget(content, parsed) { LgdOutputOptions.checkMemberTarget(this, content, parsed); },
 
     /**
      * @description Detects the dominant line ending of the source so emitted code matches it.
@@ -268,6 +254,9 @@ const LgdCompiler = {
         found.sort((first, second) => first.headStart - second.headStart);
         this.collectMalformedErrors(masked, found, failedHeadStarts, errors);
 
+        const registry = LgdClassMemberSemantics.create({ content: content, declarations: found, externals: externals });
+        this.appendTypeErrors(content, errors, LgdAccessibility.prepareDeclarations(registry, options));
+
         for(const inheritanceError of LgdObjectInheritance.check(found))
         {
             errors.push({ ...this.createError(content, inheritanceError.offset, inheritanceError.message, inheritanceError.endOffset), ...inheritanceError });
@@ -338,10 +327,10 @@ const LgdCompiler = {
         const declarations = this.buildTree(found);
         const hasBaseCalls = LgdBaseCalls.hasCalls(content, found);
         const standaloneCandidates = LgdStandaloneReturnChecker.hasCandidates(content);
-        const parsed = { declarations: declarations, allDeclarations: found, errors: errors };
+        const parsed = { declarations: declarations, allDeclarations: found, errors: errors, projectId: options.projectId || null };
         const importedEnums = [...externals.values()].some(entry => entry.kind === 'enum');
         const hasConstBindings = (/\bconst\s+(?:[$A-Z_a-z]|[[{])/).test(masked);
-        const required = found.length > 0 || hasBaseCalls || standaloneCandidates || importedEnums || hasConstBindings;
+        const required = found.length > 0 || hasBaseCalls || standaloneCandidates || importedEnums || hasConstBindings || externals.size > 0;
         if(options.deferAnalysis)
         {
             parsed.analysis = { inherited: inheritedReturnSignatures, required: required };
@@ -380,7 +369,7 @@ const LgdCompiler = {
         let context;
         try
         {
-            context = LgdReturnChecker.createContext(content, parsed.allDeclarations, emitted, options);
+            context = LgdReturnChecker.createContext(content, parsed.allDeclarations, emitted, { ...options, projectId: parsed.projectId });
         }
         catch(error)
         {
@@ -395,7 +384,7 @@ const LgdCompiler = {
         {
             const assignmentErrors = LgdAssignmentChecker.check(context);
             const memberErrors = context.members.check(context);
-            const checked = [ ...LgdEnumSyntax.check(context), ...assignmentErrors, ...memberErrors, ...LgdReturnChecker.check(context) ];
+            const checked = [ ...LgdAccessibility.check(context), ...LgdEnumSyntax.check(context), ...assignmentErrors, ...memberErrors, ...LgdReturnChecker.check(context) ];
             this.appendTypeErrors(content, parsed.errors, checked);
         }
 

@@ -28,6 +28,7 @@ const LgdReturnChecker = {
         const tree = options.tree || parser.parse(emitted.code, { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true });
         const context = {
             content: content,
+            projectId: options.projectId || null,
             declarations: declarations,
             code: emitted.code,
             map: LgdSourceMap.create(emitted.segments),

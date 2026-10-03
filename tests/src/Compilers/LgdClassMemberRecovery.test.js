@@ -9,7 +9,7 @@ function parse(source)
 describe('LGD class-member error locations and bounded recovery.', () =>
 {
     test.each([
-        [ 'public broken() {}', 'public', 'memberModifier', "Remove 'public'" ],
+        [ 'new broken() {}', 'new', 'memberModifier', "Remove 'new'" ],
         [ ',', ',', 'memberComma', 'Remove this comma' ],
         [ 'value: 1;', ':', 'memberColon', 'Type name = value;' ],
         [ 'value: { hidden() {} };', ':', 'memberColon', 'Type name = value;' ],
@@ -33,7 +33,7 @@ describe('LGD class-member error locations and bounded recovery.', () =>
     {
         const source = [
             'class Example {',
-            ' public broken() {',
+            ' new broken() {',
             '  const nested = { hidden() {} };',
             '  const text = "}; later() {"; // }',
             ' }',

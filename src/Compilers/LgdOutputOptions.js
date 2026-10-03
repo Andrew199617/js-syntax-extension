@@ -1,5 +1,23 @@
 /** @description Resolves implemented output targets without depending on editor configuration. */
 const LgdOutputOptions = {
+    /** @description Blocks newer class field/static semantics in legacy output backends. */
+    checkMemberTarget(compiler, content, parsed)
+    {
+        for(const declaration of parsed.allDeclarations)
+        {
+            const unsupported = declaration.classMembers?.some(member => member.kind === 'field' || member.static);
+            if(unsupported)
+            {
+                parsed.errors.push({ ...compiler.createError(
+                    content, declaration.nameStart,
+                    'Declared class fields and static members are supported only by the JavaScript OLOO and native-class output targets.', declaration.nameEnd
+                ),
+                code: 'lgd.output.memberTarget', category: 'compilation' });
+            }
+        }
+    },
+
+
     /** @description Validates output options, retaining safe defaults for invalid settings. */
     resolve(options = {})
     {

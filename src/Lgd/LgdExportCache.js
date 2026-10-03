@@ -1,4 +1,7 @@
 const fs = require('fs');
+const LgdProjectIdentity = require('../Compilers/LgdProjectIdentity');
+const LgdAccessibility = require('../Compilers/LgdAccessibility');
+const LgdClassMemberSemantics = require('../Compilers/LgdClassMemberSemantics');
 const { maskCode } = require('../Compilers/LgdInfer');
 const { baseTypeName } = require('../Compilers/LgdTypeMaps');
 const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
@@ -8,7 +11,14 @@ const LgdContractChecker = require('../Compilers/LgdContractChecker');
 /** @description Loads an unchanged source from cache, reading only changed on-disk files. */
 async function readSourceEntry(service, sourcePath)
 {
-    const cached = service.exportCache.get(sourcePath);
+    const identity = await LgdProjectIdentity.resolve({ sourcePath: sourcePath });
+    let cached = service.exportCache.get(sourcePath);
+    if(cached && cached.projectId !== identity.projectId)
+    {
+        service.exportCache.delete(sourcePath);
+        cached = null;
+    }
+
     const sourceVersion = service.sourceVersions.get(sourcePath);
     const openState = service.openStatesByPath.get(sourcePath);
     let sourceText;
@@ -58,7 +68,8 @@ async function readSourceEntry(service, sourcePath)
         return cached;
     }
 
-    const entry = { sourceText: sourceText, diskStamp: diskStamp, parsed: service.compiler.parse(sourceText) };
+    const entry = { sourceText: sourceText, diskStamp: diskStamp, projectId: identity.projectId,
+        parsed: service.compiler.parse(sourceText, new Map(), identity) };
     service.exportCache.set(sourcePath, entry);
     return entry;
 }
@@ -115,6 +126,8 @@ function exportSignature(service, exported)
 
     return JSON.stringify({
         name: exported.name, typeName: exported.typeName, keyword: exported.keyword,
+        accessibility: exported.accessibility, projectId: exported.projectId, ancestry: exported.ancestry,
+        constructorAccessibility: exported.constructorAccessibility,
         kind: exported.kind, baseName: exported.baseName, abstract: exported.abstract,
         contractKind: exported.contractKind, interfaceNames: exported.interfaceNames,
         contractSignatures: exported.contractSignatures, contractsKnown: exported.contractsKnown,
@@ -295,6 +308,11 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
         typeName: declaration.typeName,
         keyword: keywords.includes(baseTypeName(declaration.typeName)) ? baseTypeName(declaration.typeName) : 'Object',
         kind: declaration.kind,
+        accessibility: declaration.accessibility || 'public',
+        explicitAccessibility: declaration.accessibilityStart !== null,
+        projectId: cached.projectId,
+        constructorAccessibility: declaration.constructorMember?.accessibility || 'public',
+        ancestry: LgdAccessibility.ancestry(declaration, LgdClassMemberSemantics.create({ content: targetText, declarations: parsed.allDeclarations, externals: externals })),
         enumValueType: declaration.enumValueType,
         baseName: declaration.baseName,
         constructorParams: getConstructorParams(declaration),
@@ -302,7 +320,7 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
         methodsKnown: methods.methodsKnown,
         ...contracts,
         members: service.getDeclaredMembers(declaration, context),
-        sourcePath: sourcePath,
+        sourcePath: declaration.sourceIdentityPath || sourcePath,
         sourceText: targetText,
         nameStart: declaration.nameStart,
         nameEnd: declaration.nameEnd
@@ -318,7 +336,18 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
     return exported;
 }
 
+/** @description Rechecks open sources after a manifest boundary changes, clearing inherited export identities first. */
+async function refreshProjectIdentities(service)
+{
+    service.exportCache.clear();
+    for(const state of [...service.states.values()])
+    {
+        await service.updateDocument(state.document);
+    }
+}
+
 module.exports = {
+    refreshProjectIdentities: refreshProjectIdentities,
     readExportDeclaration: readExportDeclaration,
     readSourceEntry: readSourceEntry,
     replaceDependencies: replaceDependencies,

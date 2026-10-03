@@ -77,6 +77,10 @@ function methodSignature(member, declaration, inherited)
         name: member.name,
         kind: member.kind || 'method',
         static: Boolean(member.static),
+        accessibility: member.accessibility || 'public',
+        getterAccessibility: member.getter ? member.getterAccessibility || member.accessibility || 'public' : null,
+        setterAccessibility: member.setter ? member.setterAccessibility || member.accessibility || 'public' : null,
+        declaringProjectId: declaration.projectId || null,
         virtual: Boolean(member.virtual || member.abstract || member.override && inherited?.virtual),
         abstract: Boolean(member.abstract),
         accessorKind: member.accessorKind || null,
@@ -124,6 +128,8 @@ function mergePropertyAccessors(signature, previous)
 {
     if(previous?.kind === 'property' && signature.kind === 'property')
     {
+        signature.getterAccessibility ||= previous.getterAccessibility;
+        signature.setterAccessibility ||= previous.setterAccessibility;
         signature.getter ||= previous.getter;
         signature.setter ||= previous.setter;
         signature.propertyTypeName ||= previous.propertyTypeName;
@@ -433,7 +439,10 @@ function check(content, declarations, externals = new Map())
                 continue;
             }
 
-            const baseMember = methods.get(member.name);
+            const candidate = methods.get(member.name);
+            const foreignInternal = candidate?.accessibility === 'internal' && candidate.declaringProjectId && candidate.declaringProjectId !== declaration.projectId;
+            const inaccessible = candidate?.accessibility === 'private' || foreignInternal;
+            const baseMember = inaccessible ? null : candidate;
             if(!baseMember)
             {
                 if(member.override && inherited.methodsKnown)
@@ -442,6 +451,13 @@ function check(content, declarations, externals = new Map())
                 }
 
                 continue;
+            }
+
+            const baseAccessibility = member.accessorKind === 'get' ? baseMember.getterAccessibility : baseMember.setterAccessibility;
+            const expectedAccessibility = member.accessorKind ? baseAccessibility || baseMember.accessibility || 'public' : baseMember.accessibility || 'public';
+            if(member.override && (member.accessibility || 'public') !== expectedAccessibility)
+            {
+                addError(errors, member, `Override '${member.name}' must preserve ${expectedAccessibility} accessibility.`, { code: 'lgd.access.override' });
             }
 
             if(!baseMember.virtual || baseMember.kind !== 'method' && !baseMember.abstract)

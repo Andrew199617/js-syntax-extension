@@ -12,11 +12,19 @@ const LgdEnumSyntax = {
     parse(content, compiler)
     {
         const masked = maskCode(content);
-        const pattern = /^(?<indent>[\t ]*)(?<exportKeyword>export[\t ]+)?enum[\t ]+(?<name>[$A-Z_a-z][\w$]*)\b/gm;
+        const pattern = /^(?<indent>[\t ]*)(?<exportKeyword>export[\t ]+)?(?<declarationModifiers>(?:(?:public|private|protected|internal)[\t ]+)*)enum[\t ]+(?<name>[$A-Z_a-z][\w$]*)\b/gm;
         const declarations = [];
         const errors = [];
         for(const match of masked.matchAll(pattern))
         {
+            const modifierStart = match.index + match.groups.indent.length + (match.groups.exportKeyword || '').length;
+            const modifiers = LgdClassSyntax.readDeclarationModifiers(match.groups.declarationModifiers, modifierStart);
+            if(modifiers.error)
+            {
+                errors.push({ ...compiler.createError(content, modifiers.offset, modifiers.error, modifiers.endOffset), code: modifiers.code });
+                continue;
+            }
+
             const nameEnd = match.index + match[0].length;
             const bodyStart = LgdClassSyntax.skipSpace(masked, nameEnd);
             const bodyEnd = masked[bodyStart] === '{' ? LgdClassSyntax.findClose(masked, bodyStart) : -1;
@@ -29,7 +37,8 @@ const LgdEnumSyntax = {
             const jsdoc = compiler.findPrecedingJsdoc(content, match.index);
             const declaration = {
                 kind: 'enum', typeName: 'Object', name: match.groups.name,
-                typeStart: match.index + match.groups.indent.length + (match.groups.exportKeyword || '').length,
+                ...LgdClassSyntax.accessibilityMetadata(modifiers),
+                typeStart: modifierStart + match.groups.declarationModifiers.length,
                 typeEnd: nameEnd - match.groups.name.length - 1,
                 nameStart: nameEnd - match.groups.name.length, nameEnd: nameEnd,
                 start: jsdoc ? jsdoc.start : match.index, headStart: match.index,

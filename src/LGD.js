@@ -26,6 +26,7 @@ const LgdReferenceProvider = require('./Lgd/LgdReferenceProvider');
 const LgdCompletionProvider = require('./Lgd/LgdCompletionProvider');
 const LgdCodeActionProvider = require('./Lgd/LgdCodeActionProvider');
 const LgdSemanticTokensProvider = require('./Lgd/LgdSemanticTokensProvider');
+const LgdProjectIdentity = require('./Compilers/LgdProjectIdentity');
 const LgdCompiler = require('./Compilers/LgdCompiler');
 const LgdTransform = require('./Parsers/LgdTransform');
 const InvertIf = require('./Refactor/InvertIf');
@@ -87,7 +88,8 @@ async function compileLgdDocument(document)
     try
     {
         const externals = await lgd.languageService.collectExternalTypes(snapshot);
-        result = LgdCompiler.create().compileToJs(snapshot.getText(), externals, readOutputOptions(snapshot));
+        const identity = await LgdProjectIdentity.resolve({ sourcePath: snapshot.uri.fsPath });
+        result = LgdCompiler.create().compileToJs(snapshot.getText(), externals, { ...readOutputOptions(snapshot), ...identity });
         lgd.lgdDiagnosticCollection.set(uri, createLgdDiagnostics(snapshot, result.errors));
         const errors = getLgdErrors(result);
         if(errors.length > 0)
@@ -390,6 +392,17 @@ function activate(context)
     context.subscriptions.push(lgdFileWatcher.onDidChange(invalidateLgdFile));
     context.subscriptions.push(lgdFileWatcher.onDidCreate(invalidateLgdFile));
     context.subscriptions.push(lgdFileWatcher.onDidDelete(invalidateLgdFile));
+
+    const projectWatcher = vscode.workspace.createFileSystemWatcher('**/{lgdconfig,package}.json');
+    function refreshLgdProjects()
+    {
+        runLgdTask(() => lgd.languageService.refreshProjectIdentities());
+    }
+
+    context.subscriptions.push(projectWatcher);
+    context.subscriptions.push(projectWatcher.onDidChange(refreshLgdProjects));
+    context.subscriptions.push(projectWatcher.onDidCreate(refreshLgdProjects));
+    context.subscriptions.push(projectWatcher.onDidDelete(refreshLgdProjects));
 
     if(lgd.configuration.autoComplete.enabled)
     {
