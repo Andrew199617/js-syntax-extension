@@ -4,14 +4,18 @@ const LgdClassSyntax = require('./LgdClassSyntax');
 const LgdBaseCalls = require('./LgdBaseCalls');
 const LgdBaseChecker = require('./LgdBaseChecker');
 const LgdSourceMap = require('./LgdSourceMap');
-const JsBackend = require('./JsBackend');
 const { maskCode } = require('./LgdInfer');
 
 /** @description Emits the opt-in native JavaScript class object model from shared LGD declaration records. */
 const LgdNativeClassEmitter = {
     /** @description Reports established object bases and OLOO-only dispatch that native classes cannot represent. */
-    check(content, declarations, externals, compiler)
+    check(content, declarations, externals, analysis)
     {
+        if(!declarations.some(declaration => declaration.kind === 'class'))
+        {
+            return [];
+        }
+
         const masked = maskCode(content, true);
         const scopes = LgdBaseChecker.collectScopes(masked);
         const bindings = LgdBaseChecker.collectBindings({ content: content, masked: masked, declarations: declarations, scopes: scopes, externals: externals });
@@ -32,21 +36,13 @@ const LgdNativeClassEmitter = {
             }
         }
 
-        const children = new Set(declarations.flatMap(declaration => declaration.children));
-        const roots = declarations.filter(declaration => !children.has(declaration));
-        const emitted = compiler.emitRange(content, JsBackend.create(compiler.detectNewline(content)), compiler.fullRange(content, roots));
-        const map = LgdSourceMap.create(emitted.segments);
-        let tree;
-        try
+        if(!analysis.tree)
         {
-            tree = parser.parse(emitted.code, { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true });
-        }
-        catch
-        {
-            // Existing syntax diagnostics remain authoritative when the JavaScript mirror is invalid.
+            // The final-output validator has already reported invalid JavaScript.
             return errors;
         }
 
+        const map = LgdSourceMap.create(analysis.emitted.segments);
         function inspectDispatch(path)
         {
             const node = path.node;
@@ -65,24 +61,8 @@ const LgdNativeClassEmitter = {
             }
         }
 
-        traverse(tree, { MemberExpression: inspectDispatch, OptionalMemberExpression: inspectDispatch });
+        traverse(analysis.tree, { MemberExpression: inspectDispatch, OptionalMemberExpression: inspectDispatch });
         return errors;
-    },
-
-    /** @description Rejects native-only syntax failures, including strict-mode restrictions, at their original source locations. */
-    validateOutput(code, segments)
-    {
-        try
-        {
-            parser.parse(code, { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true });
-            return [];
-        }
-        catch(error)
-        {
-            const map = LgdSourceMap.create(segments);
-            return [{ offset: map.toSource(error.pos || 0), code: 'lgd.output.nativeSyntax',
-                message: `Cannot emit native JavaScript classes: ${error.message}` }];
-        }
     },
 
     /** @description Emits native class syntax while retaining typed documentation, nested declarations and source mappings. */
@@ -151,7 +131,12 @@ const LgdNativeClassEmitter = {
 
         const concrete = { ...declaration, methodTypedParams: declaration.methodTypedParams.filter(group => !group.abstract) };
         output.code = backend.rewriteInitializer(concrete, output.code, output.segments);
-        output.code = this.rewriteConstructorReturns(output.code, output.segments);
+        const constructorMember = declaration.constructorMember;
+        if(constructorMember && (/\breturn\b/).test(maskCode(content.slice(constructorMember.bodyStart, constructorMember.bodyEnd), true)))
+        {
+            output.code = this.rewriteConstructorReturns(output.code, output.segments);
+        }
+
         return output;
     },
 

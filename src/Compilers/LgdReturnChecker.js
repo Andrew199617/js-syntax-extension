@@ -23,7 +23,7 @@ const LgdReturnChecker = {
     createContext(content, declarations, emitted, options = {})
     {
         const { inherited = [], externals = new Map() } = options;
-        const tree = parser.parse(emitted.code, { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true });
+        const tree = options.tree || parser.parse(emitted.code, { sourceType: 'unambiguous', plugins: ['jsx'], allowReturnOutsideFunction: true });
         const context = {
             content: content,
             declarations: declarations,

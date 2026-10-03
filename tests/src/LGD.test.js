@@ -593,6 +593,37 @@ describe('LGD compile on save', () =>
         expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 error(s)');
     });
 
+    test.each([ 'oloo', 'class' ])('invalid passthrough JavaScript preserves last-good %s output and repair resumes saves', async javascriptObjectModel =>
+    {
+        const filename = path.join('workspace', 'syntax.lgd');
+        const outputPath = path.join('workspace', 'syntax.js');
+        const original = 'const count = 1;';
+        const invalid = 'const count = ;';
+        const repaired = 'const count = 2;';
+        const written = new Map();
+        FileIO.writeFileContents.mockImplementation((target, code) => Promise.resolve(written.set(target, code)));
+        lgd.configuration.options = { javascriptObjectModel: javascriptObjectModel };
+
+        saveLgdDocument(filename, original);
+        await nextTurn();
+        await nextTurn();
+        expect(written.get(outputPath)).toBe(original);
+        expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
+
+        saveLgdDocument(filename, invalid);
+        await nextTurn();
+        await nextTurn();
+        expect(FileIO.writeFileContents).toHaveBeenCalledTimes(1);
+        expect(written.get(outputPath)).toBe(original);
+        expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('.js output not updated');
+
+        saveLgdDocument(filename, repaired);
+        await nextTurn();
+        await nextTurn();
+        expect(FileIO.writeFileContents).toHaveBeenCalledTimes(2);
+        expect(written.get(outputPath)).toBe(repaired);
+    });
+
     test.each([
         [ 'String', false ],
         [ 'Number', true ]

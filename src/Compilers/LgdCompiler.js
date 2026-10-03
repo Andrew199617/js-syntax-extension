@@ -16,6 +16,7 @@ const LgdReturnChecker = require('./LgdReturnChecker');
 const LgdReturnDocChecker = require('./LgdReturnDocChecker');
 const LgdStandaloneReturnChecker = require('./LgdStandaloneReturnChecker');
 const LgdBaseCalls = require('./LgdBaseCalls');
+const LgdGeneratedJsValidator = require('./LgdGeneratedJsValidator');
 const { parseTypedParams, parseObjectMethodParams, parseMethodHead, splitTopLevelChunks, isRegexStart, skipRegexLiteral } = require('./LgdTypedParams');
 const { maskCode } = require('./LgdInfer');
 
@@ -58,18 +59,10 @@ const LgdCompiler = {
     compileToJs(content, externals = new Map(), options = {})
     {
         const resolved = LgdOutputOptions.resolve(options);
-        const parsed = this.parse(content, externals);
+        const parsed = this.parse(content, externals, { deferAnalysis: true });
         for(const error of resolved.errors)
         {
             parsed.errors.push({ ...this.createError(content, 0, error.message), ...error });
-        }
-
-        if(resolved.options.javascriptObjectModel === 'class')
-        {
-            for(const error of LgdNativeClassEmitter.check(content, parsed.allDeclarations, externals, this))
-            {
-                parsed.errors.push({ ...this.createError(content, error.offset, error.message, error.endOffset), ...error });
-            }
         }
 
         const newline = this.detectNewline(content);
@@ -78,9 +71,31 @@ const LgdCompiler = {
         const output = this.emitRange(content, backend, this.fullRange(content, parsed.declarations));
         const erased = LgdInterfaceErasure.apply(content, parsed.allDeclarations, externals, output);
         const emitted = LgdInterfaceTypes.apply(content, parsed.allDeclarations, externals, erased);
+        const validation = LgdGeneratedJsValidator.validate(emitted);
+        if(!parsed.errors.some(error => error.severity !== 'warning'))
+        {
+            for(const error of validation.errors)
+            {
+                const diagnostic = { ...this.createError(content, error.offset, error.message, error.endOffset), ...error };
+                if(resolved.options.javascriptObjectModel === 'class')
+                {
+                    diagnostic.code = 'lgd.output.nativeSyntax';
+                }
+
+                parsed.errors.push(diagnostic);
+            }
+        }
+
+        let context;
+        if(validation.errors.length === 0 && parsed.analysis?.required)
+        {
+            context = this.checkEmittedTypes(content, parsed, emitted, { externals: externals, tree: validation.tree, inherited: parsed.analysis.inherited });
+        }
+
         if(resolved.options.javascriptObjectModel === 'class')
         {
-            for(const error of LgdNativeClassEmitter.validateOutput(emitted.code, emitted.segments))
+            const analysis = { emitted: emitted, tree: validation.tree || context?.tree };
+            for(const error of LgdNativeClassEmitter.check(content, parsed.allDeclarations, externals, analysis))
             {
                 parsed.errors.push({ ...this.createError(content, error.offset, error.message, error.endOffset), ...error });
             }
@@ -140,9 +155,10 @@ const LgdCompiler = {
      * @description Parses typed declarations out of LGD source, building a containment tree for nested declarations.
      * @param {string} content the LGD source text.
      * @param {Map} externals require specs to {exportName, keyword} entries for cross-file typing.
+     * @param {Object} options defers shared assignment and return analysis until final JavaScript emission.
      * @returns {LgdParseResultType} the root declarations, the flat declaration list, and any errors.
      */
-    parse(content, externals = new Map())
+    parse(content, externals = new Map(), options = {})
     {
         const classes = LgdClassSyntax.parse(content, this);
         const found = classes.declarations;
@@ -271,7 +287,15 @@ const LgdCompiler = {
         const inheritedReturnSignatures = LgdContractChecker.bodySignatures(content, found, externals);
         const declarations = this.buildTree(found);
         const hasBaseCalls = LgdBaseCalls.hasCalls(content, found);
-        if(found.length > 0 || hasBaseCalls || LgdStandaloneReturnChecker.hasCandidates(content))
+        const standaloneCandidates = LgdStandaloneReturnChecker.hasCandidates(content);
+        const parsed = { declarations: declarations, allDeclarations: found, errors: errors };
+        const required = found.length > 0 || hasBaseCalls || standaloneCandidates;
+        if(options.deferAnalysis)
+        {
+            parsed.analysis = { inherited: inheritedReturnSignatures, required: required };
+        }
+
+        if(required && (!options.deferAnalysis || hasBaseCalls || standaloneCandidates))
         {
             const emitted = this.emitRange(content, JsBackend.create(this.detectNewline(content)), this.fullRange(content, declarations));
             const standaloneErrors = LgdStandaloneReturnChecker.check(emitted);
@@ -288,31 +312,39 @@ const LgdCompiler = {
                 }
             }
 
-            if(standaloneErrors.length === 0)
+            if(standaloneErrors.length === 0 && !options.deferAnalysis)
             {
-                let context;
-                try
-                {
-                    context = LgdReturnChecker.createContext(content, found, emitted, { inherited: inheritedReturnSignatures, externals: externals });
-                }
-                catch(error)
-                {
-                    const map = LgdSourceMap.create(emitted.segments);
-                    if(errors.length === 0)
-                    {
-                        errors.push(this.createError(content, map.toSource(error.pos || 0), `Cannot validate declared types: ${error.message}`));
-                    }
-                }
-
-                if(context)
-                {
-                    const checked = [ ...LgdAssignmentChecker.check(context), ...LgdReturnChecker.check(context) ];
-                    this.appendTypeErrors(content, errors, checked);
-                }
+                this.checkEmittedTypes(content, parsed, emitted, { externals: externals, inherited: inheritedReturnSignatures });
             }
         }
 
-        return { declarations: declarations, allDeclarations: found, errors: errors };
+        return parsed;
+    },
+
+    /** @description Checks mapped lexical assignments and returns, reusing a validated final-output syntax tree when available. */
+    checkEmittedTypes(content, parsed, emitted, options)
+    {
+        let context;
+        try
+        {
+            context = LgdReturnChecker.createContext(content, parsed.allDeclarations, emitted, options);
+        }
+        catch(error)
+        {
+            const map = LgdSourceMap.create(emitted.segments);
+            if(parsed.errors.length === 0)
+            {
+                parsed.errors.push(this.createError(content, map.toSource(error.pos || 0), `Cannot validate declared types: ${error.message}`));
+            }
+        }
+
+        if(context)
+        {
+            const checked = [ ...LgdAssignmentChecker.check(context), ...LgdReturnChecker.check(context) ];
+            this.appendTypeErrors(content, parsed.errors, checked);
+        }
+
+        return context;
     },
 
     /** @description Appends mapped lexical diagnostics while preserving earlier contract diagnostics. */
