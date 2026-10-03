@@ -1,3 +1,4 @@
+const ConvertObjectInheritanceFix = require('./ConvertObjectInheritanceFix');
 const ChangeParameterAndReturnTypeFix = require('./ChangeParameterAndReturnTypeFix');
 const ChangeReturnTypeFix = require('./ChangeReturnTypeFix');
 const ChangeParameterTypeFix = require('./ChangeParameterTypeFix');
@@ -9,7 +10,8 @@ const UseStaticTypeReceiverFix = require('./UseStaticTypeReceiverFix');
 /** @description Creates the diagnostic strategy registry; future fixes register one isolated handler here. */
 function createQuickFixRegistry()
 {
-    const handlers = [ new AddOverrideFix(),
+    const handlers = [ new ConvertObjectInheritanceFix(),
+        new AddOverrideFix(),
         new MakeBaseVirtualFix(),
         new RemoveExtraBaseArgumentsFix(),
         new ChangeParameterTypeFix(),
