@@ -243,9 +243,11 @@ const LgdLanguageService = {
     {
         const version = state.document.version;
         const text = state.document.getText();
-        const errors = this.diagnosticPolicy ? await this.diagnosticPolicy(state, configuration) : state.errors;
+        const failure = state.errors.length > 0 && state.errors.every(error => error.code === 'lgd.editor.failure');
+        const errors = this.diagnosticPolicy && !failure ? await this.diagnosticPolicy(state, configuration) : state.errors;
         const current = this.getState(state.document.uri) === state && state.document.version === version && state.document.getText() === text;
-        if(errors && current && state.compiledVersion === version && state.compiledText === text)
+        const compiled = state.compiledVersion === version && state.compiledText === text;
+        if(errors && current && (failure || compiled))
         {
             this.diagnosticCollection.set(state.document.uri, createLgdDiagnostics(state.document, errors));
         }

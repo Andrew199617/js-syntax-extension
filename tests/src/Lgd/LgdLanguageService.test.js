@@ -220,6 +220,7 @@ describe('LgdLanguageService asynchronous lifecycle', () =>
         const document = makeTextDocument(LGD_URI, 'Number value = 1;');
         const state = await service.openDocument(document);
         const originalMap = state.map;
+        service.diagnosticPolicy = jest.fn(current => Promise.resolve(current.errors));
         vscode.workspace.applyEdit.mockResolvedValueOnce(false);
         document.setText('String label = "ready";');
 
@@ -228,6 +229,7 @@ describe('LgdLanguageService asynchronous lifecycle', () =>
         expect(state.errors).toEqual([expect.objectContaining({ code: 'lgd.editor.failure' })]);
         expect(state.map).toBe(originalMap);
         expect(setCalls).toHaveLength(2);
+        expect(service.diagnosticPolicy).not.toHaveBeenCalled();
         expect(errors).toHaveLength(1);
 
         await service.updateDocument(document);
