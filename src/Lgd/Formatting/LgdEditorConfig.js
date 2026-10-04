@@ -479,6 +479,13 @@ const LgdEditorConfig = {
     /** @description Maps exact compatible values and leaves foreign-language semantics unimplemented. */
     mapProperty(result, key, value, properties)
     {
+        const declarationGroups = require('./LgdDeclarationStyleImport').map(this, result, { key: key, value: value });
+
+        if(declarationGroups !== null)
+        {
+            return declarationGroups;
+        }
+
         if(Object.hasOwn(booleanMappings, key))
         {
             return this.booleanOption(result, key, value, booleanMappings[key]);

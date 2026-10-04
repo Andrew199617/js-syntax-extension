@@ -656,6 +656,82 @@
                                     ]
                                 }
                             }
+                        },
+                        "declarations": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "modifierOrder": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "public": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "private": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "protected": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "internal": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "static": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "abstract": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "virtual": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "override": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "readonly": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "async": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        }
+                                    }
+                                },
+                                "accessibility": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "for_non_interface_members"
+                                    ]
+                                },
+                                "localTypes": {
+                                    "enum": [
+                                        "preserve",
+                                        "explicit",
+                                        "inferred"
+                                    ]
+                                }
+                            }
                         }
                     }
                 }
@@ -3629,6 +3705,175 @@
                     "type": "object",
                     "additionalProperties": false,
                     "title": "Horizontal spacing: insideCastParens",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.declarations": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Declaration style",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "modifierOrder": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "public": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "private": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "protected": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "internal": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "static": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "abstract": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "virtual": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "override": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "readonly": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        },
+                                        "async": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                        }
+                                    }
+                                },
+                                "accessibility": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "for_non_interface_members"
+                                    ]
+                                },
+                                "localTypes": {
+                                    "enum": [
+                                        "preserve",
+                                        "explicit",
+                                        "inferred"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.declarations.modifierOrder": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Declaration style: modifierOrder",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.declarations.accessibility": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Declaration style: accessibility",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.declarations.localTypes": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Declaration style: localTypes",
                     "properties": {
                         "fix": {
                             "type": "string",
