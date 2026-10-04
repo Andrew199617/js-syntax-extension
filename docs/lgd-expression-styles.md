@@ -4,7 +4,7 @@ Expression preferences belong to `formatting.options.expressions` (or the
 `options` object of `rules["lgd.format.expressions"]`). Each preference also has
 an independent `lgd.format.expressions.<option>` severity/fix policy. They are
 opt-in: the default is `preserve`. A false imported Boolean preference maps to
-`preserve`; it does not expand concise code into a different form.
+`preserve`; it does not expand concise code into a different form. The explicit `lambdaBodies` preference instead offers `always`, `when_on_single_line`, and `never` for reversible arrow body style.
 
 ## Supported forms
 
@@ -22,6 +22,7 @@ opt-in: the default is `preserve`. A false imported Boolean preference maps to
 | `inferredMemberNames` | same | Plain object-literal `name: name` becomes shorthand. |
 | `conditionalReturn` | same | Two single-return branches become one conditional return. |
 | `conditionalAssignment` | same | Two plain assignments to the same local become a conditional assignment, except anonymous values with assignment-inferred names. |
+| `lambdaBodies` | `preserve`, `always`, `when_on_single_line`, `never` | A block containing exactly one value-return becomes a parenthesized concise expression; never expands concise expressions into a single-return block. Directives, comments, missing return values and unmapped typed arrow syntax are barriers. Full compiler diagnostics, declared contracts and normalized runtime AST must remain unchanged. |
 | `interpolation` | same | Primitive literal substitutions in untagged templates become escaped literal text. Other substitutions retain their evaluation order. |
 
 The exported compatibility map lists the corresponding `dotnet_style_*` and
@@ -50,3 +51,10 @@ handled separately by the common formatting policy.
 An unsafe or unsupported form produces no edit. These conservative guarantees
 are intentional; importing a similarly named C# preference does not authorize
 changing JavaScript coercion, nullability, evaluation count, or receiver binding.
+
+`csharp_style_expression_bodied_lambdas` maps true to `always`, false to `never`,
+and `when_on_single_line` to the corresponding native mode. Single-line mode
+requires a single-line expression; it does not claim a hard line-width guarantee.
+Conversions preserve lexical `this`/`arguments`, async behavior, operand evaluation
+and object/sequence expression grouping. Comments and existing directives are never
+moved or deleted. A file with compiler errors is left unchanged by this conversion.

@@ -561,7 +561,12 @@ const LgdEditorConfig = {
     {
         const option = LgdExpressionStyleOptions.editorConfig[key];
         let mode = value;
-        if(!option.startsWith('parentheses'))
+        if(option === 'lambdaBodies')
+        {
+            const modes = Object.fromEntries([ [ 'true', 'always' ], [ 'false', 'never' ], [ 'when_on_single_line', 'when_on_single_line' ] ]);
+            mode = modes[value];
+        }
+        else if(!option.startsWith('parentheses'))
         {
             if(value !== 'true' && value !== 'false')
             {

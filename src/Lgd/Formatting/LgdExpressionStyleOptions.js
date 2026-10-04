@@ -8,13 +8,15 @@ const parentheses = [ 'parenthesesArithmetic', 'parenthesesRelational', 'parenth
 const LgdExpressionStyleOptions = {
     catalog: {
         id: 'lgd.format.expressions', title: 'Expression styles',
-        defaults: Object.fromEntries([ ...preferences, ...parentheses ].map(option => [ option, 'preserve' ])),
+        defaults: { ...Object.fromEntries([ ...preferences, ...parentheses ].map(option => [ option, 'preserve' ])), lambdaBodies: 'preserve' },
         properties: Object.fromEntries([
+            [ 'lambdaBodies', { enum: [ 'preserve', 'always', 'when_on_single_line', 'never' ] } ],
             ...preferences.map(option => [ option, { enum: [ 'preserve', 'prefer' ] } ]),
             ...parentheses.map(option => [ option, { enum: [ 'preserve', 'always_for_clarity', 'never_if_unnecessary' ] } ])
         ])
     },
     editorConfig: Object.fromEntries([
+        [ 'csharp_style_expression_bodied_lambdas', 'lambdaBodies' ],
         [ 'dotnet_style_coalesce_expression', 'coalesce' ],
         [ 'dotnet_style_null_propagation', 'nullPropagation' ],
         [ 'csharp_style_conditional_delegate_call', 'conditionalCall' ],

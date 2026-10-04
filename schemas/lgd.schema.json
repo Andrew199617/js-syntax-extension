@@ -737,6 +737,14 @@
                             "type": "object",
                             "additionalProperties": false,
                             "properties": {
+                                "lambdaBodies": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "when_on_single_line",
+                                        "never"
+                                    ]
+                                },
                                 "coalesce": {
                                     "enum": [
                                         "preserve",
@@ -4010,6 +4018,14 @@
                             "type": "object",
                             "additionalProperties": false,
                             "properties": {
+                                "lambdaBodies": {
+                                    "enum": [
+                                        "preserve",
+                                        "always",
+                                        "when_on_single_line",
+                                        "never"
+                                    ]
+                                },
                                 "coalesce": {
                                     "enum": [
                                         "preserve",
@@ -4376,6 +4392,29 @@
                     "type": "object",
                     "additionalProperties": false,
                     "title": "Expression styles: parenthesesOther",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.lambdaBodies": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: lambdaBodies",
                     "properties": {
                         "fix": {
                             "type": "string",

@@ -142,7 +142,12 @@ describe('expression configuration integration', () =>
     {
         for(const [ key, option ] of Object.entries(LgdExpressionStyleOptions.editorConfig))
         {
-            const modes = option.startsWith('parentheses') ? LgdExpressionStyleOptions.catalog.properties[option].enum : [ 'true', 'false' ];
+            let modes = option.startsWith('parentheses') ? LgdExpressionStyleOptions.catalog.properties[option].enum : [ 'true', 'false' ];
+            if(option === 'lambdaBodies')
+            {
+                modes = [ 'true', 'false', 'when_on_single_line' ];
+            }
+
             for(const mode of modes)
             {
                 const mapped = LgdEditorConfig.map({ [key]: `${mode}:warning` });
@@ -150,6 +155,10 @@ describe('expression configuration integration', () =>
                 if(mode === 'true' || mode === 'false')
                 {
                     expected = mode === 'true' ? 'prefer' : 'preserve';
+                    if(option === 'lambdaBodies')
+                    {
+                        expected = mode === 'true' ? 'always' : 'never';
+                    }
                 }
 
                 expect(mapped.options.expressions[option]).toBe(expected);

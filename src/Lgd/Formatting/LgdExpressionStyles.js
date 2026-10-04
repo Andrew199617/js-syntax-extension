@@ -1,5 +1,6 @@
 const traverse = require('@babel/traverse').default;
 const LgdFormattingModel = require('./LgdFormattingModel');
+const LgdArrowStyles = require('./LgdArrowStyles');
 const LgdExpressionStyleOptions = require('./LgdExpressionStyleOptions');
 
 /** @description Arithmetic operators share a clarity preference. */
@@ -54,6 +55,7 @@ const LgdExpressionStyles = {
             this.member(context, entry);
             this.branches(context, node);
             this.interpolation(context, entry);
+            LgdArrowStyles.analyze(context, this, entry);
         }
 
         return context.errors;
