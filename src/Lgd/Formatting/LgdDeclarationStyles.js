@@ -73,7 +73,7 @@ const LgdDeclarationStyles = {
         /** @description Includes const declarations whose generated prefixes have no source mapping. */
         function collect(path)
         {
-            entries.push({ node: path.node, parent: path.parent });
+            entries.push({ node: path.node, parent: path.parent, scope: path.scope });
         }
 
         traverse(context.model.tree, { VariableDeclaration: collect });
@@ -87,7 +87,8 @@ const LgdDeclarationStyles = {
 
             const binding = node.declarations[0];
             const type = { NumericLiteral: 'Number', StringLiteral: 'String', BooleanLiteral: 'Boolean' }[binding.init?.type];
-            if(!type || binding.id.type !== 'Identifier')
+            const shadowed = type && (entry.scope.hasBinding(type, true) || context.model.parsed.allDeclarations.some(declaration => declaration.name === type));
+            if(!type || shadowed || binding.id.type !== 'Identifier')
             {
                 continue;
             }

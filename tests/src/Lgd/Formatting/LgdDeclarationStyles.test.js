@@ -52,6 +52,18 @@ describe('Guarded declaration spelling', () =>
         expect(format('const Number value = compute();', { localTypes: 'inferred' })).toContain('Number value');
     });
 
+    test.each([ 'Number', 'String', 'Boolean' ])('declines annotations shadowed by a nominal class or import named %s', type =>
+    {
+        const literals = { Number: '1', String: '"sample"', Boolean: 'true' };
+        for(const prefix of [ `class ${type} {}\n`, `import { ${type} } from "./types";\n` ])
+        {
+            const inferred = format(`${prefix}const value = ${literals[type]};`, { localTypes: 'explicit' });
+            expect(inferred).toContain(`const value = ${literals[type]};`);
+            const explicit = format(`${prefix}const ${type} value = ${literals[type]};`, { localTypes: 'inferred' });
+            expect(explicit).toContain(`const ${type} value = ${literals[type]};`);
+        }
+    });
+
     test('honors option severity and formatting-off regions', () =>
     {
         expect(format('const value = 1;', { localTypes: 'explicit' }, { 'lgd.format.declarations.localTypes': { severity: 'off' } })).toBe('const value = 1;');
