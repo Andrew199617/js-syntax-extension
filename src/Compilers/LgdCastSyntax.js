@@ -8,7 +8,7 @@ const { collectContractBindings } = require('./LgdContractBindings');
 const { visibleBindings } = require('./LgdBaseChecker');
 const LgdSourceMap = require('./LgdSourceMap');
 
-/** @description Parses C-style casts, converting Number operands and erasing reference assertions. */
+/** @description Parses C-style casts, converting Number and Boolean operands and erasing reference assertions. */
 const LgdCastSyntax = {
     /** @description Lowers casts once while retaining source metadata for the editor and shared type analysis. */
     emit(compiler, content, backend, options)
@@ -328,10 +328,20 @@ const LgdCastSyntax = {
         }
     },
 
-    /** @description Converts only Number; other casts retain the original value with compile-time type metadata. */
+    /** @description Converts builtin Number and Boolean; other casts retain the original value with compile-time type metadata. */
     wrappers(cast, type, options)
     {
-        if(baseTypeName(cast.typeName) === 'Number' && !cast.target)
+        const targetName = baseTypeName(cast.typeName);
+        if(targetName === 'Boolean' && !cast.target)
+        {
+            const conversion = cast.typeName.endsWith('?')
+                ? '((_lgdCastValue) => _lgdCastValue === null ? null : !!_lgdCastValue)('
+                : '!!(';
+
+            return { prefix: `(${conversion}`, suffix: '))' };
+        }
+
+        if(targetName === 'Number' && !cast.target)
         {
             const conversion = cast.typeName.endsWith('?')
                 ? '((_lgdCastValue) => _lgdCastValue === null ? null : globalThis.Number(_lgdCastValue))('

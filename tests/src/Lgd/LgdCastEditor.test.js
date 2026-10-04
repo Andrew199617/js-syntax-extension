@@ -16,6 +16,7 @@ describe('Cast editor metadata.', () =>
             'const vscode = {};',
             'class Reader {',
             '    Number read(String input) { return (Number)input; }',
+            '    Boolean present(String input) { return (Boolean)input; }',
             '    readPosition(input) { return (vscode.Position?)input; }',
             '    readThis() { return (Number)this.commandName; }',
             '}',
@@ -43,16 +44,32 @@ describe('Cast editor metadata.', () =>
 
     test('explains numeric conversion versus zero-runtime-check reference assertions on hover', async () =>
     {
-        const source = 'class Item {}\nconst raw = {};\nconst item = (Item)raw;\nconst amount = (Number)"1";';
+        const source = 'class Item {}\nconst raw = {};\nconst item = (Item)raw;\nconst amount = (Number)"1";\nconst truthy = (Boolean)"false";\nconst nullable = (Boolean?)null;';
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
         const document = makeTextDocument('file:///workspace/Casts.lgd', source);
         await service.openDocument(document);
         const provider = LgdHoverProvider.create(service);
         const reference = await provider.provideHover(document, document.positionAt(source.indexOf('(Item)') + 1));
         const numeric = await provider.provideHover(document, document.positionAt(source.indexOf('(Number)') + 1));
+        const truthy = await provider.provideHover(document, document.positionAt(source.indexOf('(Boolean)') + 1));
+        const nullable = await provider.provideHover(document, document.positionAt(source.indexOf('(Boolean?)') + 1));
+        expect(truthy.contents).toContain('JavaScript Boolean truthiness');
+        expect(nullable.contents).toContain('Preserves null');
         expect(reference.contents).toContain('no runtime check');
         expect(numeric.contents).toContain('JavaScript Number');
         expect(numeric.contents).toContain('NaN');
         expect(document.getText(reference.range)).toBe('Item');
+    });
+
+    test('describes a class named Boolean as an assertion', async () =>
+    {
+        const source = 'class Boolean {} const raw = {}; const value = (Boolean)raw;';
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument('file:///workspace/Shadow.lgd', source);
+        await service.openDocument(document);
+        const provider = LgdHoverProvider.create(service);
+        const hover = await provider.provideHover(document, document.positionAt(source.indexOf('(Boolean)') + 1));
+        expect(hover.contents).toContain('no runtime check');
+        expect(hover.contents).not.toContain('truthiness');
     });
 });

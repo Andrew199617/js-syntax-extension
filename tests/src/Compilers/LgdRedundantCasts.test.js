@@ -45,6 +45,8 @@ describe('Guarded unnecessary reference cast removal.', () =>
 
     test.each([
         'const Number original = 1; const value = (Number)original;',
+        'const Boolean original = true; const value = (Boolean)original;',
+        'const String original = "false"; const value = (Boolean)original;',
         'class Item {}\nlet Item original = Item.create();\nconst value = (Item)original;',
         'class Item {}\nconst Object original = Item.create();\nconst value = (Item)original;',
         'class Item {}\nconst Item original = Item.create();\nconst value = (Item?)original;',

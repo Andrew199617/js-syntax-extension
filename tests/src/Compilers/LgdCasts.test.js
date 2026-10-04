@@ -34,6 +34,125 @@ describe('C-style casts.', () =>
         expect(value).toBe(expected);
     });
 
+    test.each([ 'oloo', 'class' ])('converts all JavaScript value categories with Boolean truthiness in %s output', objectModel =>
+    {
+        const expressions = [ '""',
+            '"hello"',
+            '"false"',
+            '"0"',
+            '" "',
+            '0',
+            '-0',
+            '1',
+            '-1',
+            'NaN',
+            'null',
+            'undefined',
+            'false',
+            'true',
+            '0n',
+            '1n',
+            'Symbol("key")',
+            '[]',
+            '{}',
+            '(() => false)' ];
+        const source = expressions.map((expression, index) => `const Boolean result${index} = (Boolean)${expression};`).join('\n');
+        const exports = `\nmodule.exports = [${expressions.map((expression, index) => `result${index}`).join(', ')}];`;
+        expect(execute(source + exports, objectModel).value).toEqual([
+            false,
+            true,
+            true,
+            true,
+            true,
+            false,
+            false,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true
+        ]);
+    });
+
+    test.each([ 'oloo', 'class' ])('preserves nullable null, precedence, and single evaluation without object coercion in %s output', objectModel =>
+    {
+        const source = [
+            'let reads = 0;',
+            'const holder = { get text() { reads++; return "false"; } };',
+            'function missing() { reads++; return null; }',
+            'const custom = { valueOf() { throw Error("coerced"); }, toString() { throw Error("coerced"); } };',
+            'const Boolean first = (Boolean)holder.text;',
+            'const Boolean? second = (Boolean?)missing();',
+            'const Boolean third = (Boolean)custom;',
+            'const Boolean? fourth = (Boolean?)undefined;',
+            'const grouped = (Boolean)("" + "0");',
+            'const nested = (Boolean)(Number)"0";',
+            'const precedence = (Boolean)"" + "suffix";',
+            'const conditional = false ? (Boolean)"" : (Boolean)"false";',
+            'module.exports = [first, second, third, fourth, grouped, nested, precedence, conditional, reads];'
+        ].join('\n');
+        expect(execute(source, objectModel).value).toEqual([ true, null, true, false, true, false, 'falsesuffix', true, 2 ]);
+    });
+
+    test.each([ 'oloo', 'class' ])('retains local and imported Boolean class assertions in %s output', objectModel =>
+    {
+        const source = 'class Boolean {} const original = Boolean.create(); const value = (Boolean)original; module.exports = value === original;';
+        const { value, compiled } = execute(source, objectModel);
+        expect(value).toBe(true);
+        expect(compiled.code).not.toContain('globalThis.Boolean(');
+        const descriptor = { exportName: 'Boolean', keyword: 'Object', kind: 'class', sourcePath: '/types/Boolean.lgd',
+            constructorParams: [], methodsKnown: true, contractsKnown: true, methodSignatures: [], contractSignatures: [], members: [] };
+        const externals = new Map([[ './Boolean.js', descriptor ]]);
+        const imported = LgdCompiler.create().compileToJs(
+            'const Boolean = require("./Boolean.js"); Object raw = {}; const value = (Boolean?)raw;', externals,
+            { javascriptObjectModel: objectModel }
+        );
+
+        expect(imported.errors).toEqual([]);
+        expect(imported.casts[0].target.kind).toBe('class');
+        expect(imported.code).not.toContain('globalThis.Boolean(');
+        expect(imported.code).toContain('@type {Boolean | null}');
+        const renamed = LgdCompiler.create().compileToJs(
+            'const Imported = require("./Boolean.js"); Object raw = {}; const value = (Imported)raw;', externals,
+            { javascriptObjectModel: objectModel }
+        );
+        expect(renamed.errors).toEqual([]);
+        expect(renamed.casts[0].target.kind).toBe('class');
+        expect(renamed.code).not.toContain('globalThis.Boolean(');
+    });
+
+    test('keeps implicit String assignments invalid and ordinary shadowed Boolean calls unchanged', () =>
+    {
+        const result = LgdCompiler.create().compileToJs('Boolean value = "false";');
+        expect(result.errors.map(error => error.code)).toEqual(['lgd.assignment.typeMismatch']);
+        const { value, compiled } = execute('const Boolean = value => value; module.exports = (Boolean)("false");');
+        expect(value).toBe('false');
+        expect(compiled.casts).toEqual([]);
+        const shadowed = LgdCompiler.create().compileToJs('const Boolean = value => value; const result = (Boolean)"false";');
+        expect(shadowed.errors.map(error => error.code)).toEqual(['lgd.cast.unknownType']);
+        expect(shadowed.code).not.toContain('globalThis.Boolean(');
+        expect(LgdCompiler.create().compileToTs('const value = (Boolean)"false";').code).toContain('!!(');
+    });
+
+    test('does not consult a shadowed or replaced global Boolean function', () =>
+    {
+        const source = 'const globalThis = { Boolean() { throw Error("called"); } }; module.exports = [(Boolean)"false", (Boolean?)""];';
+        expect(execute(source).value).toEqual([ true, false ]);
+        const replaced = { Boolean: () =>
+        {
+            throw new Error('called');
+        } };
+        expect(execute('module.exports = (Boolean)"false";', 'oloo', replaced).value).toBe(true);
+    });
+
     test('preserves nullable null and evaluates getters, calls, and object coercion once', () =>
     {
         const source = [
@@ -122,15 +241,14 @@ describe('C-style casts.', () =>
             'class Second {}',
             'First first = First.create();',
             'const second = (Second)first;',
-            'const boolean = (Boolean)"false";',
             'const text = (String)1;',
             'const large = (BigInt)1;',
             'const missing = (Missing)first;'
         ].join('\n');
         const result = LgdCompiler.create().compileToJs(source);
         const errors = result.errors.filter(error => error.code?.startsWith('lgd.cast.'));
-        expect(errors.map(error => source.slice(error.offset, error.endOffset))).toEqual([ 'Missing', 'Second', 'Boolean', 'String', 'BigInt' ]);
-        const incompatibleCount = 4;
+        expect(errors.map(error => source.slice(error.offset, error.endOffset))).toEqual([ 'Missing', 'Second', 'String', 'BigInt' ]);
+        const incompatibleCount = 3;
         expect(errors.filter(error => error.code === 'lgd.cast.incompatibleType')).toHaveLength(incompatibleCount);
     });
 

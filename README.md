@@ -694,10 +694,11 @@ export enum DownloadState {
 
 ## C-style casts
 
-Use `(Number)value` for JavaScript numeric conversion. Other casts such as `(BaseCommand)value`, `(vscode.Position)value`, or `(String)value` tell LGD the expression's type without converting or rebuilding the value. Type names, including qualified and nullable targets, are highlighted and explain their behavior on hover.
+Use `(Number)value` for JavaScript numeric conversion and `(Boolean)value` for JavaScript truthiness conversion. Other casts such as `(BaseCommand)value`, `(vscode.Position)value`, or `(String)value` tell LGD the expression's type without converting or rebuilding the value. Type names, including qualified and nullable targets, are highlighted and explain their behavior on hover.
 
 ```lgd
 const Number count = (Number)"12";
+const Boolean present = (Boolean)"hello";
 const Number? optionalCount = (Number?)maybeText;
 const BaseCommand command = (BaseCommand)unknownCommand;
 ```
@@ -705,9 +706,11 @@ const BaseCommand command = (BaseCommand)unknownCommand;
 - `Number` uses JavaScript's standard `Number` conversion: empty/whitespace strings and `null` become `0`, invalid numeric strings and `undefined` produce `NaN`, and converting a `Symbol` throws JavaScript's normal error. There is no extra validation, and normal JavaScript object coercion rules apply.
 - `Number?` preserves `null`; other values use the same numeric conversion. Operands, including getters and calls, are evaluated once.
 - Class and interface casts preserve the same object and its prototype chain in both OLOO and native-class output. Known unrelated classes and provably incompatible primitive casts are diagnosed. Unknown values and related downcasts are trusted at compile time and can still be wrong at runtime.
-- Other primitive targets do not introduce conversions: for example, `(Boolean)"false"` is a type error. Use an explicit JavaScript conversion function when that behavior is wanted.
+- `Boolean` accepts any value using JavaScript truthiness: empty strings, `0`, `-0`, `0n`, `NaN`, `null`, and `undefined` become `false`. Nonempty strings (including `"false"`, `"0"`, and whitespace), nonzero numbers/bigints, symbols, arrays, functions, and ordinary objects become `true`. Objects are not coerced through `valueOf` or `toString`.
+- `Boolean?` preserves `null`; other values use the same truthiness conversion. Operands are evaluated once. Implicit String-to-Boolean assignments remain type errors.
+- Local or imported types named `Number` or `Boolean` remain reference assertions rather than builtin conversions. Other primitive targets such as `String` do not introduce conversions. A value-only binding named `Boolean` hides the builtin cast type: `(Boolean)value` reports an unknown cast type, while `(Boolean)(value)` remains an ordinary call.
 - The target grammar matches LGD annotations: a capitalized type name, an optional namespace, and an optional `?`. Array/generic type spellings are not part of that grammar. Ordinary grouped values, function calls, and arrow parameters retain their JavaScript meaning; when a known type is followed by a grouped operand, `(Number)(expression)` is a cast. A namespace alone does not identify a grouped call as a cast; `(namespace.Type)value` is unambiguous, while `(namespace.Type)(value)` keeps its ordinary call meaning unless that type is known.
 
-These are LGD JavaScript rules, not a promise that every numeric conversion can be copied unchanged into C#. Future backends must preserve the conversion semantics explicitly.
+These are LGD JavaScript rules, not a promise that every numeric or truthiness conversion can be copied unchanged into C#. Future backends must preserve the conversion semantics explicitly.
 
-A guarded “Remove unnecessary reference cast” quick fix is available when an unchanged local `const` already declares exactly the asserted local class type. It leaves numeric conversions, nullable assertions, imported/unknown types, widening/downcasts, and commented cast heads alone. The `unnecessary-reference-cast` rule supports the standard `off`, `manual`, and opt-in `automatic` fix settings. `dotnet_diagnostic.IDE0004.severity` imports `none`/`off`, `warning`, or `error` for this limited rule. Native `unnecessary-reference-cast.severity` overrides it. Severity never enables automatic fixes.
+A guarded “Remove unnecessary reference cast” quick fix is available when an unchanged local `const` already declares exactly the asserted local class type. It leaves numeric and truthiness conversions, nullable assertions, imported/unknown types, widening/downcasts, and commented cast heads alone. The `unnecessary-reference-cast` rule supports the standard `off`, `manual`, and opt-in `automatic` fix settings. `dotnet_diagnostic.IDE0004.severity` imports `none`/`off`, `warning`, or `error` for this limited rule. Native `unnecessary-reference-cast.severity` overrides it. Severity never enables automatic fixes.

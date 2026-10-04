@@ -524,7 +524,7 @@ test('declaration project plans retain safe files while declining a nominal type
 
 test('IDE0004 severity refreshes compiler presentation without authorizing automatic fixes or hiding errors', async () =>
 {
-    const source = 'class Item {}\nconst Item original = Item.create();\nconst value = (Item)original;\nconst wrong = (Boolean)"bad";';
+    const source = 'class Item {}\nconst Item original = Item.create();\nconst value = (Item)original;\nconst wrong = (String)true;';
     const { fixes, document, service, config } = await fixture(source, {
         autoFix: true, rules: { 'unnecessary-reference-cast': { severity: 'error' } }
     });
@@ -540,7 +540,7 @@ test('IDE0004 severity refreshes compiler presentation without authorizing autom
     await fixes.formattingDiagnostics.refresh(document);
     diagnostics = service.diagnosticCollection.set.mock.calls.slice(-1)[0][1];
     expect(diagnostics.some(error => error.code === 'style')).toBe(false);
-    expect(diagnostics.some(error => error.message.includes('Cannot cast String to Boolean'))).toBe(true);
+    expect(diagnostics.some(error => error.message.includes('Cannot cast Boolean to String'))).toBe(true);
     expect((await fixes.analysisRequest(document, service.getState(document.uri))).state.errors.some(error => error.code === 'lgd.cast.redundant')).toBe(false);
     expect(service.getState(document.uri).errors.some(error => error.code === 'lgd.cast.redundant')).toBe(true);
 });

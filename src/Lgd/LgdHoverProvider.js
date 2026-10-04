@@ -60,9 +60,22 @@ const LgdHoverProvider = {
         if(cast)
         {
             const numeric = !cast.target && (cast.typeName === 'Number' || cast.typeName === 'Number?');
-            const detail = numeric
-                ? 'Converts the value using JavaScript Number. Invalid numeric input can produce NaN.'
-                : 'Asserts the expression type for LGD. JavaScript keeps the original value; no runtime check is performed.';
+            const boolean = !cast.target && (cast.typeName === 'Boolean' || cast.typeName === 'Boolean?');
+            let detail = 'Asserts the expression type for LGD. JavaScript keeps the original value; no runtime check is performed.';
+            if(numeric)
+            {
+                detail = 'Converts the value using JavaScript Number. Invalid numeric input can produce NaN.';
+            }
+            else if(boolean)
+            {
+                detail = 'Converts the value using JavaScript Boolean truthiness. Empty strings are false; nonempty strings, including "false", are true.';
+            }
+
+            if((numeric || boolean) && cast.typeName.endsWith('?'))
+            {
+                detail += ' Preserves null; other values are converted.';
+            }
+
             const markdown = [ '```lgd', `(${cast.typeName}) expression`, '```', detail ].join('\n');
             return new vscode.Hover(markdown, new vscode.Range(document.positionAt(cast.typeStart), document.positionAt(cast.typeEnd)));
         }

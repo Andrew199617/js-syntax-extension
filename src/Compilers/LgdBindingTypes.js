@@ -191,7 +191,7 @@ const LgdBindingTypes = {
         const baseType = baseTypeName(type);
         const descriptor = { keyword: UNKNOWN, readonly: Boolean(declaration?.readonly), kind: 'unknown', typeName: type, ref: null };
         this._entries.set(binding, descriptor);
-        if(Object.hasOwn(tsTypeMap, baseType))
+        if(Object.hasOwn(tsTypeMap, baseType) && !importedClass && declaration?.kind !== 'class')
         {
             descriptor.kind = 'keyword';
             descriptor.keyword = baseType;

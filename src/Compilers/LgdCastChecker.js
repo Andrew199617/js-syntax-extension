@@ -81,7 +81,7 @@ const LgdCastChecker = {
             if(incompatible)
             {
                 errors.push({ offset: cast.typeStart, endOffset: cast.typeEnd, code: 'lgd.cast.incompatibleType',
-                    message: `Cannot cast ${incompatible} to ${cast.typeName}. Only Number casts convert values; reference casts do not change the value.` });
+                    message: `Cannot cast ${incompatible} to ${cast.typeName}. Only builtin Number and Boolean casts convert values; reference casts do not change the value.` });
             }
         }
 
@@ -144,12 +144,12 @@ const LgdCastChecker = {
         return [path];
     },
 
-    /** @description Preserves JavaScript Number conversion while rejecting proven incompatible non-converting assertions. */
+    /** @description Preserves JavaScript Number and Boolean conversion while rejecting proven incompatible non-converting assertions. */
     compatible(cast, inferred, receiver, context)
     {
         const expected = baseTypeName(cast.typeName);
         const actual = baseTypeName(inferred);
-        if(expected === 'Number' && !cast.target || actual === 'Unknown')
+        if([ 'Number', 'Boolean' ].includes(expected) && !cast.target || actual === 'Unknown')
         {
             return true;
         }
