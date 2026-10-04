@@ -131,7 +131,7 @@ const LgdExpressionStyles = {
             return;
         }
 
-        context.errors.push({ ruleId: ruleId, severity: severity, offset: range.start, endOffset: range.end,
+        context.errors.push({ code: ruleId, ruleId: ruleId, severity: severity, offset: range.start, endOffset: range.end,
             expectedText: context.source.slice(range.start, range.end), newText: newText,
             message: 'Expression does not match the configured LGD style.' });
     },

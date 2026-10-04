@@ -38,6 +38,8 @@ describe('guarded expression styles', () =>
         [ 'interpolation', templateSource('function f(){return `a@{1}b@{"c"}`;}'), '`a1bc`' ]
     ])('rewrites safe %s forms', (option, source, expected) =>
     {
+        const findings = LgdExpressionStyles.analyze(source, { options: { expressions: { [option]: 'prefer' } } });
+        expect(findings[0].code).toBe(`lgd.format.expressions.${option}`);
         const result = rewrite(source, option);
         expect(result).toContain(expected);
         expect(rewrite(result, option)).toBe(result);
