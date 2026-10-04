@@ -467,3 +467,57 @@ test.each([ 'document', 'project', 'solution' ])('cleanup Fix All enforces opt-i
     expect(javascript.getText()).toBe(source);
     expect((await fixes.plan(documents, { scope: scope, automatic: true })).plan.entries).toHaveLength(0);
 });
+
+test.each([ 'document', 'project', 'solution' ])('declaration imports reach the shared %s diagnostic and quick-fix plan', async scope =>
+{
+    const adapter = require('../../../src/Lgd/Formatting/LgdEditorConfig');
+
+    const imported = adapter.map(Object.fromEntries([[ 'csharp_style_var_for_built_in_types', 'false:error' ]]));
+    const { fixes, document } = await fixture('const amount = 42;', {
+        autoFix: true, formatting: { enabled: true, options: imported.options },
+        rules: { ...imported.rules, 'lgd.format.declarations': { fix: 'automatic' } }
+    });
+    await fixes.formattingDiagnostics.refresh(document);
+    const diagnostics = fixes.formattingDiagnostics.collection.set.mock.calls.at(-1)[1];
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0].severity).toBe(vscode.DiagnosticSeverity.Error);
+    const batch = await fixes.plan([document], { scope: scope, automatic: true });
+    expect(batch.plan.entries.map(entry => entry.handler.ruleId)).toEqual(['lgd.format.declarations.localTypes']);
+    expect(await fixes.applyBatch(batch, true)).toBe(true);
+    expect(document.getText()).toBe('const Number amount = 42;');
+});
+
+test('declaration save actions require global opt-in and respect manual/off leaf overrides', async () =>
+{
+    const { fixes, document, config } = await fixture('const amount = 42;', {
+        formatting: { enabled: true, options: { declarations: { localTypes: 'explicit' } } },
+        rules: { 'lgd.format.declarations': { fix: 'automatic' } }
+    });
+    const context = { only: { contains: kind => kind.value === 'source.fixAll.lgd' } };
+    expect(await fixes.provideCodeActions(document, null, context, {})).toEqual([]);
+    config.autoFix = true;
+    config.rules['lgd.format.declarations.localTypes'] = { fix: 'manual' };
+    expect((await fixes.plan([document], { automatic: true })).plan.entries).toEqual([]);
+    expect((await fixes.plan([document], { automatic: false })).plan.entries).toHaveLength(1);
+    config.rules['lgd.format.declarations.localTypes'].fix = 'off';
+    expect((await fixes.plan([document], { automatic: false })).plan.entries).toEqual([]);
+    config.rules['lgd.format.declarations.localTypes'] = { fix: 'automatic', severity: 'off' };
+    expect((await fixes.plan([document], { automatic: true })).plan.entries).toEqual([]);
+    expect(document.getText()).toBe('const amount = 42;');
+});
+
+test('declaration project plans retain safe files while declining a nominal type shadow', async () =>
+{
+    const { fixes, document, service } = await fixture('const amount = 42;', {
+        autoFix: true, formatting: { enabled: true, options: { declarations: { localTypes: 'explicit' } } },
+        rules: { 'lgd.format.declarations': { fix: 'automatic' } }
+    });
+    const shadowed = makeTextDocument('file:///project/shadowed.lgd', 'class Number {}\nconst amount = 42;');
+    shadowed.version = 1;
+    shadowed.languageId = 'lgd';
+    await service.openDocument(shadowed);
+    const batch = await fixes.plan([ document, shadowed ], { scope: 'project', automatic: true });
+    expect(batch.plan.entries).toHaveLength(1);
+    expect(batch.plan.entries[0].document).toBe(document);
+    expect(shadowed.getText()).toBe('class Number {}\nconst amount = 42;');
+});
