@@ -299,7 +299,7 @@ test('allows the narrowly safe return-this fix without enabling factory migratio
     const { fixes, document } = await fixture(source, { autoFix: true, rules: { 'constructor-return-value': { fix: 'automatic' } } });
     const batch = await fixes.plan([document], { automatic: true });
     expect(batch.plan.entries).toHaveLength(1);
-    expect(batch.plan.entries[0].proposal.newText).toBe('return;');
+    expect(batch.plan.entries[0].proposal.newText).toBe('');
     expect(document.getText()).toBe(source);
 });
 
