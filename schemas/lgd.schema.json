@@ -873,7 +873,12 @@
             "additionalProperties": false,
             "properties": {
                 "unnecessary-reference-cast": {
-                    "$ref": "#/definitions/rule"
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "fix": { "enum": [ "off", "manual", "automatic" ] },
+                        "severity": { "enum": [ "off", "warning", "error" ] }
+                    }
                 },
                 "readonly-variable-declaration": {
                     "$ref": "#/definitions/rule"

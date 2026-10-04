@@ -69,6 +69,12 @@ const LgdFormattingDiagnostics = {
                 return;
             }
 
+            await this.refreshCompilerDiagnostics?.(document, configuration);
+            if(this.disposed || this.generations.get(key) !== generation || document.version !== version || document.getText() !== text)
+            {
+                return;
+            }
+
             const errors = LgdFormattingRules.analyze(text, configuration);
             this.collection.set(document.uri, createLgdDiagnostics(document, errors));
         }

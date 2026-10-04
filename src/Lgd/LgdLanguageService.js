@@ -193,7 +193,7 @@ const LgdLanguageService = {
         state.compiledText = content;
         state.externals = externals;
         state.projectId = identity.projectId;
-        this.publishDiagnostics(state);
+        await this.publishDiagnostics(state);
         return state;
     },
 
@@ -236,11 +236,19 @@ const LgdLanguageService = {
     /**
      * @description Publishes LGD compiler errors as editor diagnostics on the LGD document.
      * @param {Object} state the document state.
-     * @returns {void}
+     * @param {Object} [configuration] an already resolved presentation configuration.
+     * @returns {Promise<void>}
      */
-    publishDiagnostics(state)
+    async publishDiagnostics(state, configuration)
     {
-        this.diagnosticCollection.set(state.document.uri, createLgdDiagnostics(state.document, state.errors));
+        const version = state.document.version;
+        const text = state.document.getText();
+        const errors = this.diagnosticPolicy ? await this.diagnosticPolicy(state, configuration) : state.errors;
+        const current = this.getState(state.document.uri) === state && state.document.version === version && state.document.getText() === text;
+        if(errors && current && state.compiledVersion === version && state.compiledText === text)
+        {
+            this.diagnosticCollection.set(state.document.uri, createLgdDiagnostics(state.document, errors));
+        }
     },
 
     /**

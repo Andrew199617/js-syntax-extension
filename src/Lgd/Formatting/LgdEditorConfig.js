@@ -503,6 +503,21 @@ const LgdEditorConfig = {
             return this.setOption(result, [ 'whitespace', 'fileHeader' ], header);
         }
 
+        if(key === 'dotnet_diagnostic.ide0004.severity')
+        {
+            const levels = { none: 'off', off: 'off', warning: 'warning', error: 'error' };
+            if(Object.hasOwn(levels, value))
+            {
+                result.rules['unnecessary-reference-cast'] = { severity: levels[value] };
+            }
+            else
+            {
+                this.unsupported(result, key, `Severity ${value} has no exact LGD severity equivalent.`);
+            }
+
+            return [];
+        }
+
         if(key === 'dotnet_diagnostic.ide0073.severity')
         {
             this.applySeverity(result, ['whitespace.fileHeader'], value, key);

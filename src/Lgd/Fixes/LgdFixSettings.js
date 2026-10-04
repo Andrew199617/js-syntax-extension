@@ -104,7 +104,24 @@ const LgdFixSettings = {
                 continue;
             }
 
-            this._validateKeys(setting, ['fix'], `${label}.${ruleId}`);
+            if(ruleId === 'unnecessary-reference-cast')
+            {
+                this._validateKeys(setting, [ 'fix', 'severity' ], `${label}.${ruleId}`);
+                if(setting.severity !== undefined && ![ 'off', 'warning', 'error' ].includes(setting.severity))
+                {
+                    throw new Error(`LGD ${label}.${ruleId}.severity must be off, warning, or error.`);
+                }
+
+                if(setting.fix === undefined)
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                this._validateKeys(setting, ['fix'], `${label}.${ruleId}`);
+            }
+
             if(![ 'off', 'manual', 'automatic' ].includes(setting.fix))
             {
                 throw new Error(`LGD ${label}.${ruleId}.fix must be "off", "manual", or "automatic".`);

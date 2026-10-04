@@ -1,3 +1,4 @@
+const LgdFormattingPolicy = require('../../../../src/Lgd/Fixes/LgdFormattingPolicy');
 const LgdEditorConfig = require('../../../../src/Lgd/Formatting/LgdEditorConfig');
 
 /** @description Test fixtures deliberately cover configuration resource limits. */
@@ -218,4 +219,19 @@ it('imports cast-head and post-cast spacing independently', () =>
     ]));
     expect(imported.options.spacing).toMatchObject({ afterCast: true, insideCastParens: true, insideOtherParens: true, insideControlParens: false });
     expect(imported.issues).toHaveLength(0);
+});
+
+it.each([ [ 'none', 'off' ], [ 'off', 'off' ], [ 'warning', 'warning' ], [ 'error', 'error' ] ])('imports IDE0004 severity %s without authorizing fixes', (value, expected) =>
+{
+    const result = LgdEditorConfig.map({ 'dotnet_diagnostic.ide0004.severity': value });
+    expect(result.rules['unnecessary-reference-cast']).toEqual({ severity: expected });
+    expect(result.issues).toEqual([]);
+});
+
+it('native redundant-cast severity overrides imported IDE0004 without changing the independent fix policy', () =>
+{
+    const imported = LgdEditorConfig.map({ 'dotnet_diagnostic.ide0004.severity': 'error' });
+    const native = { 'unnecessary-reference-cast': { severity: 'warning', fix: 'manual' } };
+    const resolved = LgdFormattingPolicy.resolve({ options: {} }, imported, native);
+    expect(resolved.rules['unnecessary-reference-cast']).toEqual({ severity: 'warning', fix: 'manual' });
 });

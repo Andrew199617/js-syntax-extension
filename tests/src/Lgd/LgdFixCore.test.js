@@ -41,3 +41,16 @@ test('formatting diagnostics are reusable without importing an editor SDK', () =
     expect(errors.map(error => error.ruleId)).toContain('lgd.format.spacing.beforeAssignment');
     expect(errors.map(error => error.ruleId)).toContain('lgd.format.spacing.afterAssignment');
 });
+
+test('accepts independent redundant-cast severity while keeping ordinary compiler rules strict', () =>
+{
+    const settings = LgdFixSettings.create([ 'unnecessary-reference-cast', 'readonly-variable-declaration' ]);
+    for(const severity of [ 'off', 'warning', 'error' ])
+    {
+        const configuration = { version: 1, rules: { 'unnecessary-reference-cast': { severity: severity } } };
+        expect(settings.parse(JSON.stringify(configuration))).toEqual(configuration);
+    }
+
+    expect(() => settings.parse(JSON.stringify({ version: 1, rules: { 'unnecessary-reference-cast': { severity: 'invalid' } } }))).toThrow(/severity/);
+    expect(() => settings.parse(JSON.stringify({ version: 1, rules: { 'readonly-variable-declaration': { severity: 'off' } } }))).toThrow(/severity/);
+});

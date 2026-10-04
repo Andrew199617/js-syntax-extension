@@ -1,4 +1,5 @@
 const path = require('path');
+const LgdCastDiagnosticPolicy = require('../../Lgd/Fixes/LgdCastDiagnosticPolicy');
 const vscode = require('vscode');
 const LgdFixRuntime = require('./LgdFixRuntime');
 const LgdFixEdits = require('./LgdFixEdits');
@@ -32,7 +33,22 @@ const LgdFixService = {
         const ruleIds = Array.from(new Set(Array.from(service.engine.handlers.values(), handler => handler.ruleId)));
         service.configuration = LgdFixConfiguration.create(ruleIds, LgdFormattingSources);
         service.ruleHandlers = new Map(Array.from(service.engine.handlers.values(), handler => [ handler.ruleId, handler ]));
+        languageService.diagnosticPolicy = async (state, configuration) =>
+        {
+            const resolved = configuration || await service.configuration.resolve(state.document);
+            return service.configuration.buffersCurrent(resolved) ? LgdCastDiagnosticPolicy.apply(state.errors, resolved) : null;
+        };
+
         service.formattingDiagnostics = LgdFormattingDiagnostics.create(service.configuration, languageService.onError);
+        service.formattingDiagnostics.refreshCompilerDiagnostics = async (document, configuration) =>
+        {
+            const state = languageService.getState(document.uri);
+            if(state)
+            {
+                await languageService.publishDiagnostics(state, configuration);
+            }
+        };
+
         service.pending = new Map();
         service.previews = new Map();
         service.nextId = 0;
@@ -149,7 +165,8 @@ const LgdFixService = {
     {
         const config = configuration || await this.configuration.resolve(document);
         const formattingErrors = LgdFormattingRules.analyze(document.getText(), config);
-        return { configuration: config, formattingErrors: formattingErrors, state: { ...state, errors: [ ...state?.errors || [], ...formattingErrors ] } };
+        const errors = LgdCastDiagnosticPolicy.apply(state?.errors || [], config);
+        return { configuration: config, formattingErrors: formattingErrors, state: { ...state, errors: [ ...errors, ...formattingErrors ] } };
     },
 
     /** @description Offers save-compatible actions only for explicitly opted-in, automatic-safe migrations. */

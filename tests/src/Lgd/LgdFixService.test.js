@@ -521,3 +521,26 @@ test('declaration project plans retain safe files while declining a nominal type
     expect(batch.plan.entries[0].document).toBe(document);
     expect(shadowed.getText()).toBe('class Number {}\nconst amount = 42;');
 });
+
+test('IDE0004 severity refreshes compiler presentation without authorizing automatic fixes or hiding errors', async () =>
+{
+    const source = 'class Item {}\nconst Item original = Item.create();\nconst value = (Item)original;\nconst wrong = (Boolean)"bad";';
+    const { fixes, document, service, config } = await fixture(source, {
+        autoFix: true, rules: { 'unnecessary-reference-cast': { severity: 'error' } }
+    });
+    await fixes.formattingDiagnostics.refresh(document);
+    let diagnostics = service.diagnosticCollection.set.mock.calls.slice(-1)[0][1];
+    expect(diagnostics.find(error => error.code === 'style').severity).toBe(vscode.DiagnosticSeverity.Error);
+    expect((await fixes.plan([document], { automatic: true })).plan.entries).toEqual([]);
+    config.rules['unnecessary-reference-cast'].severity = 'warning';
+    await fixes.formattingDiagnostics.refresh(document);
+    diagnostics = service.diagnosticCollection.set.mock.calls.slice(-1)[0][1];
+    expect(diagnostics.find(error => error.code === 'style').severity).toBe(vscode.DiagnosticSeverity.Warning);
+    config.rules['unnecessary-reference-cast'].severity = 'off';
+    await fixes.formattingDiagnostics.refresh(document);
+    diagnostics = service.diagnosticCollection.set.mock.calls.slice(-1)[0][1];
+    expect(diagnostics.some(error => error.code === 'style')).toBe(false);
+    expect(diagnostics.some(error => error.message.includes('Cannot cast String to Boolean'))).toBe(true);
+    expect((await fixes.analysisRequest(document, service.getState(document.uri))).state.errors.some(error => error.code === 'lgd.cast.redundant')).toBe(false);
+    expect(service.getState(document.uri).errors.some(error => error.code === 'lgd.cast.redundant')).toBe(true);
+});
