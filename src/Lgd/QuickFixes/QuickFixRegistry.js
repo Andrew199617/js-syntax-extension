@@ -1,3 +1,4 @@
+const RemoveRedundantCastFix = require('./RemoveRedundantCastFix');
 const RenameClassConstructorFix = require('./RenameClassConstructorFix');
 const ReplaceConstructorReturnThisFix = require('./ReplaceConstructorReturnThisFix');
 const RemoveReturnDocTypeFix = require('./RemoveReturnDocTypeFix');
@@ -18,6 +19,7 @@ const MoveVirtualModifierFix = require('./MoveVirtualModifierFix');
 function createQuickFixRegistry()
 {
     const handlers = [
+        { handler: new RemoveRedundantCastFix(), ruleId: 'unnecessary-reference-cast', automatic: true },
         { handler: new RenameClassConstructorFix(), ruleId: 'class-constructor-name' },
         { handler: new ReplaceConstructorReturnThisFix(), ruleId: 'constructor-return-value', automatic: true },
         { handler: new ReplaceReadonlyLocalFix(), ruleId: 'readonly-variable-declaration', automatic: true },

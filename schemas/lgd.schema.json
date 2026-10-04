@@ -846,6 +846,9 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
+                "unnecessary-reference-cast": {
+                    "$ref": "#/definitions/rule"
+                },
                 "readonly-variable-declaration": {
                     "$ref": "#/definitions/rule"
                 },

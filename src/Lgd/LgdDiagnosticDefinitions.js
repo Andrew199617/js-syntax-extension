@@ -14,6 +14,7 @@ const categories = Object.freeze({
 
 /** @description Explicit diagnostic definitions link internal IDs to presentation and permitted fix strategies. */
 const definitions = Object.freeze({
+    'lgd.cast.redundant': { category: 'style', proposalKind: 'removeRedundantCast', fixKinds: ['removeRedundantCast'] },
     'lgd.jsdoc.returnType': { category: 'warning', proposalKind: 'removeReturnDocType', fixKinds: ['removeReturnDocType'] },
     'lgd.syntax.declarationModifier': { category: 'syntax' },
     'lgd.access.inaccessible': { category: 'type' },

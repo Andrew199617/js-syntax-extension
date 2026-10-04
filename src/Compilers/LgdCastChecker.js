@@ -72,6 +72,12 @@ const LgdCastChecker = {
                 }
             }
 
+            const redundant = !incompatible && !nested && this.redundant(cast, operand, checking, signature);
+            if(redundant)
+            {
+                errors.push(redundant);
+            }
+
             if(incompatible)
             {
                 errors.push({ offset: cast.typeStart, endOffset: cast.typeEnd, code: 'lgd.cast.incompatibleType',
@@ -80,6 +86,41 @@ const LgdCastChecker = {
         }
 
         return errors;
+    },
+
+    /** @description Offers removal only for an unchanged local constant with the exact existing class contract. */
+    redundant(cast, operand, context, signature)
+    {
+        if(!operand.isIdentifier() || baseTypeName(cast.typeName) === 'Number' || cast.typeName.endsWith('?'))
+        {
+            return null;
+        }
+
+        const target = cast.target;
+        const binding = operand.scope.getBinding(operand.node.name);
+        if(target?.kind !== 'class' || !context.declarations.includes(target) || !binding?.constant || binding.kind !== 'const')
+        {
+            return null;
+        }
+
+        const offset = context.map.toSource(binding.identifier.start);
+        const declaration = context.declarations.find(candidate => candidate.nameStart === offset);
+        const receiver = context.members.receiver(operand);
+        if(declaration?.typeName !== cast.typeName || receiver?.declaration !== target || receiver.kind !== 'instance')
+        {
+            return null;
+        }
+
+        const types = LgdReturnChecker.expressionTypes(operand, signature, context);
+        const head = context.content.slice(cast.start, cast.headEnd);
+        if(types.length !== 1 || types[0] !== cast.typeName || (/\/\*|\/\//).test(head))
+        {
+            return null;
+        }
+
+        return { offset: cast.typeStart, endOffset: cast.typeEnd, code: 'lgd.cast.redundant', category: 'style', severity: 'warning',
+            message: `The expression already has type ${cast.typeName}; this cast is unnecessary.`,
+            quickFix: { kind: 'removeRedundantCast', offset: cast.start, endOffset: cast.headEnd, typeName: cast.typeName } };
     },
 
     /** @description Keeps nominal identity on conditional and sequence results instead of reducing them to names. */
