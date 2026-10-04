@@ -481,6 +481,7 @@ const LgdEditorConfig = {
     mapProperty(result, key, value, properties)
     {
         const declarationGroups = require('./LgdDeclarationStyleImport').map(this, result, { key: key, value: value });
+
         if(declarationGroups !== null)
         {
             return declarationGroups;
