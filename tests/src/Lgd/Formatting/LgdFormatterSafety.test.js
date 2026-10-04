@@ -272,3 +272,29 @@ it('keeps casts separate from grouped expressions and invocation parentheses', (
     expect(formatted).toContain('call(count)');
     expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
 });
+
+it.each([
+    [ 'Number       value = 1;', 'Number value = 1;' ],
+    [ 'const     Number    value = 1;', 'const Number value = 1;' ],
+    [ 'Number?      value = null;', 'Number? value = null;' ],
+    [ 'Array     values = [];', 'Array values = [];' ],
+    [ 'const Namespace.Type   value = null;', 'const Namespace.Type value = null;' ],
+    [ 'const    value = 1;', 'const value = 1;' ]
+])('normalizes only parsed declaration-head boundaries: %s', (source, expected) =>
+{
+    const normalize = { options: { spacing: { declarations: 'normalize' } } };
+    const preserve = { options: { spacing: { declarations: 'preserve' } } };
+    expect(LgdFormatter.format(source, normalize)).toBe(expected);
+    expect(LgdFormatter.format(expected, normalize)).toBe(expected);
+    expect(LgdFormatter.format(source, preserve)).toBe(source);
+});
+
+it('preserves comments, unsupported type spellings and indentation while normalizing field names', () =>
+{
+    const source = 'class Example\n{\n    Number    value = 1;\n}';
+    expect(LgdFormatter.format(source)).toBe('class Example\n{\n    Number value = 1;\n}');
+    const commented = 'Number /* type note */    value = 1;';
+    expect(LgdFormatter.format(commented)).toContain('/* type note */');
+    const unsupported = 'Number[]    values = [];';
+    expect(LgdFormatter.format(unsupported)).toBe(unsupported);
+});

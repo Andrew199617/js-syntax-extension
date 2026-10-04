@@ -227,6 +227,13 @@ const LgdFormatter = {
             return;
         }
 
+        if(context.model.declarationGaps.has(`${gap.start}:${gap.end}`))
+        {
+            gap.text = ' ';
+            gap.rule = 'spacing.declarations';
+            return;
+        }
+
         if(declaration)
         {
             gap.contributors.add('lgd.format.spacing.declarations');

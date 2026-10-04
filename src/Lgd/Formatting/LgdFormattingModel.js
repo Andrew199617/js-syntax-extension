@@ -22,7 +22,7 @@ const LgdFormattingModel = {
                 source: source, parsed: parsed, casts: parsed.casts || [], emitted: emitted, tree: tree, map: LgdSourceMap.create(emitted.segments),
                 protected: [], nodes: [], braces: new Map(), parens: new Map(), controls: [], cases: [], labels: new Set(),
                 heritageColons: new Set(), constructorColons: new Set(), functionParens: new Set(), doWhileKeywords: new Set(),
-                conditionalTokens: new Set(), returnTypes: new Set(), declarationHeads: [], importStarts: new Map(), importEnds: new Map()
+                conditionalTokens: new Set(), returnTypes: new Set(), declarationHeads: [], declarationGaps: new Set(), importStarts: new Map(), importEnds: new Map()
             };
             this.collectNodes(model, tree, null, '');
             model.tokens = this.tokenize(model);
@@ -270,6 +270,12 @@ const LgdFormattingModel = {
             if(![ 'class', 'interface', 'enum' ].includes(declaration.kind))
             {
                 model.declarationHeads.push({ start: declaration.headStart, end: declaration.initializerStart });
+                model.declarationGaps.add(`${declaration.typeEnd}:${declaration.nameStart}`);
+                const keyword = model.codeTokens.findLast(token => token.start >= declaration.headStart && token.end <= declaration.typeStart);
+                if(keyword && [ 'const', 'let', 'readonly' ].includes(keyword.text))
+                {
+                    model.declarationGaps.add(`${keyword.end}:${declaration.typeStart}`);
+                }
             }
 
             if([ 'class', 'interface', 'enum' ].includes(declaration.kind))
@@ -291,6 +297,13 @@ const LgdFormattingModel = {
                     if(!member.isConstructor && member.returnTypeName && Number.isInteger(member.returnTypeEnd))
                     {
                         model.returnTypes.add(declaration.initializerStart + member.returnTypeEnd);
+                    }
+
+                    if(member.kind === 'field' && Number.isInteger(member.propertyTypeEnd))
+                    {
+                        const typeEnd = declaration.initializerStart + member.propertyTypeEnd;
+                        model.declarationGaps.add(`${typeEnd}:${member.nameStart}`);
+                        model.declarationHeads.push({ start: member.start, end: member.initializerStart ?? member.nameEnd });
                     }
 
                     let memberLocation = 'methods';
@@ -375,6 +388,17 @@ const LgdFormattingModel = {
                 {
                     model.conditionalTokens.add(token.start);
                 }
+            }
+        }
+
+        if(node.type === 'VariableDeclaration' && node.declarations.length > 0)
+        {
+            const binding = this.range(model, node.declarations[0].id);
+            const keyword = model.codeTokens.find(token => token.start === start && token.text === node.kind);
+            if(keyword && binding)
+            {
+                model.declarationGaps.add(`${keyword.end}:${binding.start}`);
+                model.declarationHeads.push({ start: keyword.start, end: binding.start });
             }
         }
 
