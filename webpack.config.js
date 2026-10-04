@@ -90,6 +90,14 @@ const extensionOutput = {
             assets.add(grammar.path);
         }
 
+        for(const validation of extensionManifest.contributes.jsonValidation || [])
+        {
+            if(validation.url.startsWith('./'))
+            {
+                assets.add(validation.url);
+            }
+        }
+
         for(const asset of assets)
         {
             const destination = path.join(output, asset);
