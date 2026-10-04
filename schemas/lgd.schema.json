@@ -828,6 +828,24 @@
                                     ]
                                 }
                             }
+                        },
+                        "cleanup": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "unusedLocals": {
+                                    "enum": [
+                                        "preserve",
+                                        "remove"
+                                    ]
+                                },
+                                "unreachableStatements": {
+                                    "enum": [
+                                        "preserve",
+                                        "remove"
+                                    ]
+                                }
+                            }
                         }
                     }
                 }
@@ -4415,6 +4433,94 @@
                     "type": "object",
                     "additionalProperties": false,
                     "title": "Expression styles: lambdaBodies",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.cleanup": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Safe cleanup",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "unusedLocals": {
+                                    "enum": [
+                                        "preserve",
+                                        "remove"
+                                    ]
+                                },
+                                "unreachableStatements": {
+                                    "enum": [
+                                        "preserve",
+                                        "remove"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.cleanup.unusedLocals": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Safe cleanup: unusedLocals",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.cleanup.unreachableStatements": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Safe cleanup: unreachableStatements",
                     "properties": {
                         "fix": {
                             "type": "string",

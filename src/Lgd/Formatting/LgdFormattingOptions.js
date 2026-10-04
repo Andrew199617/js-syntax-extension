@@ -65,6 +65,7 @@ const catalog = [
 ];
 
 catalog.push(require('./LgdDeclarationStyleOptions'));
+catalog.push(require('./LgdCleanupStyleOptions').catalog);
 
 for(const [ key, value ] of Object.entries(catalog[2].defaults))
 {

@@ -509,6 +509,12 @@ const LgdEditorConfig = {
             return [];
         }
 
+        if(key === 'dotnet_diagnostic.ide0035.severity')
+        {
+            this.applySeverity(result, ['cleanup.unreachableStatements'], value, key);
+            return [];
+        }
+
         if(key === 'dotnet_diagnostic.ide0055.severity')
         {
             this.applySeverity(result, LgdFormattingOptions.catalog.map(rule => rule.id.slice('lgd.format.'.length)), value, key);

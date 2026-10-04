@@ -411,3 +411,59 @@ test('settles arrow-body style and overlapping whitespace through the complete f
     expect(document.getText()).toBe('const fn = value => (value + 1);');
     expect((await fixes.plan([document], { scope: 'document', automatic: false })).plan.entries).toHaveLength(0);
 });
+
+test('imports unreachable severity without enabling cleanup or automatic application', () =>
+{
+    const mapped = LgdEditorConfig.map({ 'dotnet_diagnostic.ide0035.severity': 'error' });
+    expect(mapped.options).toEqual({});
+    expect(mapped.rules['lgd.format.cleanup.unreachableStatements']).toEqual({ severity: 'error' });
+    expect(mapped.issues).toEqual([]);
+    const policy = require('../../../src/Lgd/Fixes/LgdFormattingRules');
+
+    const config = { valid: true, formatting: { enabled: true, options: {} }, rules: mapped.rules };
+    expect(policy.analyze('function run() { return 1; work(); }', config).filter(error => error.ruleId.startsWith('lgd.format.cleanup.'))).toEqual([]);
+    const schema = require('../../../schemas/lgd.schema.json');
+    const catalog = require('../../../src/Lgd/Formatting/LgdCleanupStyleOptions').catalog;
+
+    expect(schema.properties.formatting.properties.options.properties.cleanup.properties).toEqual(catalog.properties);
+    for(const option of Object.keys(catalog.properties))
+    {
+        expect(schema.definitions.rules.properties[`${catalog.id}.${option}`]).toBeDefined();
+    }
+});
+
+test.each([ 'document', 'project', 'solution' ])('cleanup Fix All enforces opt-in and safe mixed-file edits in %s scope', async scope =>
+{
+    const source = 'function run() { const unused = 1; return 2; work(); }';
+    const rules = Object.fromEntries(LgdFormattingOptions.catalog.filter(rule => rule.id !== 'lgd.format.cleanup').map(rule => [ rule.id, { severity: 'off' } ]));
+    const { fixes, document, service, config } = await fixture(source, {
+        formatting: { enabled: true, options: { cleanup: { unusedLocals: 'remove', unreachableStatements: 'remove' } } }, rules: rules
+    });
+    const unsafe = makeTextDocument('file:///project/unsafe.lgd', 'function run() { const unused = effect(); return 2; }');
+    unsafe.version = 1;
+    unsafe.languageId = 'lgd';
+    await service.openDocument(unsafe);
+    const javascript = makeTextDocument('file:///project/untouched.js', source);
+    javascript.languageId = 'javascript';
+    vscode.workspace.workspaceFolders = [{ uri: vscode.Uri.file('/project') }];
+    vscode.workspace.textDocuments = [ document, unsafe, javascript ];
+    vscode.workspace.findFiles.mockResolvedValue([]);
+    const documents = await fixes.documents(scope, document, {});
+    expect(documents).not.toContain(javascript);
+    expect((await fixes.plan(documents, { scope: scope, automatic: true })).plan.entries).toHaveLength(0);
+    config.autoFix = true;
+    expect((await fixes.plan(documents, { scope: scope, automatic: true })).plan.entries).toHaveLength(0);
+    config.rules['lgd.format.cleanup'] = { fix: 'automatic' };
+    expect((await fixes.plan(documents, { scope: scope, automatic: true })).plan.entries).toHaveLength(2);
+    config.rules['lgd.format.cleanup.unusedLocals'] = { fix: 'off' };
+    expect((await fixes.plan(documents, { scope: scope, automatic: false })).plan.entries).toHaveLength(1);
+    config.rules['lgd.format.cleanup.unusedLocals'] = { severity: 'off' };
+    expect((await fixes.plan(documents, { scope: scope, automatic: false })).plan.entries).toHaveLength(1);
+    config.rules['lgd.format.cleanup.unusedLocals'] = { fix: 'automatic' };
+    const batch = await fixes.plan(documents, { scope: scope, automatic: true });
+    expect(await fixes.applyBatch(batch, true)).toBe(true);
+    expect(document.getText()).toBe('function run() {  return 2;  }');
+    expect(unsafe.getText()).toBe('function run() { const unused = effect(); return 2; }');
+    expect(javascript.getText()).toBe(source);
+    expect((await fixes.plan(documents, { scope: scope, automatic: true })).plan.entries).toHaveLength(0);
+});

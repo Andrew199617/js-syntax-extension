@@ -1,4 +1,5 @@
 const LgdFormatter = require('../Formatting/LgdFormatter');
+const LgdCleanupStyles = require('../Formatting/LgdCleanupStyles');
 const LgdExpressionStyles = require('../Formatting/LgdExpressionStyles');
 const LgdFormattingPolicy = require('./LgdFormattingPolicy');
 
@@ -13,7 +14,7 @@ const LgdFormattingRules = {
         }
 
         const style = { options: configuration.formatting.options, rules: configuration.rules };
-        const findings = [ ...LgdFormatter.analyze(source, style), ...LgdExpressionStyles.analyze(source, style) ];
+        const findings = [ ...LgdFormatter.analyze(source, style), ...LgdExpressionStyles.analyze(source, style), ...LgdCleanupStyles.analyze(source, style) ];
         const errors = [];
         for(const finding of findings)
         {
