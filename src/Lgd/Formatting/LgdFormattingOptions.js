@@ -61,6 +61,8 @@ const catalog = [
     }
 ];
 
+catalog.push(require('./LgdDeclarationStyleOptions'));
+
 for(const [ key, value ] of Object.entries(catalog[2].defaults))
 {
     catalog[2].properties[key] = typeof value === 'boolean' ? { type: 'boolean' } : { enum: [ 'both', 'none', 'preserve' ] };

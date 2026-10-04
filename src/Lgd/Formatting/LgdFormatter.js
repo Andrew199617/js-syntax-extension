@@ -60,6 +60,7 @@ const LgdFormatter = {
 
         this.insertBraces(context);
         this.insertHeader(context);
+        require('./LgdDeclarationStyles').analyze(context, this);
         const preview = this.apply(source, context.errors);
         if(preview !== source)
         {
