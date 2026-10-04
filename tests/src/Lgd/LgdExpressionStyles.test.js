@@ -1,6 +1,13 @@
 const virtualMachine = require('vm');
 const LgdExpressionStyles = require('../../../src/Lgd/Formatting/LgdExpressionStyles');
 const LgdFormatter = require('../../../src/Lgd/Formatting/LgdFormatter');
+const LgdExpressionStyleOptions = require('../../../src/Lgd/Formatting/LgdExpressionStyleOptions');
+const LgdEditorConfig = require('../../../src/Lgd/Formatting/LgdEditorConfig');
+const LgdFormattingPolicy = require('../../../src/Lgd/Fixes/LgdFormattingPolicy');
+const LgdFixSettings = require('../../../src/Lgd/Fixes/LgdFixSettings');
+const LgdFormattingSources = require('../../../src/Lgd/Formatting/LgdFormattingSources');
+const LgdFormattingRules = require('../../../src/Lgd/Fixes/LgdFormattingRules');
+const schema = require('../../../schemas/lgd.schema.json');
 
 /** @description Applies only the requested guarded expression preference. */
 function rewrite(source, option, mode = 'prefer', rules = {})
@@ -105,5 +112,76 @@ describe('guarded expression styles', () =>
         const result = rewrite(source, option);
         expect(result).not.toBe(source);
         expect(evaluate(result)).toEqual(evaluate(source));
+    });
+});
+
+describe('expression configuration integration', () =>
+{
+    test('catalog, strict settings and native schema expose the same family and option policies', () =>
+    {
+        const catalog = LgdExpressionStyleOptions.catalog;
+        const properties = schema.properties.formatting.properties.options.properties.expressions.properties;
+        expect(properties).toEqual(catalog.properties);
+        const settings = LgdFixSettings.create(LgdFormattingPolicy.rules().map(rule => rule.id));
+        for(const option of Object.keys(properties))
+        {
+            const ruleId = `${catalog.id}.${option}`;
+            expect(schema.definitions.rules.properties[ruleId]).toBeDefined();
+            expect(LgdFormattingPolicy.definition(ruleId)).toBeDefined();
+            for(const mode of properties[option].enum)
+            {
+                const config = { version: 1, formatting: { enabled: true, options: { expressions: { [option]: mode } } }, rules: { [ruleId]: { fix: 'manual', severity: 'warning' } } };
+                expect(settings.parse(JSON.stringify(config))).toEqual(config);
+            }
+        }
+
+        expect(() => settings.parse(JSON.stringify({ version: 1, formatting: { options: { expressions: { coalesce: 'unsafe' } } } }))).toThrow();
+    });
+
+    test('every imported expression preference preserves valid modes and rejects unsupported values', () =>
+    {
+        for(const [ key, option ] of Object.entries(LgdExpressionStyleOptions.editorConfig))
+        {
+            const modes = option.startsWith('parentheses') ? LgdExpressionStyleOptions.catalog.properties[option].enum : [ 'true', 'false' ];
+            for(const mode of modes)
+            {
+                const mapped = LgdEditorConfig.map({ [key]: `${mode}:warning` });
+                let expected = mode;
+                if(mode === 'true' || mode === 'false')
+                {
+                    expected = mode === 'true' ? 'prefer' : 'preserve';
+                }
+
+                expect(mapped.options.expressions[option]).toBe(expected);
+                expect(mapped.rules[`lgd.format.expressions.${option}`]).toEqual({ severity: 'warning' });
+                expect(mapped.issues).toEqual([]);
+            }
+
+            const invalid = LgdEditorConfig.map({ [key]: 'invalid' });
+            expect(invalid.options).toEqual({});
+            expect(invalid.issues).toHaveLength(1);
+        }
+    });
+
+    test('matching EditorConfig imports reach guarded diagnostic findings without authorizing automatic fixes', async () =>
+    {
+        const configuration = '[*.lgd]\ndotnet_style_coalesce_expression = true:error\n[*.js]\ndotnet_style_coalesce_expression = false';
+        function readSnapshot(filename)
+        {
+            return Promise.resolve({ path: filename, realPath: filename, text: filename === '/project/.editorconfig' ? configuration : null, version: null, open: false });
+        }
+
+        const imported = await LgdFormattingSources.resolve({ filePath: '/project/example.lgd', workspaceRoot: '/project', readSnapshot: readSnapshot, sources: ['editorconfig'] });
+        expect(imported.issues).toEqual([]);
+        expect(imported.options.expressions.coalesce).toBe('prefer');
+        expect(imported.rules['lgd.format.expressions.coalesce']).toEqual({ severity: 'error' });
+        const settings = { valid: true, ignored: false, formatting: { enabled: true, options: imported.options }, rules: imported.rules };
+        const source = 'function choose(value, fallback) { return value === null || value === void 0 ? fallback : value; }';
+        const findings = LgdFormattingRules.analyze(source, settings).filter(error => error.ruleId.startsWith('lgd.format.expressions.'));
+        expect(findings).toHaveLength(1);
+        expect(findings[0]).toMatchObject({ code: 'lgd.format.expressions.coalesce', severity: 'error', quickFix: { kind: 'format:lgd.format.expressions.coalesce' } });
+        expect(LgdFormattingRules.analyze(source, { ...settings, ignored: true })).toEqual([]);
+        expect(LgdFormattingRules.analyze(source, { ...settings, valid: false })).toEqual([]);
+        expect(LgdFormattingRules.analyze(source, { ...settings, formatting: { enabled: false } })).toEqual([]);
     });
 });

@@ -1,4 +1,5 @@
 const LgdFormatter = require('../Formatting/LgdFormatter');
+const LgdExpressionStyles = require('../Formatting/LgdExpressionStyles');
 const LgdFormattingPolicy = require('./LgdFormattingPolicy');
 
 /** @description Adapts editor-neutral formatter findings to the shared diagnostic and fix-rule protocol. */
@@ -11,7 +12,8 @@ const LgdFormattingRules = {
             return [];
         }
 
-        const findings = LgdFormatter.analyze(source, { options: configuration.formatting.options, rules: configuration.rules });
+        const style = { options: configuration.formatting.options, rules: configuration.rules };
+        const findings = [ ...LgdFormatter.analyze(source, style), ...LgdExpressionStyles.analyze(source, style) ];
         const errors = [];
         for(const finding of findings)
         {

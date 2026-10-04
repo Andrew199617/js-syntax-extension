@@ -2,6 +2,8 @@ const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
 const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
 const LgdFixService = require('../../../src/Editors/VSCode/LgdFixService');
+const LgdEditorConfig = require('../../../src/Lgd/Formatting/LgdEditorConfig');
+const LgdFormattingOptions = require('../../../src/Lgd/Formatting/LgdFormattingOptions');
 
 
 /** @description Creates real compiler diagnostics with controlled configuration and atomic source edits. */
@@ -42,6 +44,14 @@ async function fixture(source, options = {})
     });
 
     return { service: service, fixes: fixes, document: document, config: config };
+}
+
+/** @description Isolates expression behavior from independently configured whitespace preferences. */
+function expressionConfiguration()
+{
+    const mapped = LgdEditorConfig.map(Object.fromEntries([[ 'dotnet_style_prefer_simplified_boolean_expressions', 'true:warning' ]]));
+    const rules = Object.fromEntries(LgdFormattingOptions.catalog.filter(rule => rule.id !== 'lgd.format.expressions').map(rule => [ rule.id, { severity: 'off' } ]));
+    return { autoFix: false, formatting: { enabled: true, options: mapped.options }, rules: { ...rules, ...mapped.rules } };
 }
 
 jest.mock('vscode', () =>
@@ -338,4 +348,53 @@ test('every contributing option must permit an automatic formatting edit', async
     expect(fixes.eligibleError(handler, error, config, { automatic: true })).toBe(false);
     config.rules['lgd.format.whitespace'].fix = 'automatic';
     expect(fixes.eligibleError(handler, error, config, { automatic: true })).toBe(true);
+});
+
+test('EditorConfig expression styles register diagnostics, manual fixes and opt-in save actions', async () =>
+{
+    const source = 'function choose(value) { return value ? true : false; }';
+    const { fixes, document, config } = await fixture(source, expressionConfiguration());
+    await fixes.formattingDiagnostics.refresh(document);
+    const diagnostics = fixes.formattingDiagnostics.collection.set.mock.calls[0][1];
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0].code).toBe('style');
+    expect(diagnostics[0].severity).toBe(vscode.DiagnosticSeverity.Warning);
+    const batch = await fixes.plan([document], { scope: 'document', automatic: false });
+    expect(batch.plan.entries.map(entry => entry.handler.ruleId)).toEqual(['lgd.format.expressions.booleanSimplification']);
+    expect((await fixes.plan([document], { automatic: true })).plan.entries).toHaveLength(0);
+    config.autoFix = true;
+    expect((await fixes.plan([document], { automatic: true })).plan.entries).toHaveLength(0);
+    config.rules['lgd.format.expressions'] = { fix: 'automatic' };
+    expect((await fixes.plan([document], { automatic: true })).plan.entries).toHaveLength(1);
+    config.rules['lgd.format.expressions.booleanSimplification'].fix = 'off';
+    expect((await fixes.plan([document], { automatic: false })).plan.entries).toHaveLength(0);
+    config.rules['lgd.format.expressions.booleanSimplification'].fix = 'automatic';
+    const ready = await fixes.plan([document], { automatic: true });
+    expect(await fixes.applyBatch(ready, true)).toBe(true);
+    expect(document.getText()).toBe('function choose(value) { return !!(value); }');
+    expect((await fixes.plan([document], { automatic: true })).plan.entries).toHaveLength(0);
+});
+
+test.each([ 'document', 'project', 'solution' ])('expression Fix All uses guarded edits in %s scope', async scope =>
+{
+    const source = 'function choose(value) { return value ? true : false; }';
+    const { fixes, document, service } = await fixture(source, expressionConfiguration());
+    const unrelated = makeTextDocument('file:///project/untouched.lgd', 'function choose(value) { return value ? 1 : 0; }');
+    unrelated.version = 1;
+    unrelated.languageId = 'lgd';
+    await service.openDocument(unrelated);
+    const javascript = makeTextDocument('file:///project/untouched.js', source);
+    javascript.languageId = 'javascript';
+    vscode.workspace.workspaceFolders = [{ uri: vscode.Uri.file('/project') }];
+    vscode.workspace.textDocuments = [ document, unrelated, javascript ];
+    vscode.workspace.findFiles.mockResolvedValue([]);
+    const discovered = await fixes.documents(scope, document, {});
+    expect(discovered).not.toContain(javascript);
+    const batch = await fixes.plan(discovered, { scope: scope, automatic: false });
+    expect(batch.plan.entries).toHaveLength(1);
+    expect(batch.plan.entries[0].document.uri.toString()).toBe(document.uri.toString());
+    expect(await fixes.applyBatch(batch, true)).toBe(true);
+    expect(document.getText()).toContain('!!(value)');
+    expect(unrelated.getText()).toBe('function choose(value) { return value ? 1 : 0; }');
+    expect(javascript.getText()).toBe(source);
 });

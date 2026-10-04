@@ -1,3 +1,5 @@
+const LgdExpressionStyleOptions = require('./LgdExpressionStyleOptions');
+
 /** @description Supported brace locations correspond to syntax that LGD can actually represent. */
 const braceLocations = [ 'classes', 'interfaces', 'enums', 'constructors', 'methods', 'accessors', 'functions', 'lambdas', 'controlBlocks', 'switchBlocks', 'caseBlocks', 'tryBlocks', 'elseBlocks', 'catchBlocks', 'finallyBlocks', 'objectLiterals', 'objectPatterns' ];
 
@@ -58,7 +60,8 @@ const catalog = [
     {
         id: 'lgd.format.bracesRequired', title: 'Control-flow braces',
         defaults: { mode: 'preserve' }, properties: { mode: { enum: [ 'preserve', 'always', 'multiLine' ] } }
-    }
+    },
+    LgdExpressionStyleOptions.catalog
 ];
 
 catalog.push(require('./LgdDeclarationStyleOptions'));

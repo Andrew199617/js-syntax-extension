@@ -1,5 +1,6 @@
 const path = require('path');
 const LgdFormattingOptions = require('./LgdFormattingOptions');
+const LgdExpressionStyleOptions = require('./LgdExpressionStyleOptions');
 
 /** @description Bounds parsing and matching while meeting standard property-length requirements. */
 const limits = { key: 1024, value: 4096, pattern: 1024, path: 8192, nesting: 32, width: 16, work: 200000 };
@@ -480,10 +481,14 @@ const LgdEditorConfig = {
     mapProperty(result, key, value, properties)
     {
         const declarationGroups = require('./LgdDeclarationStyleImport').map(this, result, { key: key, value: value });
-
         if(declarationGroups !== null)
         {
             return declarationGroups;
+        }
+
+        if(Object.hasOwn(LgdExpressionStyleOptions.editorConfig, key))
+        {
+            return this.expressionOption(result, key, value);
         }
 
         if(Object.hasOwn(booleanMappings, key))
@@ -548,6 +553,29 @@ const LgdEditorConfig = {
         }
 
         return this.unsupported(result, key, 'This EditorConfig property has no implemented LGD formatting mapping.');
+    },
+
+    /** @description Imports only the guarded expression subset, retaining independent option severity. */
+    expressionOption(result, key, value)
+    {
+        const option = LgdExpressionStyleOptions.editorConfig[key];
+        let mode = value;
+        if(!option.startsWith('parentheses'))
+        {
+            if(value !== 'true' && value !== 'false')
+            {
+                return this.unsupported(result, key, 'Expected true or false.');
+            }
+
+            mode = value === 'true' ? 'prefer' : 'preserve';
+        }
+
+        if(!LgdExpressionStyleOptions.catalog.properties[option].enum.includes(mode))
+        {
+            return this.unsupported(result, key, 'Unsupported parentheses preference.');
+        }
+
+        return this.setOption(result, [ 'expressions', option ], mode);
     },
 
     /** @description Invalid Boolean values do not enable an option through JavaScript truthiness. */

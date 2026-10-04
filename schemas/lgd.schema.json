@@ -732,6 +732,94 @@
                                     ]
                                 }
                             }
+                        },
+                        "expressions": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "coalesce": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "nullPropagation": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "conditionalCall": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "booleanSimplification": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "compoundAssignment": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "inferredMemberNames": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "conditionalReturn": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "conditionalAssignment": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "interpolation": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "parenthesesArithmetic": {
+                                    "enum": [
+                                        "preserve",
+                                        "always_for_clarity",
+                                        "never_if_unnecessary"
+                                    ]
+                                },
+                                "parenthesesRelational": {
+                                    "enum": [
+                                        "preserve",
+                                        "always_for_clarity",
+                                        "never_if_unnecessary"
+                                    ]
+                                },
+                                "parenthesesOtherBinary": {
+                                    "enum": [
+                                        "preserve",
+                                        "always_for_clarity",
+                                        "never_if_unnecessary"
+                                    ]
+                                },
+                                "parenthesesOther": {
+                                    "enum": [
+                                        "preserve",
+                                        "always_for_clarity",
+                                        "never_if_unnecessary"
+                                    ]
+                                }
+                            }
                         }
                     }
                 }
@@ -3874,6 +3962,417 @@
                     "type": "object",
                     "additionalProperties": false,
                     "title": "Declaration style: localTypes",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles",
+                    "description": "Style, severity and fix policy are independent. Option-specific rules may override this family.",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        },
+                        "options": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "coalesce": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "nullPropagation": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "conditionalCall": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "booleanSimplification": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "compoundAssignment": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "inferredMemberNames": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "conditionalReturn": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "conditionalAssignment": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "interpolation": {
+                                    "enum": [
+                                        "preserve",
+                                        "prefer"
+                                    ]
+                                },
+                                "parenthesesArithmetic": {
+                                    "enum": [
+                                        "preserve",
+                                        "always_for_clarity",
+                                        "never_if_unnecessary"
+                                    ]
+                                },
+                                "parenthesesRelational": {
+                                    "enum": [
+                                        "preserve",
+                                        "always_for_clarity",
+                                        "never_if_unnecessary"
+                                    ]
+                                },
+                                "parenthesesOtherBinary": {
+                                    "enum": [
+                                        "preserve",
+                                        "always_for_clarity",
+                                        "never_if_unnecessary"
+                                    ]
+                                },
+                                "parenthesesOther": {
+                                    "enum": [
+                                        "preserve",
+                                        "always_for_clarity",
+                                        "never_if_unnecessary"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "lgd.format.expressions.coalesce": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: coalesce",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.nullPropagation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: nullPropagation",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.conditionalCall": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: conditionalCall",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.booleanSimplification": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: booleanSimplification",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.compoundAssignment": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: compoundAssignment",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.inferredMemberNames": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: inferredMemberNames",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.conditionalReturn": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: conditionalReturn",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.conditionalAssignment": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: conditionalAssignment",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.interpolation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: interpolation",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.parenthesesArithmetic": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: parenthesesArithmetic",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.parenthesesRelational": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: parenthesesRelational",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.parenthesesOtherBinary": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: parenthesesOtherBinary",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.expressions.parenthesesOther": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Expression styles: parenthesesOther",
                     "properties": {
                         "fix": {
                             "type": "string",
