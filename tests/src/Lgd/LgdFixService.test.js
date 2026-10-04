@@ -398,3 +398,16 @@ test.each([ 'document', 'project', 'solution' ])('expression Fix All uses guarde
     expect(unrelated.getText()).toBe('function choose(value) { return value ? 1 : 0; }');
     expect(javascript.getText()).toBe(source);
 });
+
+test('settles arrow-body style and overlapping whitespace through the complete fix engine', async () =>
+{
+    const source = 'const fn = value => { return value + 1; };';
+    const { fixes, document } = await fixture(source, {
+        formatting: { enabled: true, options: { expressions: { lambdaBodies: 'always' } } }
+    });
+    const first = await fixes.plan([document], { scope: 'document', automatic: false });
+    expect(first.plan.entries.length).toBeGreaterThan(0);
+    expect(await fixes.applyBatch(first, true)).toBe(true);
+    expect(document.getText()).toBe('const fn = value => (value + 1);');
+    expect((await fixes.plan([document], { scope: 'document', automatic: false })).plan.entries).toHaveLength(0);
+});
