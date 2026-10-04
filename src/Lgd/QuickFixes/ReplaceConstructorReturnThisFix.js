@@ -1,7 +1,7 @@
 const DiagnosticQuickFix = require('./DiagnosticQuickFix');
 const LgdCompiler = require('../../Compilers/LgdCompiler');
 
-/** @description Retains a constructor's early exit without discarding an evaluated expression or a comment. */
+/** @description Removes a redundant terminal this return or retains the constructor's early exit. */
 class ReplaceConstructorReturnThisFix extends DiagnosticQuickFix
 {
     constructor() { super('replaceConstructorReturnThis', true); }
@@ -28,8 +28,10 @@ class ReplaceConstructorReturnThisFix extends DiagnosticQuickFix
             return null;
         }
 
-        return { title: 'Replace return this with an early exit', target: source, snapshots: snapshots,
-            offset: fix.offset, endOffset: fix.endOffset, newText: 'return;' };
+        const removeStatement = diagnostic.quickFix.removeStatement;
+        const title = removeStatement ? 'Remove redundant return this' : 'Replace return this with an early exit';
+        return { title: title, target: source, snapshots: snapshots,
+            offset: fix.offset, endOffset: fix.endOffset, newText: removeStatement ? '' : 'return;' };
     }
 }
 

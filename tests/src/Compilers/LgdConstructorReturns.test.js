@@ -85,6 +85,40 @@ describe.each([ 'oloo', 'class' ])('LGD constructor return contracts with %s out
         expect(context.module.exports.events).toEqual([ 'field', 'finally', 'field', 'finally', 'after' ]);
     });
 
+    test.each([ '\n', '\r\n' ])('removes only the terminal constructor statement and preserves comments with %j', async newline =>
+    {
+        const source = [ 'class Command {',
+            '    Command() {',
+            '        this.callback = () => { return this; };',
+            '        // Keep the leading comment.',
+            '        return ((this)); // Keep the trailing comment.',
+            '    }',
+            '}' ].join(newline);
+        const [error] = compile(source, objectModel).errors;
+        const proposal = await new ReplaceConstructorReturnThisFix().create(contextFor(source), error.quickFix);
+        expect(proposal.title).toBe('Remove redundant return this');
+        expect(proposal.newText).toBe('');
+        const updated = source.slice(0, proposal.offset) + proposal.newText + source.slice(proposal.endOffset);
+        expect(updated).toBe(source.replace('return ((this));', ''));
+        expect(compile(updated, objectModel).errors).toEqual([]);
+    });
+
+    test.each([ 'return this; this.value = 2;',
+        'if(true) { return this; } this.value = 2;',
+        'while(true) { return this; }',
+        'try { return this; } finally { this.value = 2; }' ])('retains the exit for control flow: %s', async body =>
+    {
+        const source = `class Command { Command() { ${body} } }`;
+        const [error] = compile(source, objectModel).errors;
+        const proposal = await new ReplaceConstructorReturnThisFix().create(contextFor(source), error.quickFix);
+        expect(proposal.newText).toBe('return;');
+    });
+
+    test('allows an existing terminal bare return without a new hard error', () =>
+    {
+        expect(compile('class Command { Command() { return; } }', objectModel).errors).toEqual([]);
+    });
+
     test.each([ 'return this;', 'return ((this));', 'return (\n this\n)', 'return this' ])('replaces %s with an early exit and keeps conditional control flow', async statement =>
     {
         const source = `class Sample { Sample(Boolean stop) { this.value = 1; if(stop) ${statement}\n this.value = 2; } }\nmodule.exports = Sample;`;

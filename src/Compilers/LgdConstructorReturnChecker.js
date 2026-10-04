@@ -82,7 +82,8 @@ const LgdConstructorReturnChecker = {
                 if(argument.type === 'ThisExpression' && (/^return\b[\s(]*this[\s)]*;?$/).test(statement))
                 {
                     error.quickFix = { kind: 'replaceConstructorReturnThis', declarationStart: record.declaration.headStart,
-                        memberStart: record.member.start, offset: returnStart, endOffset: returnEnd };
+                        memberStart: record.member.start, offset: returnStart, endOffset: returnEnd,
+                        removeStatement: path.parent === owner.node.body && owner.node.body.body.at(-1) === path.node };
                 }
 
                 if(!error.quickFix)

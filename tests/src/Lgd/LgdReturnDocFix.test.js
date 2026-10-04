@@ -209,6 +209,17 @@ describe('Constructor value-return error quick fixes', () =>
         expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
     });
 
+    test('removes the only constructor statement instead of creating a terminal bare return', async () =>
+    {
+        const source = 'class Command {\r\n    Command() {\r\n        return this;\r\n    }\r\n}';
+        const fixture = await openFixture(source);
+        const [action] = await actionsFor(fixture, 'lgd.constructor.returnValue');
+        expect(action.title).toBe('Remove redundant return this');
+        await applyAction(fixture, action);
+        expect(fixture.document.getText()).toBe(source.replace('return this;', ''));
+        expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
+    });
+
     test('declines a stale fix after this becomes a side-effecting expression', async () =>
     {
         const source = 'class Sample { Sample() { return this; } }';
