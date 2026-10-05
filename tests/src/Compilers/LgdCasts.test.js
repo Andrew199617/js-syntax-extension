@@ -146,11 +146,9 @@ describe('C-style casts.', () =>
     {
         const source = 'const globalThis = { Boolean() { throw Error("called"); } }; module.exports = [(Boolean)"false", (Boolean?)""];';
         expect(execute(source).value).toEqual([ true, false ]);
-        const replaced = { Boolean: () =>
-        {
-            throw new Error('called');
-        } };
+        const replaced = { Boolean: jest.fn() };
         expect(execute('module.exports = (Boolean)"false";', 'oloo', replaced).value).toBe(true);
+        expect(replaced.Boolean).not.toHaveBeenCalled();
     });
 
     test('preserves nullable null and evaluates getters, calls, and object coercion once', () =>
