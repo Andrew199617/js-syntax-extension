@@ -31,11 +31,13 @@ const LgdReferenceProvider = {
      */
     async provideReferences(document, position, context)
     {
-        const state = this.languageService.getState(document.uri);
+        const state = this.languageService.getCurrentMirrorState(document) || await this.languageService.ensureMirror(document);
         if(!state || !state.jsDocument)
         {
             return null;
         }
+
+        const mirror = this.languageService.captureMirror(state);
 
         const jsPosition = this.languageService.toJsPosition(document.uri, position);
         if(!jsPosition)
@@ -49,7 +51,7 @@ const LgdReferenceProvider = {
             jsPosition,
             { includeDeclaration: context.includeDeclaration }
         );
-        if(!locations)
+        if(!locations || !this.languageService.isMirrorCurrent(state, mirror))
         {
             return null;
         }

@@ -51,12 +51,13 @@ const LgdHoverProvider = {
      */
     async provideHover(document, position)
     {
-        const state = this.languageService.getState(document.uri);
+        const state = this.languageService.getCurrentMirrorState(document) || await this.languageService.ensureMirror(document);
         if(!state)
         {
             return null;
         }
 
+        const mirror = this.languageService.captureMirror(state);
         const offset = document.offsetAt(position);
         const cast = state.compiledVersion === document.version && state.casts?.find(candidate => candidate.typeStart <= offset && offset < candidate.typeEnd);
         if(cast)
@@ -116,13 +117,18 @@ const LgdHoverProvider = {
             }
 
             const summary = await this.languageService.getTypeSummary(document.uri, document.getText(wordRange));
+            if(!this.languageService.isMirrorCurrent(state, mirror))
+            {
+                return null;
+            }
+
             if(summary && (summary.kind === 'class' || summary.kind === 'interface' || summary.members.length > 0 || summary.params.length > 0))
             {
                 return new vscode.Hover(this.renderTypeSummary(summary), wordRange);
             }
         }
 
-        if(!state.jsDocument)
+        if(!this.languageService.isMirrorCurrent(state, mirror))
         {
             return null;
         }
@@ -134,7 +140,7 @@ const LgdHoverProvider = {
         }
 
         const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', state.jsDocument.uri, jsPosition);
-        if(!hovers || hovers.length === 0)
+        if(!hovers || hovers.length === 0 || !this.languageService.isMirrorCurrent(state, mirror))
         {
             return null;
         }

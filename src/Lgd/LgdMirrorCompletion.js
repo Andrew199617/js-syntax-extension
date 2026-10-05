@@ -13,21 +13,17 @@ const LgdMirrorCompletion = {
             return null;
         }
 
-        const state = languageService.getState(document.uri);
+        const state = languageService.getCurrentMirrorState(document) || await languageService.ensureMirror(document);
         const current = state?.document === document && state.compiledText === source && state.compiledVersion === document.version;
         if(!current || !state.jsDocument || !state.map)
         {
             return null;
         }
 
-        const version = document.version;
-        const mirror = { document: state.jsDocument, text: state.jsDocument.getText(), version: state.jsDocument.version, map: state.map };
+        const mirror = languageService.captureMirror(state);
         const mapped = languageService.toJsPosition(document.uri, position);
         const result = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', state.jsDocument.uri, mapped);
-        const sameMirror = state.jsDocument === mirror.document && state.map === mirror.map;
-        const sameSnapshot = mirror.document.version === mirror.version && mirror.document.getText() === mirror.text;
-        const sameSource = document.version === version && document.getText() === source;
-        if(!result || !sameSource || !sameMirror || !sameSnapshot || languageService.getState(document.uri) !== state)
+        if(!result || !languageService.isMirrorCurrent(state, mirror))
         {
             return null;
         }

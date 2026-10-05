@@ -211,6 +211,18 @@ const LgdLanguageService = {
      */
     syncMirror(state, code) { return LgdMirror.sync(this, state, code); },
 
+    /** @description Reuses current compiled metadata only when its owned JavaScript mirror remains valid. */
+    getCurrentMirrorState(document) { return LgdMirror.current(this, document); },
+
+    /** @description Refreshes a retired JavaScript mirror through the existing serialized source update queue. */
+    ensureMirror(document) { return LgdMirror.ensure(this, document); },
+
+    /** @description Captures the source, mirror and mapping snapshot used by an editor provider. */
+    captureMirror(state) { return LgdMirror.capture(state); },
+
+    /** @description Checks that an awaited editor result still belongs to the exact source and mirror snapshot. */
+    isMirrorCurrent(state, snapshot) { return LgdMirror.isCurrent(this, state, snapshot); },
+
     /**
      * @description Publishes LGD compiler errors as editor diagnostics on the LGD document.
      * @param {Object} state the document state.

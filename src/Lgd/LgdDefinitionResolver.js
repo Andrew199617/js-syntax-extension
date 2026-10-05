@@ -248,16 +248,23 @@ function mapProviderLocation(languageService, location)
         return null;
     }
 
+    let retiredMirror = false;
     for(const state of languageService.states.values())
     {
         if(state.jsDocument && state.jsDocument.uri.toString() === uri.toString())
         {
+            if(languageService.getCurrentMirrorState(state.document) !== state)
+            {
+                retiredMirror = true;
+                continue;
+            }
+
             const mapped = languageService.toLgdRange(state.document.uri, range);
             return mapped ? new vscode.Location(state.document.uri, mapped) : null;
         }
     }
 
-    return new vscode.Location(uri, range);
+    return retiredMirror ? null : new vscode.Location(uri, range);
 }
 
 module.exports = { resolveImportedDefinition: resolveImportedDefinition, mapProviderLocation: mapProviderLocation };

@@ -2,6 +2,68 @@ const vscode = require('vscode');
 
 /** @description Maintains generated JavaScript mirrors without taking ownership of saved or edited previews. */
 const LgdMirror = {
+    /** @description Finds the current source state only when its generated mirror is still valid for delegation. */
+    current(service, document)
+    {
+        const state = service.getState(document.uri);
+        if(!state || state.document !== document || document.isClosed || !state.map)
+        {
+            return null;
+        }
+
+        const compiled = state.compiledVersion === document.version && state.compiledText === document.getText();
+        return compiled && this.canUpdate(state.jsDocument, state.generatedMirrorText) ? state : null;
+    },
+
+    /** @description Waits for queued updates and refreshes retired mirrors without reviving a closed or changed source request. */
+    async ensure(service, document)
+    {
+        const state = service.getState(document.uri);
+        const source = { text: document.getText(), version: document.version };
+        if(!state || state.document !== document || document.isClosed)
+        {
+            return null;
+        }
+
+        const key = document.uri.toString();
+        let pending;
+        do
+        {
+            pending = service.pendingUpdates.get(key);
+            if(pending) await pending;
+            const sameSource = document.version === source.version && document.getText() === source.text;
+            if(!sameSource || document.isClosed || service.getState(document.uri) !== state || state.document !== document)
+            {
+                return null;
+            }
+        }
+        while(service.pendingUpdates.get(key) !== pending);
+
+        if(this.current(service, document) !== state)
+        {
+            await service.updateDocument(document, false);
+        }
+
+        const sameSource = document.version === source.version && document.getText() === source.text;
+        return sameSource && this.current(service, document) === state ? state : null;
+    },
+
+    /** @description Captures source, mirror and mapping identity before a delegated provider request. */
+    capture(state)
+    {
+        return { document: state.jsDocument, text: state.jsDocument.getText(), version: state.jsDocument.version, map: state.map,
+            sourceDocument: state.document, sourceText: state.document.getText(), sourceVersion: state.document.version };
+    },
+
+    /** @description Rejects provider results when their source, mirror or source map changed while awaiting them. */
+    isCurrent(service, state, snapshot)
+    {
+        const sameSource = snapshot.sourceDocument.version === snapshot.sourceVersion && snapshot.sourceDocument.getText() === snapshot.sourceText;
+        const sameMirror = state.jsDocument === snapshot.document && state.map === snapshot.map;
+        const sameText = snapshot.document.version === snapshot.version && snapshot.document.getText() === snapshot.text;
+        return sameSource && sameMirror && sameText && this.current(service, snapshot.sourceDocument) === state;
+    },
+
     /**
      * @description Updates a reusable mirror or creates a fresh JavaScript document when its preview was retired.
      * @param {Object} service the owning language service.

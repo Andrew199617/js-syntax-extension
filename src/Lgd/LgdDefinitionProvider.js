@@ -30,13 +30,20 @@ const LgdDefinitionProvider = {
      */
     async provideDefinition(document, position)
     {
-        const state = this.languageService.getState(document.uri);
+        const state = this.languageService.getCurrentMirrorState(document) || await this.languageService.ensureMirror(document);
         if(!state || !state.jsDocument)
         {
             return null;
         }
 
+        const mirror = this.languageService.captureMirror(state);
+
         const imported = await resolveImportedDefinition(this.languageService, state, position);
+        if(!this.languageService.isMirrorCurrent(state, mirror))
+        {
+            return null;
+        }
+
         if(imported)
         {
             return [imported];
@@ -49,7 +56,7 @@ const LgdDefinitionProvider = {
         }
 
         const definitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', state.jsDocument.uri, jsPosition);
-        if(!definitions)
+        if(!definitions || !this.languageService.isMirrorCurrent(state, mirror))
         {
             return null;
         }
