@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "checkJs": false,
+        "target": "ES2023",
+        "alwaysStrict": true,
+        "allowSyntheticDefaultImports": false,
+        "allowUmdGlobalAccess": true,
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "baseUrl": "."
+    },
+    "exclude": [
+        ".github",
+        "node_modules"
+    ]
+}

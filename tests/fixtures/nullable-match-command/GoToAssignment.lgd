@@ -1,0 +1,25 @@
+const { Oloo } = require('@mavega/oloo');
+import BaseCommand from './BaseCommand';
+import vscode from 'vscode';
+/** @description Command to go to the start of the assignment in the current line. */
+class GoToAssignment : BaseCommand {
+  /** @description Initialize an instance of GoToAssignment. */
+  GoToAssignment() : base("lgd.goToAssignment", "Go To Assignment") { }
+  readonly Number test = 0;
+  async override executeCommand() {
+    const Object editor = vscode.window.activeTextEditor;
+    if (!editor) { return; }
+    const Object document = editor.document;
+    const Object position = editor.selection.active;
+    const String textLine = document.lineAt(position.line).text;
+    RegExpMatchArray? match = textLine.match(/=(\s*)/);
+    if (!match) { return; }
+    Number assignmentIndex = match.index + match[0].length;
+    if (assignmentIndex !== -1) {
+      const Object newPosition = new vscode.Position(position.line, assignmentIndex);
+      editor.selection = new vscode.Selection(newPosition, newPosition);
+      editor.revealRange(new vscode.Range(newPosition, newPosition));
+    }
+  }
+};
+module.exports = GoToAssignment;

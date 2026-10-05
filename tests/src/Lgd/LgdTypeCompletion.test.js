@@ -24,6 +24,20 @@ beforeEach(() => vscode.__reset());
 
 describe('LGD type-space completion', () =>
 {
+    test.each([ 'String', 'string' ])('accepts the full nullable match command with %s in compiler and editor diagnostics', async stringType =>
+    {
+        const filename = path.resolve(__dirname, '../../fixtures/nullable-match-command/GoToAssignment.lgd');
+        const original = await fs.readFile(filename, 'utf8');
+        const source = original.replace('const String textLine', `const ${stringType} textLine`);
+        const document = makeTextDocument(`file://${filename}`, source);
+        const publish = jest.fn();
+        const service = LgdLanguageService.create({ set: publish, delete: () => undefined }, () => undefined);
+        const state = await service.openDocument(document);
+        expect(state.errors).toEqual([]);
+        expect(publish).toHaveBeenLastCalledWith(document.uri, []);
+        expect(service.compiler.compileToJs(source, state.externals).errors).toEqual([]);
+    });
+
     test.each([
         'Object¦ match = textLine.match(/=(\\s*)/);',
         'Reg¦ match = textLine.match(/=(\\s*)/);',

@@ -28,11 +28,19 @@ const LgdAmbientTypes = {
         registry._typescript = typescript;
         const host = typescript.createCompilerHost(options);
         const readSource = host.getSourceFile.bind(host);
+
+        // TypeScript normalizes Windows separators before invoking the compiler host.
+        function canonicalFilename(name)
+        {
+            return host.getCanonicalFileName(name.replaceAll('\\', '/'));
+        }
+
+        const virtualFilename = canonicalFilename(filename);
         host.getSourceFile = (name, languageVersion, ...remaining) =>
         {
-            if(name === filename)
+            if(canonicalFilename(name) === virtualFilename)
             {
-                return typescript.createSourceFile(filename, source, languageVersion, true);
+                return typescript.createSourceFile(name, source, languageVersion, true);
             }
 
             return readSource(name, languageVersion, ...remaining);
@@ -47,7 +55,7 @@ const LgdAmbientTypes = {
             .map(symbol => [ symbol.name, symbol ]));
         registry._returns = new Map();
         registry._dependencies = new Map(registry._program.getSourceFiles()
-            .filter(file => !registry._program.isSourceFileDefaultLibrary(file) && file.fileName !== filename)
+            .filter(file => !registry._program.isSourceFileDefaultLibrary(file) && canonicalFilename(file.fileName) !== virtualFilename)
             .map(file => [ file.fileName, typescript.sys.getModifiedTime(file.fileName)?.getTime() ]));
         this._registries.set(key, registry);
         if(this._registries.size > registryLimit) this._registries.delete(this._registries.keys().next().value);

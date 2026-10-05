@@ -12,6 +12,34 @@ const MATCH_SOURCE = 'String textLine = "a=b";\n';
 
 describe('standard-library ambient type resolution', () =>
 {
+    test('resolves nullable ambient types when Windows paths reach the normalized TypeScript host', () =>
+    {
+        const factory = Object.create(LgdAmbientTypes);
+        factory._registries = new Map();
+        factory._typescript = require('typescript');
+        const join = jest.spyOn(path, 'join').mockImplementation(path.win32.join);
+        let registry;
+        try
+        {
+            registry = factory.forSource();
+        }
+        finally
+        {
+            join.mockRestore();
+        }
+
+        expect(registry.resolve('RegExpMatchArray')).toEqual({ name: 'RegExpMatchArray', kind: 'interface' });
+        expect(registry.resolve('Date')).toEqual({ name: 'Date', kind: 'interface' });
+        const externals = new Map();
+        externals.ambient = registry;
+        const source = 'Date? date = null;\nRegExpMatchArray? match = "a=b".match(/=/);\n'
+            + 'interface IResult {\n RegExpMatchArray? read(Date? value);\n}\n'
+            + 'class Result {\n RegExpMatchArray? cached = null;\n Date? read(Date? value) { return value; }\n}\n'
+            + 'Function inspect = (RegExpMatchArray? value) => value;\n'
+            + 'RegExpMatchArray? asserted = (RegExpMatchArray?) opaqueCall();';
+        expect(LgdCompiler.create().compileToJs(source, externals).errors).toEqual([]);
+    });
+
     test('reads type-space names and nullable overload results from the TypeScript checker', () =>
     {
         const registry = LgdAmbientTypes.forSource();

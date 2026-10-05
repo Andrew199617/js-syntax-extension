@@ -1,0 +1,5 @@
+class BaseCommand {
+    BaseCommand(String command, String title) {}
+    async virtual executeCommand() {}
+}
+module.exports = BaseCommand;
