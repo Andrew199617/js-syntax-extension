@@ -150,7 +150,6 @@ const LgdCompletionProvider = {
             return [];
         }
 
-        if(namespace?.kind === 'moduleNamespace') symbols.clear();
         for(const [ name, declaration ] of visible)
         {
             let label = name;

@@ -161,17 +161,43 @@ describe('LGD type-space completion', () =>
         }
     });
 
-    test('uses installed declarations for an explicit imported namespace without inventing package types', async () =>
+    test.each([ 'import vscode from "vscode";', 'import * as vscode from "vscode";' ])('uses installed declarations for an explicit imported namespace: %s', async imported =>
     {
-        const source = 'import vscode from "vscode";\nvscode.¦Position position = opaqueCall();';
+        const source = `${imported}\nvscode.Po¦sition position = opaqueCall();\nvscode.TextDocument document = opaqueCall();`;
         const document = makeTextDocument(`file://${path.join(__dirname, 'Consumer.lgd')}`, source.replace('¦', ''));
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
         const state = await service.openDocument(document);
         expect(state.errors).toEqual([]);
+        const provider = LgdCompletionProvider.create(service);
+        const items = await provider.provideCompletionItems(document, document.positionAt(source.indexOf('¦')));
+        const position = items.find(item => item.label === 'Position');
+        expect(position.kind).toBe(vscode.CompletionItemKind.Class);
+        expect(document.getText(position.range)).toBe('Position');
+        const allTypes = await provider.provideCompletionItems(document, document.positionAt(source.indexOf('vscode.Po') + 'vscode.'.length));
+        expect(allTypes.find(item => item.label === 'TextDocument').kind).toBe(vscode.CompletionItemKind.Interface);
+        expect(allTypes.map(item => item.label)).toEqual([...new Set(allTypes.map(item => item.label))]);
+        expect(allTypes.some(item => item.label === 'window')).toBe(false);
+        expect(allTypes.some(item => item.label === 'showInformationMessage')).toBe(false);
+    });
+
+    test('excludes installed namespace types behind an ordinary parameter shadow', async () =>
+    {
+        const source = 'import * as vscode from "vscode";\nFunction read = (Object vscode) => {\n vscode.Po¦sition position = opaqueCall();\n};';
+        const document = makeTextDocument(`file://${path.join(__dirname, 'Consumer.lgd')}`, source.replace('¦', ''));
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        await service.openDocument(document);
         const items = await LgdCompletionProvider.create(service).provideCompletionItems(document, document.positionAt(source.indexOf('¦')));
-        expect(items.find(item => item.label === 'Position').kind).toBe(vscode.CompletionItemKind.Class);
-        expect(items.some(item => item.label === 'window')).toBe(false);
-        expect(items.some(item => item.label === 'showInformationMessage')).toBe(false);
+        expect(items).toEqual([]);
+    });
+
+    test('does not invent types for an unresolved imported namespace', async () =>
+    {
+        const source = 'import * as unknown from "__lgd_missing_type_fixture__";\nunknown.¦Position position = opaqueCall();';
+        const document = makeTextDocument(`file://${path.join(__dirname, 'Consumer.lgd')}`, source.replace('¦', ''));
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        await service.openDocument(document);
+        const items = await LgdCompletionProvider.create(service).provideCompletionItems(document, document.positionAt(source.indexOf('¦')));
+        expect(items).toEqual([]);
     });
 
     test.each([ '(vscode.Position) raw', '(vscode.Position)(raw)', '(vscode.Position?) (raw)' ])('erases a known imported type assertion with a grouped operand: %s', async expression =>
