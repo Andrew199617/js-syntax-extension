@@ -23,7 +23,7 @@ describe('Nullable LGD type syntax.', () =>
         expect(parameter.defaultText).toBe('null');
     });
 
-    test.each([ 'void?', 'Number??', 'vscode..Position?', 'vscode.Position?.', 'vscode.Position?[]' ])('Does not accept malformed or unsupported nullable type %s as a full method annotation.', typeName =>
+    test.each([ 'void?', 'Number??', 'vscode..Position?', 'vscode.Position?.' ])('Does not accept malformed or unsupported nullable type %s as a full method annotation.', typeName =>
     {
         expect(parseMethodHead(`${typeName} find() {}`)).toBeNull();
     });

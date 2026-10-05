@@ -527,6 +527,7 @@ function activate(context)
             return;
         }
 
+        lgd.languageService.exportCache.clear();
         for(const document of vscode.workspace.textDocuments)
         {
             if(document.languageId === 'lgd')

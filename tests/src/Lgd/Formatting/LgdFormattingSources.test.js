@@ -1,3 +1,4 @@
+const path = require('path');
 const LgdClangFormat = require('../../../../src/Lgd/Formatting/LgdClangFormat');
 const LgdEslintStyle = require('../../../../src/Lgd/Formatting/LgdEslintStyle');
 const LgdFormattingSources = require('../../../../src/Lgd/Formatting/LgdFormattingSources');
@@ -5,8 +6,14 @@ const LgdFormattingSources = require('../../../../src/Lgd/Formatting/LgdFormatti
 /** @description Simulates snapshot-aware source discovery without accessing any real user configuration. */
 async function resolve(files, sources)
 {
-    const readSnapshot = jest.fn(filename => Promise.resolve({ path: filename, realPath: filename, text: files[filename] ?? null, version: null, open: false }));
-    const result = await LgdFormattingSources.resolve({ filePath: '/project/src/main.lgd', workspaceRoot: '/project', readSnapshot: readSnapshot, sources: sources });
+    const snapshotsByPath = new Map();
+    for(const [ filename, text ] of Object.entries(files))
+    {
+        snapshotsByPath.set(path.resolve(filename), text);
+    }
+
+    const readSnapshot = jest.fn(filename => Promise.resolve({ path: filename, realPath: filename, text: snapshotsByPath.get(filename) ?? null, version: null, open: false }));
+    const result = await LgdFormattingSources.resolve({ filePath: path.resolve('/project/src/main.lgd'), workspaceRoot: path.resolve('/project'), readSnapshot: readSnapshot, sources: sources });
     return { ...result, readSnapshot: readSnapshot };
 }
 
@@ -109,7 +116,7 @@ describe('snapshot-aware style source precedence', () =>
         };
         const result = await resolve(files, [ 'editorconfig', 'clang-format', 'eslint' ]);
         expect(result.options.indentation).toMatchObject({ size: 4 });
-        expect(result.snapshots.some(snapshot => snapshot.path === '/project/src/.editorconfig' && snapshot.text === null)).toBe(true);
+        expect(result.snapshots.some(snapshot => snapshot.path === path.resolve('/project/src/.editorconfig') && snapshot.text === null)).toBe(true);
         const reordered = await resolve(files, [ 'eslint', 'clang-format', 'editorconfig' ]);
         expect(reordered.options.indentation.size).toBe(2);
     });
@@ -135,7 +142,7 @@ describe('snapshot-aware style source precedence', () =>
             '/project/src/.eslintrc.json': '{"root":true,"rules":{"indent":["warn",4]},"overrides":[{"files":["*.lgd"],"rules":{"indent":["error",8]}}]}'
         }, ['eslint']);
         expect(result.options.indentation).toMatchObject({ size: 8 });
-        expect(result.readSnapshot.mock.calls.some(([filename]) => filename === '/project/.eslintrc.json')).toBe(false);
+        expect(result.readSnapshot.mock.calls.some(([filename]) => filename === path.resolve('/project/.eslintrc.json'))).toBe(false);
     });
 
     test('fails closed on malformed selected sources and invalid numeric values', async () =>
@@ -169,4 +176,68 @@ it.each([ [ 'None', 'preserve' ], [ 'All', 'nextLine' ], [ 'AllDefinitions', 'ne
     const imported = LgdClangFormat.parse(`AlwaysBreakAfterReturnType: ${external}`);
     expect(imported.options.wrapping.returnType).toBe(native);
     expect(imported.issues).toHaveLength(0);
+});
+
+test('explicit imported and native layout choices take precedence over readable defaults', () =>
+{
+    const formatter = require('../../../../src/Lgd/Formatting/LgdFormatter');
+
+    const source = 'class Example\n{\n    Example() { }\n\n    Number add(Number first)\n    {\n        return first\n            + 1;\n    }\n}';
+    const imported = LgdClangFormat.parse('SeparateDefinitionBlocks: Never\nBreakBinaryOperations: Never\nBreakBeforeBinaryOperators: NonAssignment');
+    const preserved = formatter.format(source, { options: imported.options });
+    expect(preserved).toContain('Example() { }\n    Number add');
+    expect(preserved).toContain('return first\n');
+    const rules = { 'lgd.format.wrapping': { options: { binaryOperations: 'fit' } }, 'lgd.format.lineBreaks': { options: { separateDefinitions: 'always' } } };
+    const overridden = formatter.format(source, { options: imported.options, rules: rules });
+    expect(overridden).toContain('Example() { }\n\n    Number add');
+    expect(overridden).toContain('return first + 1;');
+    expect(formatter.format(overridden, { options: imported.options, rules: rules })).toBe(overridden);
+});
+
+test.each([ false, true ])('honors imported %s parenthesis padding and explicit native precedence', padding =>
+{
+    const formatter = require('../../../../src/Lgd/Formatting/LgdFormatter');
+    const editorConfig = require('../../../../src/Lgd/Formatting/LgdEditorConfig');
+
+    const source = 'function choose(value, fallback){if(value){read(value);}return(value ?? (fallback));}';
+    const edge = padding ? ' ' : '';
+    const editor = editorConfig.map(Object.fromEntries([
+        [ 'csharp_space_between_parentheses', padding ? 'control_flow_statements,expressions' : 'false' ],
+        [ 'csharp_space_between_method_declaration_parameter_list_parentheses', String(padding) ],
+        [ 'csharp_space_between_method_call_parameter_list_parentheses', String(padding) ]
+    ]));
+    const clang = LgdClangFormat.parse(`SpacesInParentheses: ${padding}`);
+    const eslint = LgdEslintStyle.parse(JSON.stringify({ rules: { 'space-in-parens': [ 'error', padding ? 'always' : 'never' ], 'keyword-spacing': [ 'error', { after: false } ] } }));
+    for(const imported of [ editor, clang, eslint ])
+    {
+        expect(imported.issues).toHaveLength(0);
+        const configuration = { options: imported.options, rules: imported.rules };
+        const formatted = formatter.format(source, configuration);
+        expect(formatted).toContain(`function choose(${edge}value, fallback${edge})`);
+        expect(formatted).toContain(`if(${edge}value${edge})`);
+        expect(formatted).toContain(`read(${edge}value${edge});`);
+        expect(formatted).toContain(`(${edge}value ?? (${edge}fallback${edge})${edge});`);
+        expect(formatter.format(formatted, configuration)).toBe(formatted);
+        const override = { insideDeclarationParens: !padding, insideControlParens: !padding, insideCallParens: !padding, insideOtherParens: !padding };
+        const native = formatter.format(source, { ...configuration, rules: { ...configuration.rules, 'lgd.format.spacing': { options: override } } });
+        const nativeEdge = padding ? '' : ' ';
+        expect(native).toContain(`function choose(${nativeEdge}value, fallback${nativeEdge})`);
+        expect(native).toContain(`if(${nativeEdge}value${nativeEdge})`);
+        expect(native).toContain(`read(${nativeEdge}value${nativeEdge});`);
+        expect(native).toContain(`(${nativeEdge}value ?? (${nativeEdge}fallback${nativeEdge})${nativeEdge});`);
+    }
+
+    expect(formatter.format(source, { options: eslint.options })).toContain(`return(${edge}value ?? (${edge}fallback${edge})${edge});`);
+});
+
+test('imports a return keyword override without changing the control keyword preference', () =>
+{
+    const formatter = require('../../../../src/Lgd/Formatting/LgdFormatter');
+
+    const imported = LgdEslintStyle.parse('{"rules":{"keyword-spacing":["warn",{"after":false,"overrides":{"return":{"after":true}}}]}}');
+    expect(imported.options.spacing).toEqual({ afterControlKeywords: false, afterReturnKeyword: true });
+    expect(imported.rules['lgd.format.spacing.afterReturnKeyword']).toEqual({ severity: 'warning' });
+    expect(formatter.format('function run(value){if(value){return(value);}}', { options: imported.options })).toContain('return (value);');
+    const native = { options: { afterReturnKeyword: false, insideOtherParens: false } };
+    expect(formatter.format('function run(value){return(value);}', { options: imported.options, rules: { 'lgd.format.spacing': native } })).toContain('return(value);');
 });

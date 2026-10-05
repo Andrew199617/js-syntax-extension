@@ -39,9 +39,11 @@ const LgdFormattingLayout = {
             const bracePadding = 5;
             const fits = width === 0 || indentation + headerLength + flatLength + bracePadding <= width;
             let mode = context.options.lineBreaks.shortBlocks;
+            let compactRule = 'lineBreaks.shortBlocks';
             if([ 'constructors', 'methods', 'accessors', 'functions' ].includes(block.location))
             {
                 mode = context.options.lineBreaks.shortFunctions;
+                compactRule = 'lineBreaks.shortFunctions';
                 if(mode === 'inline')
                 {
                     mode = [ 'methods', 'accessors', 'constructors' ].includes(block.location) ? 'all' : 'empty';
@@ -50,6 +52,7 @@ const LgdFormattingLayout = {
             else if(block.location === 'lambdas')
             {
                 mode = context.options.lineBreaks.shortLambdas;
+                compactRule = 'lineBreaks.shortLambdas';
                 if(mode === 'inline')
                 {
                     mode = block.inlineArgument ? 'all' : 'empty';
@@ -59,18 +62,26 @@ const LgdFormattingLayout = {
             {
                 const head = tokens[index - 1];
                 const keyword = head?.text === ')' ? tokens[tokens[head.open]?.index - 1]?.text : head?.text;
-                if(keyword === 'if' && context.options.lineBreaks.shortIfs === 'never' || [ 'for', 'while', 'do' ].includes(keyword) && !context.options.lineBreaks.shortLoops)
+                if(keyword === 'if' && context.options.lineBreaks.shortIfs === 'never')
                 {
                     mode = 'never';
+                    compactRule = 'lineBreaks.shortIfs';
+                }
+                else if([ 'for', 'while', 'do' ].includes(keyword) && !context.options.lineBreaks.shortLoops)
+                {
+                    mode = 'never';
+                    compactRule = 'lineBreaks.shortLoops';
                 }
             }
 
             const allowEmpty = mode === 'empty' && block.empty;
             const allowContents = [ 'all', 'always' ].includes(mode) || mode === 'preserve' && !(/[\r\n]/u).test(interior);
-            block.compact = !hasComment && !nested && fits && (allowEmpty || allowContents);
+            let compactCandidate = !hasComment && !nested && (allowEmpty || allowContents);
+            block.compact = compactCandidate && fits;
             if([ 'classes', 'interfaces', 'enums', 'switchBlocks' ].includes(block.location))
             {
                 block.compact = false;
+                compactCandidate = false;
             }
 
             if(block.location === 'controlBlocks')
@@ -81,22 +92,74 @@ const LgdFormattingLayout = {
                 if(keyword === 'if' && [ 'all', 'withoutElse' ].includes(ifMode))
                 {
                     const after = tokens[open.close + 1];
-                    block.compact = !hasComment && !nested && fits && (ifMode === 'all' || after?.text !== 'else');
+                    compactCandidate = !hasComment && !nested && (ifMode === 'all' || after?.text !== 'else');
+                    block.compact = compactCandidate && fits;
+                    compactRule = 'lineBreaks.shortIfs';
                 }
                 else if([ 'for', 'while', 'do' ].includes(keyword) && context.options.lineBreaks.shortLoops)
                 {
-                    block.compact = !hasComment && !nested && fits;
+                    compactCandidate = !hasComment && !nested;
+                    block.compact = compactCandidate && fits;
+                    compactRule = 'lineBreaks.shortLoops';
                 }
             }
 
             if(context.options.lineBreaks.preserveSingleLineBlocks && !hasComment && !(/[\r\n]/u).test(interior) && !block.object)
             {
                 block.compact = true;
+                compactCandidate = false;
+                compactRule = 'lineBreaks.preserveSingleLineBlocks';
             }
 
             if(block.object)
             {
-                block.compact = context.options.lineBreaks.objectMembers === 'singleLine' && !hasComment && !nested && fits;
+                compactCandidate = context.options.lineBreaks.objectMembers === 'singleLine' && !hasComment && !nested;
+                block.compact = compactCandidate && fits;
+                compactRule = 'lineBreaks.objectMembers';
+            }
+
+            block.compactRule = compactRule;
+            block.compactRuleIds = [`lgd.format.${compactRule}`];
+            block.compactWidthDependent = compactCandidate;
+            if(compactCandidate)
+            {
+                block.compactRuleIds.push('lgd.format.wrapping.columnLimit');
+                if(indentation > 0)
+                {
+                    block.compactRuleIds.push('lgd.format.indentation.size');
+                }
+            }
+        }
+    },
+
+    /** @description Retains each independent preference used to decide a compact block's layout. */
+    _attributeCompactRules(gap, block)
+    {
+        for(const ruleId of block.compactRuleIds)
+        {
+            gap.contributors.add(ruleId);
+        }
+    },
+
+    /** @description Keeps member documentation attached while separating constructors, methods and field groups. */
+    describeMemberGaps(context)
+    {
+        context.memberGaps = new Set();
+        for(const declaration of context.model.parsed.allDeclarations)
+        {
+            const members = declaration.classMembers || [];
+            for(let index = 1; index < members.length; index++)
+            {
+                const previous = members[index - 1];
+                const next = members[index];
+                if(previous.kind === 'field' && next.kind === 'field')
+                {
+                    continue;
+                }
+
+                const comments = context.model.tokens.filter(token => token.comment && token.start >= previous.bodyEnd && token.end <= next.start);
+                const leading = comments.find(token => (/\r|\n/u).test(context.source.slice(previous.bodyEnd, token.start)) || token.text.startsWith('/**'));
+                context.memberGaps.add(leading?.start ?? next.start);
             }
         }
     },
@@ -148,7 +211,7 @@ const LgdFormattingLayout = {
     layoutGap(context, gap)
     {
         const { previous, next } = gap;
-        if(!previous || !next || previous.comment || next.comment)
+        if(!previous || !next)
         {
             return;
         }
@@ -160,6 +223,38 @@ const LgdFormattingLayout = {
             {
                 return;
             }
+        }
+
+        const separation = context.options.lineBreaks.separateDefinitions;
+        if(context.memberGaps.has(next.start))
+        {
+            let breaks = separation === 'always' ? 2 : 1;
+            if(separation === 'preserve')
+            {
+                breaks = gap.original.match(/\r\n|\r|\n/gu)?.length || 1;
+            }
+
+            gap.text = context.newline.repeat(Math.min(breaks, context.options.lineBreaks.maxEmptyLines + 1));
+            gap.rule = 'lineBreaks.separateDefinitions';
+            if(breaks > context.options.lineBreaks.maxEmptyLines + 1)
+            {
+                gap.contributors.add('lgd.format.lineBreaks.maxEmptyLines');
+            }
+
+            if(next.comment)
+            {
+                const anchor = context.model.codeTokens.find(token => token.start > next.start);
+                const indented = { ...gap, next: anchor };
+                this.indentGap(context, indented);
+                gap.text = indented.text;
+            }
+
+            return;
+        }
+
+        if(previous.comment || next.comment)
+        {
+            return;
         }
 
         const blocks = context.model.braces;
@@ -177,10 +272,15 @@ const LgdFormattingLayout = {
                 placement = 'sameLine';
             }
 
+            if(opening.compact || opening.compactWidthDependent)
+            {
+                this._attributeCompactRules(gap, opening);
+            }
+
             if(placement === 'nextLineIfMultiline')
             {
                 const headStart = previous.text === ')' ? context.model.codeTokens[previous.open]?.start : previous.start;
-                placement = (/[\r\n]/u).test(context.source.slice(headStart, previous.end)) ? 'nextLine' : 'sameLine';
+                placement = this.multilineHead(context, headStart, previous.end) ? 'nextLine' : 'sameLine';
             }
 
             gap.text = placement === 'sameLine' ? ' ' : context.newline;
@@ -201,20 +301,14 @@ const LgdFormattingLayout = {
                 gap.text = context.newline.repeat(count);
             }
 
-            let option = 'shortBlocks';
-            if([ 'constructors', 'methods', 'accessors', 'functions' ].includes(block.location))
-            {
-                option = 'shortFunctions';
-            }
-            else if(block.location === 'lambdas')
-            {
-                option = 'shortLambdas';
-            }
+            gap.rule = block.compactRule;
+            this._attributeCompactRules(gap, block);
 
-            gap.rule = `lineBreaks.${option}`;
-            if(context.options.lineBreaks.preserveSingleLineBlocks)
+            const boundaryBreaks = gap.original.match(/\r\n|\r|\n/gu)?.length || 0;
+            if(!block.compact && boundaryBreaks > 1)
             {
-                gap.contributors.add('lgd.format.lineBreaks.preserveSingleLineBlocks');
+                const boundaryOption = afterOpen ? 'emptyLinesAtBlockStart' : 'emptyLinesAtBlockEnd';
+                gap.contributors.add(`lgd.format.lineBreaks.${boundaryOption}`);
             }
         }
         else if(previous.text === '}' && ([ 'else', 'catch', 'finally' ].includes(next.text) || next.text === 'while' && context.model.doWhileKeywords.has(next.start)))
@@ -240,7 +334,7 @@ const LgdFormattingLayout = {
             const previousBlock = blocks.get(previousOpen?.start);
             if(previousBlock && !previousBlock.object && previousBlock.location !== 'lambdas')
             {
-                const preserveLines = (/[\r\n]/u).test(gap.original) && context.options.lineBreaks.separateDefinitions === 'preserve';
+                const preserveLines = (/[\r\n]/u).test(gap.original) && (!previousBlock.definition || context.options.lineBreaks.separateDefinitions === 'preserve');
                 gap.text = preserveLines ? gap.original : context.newline;
                 if(previousBlock.definition && context.options.lineBreaks.separateDefinitions === 'always')
                 {
@@ -370,7 +464,8 @@ const LgdFormattingLayout = {
         if(parent?.compact && !parent.object && !gap.rule && (/[\r\n]/u).test(gap.text))
         {
             gap.text = ' ';
-            gap.rule = parent.location === 'lambdas' ? 'lineBreaks.shortLambdas' : 'lineBreaks.shortFunctions';
+            gap.rule = parent.compactRule;
+            this._attributeCompactRules(gap, parent);
         }
     },
 
@@ -378,8 +473,8 @@ const LgdFormattingLayout = {
     describeWrapping(context)
     {
         context.binaryWraps = new Map();
-        this.describeBinaryWrapping(context);
         context.wraps = new Map();
+        this.describeBinaryWrapping(context);
         const options = context.options.wrapping;
         for(const [ start, kind ] of context.model.parens)
         {
@@ -454,6 +549,7 @@ const LgdFormattingLayout = {
             return;
         }
 
+        const columns = options.binaryOperations === 'fit' ? this.layoutColumns(context) : null;
         const expressions = context.model.nodes.filter(record => [ 'BinaryExpression', 'LogicalExpression' ].includes(record.node.type));
         const records = new Map(expressions.map(record => [ record.node, record ]));
         const precedence = [ [ '||', '??' ], ['&&'], ['|'], ['^'], ['&'], [ '==', '!=', '===', '!==' ], [ '<', '>', '<=', '>=', 'in', 'instanceof' ], [ '<<', '>>', '>>>' ], [ '+', '-' ], [ '*', '/', '%' ], ['**'] ];
@@ -472,9 +568,25 @@ const LgdFormattingLayout = {
             }
 
             const original = context.source.slice(root.start, root.end);
-            const width = this.column(context.source, root.start) + original.length;
+            let width = this.column(context.source, root.start) + original.length;
+            const fitting = options.binaryOperations === 'fit';
+            if(fitting)
+            {
+                width = this.binaryWidth(context, root, columns);
+                if(width === null)
+                {
+                    continue;
+                }
+            }
+
+            const fits = options.columnLimit === 0 || width <= options.columnLimit;
             const wrapped = (/[\r\n]/u).test(original);
-            if(!wrapped && (options.columnLimit === 0 || width <= options.columnLimit))
+            if(!fitting && !wrapped && fits)
+            {
+                continue;
+            }
+
+            if(fitting && !fits && !rootOperators?.includes(record.node.operator))
             {
                 continue;
             }
@@ -490,9 +602,121 @@ const LgdFormattingLayout = {
             const index = context.model.byStart.get(operator.start);
             const next = context.model.codeTokens[index + 1];
             const before = options.binaryOperators === 'before' || options.binaryOperators === 'beforeNonAssignment';
+            if(fitting && fits)
+            {
+                const padding = context.options.spacing.binaryOperators === 'none' && ![ 'in', 'instanceof' ].includes(operator.text) ? '' : ' ';
+                if((/[\r\n]/u).test(context.source.slice(left.end, next.start)))
+                {
+                    context.binaryWraps.set(operator.start, padding);
+                    context.binaryWraps.set(next.start, padding);
+                }
+
+                continue;
+            }
+
             context.binaryWraps.set(operator.start, before ? context.newline : ' ');
             context.binaryWraps.set(next.start, before ? ' ' : context.newline);
         }
+    },
+
+    /** @description Uses planned expression breaks when selecting multiline-only brace placement. */
+    multilineHead(context, start, end)
+    {
+        let previous;
+        for(const token of context.model.tokens.filter(candidate => candidate.start >= start && candidate.end <= end))
+        {
+            if((/[\r\n]/u).test(token.text))
+            {
+                return true;
+            }
+
+            if(previous)
+            {
+                const gap = context.binaryWraps.get(token.start) ?? context.wraps.get(token.start)?.text ?? context.source.slice(previous.end, token.start);
+                if((/[\r\n]/u).test(gap))
+                {
+                    return true;
+                }
+            }
+
+            previous = token;
+        }
+
+        return false;
+    },
+
+    /** @description Measures expressions against their formatted line, not an unrelated compact source prefix. */
+    layoutColumns(context)
+    {
+        const columns = new Map();
+        let column = 0;
+        let previous;
+        for(const next of context.model.tokens)
+        {
+            const start = previous?.end || 0;
+            const original = context.source.slice(start, next.start);
+            const gap = { start: start, end: next.start, original: original, text: original, rule: null, contributors: new Set(), previous: previous, next: next };
+            this.layoutGap(context, gap);
+            this.spaceGap(context, gap);
+            this.indentGap(context, gap);
+            column = this.advanceColumn(column, gap.text, context.options.indentation.tabWidth);
+            columns.set(next.start, column);
+            column = this.advanceColumn(column, next.text, context.options.indentation.tabWidth);
+            previous = next;
+        }
+
+        return columns;
+    },
+
+    /** @description Counts tab stops and line endings as displayed columns. */
+    advanceColumn(column, text, tabWidth)
+    {
+        for(const character of text)
+        {
+            if(character === '\r' || character === '\n')
+            {
+                column = 0;
+            }
+            else if(character === '\t')
+            {
+                column += tabWidth - column % tabWidth;
+            }
+            else
+            {
+                column++;
+            }
+        }
+
+        return column;
+    },
+
+    /** @description Counts opaque literal bytes and delimiter suffixes without changing protected contents. */
+    binaryWidth(context, root, columns)
+    {
+        const tokens = context.model.tokens.filter(token => token.start >= root.start && token.end <= root.end);
+        if(tokens.some(token => token.comment || (/[\r\n]/u).test(token.text)))
+        {
+            return null;
+        }
+
+        let length = 0;
+        let previous;
+        for(const next of tokens)
+        {
+            if(previous)
+            {
+                const original = context.source.slice(previous.end, next.start);
+                const gap = { original: original, text: original.replace(/\s+/gu, ' '), rule: null, contributors: new Set(), previous: previous, next: next };
+                this.spaceGap(context, gap);
+                length += gap.text.length;
+            }
+
+            length += next.text.length;
+            previous = next;
+        }
+
+        const suffix = context.source.slice(root.end).match(/^[\t ]*[);,\]]*/u)[0];
+        return (columns.get(root.start) || 0) + length + suffix.length;
     },
 
     /** @description Applies planned expression breaks after generic relocation of preexisting line breaks. */

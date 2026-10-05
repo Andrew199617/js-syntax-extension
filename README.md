@@ -62,7 +62,7 @@ LGD keyword highlighting distinguishes control flow such as `return` and `if` fr
 
 ## Configurable fixes and Fix All
 
-Use the **LGD: Fix All…** editor-title button or command to choose a scope:
+Use **Fix All…** in the native Quick Fix menu for an enabled bulk-fixable diagnostic, or the **LGD: Fix All…** editor-title button or command, to choose a scope:
 
 - **Document / File** edits the current LGD buffer, including unsaved changes. The two command names are aliases for the same scope. An untitled LGD document can use manual fixes, but has no project configuration or automatic fixes.
 - **Project** uses the nearest ancestor `.vscode/lgd.json` as its project boundary, falling back to the current workspace folder. Nested configured projects are separate.
@@ -233,7 +233,7 @@ first.items.push("shield"); // second.items is still empty
 const total = Player.total(); // 2
 ```
 
-Each instance gets its own writable data fields before constructor execution, including fresh mutable initializer values. Fields without an initializer default to `0` for `Number`, `false` for `Boolean`, `0n` for `BigInt`, and `null` for reference-like types such as `String`, `Object` and `Array`. Field initializers execute in source order. An initializer cannot use `this` or an implicit instance member; static members and explicitly named other objects are allowed.
+Each instance gets its own writable data fields before constructor execution, including fresh mutable initializer values. Nonnullable `T[]` fields without an initializer get independent empty arrays. Other fields without an initializer default to `0` for `Number`, `false` for `Boolean`, `0n` for `BigInt`, and `null` for reference-like types such as `String`, `Object` and `Array`. Field initializers execute in source order. An initializer cannot use `this` or an implicit instance member; static members and explicitly named other objects are allowed.
 
 Static fields initialize once when the class declaration executes. Inherited reads and writes share the declaring class's storage, including `Derived.count++`; inherited static methods retain their declaring context. This eager initialization timing is LGD's JavaScript behavior; C# can defer initialization. Use `Player.count` or `Player.total()`: accessing a static member through `first` is an error, as is accessing an instance member through `Player`. Static methods cannot use `this` or implicit instance members, but may access an explicit instance parameter. Locals and parameters shadow implicit member names normally.
 
@@ -286,6 +286,14 @@ Getter and setter access is checked separately. Abstract property contracts can 
 
 Checks follow relative LGD imports, known aliases, inherited member owners, typed fields, and known method-result types. They also update after an imported member's visibility changes. Hovers show explicit visibility and completions omit inaccessible members. Both OLOO and native-class output erase the modifiers and retain ordinary JavaScript storage/dispatch. This is compile-time checking, not a runtime security boundary: dynamic property names, reflection, opaque values, and external JavaScript remain outside guaranteed enforcement.
 
+## Type completion and standard-library annotations
+
+Use Ctrl+Space while writing an LGD type annotation. Suggestions include primitive aliases, visible local types, explicit LGD import aliases and namespace exports, and type declarations resolved for your explicit imports. They work in declarations, parameters, return types, fields, property contracts, casts, and heritage lists. Ordinary values, binding names, comments, strings, and regular-expression literals keep their normal editing behavior.
+
+Type suggestions use the nearest `tsconfig.json` or `jsconfig.json`, including its target, libraries, paths, and explicit installed declarations. Standalone files use ECMAScript 2022 types. Browser globals require a configured browser library; unresolved imports do not invent types. Generic argument and union spellings are not supported yet.
+
+A known native `String.match(...)` result is `RegExpMatchArray` or `null`. Use `RegExpMatchArray? match = textLine.match(/=(\s*)/);` when the receiver is a known string. A bare `RegExpMatchArray` annotation diagnoses the possible null result; unknown calls remain conservative. A non-null guard permits using the result as a typed string array. Existing legacy bare primitive/local null assignments retain their previous behavior.
+
 ## LGD interfaces and abstract classes
 
 Declare method contracts with typed parameters and a return type. Interfaces can inherit multiple interfaces; classes can name one base first, followed by interfaces:
@@ -332,6 +340,8 @@ The target language and the JavaScript object model are separate settings:
 
 `javascriptObjectModel` supports `oloo` (the default) and `class`. Both preserve the source's `Name.create(...)` caller API. Native class output emits real JavaScript classes and requires class bases; known OLOO object bases and `Oloo.base` calls are diagnosed. Use `base.method(...)` for class inheritance calls.
 
+`new Name(...)` follows the resolved class's object model: OLOO classes use their `create(...)` factory, and native classes keep `new`. Relative LGD imports retain the defining source's setting, including supported aliases and explicit CommonJS/ESM exports. A consumer can use both models at once. External JavaScript, built-ins, dynamic constructors, and imports without known construction metadata keep `new`. A class hierarchy must use compatible object models; mixing models between a class and its base is diagnosed.
+
 Choose native classes deliberately: methods live on `.prototype`, instances use native class construction, and a base constructor's virtual method calls dispatch to the derived implementation during construction. OLOO keeps its object-level method API and retains the base-factory lifecycle for existing OLOO object bases. Both output modes support root declared fields and static members. Native class output diagnoses inherited declared-instance-field hierarchies because JavaScript native construction cannot preserve LGD's C#-style field initialization order; select OLOO for those hierarchies. Changing the setting refreshes open LGD mirrors; save the source to update its adjacent JavaScript file.
 
 ## Generated JavaScript checks
@@ -344,7 +354,25 @@ JavaScript modules, CommonJS and JSX remain supported. Top-level returns are acc
 
 Declared locals and typed parameters are checked in top-level `Function` initializers, ordinary JavaScript function bodies, object methods, classes, constructors and nested callbacks. Writes use the actual lexical binding, so a shadowing callback parameter or block local does not inherit an unrelated outer type. Compound assignments and known destructuring values are checked too; rest parameter bindings are arrays.
 
-Method return checks follow the current value through assignments and branches. After an incompatible write is rejected, later diagnostics retain the binding's declared type to avoid cascading errors; the assignment error still blocks saving generated JavaScript. Known `null` values require a nullable return annotation; `undefined` requires `void`. Existing unsuffixed annotations still permit null and undefined in assignment positions; unknown calls and effects remain conservative.
+Method return checks follow the current value through assignments and branches. After an incompatible write is rejected, later diagnostics retain the binding's declared type to avoid cascading errors; the assignment error still blocks saving generated JavaScript. Known `null` values require a nullable return annotation; `undefined` requires `void`. Existing bare named annotations still permit null and undefined in assignment positions; unknown calls and effects remain conservative.
+
+## Postfix array types
+
+Use `T[]` for typed arrays, including nested and imported types. Lowercase `string`, `number`, `boolean`, `bigint`, `symbol` and `object` are aliases for the existing primitive annotations in type positions. Ordinary JavaScript names and runtime `Array` APIs keep their meaning.
+
+```lgd
+const string[] lines = document.getText().split('\n');
+let number[] lengths = [lines.length];
+String[][] rows = [["first", "second"]];
+String?[] optionalLabels = ["first", null];
+String[]? cached = null;
+```
+
+Arrays work in local declarations, typed parameters, method returns, fields and interface contracts. Initializers, later assignments, numeric indexed writes, indexed reads and `length` retain element type information. Mutable array aliases must preserve their element contract; fresh literals can initialize nullable element arrays. Unknown values remain conservative.
+
+`T[]?` is a nullable array; `T?[]` is an array of nullable elements. Neither includes `undefined`. A nonnullable array field without an initializer gets a fresh empty array; a nullable array field gets `null`. Legacy bare `Array` remains an unknown-element array (`any[]` in generated types) and retains its existing defaults and assignment behavior.
+
+General union and generic annotations such as `String | Number` and `Array<String>` are not supported yet. Use `String[]` for arrays.
 
 ## Explicit LGD method return types
 
@@ -717,7 +745,7 @@ const BaseCommand command = (BaseCommand)unknownCommand;
 - `Boolean` accepts any value using JavaScript truthiness: empty strings, `0`, `-0`, `0n`, `NaN`, `null`, and `undefined` become `false`. Nonempty strings (including `"false"`, `"0"`, and whitespace), nonzero numbers/bigints, symbols, arrays, functions, and ordinary objects become `true`. Objects are not coerced through `valueOf` or `toString`.
 - `Boolean?` preserves `null`; other values use the same truthiness conversion. Operands are evaluated once. Implicit String-to-Boolean assignments remain type errors.
 - Local or imported types named `Number` or `Boolean` remain reference assertions rather than builtin conversions. Other primitive targets such as `String` do not introduce conversions. A value-only binding named `Boolean` hides the builtin cast type: `(Boolean)value` reports an unknown cast type, while `(Boolean)(value)` remains an ordinary call.
-- The target grammar matches LGD annotations: a capitalized type name, an optional namespace, and an optional `?`. Array/generic type spellings are not part of that grammar. Ordinary grouped values, function calls, and arrow parameters retain their JavaScript meaning; when a known type is followed by a grouped operand, `(Number)(expression)` is a cast. A namespace alone does not identify a grouped call as a cast; `(namespace.Type)value` is unambiguous, while `(namespace.Type)(value)` keeps its ordinary call meaning unless that type is known.
+- The target grammar matches LGD annotations: a named type or primitive alias, an optional namespace, and `[]` or `?` suffixes. Postfix arrays and lowercase primitive aliases are supported; general generic type spellings are not supported yet. Ordinary grouped values, function calls, and arrow parameters retain their JavaScript meaning; when a known type is followed by a grouped operand, `(Number)(expression)` is a cast. A namespace alone does not identify a grouped call as a cast; `(namespace.Type)value` is unambiguous, while `(namespace.Type)(value)` keeps its ordinary call meaning unless that type is known.
 
 These are LGD JavaScript rules, not a promise that every numeric or truthiness conversion can be copied unchanged into C#. Future backends must preserve the conversion semantics explicitly.
 

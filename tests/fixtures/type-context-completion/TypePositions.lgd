@@ -1,0 +1,36 @@
+import { Parent as ImportedParent } from "./Base";
+import * as baseTypes from "./Base";
+import vscode from "vscode";
+
+interface IMatchReader
+{
+    RegExpMatchArray? Read(String textLine);
+    RegExpMatchArray? Cached { get; }
+}
+
+class MatchReader : ImportedParent
+{
+    RegExpMatchArray? cached = null;
+    static RegExpMatchArray? latest = null;
+
+    MatchReader(RegExpMatchArray? initial) : base()
+    {
+        this.cached = initial;
+    }
+
+    RegExpMatchArray? Read(String textLine)
+    {
+        return textLine.match(/=(\s*)/);
+    }
+}
+
+Object reader = {
+    RegExpMatchArray? Read(String textLine)
+    {
+        return textLine.match(/=(\s*)/);
+    }
+};
+
+Function inspect = (RegExpMatchArray? result) => result;
+RegExpMatchArray? asserted = (RegExpMatchArray?) unknownValue;
+vscode.Position origin = new vscode.Position(0, 0);

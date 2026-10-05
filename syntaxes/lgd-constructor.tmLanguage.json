@@ -1,0 +1,60 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "LGD Constructor Signature",
+	"scopeName": "source.lgd.constructor",
+	"comment": "Only source-backed constructor hovers use this fence. Markdown code blocks do not receive document semantic tokens.",
+	"patterns": [
+		{
+			"name": "meta.constructor.signature.lgd",
+			"begin": "^[ \\t]*(?:(public|protected|private|internal)[ \\t]+)?(?:(new)[ \\t]+)?([$_a-zA-Z][\\w$]*(?:[ \\t]*\\.[ \\t]*[$_a-zA-Z][\\w$]*)*)(?=[ \\t]*\\()",
+			"beginCaptures": {
+				"1": {
+					"name": "storage.modifier.lgd"
+				},
+				"2": {
+					"name": "keyword.operator.new.js"
+				},
+				"3": {
+					"name": "entity.name.type.class.lgd"
+				}
+			},
+			"end": "(?<=\\))",
+			"patterns": [
+				{
+					"include": "#parameters"
+				}
+			]
+		}
+	],
+	"repository": {
+		"parameters": {
+			"name": "meta.parameters.js",
+			"begin": "\\(",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.definition.parameters.begin.js"
+				}
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.definition.parameters.end.js"
+				}
+			},
+			"patterns": [
+				{
+					"comment": "Use the same class/type role as the semantic tokens for source parameter annotations.",
+					"match": "\\b((?:(?:[$_a-zA-Z][\\w$]*\\.)*[A-Z][\\w$]*|number|string|boolean|bigint|symbol|object)(?:\\[\\]|\\?)*)(?=[ \\t]+[$_a-zA-Z][\\w$]*\\b)",
+					"captures": {
+						"1": {
+							"name": "entity.name.type.class.lgd"
+						}
+					}
+				},
+				{
+					"include": "source.js#function-parameters-body"
+				}
+			]
+		}
+	}
+}

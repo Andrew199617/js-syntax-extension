@@ -1,0 +1,25 @@
+class Example
+{
+    readonly Number count;
+
+    Example(Number count)
+    {
+        this.count = count;
+    }
+
+    Number add(Number first)
+    {
+        if(first
+            > 0)
+        {
+            return(first + 1);
+        }
+
+        return 0;
+    }
+
+    Number readCount()
+    {
+        return this.count;
+    }
+}

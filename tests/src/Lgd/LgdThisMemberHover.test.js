@@ -67,9 +67,9 @@ describe('LGD this. member hover.', () =>
 {
     test('getTypeSummary lists the property create() assigns as a member.', async () =>
     {
-        const { service } = await openOlooDocument();
+        const { service, document } = await openOlooDocument();
 
-        const summary = await service.getTypeSummary(LGD_URI, 'BaseCommand');
+        const summary = await service.getTypeSummary(document.uri.toString(), 'BaseCommand');
 
         expect(summary.members.map(member => member.name)).toContain('command');
     });

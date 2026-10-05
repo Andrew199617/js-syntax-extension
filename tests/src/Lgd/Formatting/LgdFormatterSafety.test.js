@@ -223,7 +223,7 @@ it.each([
     "const external = require('package');\nconst local = require('./local.js');"
 ])('groups adjacent imports by origin without reordering %s', source =>
 {
-    const configuration = { options: { lineBreaks: { importGroups: 'origin' } } };
+    const configuration = { options: { lineBreaks: { importGroups: 'origin' }, spacing: { insideCallParens: false } } };
     const formatted = LgdFormatter.format(source, configuration);
     expect(formatted).toContain(';\n\n');
     expect(formatted.replace('\n\n', '\n')).toBe(source);
@@ -295,6 +295,148 @@ it('preserves comments, unsupported type spellings and indentation while normali
     expect(LgdFormatter.format(source)).toBe('class Example\n{\n    Number value = 1;\n}');
     const commented = 'Number /* type note */    value = 1;';
     expect(LgdFormatter.format(commented)).toContain('/* type note */');
-    const unsupported = 'Number[]    values = [];';
+    const unsupported = 'Array<Number>    values = [];';
     expect(LgdFormatter.format(unsupported)).toBe(unsupported);
+    const array = 'Number[]    values = [];';
+    const formatted = LgdFormatter.format(array);
+    expect(formatted).toBe('Number[] values = [];');
+    expect(LgdFormatter.format(formatted)).toBe(formatted);
+});
+
+it.each([ '\n', '\r\n', '\r' ])('uses readable default member gaps and joins short operator expressions with %j endings', newline =>
+{
+    const source = [ 'class Example { Example() {} Number add(Number first, Number second) {', 'if(first', '> 0) { return first', '+ second; }', '', 'return 0; } }' ].join(newline);
+    const formatted = LgdFormatter.format(source);
+    expect(formatted).toContain(`Example() { }${newline}${newline}    Number add`);
+    expect(formatted).toContain('if(first > 0)');
+    expect(formatted).toContain('return first + second;');
+    expect(formatted).toContain(`}${newline}${newline}        return 0;`);
+    expect(LgdFormatter.format(formatted)).toBe(formatted);
+    expect(LgdFormatter.analyze(formatted)).toEqual([]);
+});
+
+it.each([ 'before', 'after', 'beforeNonAssignment' ])('joins both sides of a fitting operator in one action with %s placement', placement =>
+{
+    const configuration = { options: { wrapping: { binaryOperators: placement } } };
+    for(const source of [ 'const ready = first &&\nsecond;', 'const ready = first\n&& second;', 'const ready = first\n&&\nsecond;' ])
+    {
+        const formatted = LgdFormatter.format(source, configuration);
+        expect(formatted).toBe('const ready = first && second;');
+        expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+    }
+});
+
+it('measures operator width after block layout rather than the original single-line class prefix', () =>
+{
+    const source = 'class Example { Example() {} Number add(Number first, Number second) { if(first > 0) { return first + second; } return 0; } }';
+    const configuration = { options: { wrapping: { columnLimit: 40 } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('if(first > 0)');
+    expect(formatted).toContain('return first + second;');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});
+
+it('wraps long default expressions by precedence and accounts for meaningful spaces inside literals', () =>
+{
+    const source = 'const result = firstValue + secondValue * thirdValue - fourthValue;';
+    const configuration = { options: { wrapping: { columnLimit: 25 } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('\n    + secondValue * thirdValue');
+    expect(formatted).toContain('\n    - fourthValue');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+    const literal = 'const value = "long                     literal" + other;';
+    const withLiteral = LgdFormatter.format(literal, { options: { wrapping: { columnLimit: 42 } } });
+    expect(withLiteral).toContain('"long                     literal"\n    + other;');
+});
+
+it('retains leading documentation, trailing comments, template bytes and disabled member spacing', () =>
+{
+    const source = [ 'class Example {', '    Example() {} // constructor note', '    /** Method documentation. */', '    String text() { return `  first', '> 0  `; }', '    // lgd-format off', '    Number preserved(){return 1;}', '    Number alsoPreserved(){return 2;}', '    // lgd-format on', '}' ].join('\n');
+    const formatted = LgdFormatter.format(source);
+    expect(formatted).toContain('// constructor note\n\n    /** Method documentation. */\n    String text()');
+    expect(formatted).toContain('`  first\n> 0  `');
+    expect(formatted).toContain('    Number preserved(){return 1;}\n    Number alsoPreserved(){return 2;}');
+    expect(LgdFormatter.format(formatted)).toBe(formatted);
+});
+
+it('preserves explicit member gaps and existing operator breaks when requested', () =>
+{
+    const source = 'class Example\n{\n    Example() { }\n    Number add(Number first)\n    {\n        return first\n            + 1;\n    }\n}';
+    const configuration = { options: { lineBreaks: { separateDefinitions: 'preserve' }, wrapping: { binaryOperations: 'preserve', binaryOperators: 'preserve' } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('Example() { }\n    Number add');
+    expect(formatted).toContain('return first\n');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+    const joined = LgdFormatter.format(source, { options: { lineBreaks: { separateDefinitions: 'never' } } });
+    expect(joined).not.toContain('\n\n');
+});
+
+it('settles multiline-only braces after joining or wrapping their condition', () =>
+{
+    const source = 'if(first\n> 0) { act(); }';
+    const configuration = { options: { braces: { style: 'attach', wrapping: { controlBlocks: 'nextLineIfMultiline' } } } };
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('if(first > 0) {');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+    const long = 'if(firstLongCondition && secondLongCondition) { act(); }';
+    const narrow = { options: { ...configuration.options, wrapping: { columnLimit: 30 } } };
+    const wrapped = LgdFormatter.format(long, narrow);
+    expect(wrapped).toContain('secondLongCondition)\n{');
+    expect(LgdFormatter.format(wrapped, narrow)).toBe(wrapped);
+});
+
+it('preserves conditional punctuation and comment boundaries while joining safe operand breaks', () =>
+{
+    const source = 'const value = ready ? first\n+ second : third + // Keep operator context.\nfourth;';
+    const formatted = LgdFormatter.format(source);
+    expect(formatted).toContain('? first + second :');
+    expect(formatted).toContain('+ // Keep operator context.\n');
+    expect(LgdFormatter.format(formatted)).toBe(formatted);
+});
+
+it('leaves comment-bearing and multiline-literal expressions free of invented operator breaks', () =>
+{
+    for(const expression of [ 'first + second /* retain */ + third', 'first + `line\n  continuation` + third' ])
+    {
+        const formatted = LgdFormatter.format(`const result = ${expression};`);
+        expect(formatted).toBe(`const result = ${expression};`);
+    }
+});
+
+it('counts imported tab indentation when deciding whether an expression fits', () =>
+{
+    const configuration = { options: { indentation: { style: 'tab', size: 4, tabWidth: 4 }, wrapping: { columnLimit: 24 } } };
+    const source = 'class Example { Number total() { return first + second; } }';
+    const formatted = LgdFormatter.format(source, configuration);
+    expect(formatted).toContain('return first\n\t\t\t+ second;');
+    expect(LgdFormatter.format(formatted, configuration)).toBe(formatted);
+});
+
+it('attributes ordinary member separation independently of the unused blank-line limit', () =>
+{
+    const source = 'class Example\n{\n    Example() { }\n    Number value() { return 1; }\n}';
+    const findings = LgdFormatter.analyze(source);
+    const separation = findings.find(error => error.relatedRuleIds.includes('lgd.format.lineBreaks.separateDefinitions'));
+    expect(separation.relatedRuleIds).not.toContain('lgd.format.lineBreaks.maxEmptyLines');
+});
+
+it.each([ '\n', '\r\n', '\r' ])('preserves return ASI and opaque parenthesis content with %j endings', newline =>
+{
+    const source = [
+        'const pattern = /return\\(value\\)/;',
+        'const text = "return(value)";',
+        'function empty(){return',
+        '(1);}',
+        'function value(){return(2);}',
+        'function annotated(){return /* retain (spacing) */ (3);}',
+        'JSON.stringify([empty(),value(),annotated(),pattern.test(text)]);'
+    ].join(newline);
+    const formatted = LgdFormatter.format(source);
+    expect(formatted).toContain('/return\\(value\\)/');
+    expect(formatted).toContain('"return(value)"');
+    expect(formatted).toContain('/* retain (spacing) */');
+    expect(formatted).toContain(`return${newline}`);
+    expect(formatted).toContain('return (2);');
+    expect(virtualMachine.runInNewContext(formatted)).toBe(virtualMachine.runInNewContext(source));
+    expect(LgdFormatter.format(formatted)).toBe(formatted);
 });

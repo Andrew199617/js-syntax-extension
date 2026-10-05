@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const LgdFixRuntime = require('./LgdFixRuntime');
 const LgdFixEdits = require('./LgdFixEdits');
 const LgdFixPlan = require('../../Lgd/Fixes/LgdFixPlan');
+const LgdFixComposition = require('../../Lgd/Fixes/LgdFixComposition');
 const LgdFixConfiguration = require('./LgdFixConfiguration');
 const LgdFormattingDiagnostics = require('./LgdFormattingDiagnostics');
 const LgdFormattingPolicy = require('../../Lgd/Fixes/LgdFormattingPolicy');
@@ -32,7 +33,7 @@ const LgdFixService = {
         service.engine = LgdFixRuntime.create(languageService);
         const ruleIds = Array.from(new Set(Array.from(service.engine.handlers.values(), handler => handler.ruleId)));
         service.configuration = LgdFixConfiguration.create(ruleIds, LgdFormattingSources);
-        service.ruleHandlers = new Map(Array.from(service.engine.handlers.values(), handler => [ handler.ruleId, handler ]));
+        service.ruleHandlers = new Map(Array.from(service.engine.handlers.values()).filter(handler => !handler.individualOnly).map(handler => [ handler.ruleId, handler ]));
         languageService.diagnosticPolicy = async (state, configuration) =>
         {
             const resolved = configuration || await service.configuration.resolve(state.document);
@@ -61,7 +62,7 @@ const LgdFixService = {
     {
         this.formattingDiagnostics.register(subscriptions);
         this.configuration.register(subscriptions, () => this.formattingDiagnostics.refreshAll());
-        subscriptions.push(vscode.commands.registerCommand('lgd.fixAll', () => this.chooseScope()));
+        subscriptions.push(vscode.commands.registerCommand('lgd.fixAll', uri => this.chooseScope(uri)));
         subscriptions.push(vscode.commands.registerCommand('lgd.fixAllDocument', () => this.run('document')));
         subscriptions.push(vscode.commands.registerCommand('lgd.fixAllFile', () => this.run('document')));
         subscriptions.push(vscode.commands.registerCommand('lgd.fixAllProject', () => this.run('project')));
@@ -97,7 +98,20 @@ const LgdFixService = {
             proposal.fixConfigurations.push({ document: document, config: config });
         }
 
+        const configurations = new Map(proposal.fixConfigurations.map(entry => [ entry.document.uri.toString(), entry.config ]));
+        const composed = this.composeProposal(proposal, configurations, { automatic: false });
+        Object.assign(proposal, composed);
         return true;
+    },
+
+    /** @description Shares local cleanup and its existing policy checks across individual, batch and save fixes. */
+    composeProposal(proposal, configurations, options)
+    {
+        return LgdFixComposition.compose(proposal, configurations, (error, configuration) =>
+        {
+            const handler = this.ruleHandlers.get(error.ruleId);
+            return handler && this.eligibleError(handler, error, configuration, options);
+        });
     },
 
     /** @description Rejects a quick fix if a policy changed after the lightbulb menu was opened. */
@@ -160,6 +174,31 @@ const LgdFixService = {
         });
     },
 
+    /** @description Requires each native action contributing to a migration to be independently allowed. */
+    eligibleProposal(proposal, configuration, options)
+    {
+        return (proposal.ruleIds || []).every(ruleId =>
+        {
+            const handler = this.ruleHandlers.get(ruleId);
+            return handler && this.eligible(handler, configuration, options.automatic, options.rules);
+        });
+    },
+
+    /** @description Reuses manual batch eligibility before exposing its scope picker beside a diagnostic fix. */
+    eligibleQuickFix(document, proposal, handler, error)
+    {
+        if(vscode.workspace.isTrusted === false || document.languageId !== 'lgd' || ![ 'file', 'untitled' ].includes(document.uri.scheme))
+        {
+            return false;
+        }
+
+        return proposal.fixConfigurations.every(entry =>
+        {
+            const options = { automatic: false };
+            return this.eligibleError(handler, error, entry.config, options) && this.eligibleProposal(proposal, entry.config, options);
+        });
+    },
+
     /** @description Adds fresh style findings for this request without mutating semantic compiler state. */
     async analysisRequest(document, state, configuration)
     {
@@ -197,8 +236,9 @@ const LgdFixService = {
     },
 
     /** @description Presents document/file, nearest project and all workspace roots without inventing a solution format. */
-    async chooseScope()
+    async chooseScope(uri)
     {
+        const document = uri ? await vscode.workspace.openTextDocument(uri) : vscode.window.activeTextEditor?.document;
         const choice = await vscode.window.showQuickPick([
             { label: 'Document / File', description: 'Current LGD editor buffer, including unsaved changes', scope: 'document' },
             { label: 'Project', description: 'Nearest .vscode/lgd.json project, or current workspace folder', scope: 'project' },
@@ -206,7 +246,7 @@ const LgdFixService = {
         ], { placeHolder: 'Fix all configured LGD issues in…' });
         if(choice)
         {
-            return this.run(choice.scope);
+            return this.run(choice.scope, { document: document });
         }
 
         return false;
@@ -321,7 +361,8 @@ const LgdFixService = {
                     const key = target.uri.toString();
                     const targetConfig = configurations.get(key)?.config || await this.configuration.resolve(target);
                     configurations.set(key, { document: target, config: targetConfig });
-                    if(!targetConfig.valid || targetConfig.ignored || !this.eligibleError(entry.handler, entry.error, targetConfig, options))
+                    const eligible = this.eligibleError(entry.handler, entry.error, targetConfig, options) && this.eligibleProposal(entry.proposal, targetConfig, options);
+                    if(!targetConfig.valid || targetConfig.ignored || !eligible)
                     {
                         permitted = false;
                     }
@@ -329,6 +370,8 @@ const LgdFixService = {
 
                 if(permitted)
                 {
+                    const policies = new Map(Array.from(configurations, ([ key, target ]) => [ key, target.config ]));
+                    entry.proposal = this.composeProposal(entry.proposal, policies, options);
                     entries.push(entry);
                 }
             }

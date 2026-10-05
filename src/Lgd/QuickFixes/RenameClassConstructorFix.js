@@ -13,7 +13,7 @@ class RenameClassConstructorFix extends ConvertObjectInheritanceFix
     }
 
     /** @description Preserves the signature and body while rejecting duplicate or factory-style constructors. */
-    createProposal(context, fix)
+    async createProposal(context, fix)
     {
         const { source, state, document, languageService, snapshots } = context;
         const compiler = LgdCompiler.create();
@@ -26,7 +26,13 @@ class RenameClassConstructorFix extends ConvertObjectInheritanceFix
 
         if(this._documentedBase(declaration) || LgdFactoryMigration.read(source.text, declaration, parsed.allDeclarations)?.factory)
         {
-            return super.createProposal(context, { ...fix, kind: 'convertObjectInheritance' });
+            const proposal = await super.createProposal(context, { ...fix, kind: 'convertObjectInheritance' });
+            if(proposal)
+            {
+                proposal.ruleIds = [ 'class-constructor-name', 'object-inheritance' ];
+            }
+
+            return proposal;
         }
 
         const candidates = declaration.classMembers.filter(member => member.name === 'constructor' || member.name === 'create');

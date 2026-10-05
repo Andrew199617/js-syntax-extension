@@ -241,3 +241,282 @@ describe('Constructor overload boundaries and recovery.', () =>
         expect(result.errors.map(error => error.code)).toContain('lgd.constructor.argumentType');
     });
 });
+
+describe.each([ 'oloo', 'class' ])('Generated factory layout with %s output.', objectModel =>
+{
+    test.each([
+        '',
+        'Example(Number value = 1) { this.value = value; }',
+        'Example() {} Example(Number value, ...String labels) { this.value = value; this.labels = labels; }'
+    ])('Puts create first without an empty header line for constructor set %s.', constructors =>
+    {
+        const source = [
+            'class Example {',
+            '    Number value = 1;',
+            '    /** Reads the current value. */',
+            '    Number read() { return this.value; }',
+            `    ${constructors}`,
+            '    /** Keeps the later member in place. */',
+            '    Number later() { return this.value; }',
+            '}'
+        ].join('\r\n');
+        const result = compile(source, objectModel);
+        expect(result.errors).toEqual([]);
+        expect(result.code).toMatch(/^\S[^\n\r]*{\r\n {4}\/\*\*/);
+        expect(result.code.indexOf('create(')).toBeLessThan(result.code.indexOf('Reads the current value.'));
+        expect(result.code.indexOf('read()')).toBeLessThan(result.code.indexOf('later()'));
+        expect(result.code).toContain('Keeps the later member in place.');
+        expect(result.code.replace(/\r\n/g, '')).not.toContain('\n');
+        if(constructors && objectModel === 'class')
+        {
+            expect(result.code.indexOf('read()')).toBeLessThan(result.code.indexOf('constructor('));
+            expect(result.code.indexOf('constructor(')).toBeLessThan(result.code.indexOf('later()'));
+        }
+    });
+
+    test('Preserves comments and mappings on ordinary methods and the original constructor.', () =>
+    {
+        const source = [
+            'class Example {',
+            '    /** Reads the label. */',
+            '    String read() { return this.label; }',
+            '    // Initialize only when called.',
+            '    Example(String label) { this.label = label; }',
+            '    /** Reads the same label later. */',
+            '    String later() { return this.label; }',
+            '}'
+        ].join('\n');
+        const result = compile(source, objectModel);
+        expect(result.errors).toEqual([]);
+        expect(result.code.indexOf('read()')).toBeLessThan(result.code.indexOf('// Initialize only when called.'));
+        expect(result.code.indexOf('// Initialize only when called.')).toBeLessThan(result.code.indexOf('this.label = label;'));
+        const map = LgdSourceMap.create(result.mappings);
+        expect(result.code).toContain('Reads the label.');
+        expect(result.code).toContain('Reads the same label later.');
+        for(const marker of [ 'read()', 'Initialize only when called.', 'label)', 'this.label = label;', 'later()' ])
+        {
+            const offset = source.indexOf(marker);
+            const output = map.toOutput(offset);
+            expect(result.code.slice(output, output + marker.length)).toBe(marker);
+            expect(map.toSource(output)).toBe(offset);
+        }
+    });
+});
+
+describe('Generated factory evaluation order.', () =>
+{
+    test('Keeps object-base construction, constructor comments, defaults and body effects together.', () =>
+    {
+        const source = [
+            'let events = [];',
+            'const Object Base = { create(String label) { events.push("base"); return { label }; } };',
+            'class Child : Base {',
+            '    String read() { return this.label; } // This stays with read.',
+            '    /** Builds the child. */',
+            '    // This stays with construction.',
+            '    Child(String label = "ready", ...String labels) : base(label) { events.push("body"); this.labels = labels; this.count = arguments.length; }',
+            '    String later() { return this.label; }',
+            '}',
+            'const initial = Child.create();',
+            'const named = Child.create("named", "a", "b");',
+            'module.exports = { initial, named, events };'
+        ].join('\n');
+        const result = compile(source);
+        expect(result.errors).toEqual([]);
+        const child = result.code.slice(result.code.indexOf('const Child'));
+        expect(child.indexOf('Builds the child.')).toBeLessThan(child.indexOf('create('));
+        expect(child.indexOf('This stays with construction.')).toBeLessThan(child.indexOf('create('));
+        expect(child.indexOf('create(')).toBeLessThan(child.indexOf('read()'));
+        expect(child).toContain('read() { return this.label; }, // This stays with read.');
+        expect(child.indexOf('read()')).toBeLessThan(child.indexOf('later()'));
+        const exported = execute(source, 'oloo');
+        expect(exported.events).toEqual([ 'base', 'body', 'base', 'body' ]);
+        expect(exported.initial.read()).toBe('ready');
+        expect(exported.initial.count).toBe(0);
+        expect(exported.named.labels).toEqual([ 'a', 'b' ]);
+        const argumentCount = 3;
+        expect(exported.named.count).toBe(argumentCount);
+        const map = LgdSourceMap.create(result.mappings);
+        for(const marker of [ 'Builds the child.', 'This stays with read.', 'This stays with construction.', 'label = "ready"', 'events.push("body")' ])
+        {
+            const offset = source.indexOf(marker);
+            expect(result.code.slice(map.toOutput(offset), map.toOutput(offset) + marker.length)).toBe(marker);
+        }
+    });
+
+    test('Retains symbol-key helper identities and their definition-time evaluation order.', () =>
+    {
+        const source = [
+            'class Example {',
+            '    Number value = 1;',
+            '    Number read() { return this.value; }',
+            '    Example() {}',
+            '    Example(Number value) { this.value = value; }',
+            '}',
+            'module.exports = Example;'
+        ].join('\n');
+        const result = compile(source);
+        expect(result.errors).toEqual([]);
+        const keys = [];
+        const context = {
+            Symbol: {
+                /** @description Records definition-time helper keys while keeping native symbol identity. */
+                for: key =>
+                {
+                    keys.push(key);
+                    return Symbol.for(key);
+                }
+            },
+            module: { exports: null }
+        };
+        virtualMachine.runInNewContext(result.code, context);
+        expect(keys).toEqual([ 'lgd.class.initialize', 'lgd.class.initialize:0', 'lgd.class.initialize:1', 'lgd.class.fields' ]);
+        expect(Object.keys(context.module.exports)).toEqual([ 'create', 'read' ]);
+        expect(Object.getOwnPropertySymbols(context.module.exports)).toEqual(keys.map(key => Symbol.for(key)));
+        expect(context.module.exports.create(2).read()).toBe(2);
+    });
+});
+
+describe.each([ 'oloo', 'class' ])('Constructor comment associations with %s output.', objectModel =>
+{
+    test('Keeps later overload comments with their selected branch or helper and leaves adjacent method docs intact.', () =>
+    {
+        const source = [
+            'let events = [];',
+            'class Example {',
+            '    /** The first constructor remains documented. */',
+            '    Example() { events.push("empty"); this.label = "empty"; }',
+            '    /** Reads the label between overloads. */',
+            '    String read() { return this.label; } // This belongs to read.',
+            '',
+            '    /** Uses the default count.',
+            '     * Keeps this authored detail.',
+            '     */',
+            '    // Named overload marker.',
+            '    Example(String label, Number count = events.push("default")) { events.push("named"); this.label = label; this.count = count; this.length = arguments.length; }',
+            '    /** Documents the adjacent method. */',
+            '    String adjacent() { return this.label; }',
+            '',
+            '    // Rest overload marker.',
+            '',
+            '    /* Keeps the separate rest comment. */',
+            '    Example(String label, Number count, Boolean flag, ...String labels) { events.push("rest"); this.label = label; this.labels = labels; this.length = arguments.length; }',
+            '    /** Documents the final method. */',
+            '    String finalLabel() { return this.label; }',
+            '}',
+            'const empty = Example.create();',
+            'const named = Example.create("named");',
+            'const rest = Example.create("rest", 2, true, "a", "b");',
+            'module.exports = { empty, named, rest, events };'
+        ].join('\r\n');
+        const result = compile(source, objectModel);
+        expect(result.errors).toEqual([]);
+        for(const comment of [
+            'The first constructor remains documented.',
+            'Uses the default count.',
+            'Keeps this authored detail.',
+            'Named overload marker.',
+            'Rest overload marker.',
+            'Keeps the separate rest comment.',
+            'This belongs to read.',
+            'Reads the label between overloads.',
+            'Documents the adjacent method.',
+            'Documents the final method.'
+        ])
+        {
+            expect(result.code.split(comment)).toHaveLength(2);
+        }
+
+        const namedComment = result.code.indexOf('// Named overload marker.');
+        const restComment = result.code.indexOf('// Rest overload marker.');
+        const firstDocumentation = result.code.indexOf('The first constructor remains documented.');
+        const adjacentDocumentation = result.code.indexOf('Documents the adjacent method.');
+        const finalDocumentation = result.code.indexOf('Documents the final method.');
+        expect(adjacentDocumentation).toBeLessThan(result.code.indexOf('adjacent()'));
+        expect(finalDocumentation).toBeLessThan(result.code.indexOf('finalLabel()'));
+        if(objectModel === 'class')
+        {
+            expect(firstDocumentation).toBeLessThan(result.code.indexOf('constructor('));
+            expect(namedComment).toBeLessThan(result.code.indexOf('if(_lgdArguments.length >= 1 && _lgdArguments.length <= 2)'));
+            expect(restComment).toBeLessThan(result.code.indexOf('if(_lgdArguments.length >= 3)'));
+            expect(restComment).toBeLessThan(result.code.indexOf('read()'));
+            expect(result.code).toContain('        /** Uses the default count.\r\n         * Keeps this authored detail.\r\n         */');
+            expect(result.code).toContain('        // Rest overload marker.\r\n\r\n        /* Keeps the separate rest comment. */');
+        }
+        else
+        {
+            expect(firstDocumentation).toBeLessThan(result.code.indexOf('[Symbol.for("lgd.class.initialize:0")]()'));
+            expect(namedComment).toBeLessThan(result.code.indexOf('[Symbol.for("lgd.class.initialize:1")](label'));
+            expect(restComment).toBeLessThan(result.code.indexOf('[Symbol.for("lgd.class.initialize:2")](label'));
+            expect(result.code.indexOf('adjacent()')).toBeLessThan(restComment);
+        }
+
+        const map = LgdSourceMap.create(result.mappings);
+        for(const marker of [ 'Uses the default count.', 'Keeps this authored detail.', 'Named overload marker.', 'Rest overload marker.', 'Keeps the separate rest comment.', 'This belongs to read.' ])
+        {
+            const offset = source.indexOf(marker);
+            const output = map.toOutput(offset);
+            expect(result.code.slice(output, output + marker.length)).toBe(marker);
+            expect(map.toSource(output)).toBe(offset);
+        }
+
+        expect(result.code.replace(/\r\n/g, '')).not.toContain('\n');
+        const exported = execute(source, objectModel);
+        expect(exported.events).toEqual([ 'empty', 'default', 'named', 'rest' ]);
+        expect(exported.named.length).toBe(1);
+        expect(exported.rest.labels).toEqual([ 'a', 'b' ]);
+        const restArgumentCount = 5;
+        expect(exported.rest.length).toBe(restArgumentCount);
+        expect(exported.named.adjacent()).toBe('named');
+        expect(exported.rest.finalLabel()).toBe('rest');
+    });
+
+    test('Moves a same-line leading JSDoc without consuming the following method documentation.', () =>
+    {
+        const source = [
+            'class Example {',
+            '    Example() {}',
+            '    read() { return 1; } /** Later constructor docs. */ Example(Number value) { this.value = value; } /** Following method docs. */ later() { return 2; }',
+            '}',
+            'module.exports = Example;'
+        ].join('\n');
+        const result = compile(source, objectModel);
+        expect(result.errors).toEqual([]);
+        const laterConstructor = objectModel === 'class' ? 'if(_lgdArguments.length === 1)' : '[Symbol.for("lgd.class.initialize:1")](value)';
+        expect(result.code.indexOf('Later constructor docs.')).toBeLessThan(result.code.indexOf(laterConstructor));
+        expect(result.code.indexOf('Following method docs.')).toBeLessThan(result.code.indexOf('later()'));
+        expect(result.code.split('Later constructor docs.')).toHaveLength(2);
+        expect(result.code.split('Following method docs.')).toHaveLength(2);
+        expect(execute(source, objectModel).create(2).later()).toBe(2);
+    });
+
+    test('Retains a trailing line-comment boundary when a removed overload shares its line with the next method.', () =>
+    {
+        const source = [
+            'class Example {',
+            '    Example() {}',
+            '    read() { return 1; } // Keep the line ending after this comment.',
+            '    // This describes the named overload.',
+            '    Example(Number value) { this.value = value; } later() { return 2; }',
+            '}',
+            'module.exports = Example;'
+        ].join('\n');
+        const Example = execute(source, objectModel);
+        expect(Example.create(2).later()).toBe(2);
+    });
+});
+
+test('Retains a trailing line-comment boundary when an object-base factory moves ahead of its methods.', () =>
+{
+    const source = [
+        'const Object Base = { create() { return {}; } };',
+        'class Child : Base {',
+        '    read() { return 1; } // This remains a read comment.',
+        '    /** Creates the child. */',
+        '    Child() {} later() { return 2; }',
+        '}',
+        'module.exports = Child;'
+    ].join('\n');
+    const Child = execute(source, 'oloo');
+    expect(Child.create().later()).toBe(2);
+});

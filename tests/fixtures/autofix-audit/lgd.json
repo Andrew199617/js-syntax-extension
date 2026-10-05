@@ -1,0 +1,13 @@
+{
+    "version": 1,
+    "autoFix": false,
+    "formatting": {
+        "enabled": true,
+        "sources": [],
+        "options": {
+            "expressions": {
+                "booleanSimplification": "prefer"
+            }
+        }
+    }
+}

@@ -355,6 +355,9 @@
                                 "afterControlKeywords": {
                                     "type": "boolean"
                                 },
+                                "afterReturnKeyword": {
+                                    "type": "boolean"
+                                },
                                 "beforeFunctionParen": {
                                     "type": "boolean"
                                 },
@@ -596,6 +599,7 @@
                                 "binaryOperations": {
                                     "enum": [
                                         "preserve",
+                                        "fit",
                                         "respectPrecedence",
                                         "onePerLine"
                                     ]
@@ -884,6 +888,9 @@
                     "$ref": "#/definitions/rule"
                 },
                 "return-type-documentation": {
+                    "$ref": "#/definitions/rule"
+                },
+                "inheritance-documentation": {
                     "$ref": "#/definitions/rule"
                 },
                 "virtual-documentation": {
@@ -1232,6 +1239,9 @@
                                 "afterControlKeywords": {
                                     "type": "boolean"
                                 },
+                                "afterReturnKeyword": {
+                                    "type": "boolean"
+                                },
                                 "beforeFunctionParen": {
                                     "type": "boolean"
                                 },
@@ -1521,6 +1531,7 @@
                                 "binaryOperations": {
                                     "enum": [
                                         "preserve",
+                                        "fit",
                                         "respectPrecedence",
                                         "onePerLine"
                                     ]
@@ -2303,6 +2314,29 @@
                     "type": "object",
                     "additionalProperties": false,
                     "title": "Horizontal spacing: afterControlKeywords",
+                    "properties": {
+                        "fix": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "manual",
+                                "automatic"
+                            ]
+                        },
+                        "severity": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "warning",
+                                "error"
+                            ]
+                        }
+                    }
+                },
+                "lgd.format.spacing.afterReturnKeyword": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "title": "Horizontal spacing: afterReturnKeyword",
                     "properties": {
                         "fix": {
                             "type": "string",

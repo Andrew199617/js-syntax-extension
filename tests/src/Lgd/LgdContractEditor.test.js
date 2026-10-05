@@ -87,8 +87,8 @@ describe('LGD interface and abstract editor contracts', () =>
         const spans = LgdSemanticTokensProvider.create(service).collectTypeSpans(source, state.declarations);
         const types = spans.map(span => source.slice(span.start, span.end));
         expect(types).toContain('Number?');
-        const memberTypeCount = 3;
-        expect(types.filter(type => type === 'IValue?')).toHaveLength(memberTypeCount);
+        const annotationCount = Array.from(source.matchAll(/IValue\?/g)).length;
+        expect(types.filter(type => type === 'IValue?')).toHaveLength(annotationCount);
         const hover = await LgdHoverProvider.create(service).provideHover(document, document.positionAt(source.indexOf('IValue')));
         expect(hover.contents).toContain('count: Number?');
     });

@@ -1,0 +1,2 @@
+String textLine = "key = value";
+RegExpMatchArray match = textLine.match(/=(\s*)/);

@@ -29,6 +29,22 @@ function makeDocument(directory, name, text = '')
     return document;
 }
 
+/**
+ * @description Creates a real directory link without requiring Windows file-symlink privileges.
+ * @param {string} target the linked directory.
+ * @param {string} link the link path.
+ */
+async function linkDirectory(target, link)
+{
+    let type = 'dir';
+    if(process.platform === 'win32')
+    {
+        type = 'junction';
+    }
+
+    await fs.promises.symlink(target, link, type);
+}
+
 jest.mock('vscode', () => require('./fakeVscode').createFakeVscode(jest));
 
 describe('LGD project fix configuration', () =>
@@ -72,6 +88,27 @@ describe('LGD project fix configuration', () =>
         expect(result).toMatchObject({ valid: true, ignored: false, autoFix: false, rules: {}, root: directory, configPath: null });
         expect(result.configSnapshots.every(snapshot => snapshot.text === null)).toBe(true);
         expect(await reader.isCurrent(document, result)).toBe(true);
+    });
+
+    test('shares compact parenthesis defaults and explicit native overrides with the editor', async () =>
+    {
+        const document = makeDocument(directory, 'src/Example.lgd');
+        await writeConfiguration(directory, { version: 1, formatting: { enabled: true, sources: [] } });
+        const defaults = await reader.resolve(document);
+        expect(defaults.formatting.options.spacing).toMatchObject({
+            afterReturnKeyword: true, insideCastParens: false, insideControlParens: false, insideDeclarationParens: false, insideCallParens: false, insideOtherParens: false,
+            insideEmptyDeclarationParens: false, insideEmptyCallParens: false
+        });
+        const spacing = { afterReturnKeyword: false, insideCastParens: true, insideControlParens: true, insideDeclarationParens: true, insideCallParens: true,
+            insideOtherParens: true, insideEmptyDeclarationParens: true, insideEmptyCallParens: true };
+        await writeConfiguration(directory, { version: 1, formatting: { enabled: true, sources: [], options: { spacing: spacing } } });
+        const padded = await reader.resolve(document);
+        expect(padded.valid).toBe(true);
+        expect(padded.formatting.options.spacing).toMatchObject(spacing);
+        await writeConfiguration(directory, { version: 1, formatting: { enabled: true, sources: [], options: { spacing: spacing } }, rules: { 'lgd.format.spacing': { options: { afterReturnKeyword: true, insideOtherParens: false } } } });
+        const overridden = await reader.resolve(document);
+        expect(overridden.formatting.options.spacing.afterReturnKeyword).toBe(true);
+        expect(overridden.formatting.options.spacing.insideOtherParens).toBe(false);
     });
 
     test('untitled and non-workspace files use manual defaults without configuration', async () =>
@@ -153,6 +190,8 @@ describe('LGD project fix configuration', () =>
         '{"version":1,"rules":{"readonly-variable-declaration":"automatic"}}',
         '{"version":1,"rules":{"readonly-variable-declaration":{"fix":"on"}}}',
         '{"version":1,"rules":{"readonly-variable-declaration":{"fix":"off","extra":true}}}',
+        '{"version":1,"rules":{"readonly-variable-declaration":{"severity":"off"}}}',
+        '{"version":1,"rules":{"readonly-variable-declaration":{"severity":"error"}}}',
         '{"version":1,"rules":{"__proto__":{"fix":"automatic"}}}',
         '{"version":1,"ignores":["!src/**"]}',
         '{"version":1,"ignores":"src/**"}',
@@ -358,11 +397,25 @@ describe('LGD project fix configuration', () =>
             const readFile = jest.spyOn(fs.promises, 'readFile');
             expect((await reader.resolve(document)).valid).toBe(false);
             expect(readFile.mock.calls.some(([file]) => file === outsidePath)).toBe(false);
-            await fs.promises.symlink(outsidePath, path.join(directory, '.vscode', 'linked.json'));
-            await writeConfiguration(directory, { version: 1, extends: './linked.json' });
+            let linkedPath = path.join(directory, '.vscode', 'linked.json');
+            let linkedReference = './linked.json';
+            if(process.platform === 'win32')
+            {
+                // Exercise the same physical config escape through an unprivileged junction.
+                const linkedDirectory = path.join(directory, '.vscode', 'linked-config');
+                await linkDirectory(outside, linkedDirectory);
+                linkedPath = path.join(linkedDirectory, 'outside.json');
+                linkedReference = './linked-config/outside.json';
+            }
+            else
+            {
+                await fs.promises.symlink(outsidePath, linkedPath);
+            }
+
+            await writeConfiguration(directory, { version: 1, extends: linkedReference });
             expect((await reader.resolve(document)).valid).toBe(false);
-            expect(readFile.mock.calls.some(([file]) => file.endsWith('linked.json'))).toBe(false);
-            await fs.promises.symlink(outside, path.join(directory, 'linked-sources'));
+            expect(readFile.mock.calls.some(([file]) => file === linkedPath || file === outsidePath)).toBe(false);
+            await linkDirectory(outside, path.join(directory, 'linked-sources'));
             expect((await reader.resolve(makeDocument(directory, 'linked-sources/Example.lgd'))).valid).toBe(false);
         }
         finally
@@ -393,7 +446,7 @@ describe('LGD project fix configuration', () =>
         vscode.workspace.getWorkspaceFolder.mockReturnValue({ uri: vscode.Uri.file(workspaceRoot) });
         expect((await reader.resolve(makeDocument(workspaceRoot, 'src/Example.lgd'))).ignored).toBe(false);
         await fs.promises.mkdir(path.join(workspaceRoot, 'generated'));
-        await fs.promises.symlink(path.join(workspaceRoot, 'generated'), path.join(workspaceRoot, 'sources'));
+        await linkDirectory(path.join(workspaceRoot, 'generated'), path.join(workspaceRoot, 'sources'));
         expect((await reader.resolve(makeDocument(workspaceRoot, 'sources/Example.lgd'))).ignored).toBe(true);
     });
 

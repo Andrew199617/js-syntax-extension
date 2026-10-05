@@ -1,3 +1,4 @@
+const path = require('path');
 const virtualMachine = require('vm');
 const LgdExpressionStyles = require('../../../src/Lgd/Formatting/LgdExpressionStyles');
 const LgdFormatter = require('../../../src/Lgd/Formatting/LgdFormatter');
@@ -174,13 +175,14 @@ describe('expression configuration integration', () =>
 
     test('matching EditorConfig imports reach guarded diagnostic findings without authorizing automatic fixes', async () =>
     {
+        const configurationPath = path.resolve('/project/.editorconfig');
         const configuration = '[*.lgd]\ndotnet_style_coalesce_expression = true:error\n[*.js]\ndotnet_style_coalesce_expression = false';
         function readSnapshot(filename)
         {
-            return Promise.resolve({ path: filename, realPath: filename, text: filename === '/project/.editorconfig' ? configuration : null, version: null, open: false });
+            return Promise.resolve({ path: filename, realPath: filename, text: filename === configurationPath ? configuration : null, version: null, open: false });
         }
 
-        const imported = await LgdFormattingSources.resolve({ filePath: '/project/example.lgd', workspaceRoot: '/project', readSnapshot: readSnapshot, sources: ['editorconfig'] });
+        const imported = await LgdFormattingSources.resolve({ filePath: path.resolve('/project/example.lgd'), workspaceRoot: path.resolve('/project'), readSnapshot: readSnapshot, sources: ['editorconfig'] });
         expect(imported.issues).toEqual([]);
         expect(imported.options.expressions.coalesce).toBe('prefer');
         expect(imported.rules['lgd.format.expressions.coalesce']).toEqual({ severity: 'error' });

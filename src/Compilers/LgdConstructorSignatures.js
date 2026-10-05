@@ -83,6 +83,7 @@ const LgdConstructorSignatures = {
     {
         return this.get(declaration).map(signature => ({ accessibility: signature.accessibility,
             params: signature.params.map(parameter => ({ name: parameter.name, typeName: parameter.typeName,
+                raw: parameter.name ? undefined : parameter.raw,
                 rest: Boolean(parameter.rest), optional: Boolean(parameter.optional), defaultText: parameter.defaultText ?? null })) }));
     },
 

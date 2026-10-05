@@ -1,0 +1,9 @@
+class Calculator {
+    Number calculate() {
+        readonly Number amount = 2;
+        const Number factor = 3;
+        return amount * factor;
+    }
+}
+const Calculator calculator = new Calculator();
+const Number result = calculator.calculate();

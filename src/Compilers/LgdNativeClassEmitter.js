@@ -108,11 +108,20 @@ const LgdNativeClassEmitter = {
         }
 
         LgdClassSyntax.appendGenerated(output, ' {', declaration.initializerStart, { end: declaration.initializerStart + 1 });
+        this.emitFactory(output, context);
         let cursor = declaration.initializerStart + 1;
         for(const member of declaration.classMembers)
         {
             const memberStart = member.abstract ? member.erasureStart ?? member.start : member.start;
-            LgdClassSyntax.appendSource(output, context, cursor, memberStart);
+            if(member.isConstructor && member !== declaration.constructorMember)
+            {
+                const prefixStart = LgdConstructorOverloadEmitter.memberPrefixStart(context, member);
+                LgdClassSyntax.appendSource(output, context, cursor, prefixStart);
+                cursor = member.bodyEnd;
+                continue;
+            }
+
+            LgdClassSyntax.appendMemberPrefix(output, context, cursor, member);
             if(member.abstract)
             {
                 LgdClassSyntax.appendGenerated(output, '', memberStart, { end: member.bodyEnd });
@@ -146,7 +155,6 @@ const LgdNativeClassEmitter = {
         }
 
         LgdClassFields.emitInstanceInitializer(output, context);
-        this.emitFactory(output, context);
         LgdClassSyntax.appendSource(output, context, cursor, declaration.initializerEnd);
         LgdClassFields.emitRuntimeAliases(output, context);
         LgdClassFields.emitStaticFields(output, context);

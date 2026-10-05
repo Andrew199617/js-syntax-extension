@@ -47,6 +47,7 @@ const LgdCodeActionProvider = {
         state = analysis.state;
         const actions = [];
         const offeredEdits = new Map();
+        const bulkDiagnostics = new Set();
         for(const diagnostic of context.diagnostics)
         {
             const error = this.matchError(document, state, diagnostic, range);
@@ -62,6 +63,11 @@ const LgdCodeActionProvider = {
                 if(this.fixService && !await this.fixService.prepareIndividual(proposal, handler, { document: document, configuration: analysis.configuration }))
                 {
                     continue;
+                }
+
+                if(this.fixService?.eligibleQuickFix(document, proposal, handler, error))
+                {
+                    bulkDiagnostics.add(diagnostic);
                 }
 
                 const editKey = JSON.stringify(DiagnosticQuickFix.edits(proposal).map(edit => [ edit.target.document.uri.toString(), edit.offset, edit.endOffset, edit.newText ]));
@@ -87,6 +93,15 @@ const LgdCodeActionProvider = {
                 actions.push(action);
                 offeredEdits.set(editKey, action);
             }
+        }
+
+        if(bulkDiagnostics.size > 0)
+        {
+            const action = new vscode.CodeAction('Fix All…', vscode.CodeActionKind.QuickFix);
+            action.diagnostics = Array.from(bulkDiagnostics);
+            action.isPreferred = false;
+            action.command = { command: 'lgd.fixAll', title: action.title, arguments: [document.uri] };
+            actions.push(action);
         }
 
         return token?.isCancellationRequested ? [] : actions;

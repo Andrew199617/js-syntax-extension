@@ -26,6 +26,7 @@ const LgdFormatter = {
             newline: this.newline(source, options), errors: [], blocked: this.disabledRanges(model)
         };
         this.describeBlocks(context);
+        this.describeMemberGaps(context);
         this.describeWrapping(context);
         const tokens = model.tokens;
         for(let index = 0; index <= tokens.length; index++)
@@ -51,6 +52,7 @@ const LgdFormatter = {
                 }
             }
 
+            this.attributeTrailingWhitespace(context, gap);
             if(gap.rule && gap.text !== original && this.safeGap(gap))
             {
                 this.attributeLineEndings(context, gap);
@@ -103,6 +105,31 @@ const LgdFormatter = {
 
         context.errors = context.errors.filter(error => error.offset > offset || error.endOffset < offset);
         this.add(context, 'whitespace.fileHeader', { offset: offset, endOffset: offset, newText: header });
+    },
+
+    /** @description Tracks trailing-byte removal even when layout replaced the gap before the cleanup stage. */
+    attributeTrailingWhitespace(context, gap)
+    {
+        function trailing(text)
+        {
+            return text.match(/[\t ]+(?=\r\n|\r|\n)/gu) || [];
+        }
+
+        const original = trailing(gap.original);
+        if(original.length === 0 || JSON.stringify(original) === JSON.stringify(trailing(gap.text)))
+        {
+            return;
+        }
+
+        if(!context.options.whitespace.trimTrailingWhitespace)
+        {
+            gap.text = gap.original;
+            gap.rule = null;
+            gap.contributors.clear();
+            return;
+        }
+
+        gap.contributors.add('lgd.format.whitespace.trimTrailingWhitespace');
     },
 
     /** @description Attributes final newline-byte changes even when an earlier layout stage performed them. */
@@ -241,7 +268,12 @@ const LgdFormatter = {
 
         let preference;
         let option;
-        if(context.model.casts.some(cast => cast.headEnd === previous.end))
+        if(context.model.returnKeywords.has(previous.start) && ![ ';', '}' ].includes(next.text))
+        {
+            option = 'afterReturnKeyword';
+            preference = spacing[option];
+        }
+        else if(context.model.casts.some(cast => cast.headEnd === previous.end))
         {
             option = 'afterCast';
             preference = spacing.afterCast;
@@ -498,6 +530,11 @@ const LgdFormatter = {
         const updated = gap.text.replace(/[^\S\r\n]*$/u, indent);
         if(updated !== gap.text)
         {
+            if(preservedIndent === null)
+            {
+                gap.contributors.add('lgd.format.indentation.size');
+            }
+
             gap.text = updated;
             gap.rule = `indentation.${indentationPolicy}`;
             const oldIndent = gap.original.match(/[^\S\r\n]*$/u)?.[0] || '';

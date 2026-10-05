@@ -1,0 +1,32 @@
+// The declared graph is recursive. The finite access path must keep its leaf type.
+class Left
+{
+    Right next;
+    String label = "leaf";
+}
+
+class Right
+{
+    Left next;
+}
+
+Left left = Left.create();
+Right right = Right.create();
+left.next = right;
+right.next = left;
+
+// Twelve field hops cross the mutual cycle six times.
+const alias = left
+    .next.next.next.next
+    .next.next.next.next
+    .next.next.next.next;
+String accepted = alias.label;
+Number rejected = alias.label; // Real String-to-Number error.
+
+// A shadowed alias has its own binding and must stay Number.
+{
+    const alias = { label: 7 };
+    const { label } = alias;
+    Number acceptedShadow = label;
+    String rejectedShadow = label; // Real Number-to-String error.
+}

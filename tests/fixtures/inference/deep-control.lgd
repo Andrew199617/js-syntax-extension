@@ -1,0 +1,46 @@
+// Twelve nested blocks retain diagnostics after unknown external properties.
+class DeepReader
+{
+    Number read(Object document, Boolean ready)
+    {
+        while(ready)
+        {
+            if(ready)
+            {
+                for(let index = 0; index < 2; index++)
+                {
+                    if(ready)
+                    {
+                        while(ready)
+                        {
+                            if(ready)
+                            {
+                                for(let pass = 0; pass < 2; pass++)
+                                {
+                                    if(ready)
+                                    {
+                                        while(ready)
+                                        {
+                                            if(ready)
+                                            {
+                                                while(ready)
+                                                {
+                                                    if(ready)
+                                                    {
+                                                        const String text = document.section.body.lineAt(0).text;
+                                                        Number count = "wrong"; // Real String-to-Number error.
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return 1;
+    }
+}

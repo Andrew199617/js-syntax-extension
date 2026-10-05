@@ -139,7 +139,8 @@ const LgdEslintStyle = {
 
         if(name === 'keyword-spacing')
         {
-            return { spacing: { afterControlKeywords: preference?.after !== false } };
+            const afterReturn = preference?.overrides?.return?.after ?? preference?.after;
+            return { spacing: { afterControlKeywords: preference?.after !== false, afterReturnKeyword: afterReturn !== false } };
         }
 
         if(name === 'space-before-function-paren')

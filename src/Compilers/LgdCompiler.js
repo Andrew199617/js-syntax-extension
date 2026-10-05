@@ -17,6 +17,7 @@ const LgdOverrideChecker = require('./LgdOverrideChecker');
 const LgdContractChecker = require('./LgdContractChecker');
 const LgdNativeClassEmitter = require('./LgdNativeClassEmitter');
 const LgdOutputOptions = require('./LgdOutputOptions');
+const LgdConstructionLowering = require('./LgdConstructionLowering');
 const LgdInterfaceErasure = require('./LgdInterfaceErasure');
 const LgdInterfaceTypes = require('./LgdInterfaceTypes');
 const LgdReturnChecker = require('./LgdReturnChecker');
@@ -67,6 +68,9 @@ const LgdCompiler = {
             parsed.errors.push({ ...this.createError(content, 0, error.message), ...error });
         }
 
+        const constructionKind = LgdConstructionLowering.prepare(parsed.allDeclarations, options);
+        this.appendTypeErrors(content, parsed.errors, LgdConstructionLowering.checkInheritance(content, parsed.allDeclarations, externals));
+
         const newline = this.detectNewline(content);
         const backend = JsBackend.create(newline);
         backend.objectModel = resolved.options.javascriptObjectModel;
@@ -105,8 +109,9 @@ const LgdCompiler = {
             }
         }
 
-        return { code: emitted.code, mappings: emitted.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations,
-            casts: parsed.casts || [], errors: parsed.errors };
+        const lowered = LgdConstructionLowering.apply({ content: content, declarations: parsed.allDeclarations, externals: externals }, emitted, validation.tree);
+        return { code: lowered.code, mappings: lowered.segments, declarations: parsed.declarations, allDeclarations: parsed.allDeclarations,
+            constructionKind: constructionKind, constructionSites: lowered.constructionSites || [], casts: parsed.casts || [], errors: parsed.errors };
     },
 
     /**
@@ -190,7 +195,8 @@ const LgdCompiler = {
             const head = headMatch.groups;
             const headStart = headMatch.index;
             const headEnd = headStart + headMatch[0].length;
-            if(LgdVariableSyntax.isClassMemberHead(masked, classes.declarations, headStart, headEnd))
+            const scanner = { masked: masked, classes: classes, head: head, start: headStart, end: headEnd, errors: errors, failed: failedHeadStarts, compiler: this };
+            if(LgdVariableSyntax.excludeHead(scanner))
             {
                 headMatch = declarationHeadPattern.exec(masked);
                 continue;
@@ -234,7 +240,7 @@ const LgdCompiler = {
                 name: head.variableName,
                 nameStart: nameStart,
                 nameEnd: nameEnd,
-                readonly: Boolean(head.bindingKeyword),
+                readonly: Boolean(head.bindingKeyword) && head.bindingKeyword.trim() !== 'let',
                 bindingKind: head.bindingKeyword?.trim() || 'let',
                 bindingStart: headStart + head.indent.length + (head.exportKeyword || '').length,
                 bindingEnd: typeStart,
@@ -255,7 +261,7 @@ const LgdCompiler = {
             headMatch = declarationHeadPattern.exec(masked);
         }
 
-        errors.push(...LgdVariableSyntax.checkLegacy(content, found, this));
+        errors.push(...LgdVariableSyntax.checkBindings(masked, found, failedHeadStarts, this));
 
         found.sort((first, second) => first.headStart - second.headStart);
         this.collectMalformedErrors(masked, found, failedHeadStarts, errors);
@@ -895,13 +901,7 @@ const LgdCompiler = {
     createError(content, offset, message, endOffset = null)
     {
         const line = content.slice(0, offset).split('\n').length;
-        const error = { message: message, line: line, offset: offset };
-        if(Number.isInteger(endOffset))
-        {
-            error.endOffset = endOffset;
-        }
-
-        return error;
+        return LgdVariableSyntax.error(line, offset, message, endOffset);
     }
 };
 

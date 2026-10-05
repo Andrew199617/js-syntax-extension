@@ -1,4 +1,5 @@
 const LgdConstructorSignatures = require('../Compilers/LgdConstructorSignatures');
+const LgdMethodDocumentation = require('../Compilers/LgdMethodDocumentation');
 const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
 const LgdClassMemberSemantics = require('../Compilers/LgdClassMemberSemantics');
 const LgdContractChecker = require('../Compilers/LgdContractChecker');
@@ -27,6 +28,7 @@ async function getTypeSummary(service, uri, name)
         return imported
             ? {
                 name: name, typeName: imported.keyword, kind: imported.kind, baseName: imported.baseName,
+                documentation: LgdMethodDocumentation.parse(imported.jsdoc || '/** */'),
                 abstract: imported.abstract, interfaceNames: imported.interfaceNames,
                 accessibility: imported.accessibility, explicitAccessibility: imported.explicitAccessibility,
                 readonly: true, members: imported.members || [], params: [],
@@ -65,6 +67,7 @@ async function getTypeSummary(service, uri, name)
     if(declaration.kind === 'class' || declaration.kind === 'interface' || required?.kind === 'class' || required?.kind === 'interface')
     {
         summary.kind = required?.kind || declaration.kind;
+        summary.documentation = LgdMethodDocumentation.parse(required?.jsdoc || declaration.jsdoc || '/** */');
         summary.abstract = declaration.abstract || required?.abstract;
         summary.interfaceNames = declaration.interfaceNames || required?.interfaceNames || [];
         summary.baseName = declaration.baseName || required?.baseName;

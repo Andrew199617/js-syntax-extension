@@ -1,0 +1,14 @@
+import BaseCommand from './BaseCommand';
+import vscode from 'vscode';
+
+/** @description Command to go to the start of an assignment. */
+class GoToAssignment : BaseCommand {
+    Number assignmentIndex;
+    Array assignments = [];
+
+    GoToAssignment() : base('lgd.goToAssignment', 'Go To Assignment') {}
+
+    String readCommandName() { return commandName; }
+}
+
+export default GoToAssignment;

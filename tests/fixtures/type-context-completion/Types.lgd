@@ -1,0 +1,9 @@
+export class Item
+{
+    Number score = 1;
+    Item() {}
+}
+export interface IItem
+{
+    Number Read();
+}

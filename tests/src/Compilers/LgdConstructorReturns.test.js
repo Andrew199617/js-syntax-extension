@@ -172,3 +172,31 @@ test('withholds a this-return fix containing comments and rejects forged or stal
     expect(commented.errors[0].code).toBe('lgd.constructor.returnValue');
     expect(commented.errors[0].quickFix).toBeUndefined();
 });
+
+test.each([ '\n', '\r\n', '\r' ])('cleans the removed terminal return boundary without changing %j endings or authored spacing', async newline =>
+{
+    const lines = [ 'class Sample', '{', '    Sample()', '    {', '        this.first = 1;', '', '        this.second = 2;', '', '        return this;', '', '    }', '}' ];
+    const source = lines.join(newline);
+    const fix = compile(source).errors[0].quickFix;
+    const proposal = await new ReplaceConstructorReturnThisFix().create(contextFor(source), fix);
+    const updated = source.slice(0, proposal.offset) + proposal.newText + source.slice(proposal.endOffset);
+    expect(updated).toBe(source.replace(`${newline}${newline}        return this;${newline}`, ''));
+    expect(compile(updated).errors).toEqual([]);
+    expect(proposal.expectedText).toBe(source.slice(proposal.offset, proposal.endOffset));
+});
+
+test.each([
+    [ 'class Sample { Sample() { return this; } }', 'class Sample { Sample() { } }' ],
+    [ 'class Sample { Sample(){return this;} }', 'class Sample { Sample(){} }' ],
+    [ 'class Sample\n{\n    Sample()\n    {\n        return this;\n    }\n}', 'class Sample\n{\n    Sample()\n    {\n    }\n}' ],
+    [ 'class Sample { Sample() {\n        // Keep this explanation.\n        return this;\n    } }', 'class Sample { Sample() {\n        // Keep this explanation.\n    } }' ]
+])('removes terminal-return whitespace safely in empty and documented constructors: %s', async (source, expected) =>
+{
+    const fix = compile(source).errors[0].quickFix;
+    const handler = new ReplaceConstructorReturnThisFix();
+    const proposal = await handler.create(contextFor(source), fix);
+    const updated = source.slice(0, proposal.offset) + proposal.newText + source.slice(proposal.endOffset);
+    expect(updated).toBe(expected);
+    expect(compile(updated).errors).toEqual([]);
+    expect(await handler.create(contextFor(updated), fix)).toBeNull();
+});

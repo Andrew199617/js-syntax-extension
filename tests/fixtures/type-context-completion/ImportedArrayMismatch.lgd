@@ -1,0 +1,3 @@
+import { Item as Entry } from "./Types";
+Entry[] items = [Entry.create()];
+String wrong = items[0].score;

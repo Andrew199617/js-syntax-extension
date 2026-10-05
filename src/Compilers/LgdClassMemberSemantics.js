@@ -1,4 +1,7 @@
+const LgdAmbientTypes = require('./LgdAmbientTypes');
 const LgdConstructorSignatures = require('./LgdConstructorSignatures');
+const LgdModuleBindings = require('./LgdModuleBindings');
+const LgdConstructionLowering = require('./LgdConstructionLowering');
 const LgdMemberTypeGraph = require('./LgdMemberTypeGraph');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
@@ -6,7 +9,7 @@ const { collectContractBindings } = require('./LgdContractBindings');
 const { visibleBindings } = require('./LgdBaseChecker');
 const { maskCode } = require('./LgdInfer');
 const LgdClassMemberInference = require('./LgdClassMemberInference');
-const { tsTypeMap, baseTypeName } = require('./LgdTypeMaps');
+const { tsTypeMap, baseTypeName, rootTypeName, elementTypeName, canonicalTypeName, isNullableType, restTypeName } = require('./LgdTypeMaps');
 const LgdSourceMap = require('./LgdSourceMap');
 const { skipTrivia } = require('./LgdMethodSignature');
 const LgdInterfaceErasure = require('./LgdInterfaceErasure');
@@ -27,6 +30,7 @@ const LgdClassMemberSemantics = {
         registry._memberTypes = new WeakMap();
         registry._declaringTypes = new WeakMap();
         registry._externalTypes = LgdMemberTypeGraph.imports(context.externals || new Map());
+        registry._constructionDeclarations = new Map(context.declarations.filter(declaration => declaration.kind === 'class').map(declaration => [ declaration.nameStart, declaration ]));
         registry._memberTypeOffsets = new WeakMap();
         return registry;
     },
@@ -77,7 +81,8 @@ const LgdClassMemberSemantics = {
             const initializer = Number.isInteger(member.initializerStart)
                 ? this._context.content.slice(member.initializerStart, member.initializerEnd).trim()
                 : null;
-            const referenceDefault = ![ 'Number', 'Boolean', 'BigInt' ].includes(member.propertyTypeName);
+            const arrayDefault = elementTypeName(member.propertyTypeName) !== null && !isNullableType(member.propertyTypeName);
+            const referenceDefault = !arrayDefault && ![ 'Number', 'Boolean', 'BigInt' ].includes(canonicalTypeName(member.propertyTypeName));
             const defaultNull = member.kind === 'field' && (initializer === 'null' || initializer === null && referenceDefault);
             const ownDocumentation = LgdMethodDocumentation.own(this._context.content, member, this._documentationAttachments);
             const description = {
@@ -104,7 +109,7 @@ const LgdClassMemberSemantics = {
                 description.returnTypeName ||= previous.returnTypeName;
             }
 
-            const memberType = valueType && this._type(valueType, declaration.headStart);
+            const memberType = valueType && this._type(rootTypeName(valueType), declaration.headStart);
             const previousType = previous && this._memberTypes.get(previous);
             description.typeIdentity = LgdMemberTypeGraph.key(memberType || previousType);
             this._declaringTypes.set(description, declaration);
@@ -152,14 +157,18 @@ const LgdClassMemberSemantics = {
             const own = new Map();
             const base = declaration.baseName && registry.base(declaration);
             const inherited = base ? registry.members(base) : [];
+            const importedBase = LgdModuleBindings.imports(content).find(imported => imported.name === declaration.baseName?.split('.')[0]);
+            const unresolvedImport = base?.unresolvedImport || !base && importedBase;
             declaration.baseIsLgdClass = base?.kind === 'class';
             const ownFields = (declaration.classMembers || []).some(member => member.kind === 'field' && !member.static);
             const inheritedFields = inherited.some(member => member.kind === 'field' && !member.static);
             declaration.hasDeclaredInstanceFieldsInHierarchy = ownFields || inheritedFields;
             if(declaration.baseName && base?.kind !== 'class' && declaration.hasDeclaredInstanceFieldsInHierarchy)
             {
-                errors.push({ offset: declaration.baseStart, endOffset: declaration.baseEnd, code: 'lgd.member.foreignBaseFields',
-                    message: 'Declared instance fields require a known LGD class base; foreign or unresolved object factory initialization is not supported.' });
+                errors.push({ offset: declaration.baseStart, endOffset: declaration.baseEnd, code: unresolvedImport ? 'lgd.member.unresolvedBaseImport' : 'lgd.member.foreignBaseFields',
+                    message: unresolvedImport
+                        ? `Cannot resolve imported base '${declaration.baseName}' from '${unresolvedImport.spec}'. Export an LGD class with the requested import name.`
+                        : `Declared instance fields require an LGD class base. Base '${declaration.baseName}' is not a known LGD class; object factory field initialization is not supported.` });
             }
 
             if(base?.kind === 'class' && registry._context.declarations.includes(base) && base.headStart > declaration.headStart)
@@ -177,7 +186,10 @@ const LgdClassMemberSemantics = {
 
                 const fieldType = member.propertyTypeName;
                 const visible = visibleBindings(registry._bindings, declaration.headStart);
-                const unknownField = member.kind === 'field' && !Object.hasOwn(tsTypeMap, baseTypeName(fieldType)) && !visible.has(baseTypeName(fieldType).split('.')[0]);
+                const namedField = member.kind === 'field' && !Object.hasOwn(tsTypeMap, rootTypeName(fieldType));
+                const ambient = externals.ambient || LgdAmbientTypes.forSource(externals.sourceContext?.sourcePath);
+                const knownField = fieldType && (visible.has(rootTypeName(fieldType).split('.')[0]) || ambient.resolve(rootTypeName(fieldType)));
+                const unknownField = namedField && !knownField;
                 if(unknownField)
                 {
                     const typeStart = declaration.initializerStart + member.propertyTypeStart;
@@ -320,9 +332,35 @@ const LgdClassMemberSemantics = {
             return { declaration: declaration, kind: 'type', reference: binding.identifier.name };
         }
 
+        const imported = LgdModuleBindings.forBinding(binding, this._context.externals);
+        if(imported?.kind === 'moduleNamespace')
+        {
+            return { declaration: imported, kind: 'namespace', reference: binding.identifier.name };
+        }
+
+        if(imported?.kind === 'class')
+        {
+            return { declaration: imported, kind: 'type', reference: binding.identifier.name };
+        }
+
+        if(binding.path.isVariableDeclarator() && binding.path.node.id.type === 'ObjectPattern')
+        {
+            const external = LgdConstructionLowering.binding(binding, { map: this._context.map,
+                declarations: this._constructionDeclarations, externals: this._context.externals }, visited);
+            if(external?.kind === 'class')
+            {
+                return { declaration: external, kind: 'type', reference: binding.identifier.name };
+            }
+        }
+
         const parameter = this._parameterType(binding, offset);
         const declaredType = declaration?.typeName || parameter?.typeName || this._context.bindings?.type(binding);
         const annotationOffset = parameter?.offset ?? declaration?.typeStart ?? this._offset(path);
+        if(elementTypeName(declaredType) !== null)
+        {
+            return null;
+        }
+
         const type = declaredType && this._type(declaredType, annotationOffset, declaration);
         if(type)
         {
@@ -376,7 +414,7 @@ const LgdClassMemberSemantics = {
 
                 if(parameter)
                 {
-                    return { typeName: parameter.rest ? 'Array' : parameter.typeName, offset: declaration.initializerStart + group.start };
+                    return { typeName: parameter.rest ? restTypeName(parameter.typeName) : parameter.typeName, offset: declaration.initializerStart + group.start };
                 }
             }
         }
@@ -395,6 +433,11 @@ const LgdClassMemberSemantics = {
         }
 
         const receiver = this.receiver(path.get('object'), visited);
+        if(receiver?.kind === 'namespace')
+        {
+            return null;
+        }
+
         const member = receiver && this.members(receiver.declaration).find(candidate => candidate.name === name);
         if(!member)
         {

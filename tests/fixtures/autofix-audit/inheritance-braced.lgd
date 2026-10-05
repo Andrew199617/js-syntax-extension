@@ -1,0 +1,30 @@
+class GoToNextMethod
+{
+    readonly Object command;
+
+    /** @description Initialize the command metadata. */
+    GoToNextMethod(String commandName, String title)
+    {
+        this.command = { title: title, command: commandName };
+    }
+
+    virtual Number nextLine(Number currentLine)
+    {
+        return currentLine + 1;
+    }
+}
+
+/**
+ * @description Command to help navigate in a window.
+ * @extends {GoToNextMethod}
+ */
+class GoToLastMethod : GoToNextMethod
+{
+    /** @description Initialize an instance of GoToLastMethod. */
+    GoToLastMethod() : base("lgd.goToLastMethod", "Go To Last Method") {}
+
+    override Number nextLine(Number currentLine)
+    {
+        return base.nextLine(currentLine);
+    }
+}

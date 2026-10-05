@@ -411,7 +411,7 @@ describe('LGD field syntax and member diagnostics.', () =>
         [ 'abstract field', 'abstract class Sample { abstract Number value; }', 'cannot' ],
         [ 'interface field', 'interface Sample { Number value; }', 'cannot' ],
         [ 'void field', 'class Sample { void value; }', 'value type' ],
-        [ 'lowercase type', 'class Sample { number value = 1; }', 'capitalized' ],
+        [ 'unsupported lowercase type', 'class Sample { numeric value = 1; }', 'value type' ],
         [ 'missing initializer', 'class Sample { Number value = ; }', 'initializer expression' ],
         [ 'missing semicolon', 'class Sample { Number value = 1 }', 'Unbalanced brackets' ],
         [ 'duplicate static modifier', 'class Sample { static static Number value = 1; }', 'Duplicate' ],

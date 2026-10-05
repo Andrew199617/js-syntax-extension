@@ -77,7 +77,7 @@ async function saveFiles(filenames, source = 'const Example = {\n  value: 1\n};'
 }
 
 jest.unmock('../../src/Errors/VscodeError');
-jest.mock('fs', () => ({ exists: jest.fn(), promises: { readFile: jest.fn(), stat: jest.fn() } }));
+jest.mock('fs', () => ({ ...jest.requireActual('fs'), exists: jest.fn(), promises: { readFile: jest.fn(), stat: jest.fn() } }));
 jest.mock('path', () => ({ ...jest.requireActual('path') }));
 jest.mock('../../src/Logging/FileIO', () => ({ writeFileContents: jest.fn(), rename: jest.fn() }));
 
@@ -495,12 +495,12 @@ describe('manual LGD compilation', () =>
         );
     });
 
-    test('announces success only after the output write finishes', async () =>
+    test.each([ 'Number count = 1;', 'readonly Number count = 1;' ])('announces success only after writing real compiled output: %s', async source =>
     {
         const outputWrite = deferred();
         FileIO.writeFileContents.mockReturnValueOnce(outputWrite.promise);
         vscode.window.activeTextEditor = {
-            document: { fileName: path.join('workspace', 'working.lgd'), getText: () => 'Number count = 1;' }
+            document: { fileName: path.join('workspace', 'working.lgd'), getText: () => source }
         };
 
         const compilation = compileCurrent();
@@ -509,10 +509,9 @@ describe('manual LGD compilation', () =>
         outputWrite.resolve();
         await compilation;
 
-        expect(FileIO.writeFileContents).toHaveBeenCalledWith(
-            path.join('workspace', 'working.js'),
-            '/** @type {number} */\nlet count = 1;'
-        );
+        const result = LgdCompiler.create().compileToJs(source);
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'working.js'), result.code);
+        expect(getDiagnostics(path.join('workspace', 'working.lgd')).map(diagnostic => diagnostic.severity)).toEqual(result.errors.map(() => vscode.DiagnosticSeverity.Warning));
         expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('LGD: Compiled .lgd file into .js file.');
     });
 });
@@ -540,17 +539,15 @@ describe('LGD compile-all results', () =>
         expect(getOutput()).toContain('Cannot assign Counter to String.');
     });
 
-    test('writes warning-only results and counts their warnings separately', async () =>
+    test('writes real readonly migration results and counts their warnings separately', async () =>
     {
-        fs.promises.readFile.mockResolvedValue('Number value = 1;');
-        jest.spyOn(LgdCompiler, 'compileToJs').mockReturnValue({
-            code: 'let value = 1;',
-            errors: [{ severity: 'warning', message: 'A compiler warning.', line: 1, offset: 0 }]
-        });
-
+        const source = 'readonly Number value = 1;';
+        const result = LgdCompiler.create().compileToJs(source);
+        vscode.workspace.findFiles.mockImplementation(pattern => Promise.resolve(pattern.includes('.lgd') ? [vscode.Uri.file('warning.lgd')] : []));
+        fs.promises.readFile.mockResolvedValue(source);
         await compileAll();
-
-        expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'consumer.js'), 'let value = 1;');
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith('warning.js', result.code);
+        expect(getDiagnostics('warning.lgd')).toEqual([expect.objectContaining({ code: 'warning', severity: vscode.DiagnosticSeverity.Warning })]);
         expect(getOutput()).toContain('1 compiled, 0 skipped, 0 failed; 0 errors, 1 warnings');
     });
 });
@@ -701,36 +698,33 @@ describe('LGD compile on save', () =>
         }
     });
 
-    test('saving a mix of errors and warnings blocks output and counts only errors', async () =>
+    test('a real error beside a readonly warning preserves last-good output on save', async () =>
     {
-        jest.spyOn(LgdCompiler, 'compileToJs').mockReturnValue({
-            code: 'invalid output',
-            errors: [
-                { severity: 'warning', message: 'A compiler warning.', line: 1, offset: 0 },
-                { message: 'A compiler error.', line: 1, offset: 0 }
-            ]
-        });
-
-        saveLgdDocument(path.join('workspace', 'broken.lgd'), 'Number value = "many";');
+        const filename = path.join('workspace', 'readonly.lgd');
+        saveLgdDocument(filename, 'readonly Number value = 1;');
         await nextTurn();
         await nextTurn();
-
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'readonly.js'), expect.stringContaining('const value = 1;'));
+        FileIO.writeFileContents.mockClear();
+        saveLgdDocument(filename, 'readonly Number value = 1;\r\nvalue = 2;');
+        await nextTurn();
+        await nextTurn();
         expect(FileIO.writeFileContents).not.toHaveBeenCalled();
+        expect(getDiagnostics(filename).map(diagnostic => diagnostic.severity)).toEqual([ vscode.DiagnosticSeverity.Warning, vscode.DiagnosticSeverity.Error ]);
         expect(vscode.window.createStatusBarItem.mock.results[0].value.text).toContain('1 error(s)');
     });
 
-    test('saving warning-only LGD still updates the output', async () =>
+    test.each([ 'oloo', 'class' ])('saving real readonly locals writes const output with %s mode', async mode =>
     {
-        jest.spyOn(LgdCompiler, 'compileToJs').mockReturnValue({
-            code: 'let value = 1;',
-            errors: [{ severity: 'warning', message: 'A compiler warning.', line: 1, offset: 0 }]
-        });
-
-        saveLgdDocument(path.join('workspace', 'working.lgd'), 'Number value = 1;');
+        lgd.configuration.options = { javascriptObjectModel: mode };
+        const filename = path.join('workspace', 'readonly.lgd');
+        const source = 'readonly Number value = 1;';
+        const result = LgdCompiler.create().compileToJs(source, new Map(), { javascriptObjectModel: mode });
+        saveLgdDocument(filename, source);
         await nextTurn();
         await nextTurn();
-
-        expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'working.js'), 'let value = 1;');
+        expect(FileIO.writeFileContents).toHaveBeenCalledWith(path.join('workspace', 'readonly.js'), result.code);
+        expect(getDiagnostics(filename)).toEqual([expect.objectContaining({ code: 'warning', severity: vscode.DiagnosticSeverity.Warning })]);
     });
 
     test('saving real redundant return documentation warnings still updates JavaScript', async () =>

@@ -1,50 +1,13 @@
+const fs = require('fs');
+const path = require('path');
 const vscode = require('vscode');
 const { makeTextDocument } = require('./fakeVscode');
-const LgdLanguageService = require('../../../src/Lgd/LgdLanguageService');
-const LgdFixService = require('../../../src/Editors/VSCode/LgdFixService');
+
+/** @description Shared real compiler and atomic-source fixtures bound to this runner. */
+const { fixture, quickFixFixture } = require('./fixServiceFixture')(jest);
 const LgdEditorConfig = require('../../../src/Lgd/Formatting/LgdEditorConfig');
 const LgdFormattingOptions = require('../../../src/Lgd/Formatting/LgdFormattingOptions');
 
-
-/** @description Creates real compiler diagnostics with controlled configuration and atomic source edits. */
-async function fixture(source, options = {})
-{
-    const service = LgdLanguageService.create({ set: jest.fn(), delete: jest.fn() }, error =>
-    {
-        throw error;
-    });
-
-    const document = makeTextDocument('file:///project/example.lgd', source);
-    document.version = 1;
-    document.languageId = 'lgd';
-    await service.openDocument(document);
-    const fixes = LgdFixService.create(service);
-    const config = { valid: true, ignored: false, root: '/project', autoFix: false, rules: {}, ...options };
-    fixes.configuration = { resolve: jest.fn(() => Promise.resolve(config)), isCurrent: jest.fn(() => Promise.resolve(true)), buffersCurrent: jest.fn(() => true) };
-    fixes.formattingDiagnostics.configuration = fixes.configuration;
-    const baseApply = vscode.workspace.applyEdit.getMockImplementation();
-    vscode.workspace.applyEdit.mockImplementation(edit =>
-    {
-        const sourceEdits = edit.replacements.filter(replacement => replacement.uri.toString() === document.uri.toString());
-        const ordered = sourceEdits.sort((left, right) => document.offsetAt(right.range.start) - document.offsetAt(left.range.start));
-        for(const replacement of ordered)
-        {
-            const start = document.offsetAt(replacement.range.start);
-            const end = document.offsetAt(replacement.range.end);
-            const text = document.getText();
-            document.setText(text.slice(0, start) + replacement.newText + text.slice(end));
-        }
-
-        if(sourceEdits.length > 0)
-        {
-            document.version++;
-        }
-
-        return baseApply(edit);
-    });
-
-    return { service: service, fixes: fixes, document: document, config: config };
-}
 
 /** @description Isolates expression behavior from independently configured whitespace preferences. */
 function expressionConfiguration()
@@ -60,6 +23,10 @@ jest.mock('vscode', () =>
 
     api.CodeAction = jest.fn((title, kind) => ({ title: title, kind: kind }));
     api.CodeActionKind = jest.fn(value => ({ value: value }));
+    api.CodeActionKind.QuickFix = { value: 'quickfix' };
+    api.commands.registerCommand = jest.fn();
+    api.languages.registerCodeActionsProvider = jest.fn();
+    api.workspace.registerTextDocumentContentProvider = jest.fn();
     api.window = { setStatusBarMessage: jest.fn(), showInformationMessage: jest.fn(), showWarningMessage: jest.fn(), showQuickPick: jest.fn(), withProgress: jest.fn() };
     api.ProgressLocation = { Notification: 15 };
     api.Uri = { file: filename => require('./fakeVscode').makeTextDocument(`file://${filename}`, '').uri };
@@ -84,6 +51,10 @@ beforeEach(() =>
     vscode.workspace.isTrusted = true;
     vscode.workspace.workspaceFolders = [];
     vscode.workspace.textDocuments = [];
+    vscode.window.activeTextEditor = undefined;
+    vscode.window.showQuickPick.mockReset();
+    vscode.window.showWarningMessage.mockReset();
+    vscode.window.withProgress.mockImplementation((options, callback) => callback({ report: jest.fn() }, {}));
 });
 
 test('fixes all screenshot readonly locals in the unsaved buffer, preserves members, and is idempotent', async () =>
@@ -299,7 +270,7 @@ test('allows the narrowly safe return-this fix without enabling factory migratio
     const { fixes, document } = await fixture(source, { autoFix: true, rules: { 'constructor-return-value': { fix: 'automatic' } } });
     const batch = await fixes.plan([document], { automatic: true });
     expect(batch.plan.entries).toHaveLength(1);
-    expect(batch.plan.entries[0].proposal.newText).toBe('');
+    expect(batch.plan.entries[0].proposal.newText).toBe(' ');
     expect(document.getText()).toBe(source);
 });
 
@@ -543,4 +514,182 @@ test('IDE0004 severity refreshes compiler presentation without authorizing autom
     expect(diagnostics.some(error => error.message.includes('Cannot cast Boolean to String'))).toBe(true);
     expect((await fixes.analysisRequest(document, service.getState(document.uri))).state.errors.some(error => error.code === 'lgd.cast.redundant')).toBe(false);
     expect(service.getState(document.uri).errors.some(error => error.code === 'lgd.cast.redundant')).toBe(true);
+});
+
+test('terminal-return cleanup obeys its independent fix opt-out', async () =>
+{
+    const source = 'class Example\n{\n    Example()\n    {\n        return this;\n    }\n}';
+    const { fixes, document, config } = await fixture(source, { autoFix: true, rules: { 'constructor-return-value': { fix: 'off' } } });
+    expect((await fixes.plan([document], { automatic: false })).plan.entries).toEqual([]);
+    expect(document.getText()).toBe(source);
+    config.rules['constructor-return-value'].fix = 'automatic';
+    const batch = await fixes.plan([document], { automatic: true });
+    expect(await fixes.applyBatch(batch, true)).toBe(true);
+    expect(document.getText()).toBe('class Example\n{\n    Example()\n    {\n    }\n}');
+    expect((await fixes.plan([document], { automatic: true })).plan.entries).toEqual([]);
+});
+
+test.each([ 'lgd.format.lineBreaks.separateDefinitions', 'lgd.format.wrapping.binaryOperations' ])('respects the default-layout fix opt-out for %s', async ruleId =>
+{
+    const source = 'class Example\n{\n    Example() { }\n    Number add(Number first)\n    {\n        return first\n            + 1;\n    }\n}';
+    const { fixes, document } = await fixture(source, { formatting: { enabled: true, options: {} }, rules: { [ruleId]: { fix: 'off' } } });
+    const batch = await fixes.plan([document], { automatic: false });
+    expect(batch.plan.edits.every(edit => !edit.ruleIds.includes(ruleId))).toBe(true);
+    expect(await fixes.applyBatch(batch, true)).toBe(true);
+    const formatted = document.getText();
+    if(ruleId.endsWith('separateDefinitions'))
+    {
+        expect(formatted).toContain('Example() { }\n    Number add');
+        expect(formatted).toContain('return first + 1;');
+    }
+    else
+    {
+        expect(formatted).toContain('Example() { }\n\n    Number add');
+        expect(formatted).toContain('return first\n');
+    }
+});
+
+describe('Fix All in the native diagnostic quick-fix menu', () =>
+{
+    test('offers a generic scope picker when hovering this and preserves terminal versus early return behavior', async () =>
+    {
+        const source = await fs.promises.readFile(path.join(__dirname, '../../fixtures/fix-all-hover.lgd'), 'utf8');
+        const { fixes, document, diagnostics, provider } = await quickFixFixture(source);
+        const returnDiagnostics = diagnostics.filter(diagnostic => document.getText(diagnostic.range) === 'this');
+        expect(returnDiagnostics).toHaveLength(2);
+        const position = document.positionAt(source.indexOf('return this;') + 'return th'.length);
+        const range = new vscode.Range(position, position);
+        const context = { diagnostics: [returnDiagnostics[0]], only: { contains: kind => kind.value === 'quickfix' } };
+        const actions = await provider.provideCodeActions(document, range, context, {});
+        expect(actions.map(action => action.title)).toEqual([ 'Replace return this with an early exit', 'Fix All…' ]);
+        const action = actions[1];
+        expect(action.kind).toBe(vscode.CodeActionKind.QuickFix);
+        expect(action.isPreferred).toBe(false);
+        expect(action.diagnostics).toEqual([returnDiagnostics[0]]);
+        expect(action.command).toEqual({ command: 'lgd.fixAll', title: 'Fix All…', arguments: [document.uri] });
+
+        fixes.formattingDiagnostics.register = jest.fn();
+        fixes.configuration.register = jest.fn();
+        fixes.register([]);
+        const command = vscode.commands.registerCommand.mock.calls.find(([name]) => name === action.command.command)[1];
+        vscode.workspace.openTextDocument.mockResolvedValueOnce(document);
+        vscode.window.showQuickPick.mockResolvedValue({ scope: 'document' });
+        expect(await command(...action.command.arguments)).toBe(true);
+        expect(vscode.window.showQuickPick.mock.calls[0][0].map(item => item.scope)).toEqual([ 'document', 'project', 'solution' ]);
+        expect(document.getText()).toContain('if(stop) return;');
+        expect(document.getText()).not.toContain('return this;');
+        expect(document.getText()).toContain('const Number amount = 2;');
+        expect(fixes.languageService.getState(document.uri).errors).toEqual([]);
+    });
+
+    test('adds just one diagnostic-linked Fix All action for multiple eligible diagnostics', async () =>
+    {
+        const source = 'readonly Number first = 1; readonly Number second = 2;';
+        const { document, diagnostics, provider, range } = await quickFixFixture(source);
+        const actions = await provider.provideCodeActions(document, range, { diagnostics: diagnostics }, {});
+        expect(actions).toHaveLength(diagnostics.length + 1);
+        const bulk = actions.filter(action => action.command.command === 'lgd.fixAll');
+        expect(bulk).toHaveLength(1);
+        expect(bulk[0].diagnostics).toEqual(diagnostics);
+    });
+
+    test.each([
+        { rules: { 'readonly-variable-declaration': { fix: 'off' } } },
+        { rules: { 'readonly-variable-declaration': { severity: 'off' } } },
+        { ignored: true },
+        { valid: false }
+    ])('does not expose bulk fixing for disabled or excluded configuration %j', async options =>
+    {
+        const { document, diagnostics, provider, range } = await quickFixFixture('readonly Number value = 1;', options);
+        const actions = await provider.provideCodeActions(document, range, { diagnostics: diagnostics }, {});
+        expect(actions.some(action => action.command.command === 'lgd.fixAll')).toBe(false);
+    });
+
+    test.each([ 'cancelled', 'stale', 'untrusted', 'unsupported scheme', 'other language', 'source action', 'unrelated diagnostic', 'outside range' ])('does not expose a bulk action in a %s context', async condition =>
+    {
+        const { document, diagnostics, provider, range } = await quickFixFixture('readonly Number value = 1;');
+        const context = { diagnostics: diagnostics };
+        const token = { isCancellationRequested: condition === 'cancelled' };
+        let requestedRange = range;
+        if(condition === 'stale') document.version++;
+        if(condition === 'untrusted') vscode.workspace.isTrusted = false;
+        if(condition === 'unsupported scheme') document.uri.scheme = 'git';
+        if(condition === 'other language') document.languageId = 'javascript';
+        if(condition === 'source action') context.only = { contains: kind => kind.value === 'source.fixAll.lgd' };
+        if(condition === 'unrelated diagnostic') diagnostics[0].source = 'Other extension';
+        if(condition === 'outside range') requestedRange = new vscode.Range(document.positionAt(document.getText().length), document.positionAt(document.getText().length));
+        const actions = await provider.provideCodeActions(document, requestedRange, context, token);
+        expect(actions.some(action => action.command.command === 'lgd.fixAll')).toBe(false);
+    });
+
+    test('allows manual fixes in an untitled LGD buffer without enabling save actions', async () =>
+    {
+        const { document, diagnostics, provider, range, fixes } = await quickFixFixture('readonly Number value = 1;');
+        document.uri.scheme = 'untitled';
+        const actions = await provider.provideCodeActions(document, range, { diagnostics: diagnostics }, {});
+        expect(actions.some(action => action.command.command === 'lgd.fixAll')).toBe(true);
+        const sourceContext = { only: { contains: kind => kind.value === 'source.fixAll.lgd' } };
+        expect(await fixes.provideCodeActions(document, range, sourceContext, {})).toEqual([]);
+    });
+
+    test('requires manual bulk opt-in for semantic fixes and keeps the review prompt', async () =>
+    {
+        const source = 'class Base { void run() {} }\nclass Child : Base { override void run() {} }';
+        const { document, diagnostics, provider, range, fixes, config } = await quickFixFixture(source);
+        const context = { diagnostics: diagnostics };
+        const individual = await provider.provideCodeActions(document, range, context, {});
+        expect(individual.map(action => action.title)).toEqual(['Make Base.run virtual']);
+        config.rules['nonvirtual-base'] = { fix: 'manual' };
+        const enabled = await provider.provideCodeActions(document, range, context, {});
+        expect(enabled.map(action => action.title)).toEqual([ 'Make Base.run virtual', 'Fix All…' ]);
+        vscode.workspace.openTextDocument.mockResolvedValueOnce(document);
+        vscode.window.showQuickPick.mockResolvedValue({ scope: 'document' });
+        vscode.window.showWarningMessage.mockResolvedValue('Cancel');
+        expect(await fixes.chooseScope(enabled[1].command.arguments[0])).toBe(false);
+        expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(expect.stringContaining('Includes changes to contracts or behavior.'), 'Review changes', 'Apply fixes', 'Cancel');
+        expect(document.getText()).toBe(source);
+    });
+
+    test('withholds bulk fixing for an unsafe return and unrelated available fixes elsewhere', async () =>
+    {
+        const source = 'class Command { Command() { return initializeOther(); } } readonly Number value = 1;';
+        const { document, diagnostics, provider } = await quickFixFixture(source);
+        const diagnostic = diagnostics.find(candidate => document.getText(candidate.range) === 'initializeOther()');
+        expect(await provider.provideCodeActions(document, diagnostic.range, { diagnostics: [diagnostic] }, {})).toEqual([]);
+    });
+
+    test.each([ 'document', 'project', 'solution' ])('keeps the original document when choosing %s after the active editor changes', async scope =>
+    {
+        const { fixes, document } = await fixture('readonly Number value = 1;');
+        const other = makeTextDocument('file:///other/changed.lgd', 'readonly Number other = 2;');
+        vscode.window.activeTextEditor = { document: other };
+        vscode.workspace.openTextDocument.mockResolvedValueOnce(document);
+        vscode.window.showQuickPick.mockResolvedValue({ scope: scope });
+        fixes.run = jest.fn(() => true);
+        expect(await fixes.chooseScope(document.uri)).toBe(true);
+        expect(fixes.run).toHaveBeenCalledWith(scope, { document: document });
+    });
+
+    test('cancelling the scope picker applies nothing', async () =>
+    {
+        const { fixes, document } = await fixture('readonly Number value = 1;');
+        vscode.workspace.openTextDocument.mockResolvedValueOnce(document);
+        vscode.window.showQuickPick.mockResolvedValue();
+        fixes.run = jest.fn();
+        expect(await fixes.chooseScope(document.uri)).toBe(false);
+        expect(fixes.run).not.toHaveBeenCalled();
+    });
+
+    test('rechecks configuration when Fix All is selected after opening the quick-fix menu', async () =>
+    {
+        const source = 'readonly Number value = 1;';
+        const { document, diagnostics, provider, range, fixes, config } = await quickFixFixture(source);
+        const actions = await provider.provideCodeActions(document, range, { diagnostics: diagnostics }, {});
+        const action = actions.find(candidate => candidate.command.command === 'lgd.fixAll');
+        config.rules['readonly-variable-declaration'] = { fix: 'off' };
+        vscode.workspace.openTextDocument.mockResolvedValueOnce(document);
+        vscode.window.showQuickPick.mockResolvedValue({ scope: 'document' });
+        expect(await fixes.chooseScope(action.command.arguments[0])).toBe(false);
+        expect(document.getText()).toBe(source);
+    });
 });

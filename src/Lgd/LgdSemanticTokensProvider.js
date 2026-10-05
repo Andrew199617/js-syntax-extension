@@ -2,14 +2,17 @@ const vscode = require('vscode');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const { maskCode } = require('../Compilers/LgdInfer');
+const { parseTypeName, elementTypeName } = require('../Compilers/LgdTypeMaps');
 const LgdKeywordFamilies = require('./LgdKeywordFamilies');
+const LgdClassMemberSemantics = require('../Compilers/LgdClassMemberSemantics');
 
 /** @import { CancellationToken, SemanticTokens, TextDocument } from 'vscode' */
 
 /**
  * @description Provides type, parameter, and theme-controlled keyword families for LGD documents.
  * Type references use the theme's class color. The TextMate grammar already colors the eight type
- * keywords in declaration position; this provider covers the spots it cannot see:
+ * keywords in declaration position; this provider gives source annotations and resolved class
+ * bindings the same role, including local types and construction callees, and covers
  * typed parameter types like vscode.TextDocument and JSDoc type tags like
  * @type {vscode.Command}.
  * @type {LgdSemanticTokensProviderType}
@@ -102,7 +105,14 @@ const LgdSemanticTokensProvider = {
 
         for(const cast of state.casts || [])
         {
-            const end = cast.typeName.endsWith('?') ? cast.typeEnd - 1 : cast.typeEnd;
+            const annotation = parseTypeName(cast.typeName);
+            let node = annotation?.annotation;
+            while(node && node.kind !== 'named')
+            {
+                node = node.element;
+            }
+
+            const end = node ? cast.typeStart + node.end - node.start : cast.typeEnd;
             spans.push({ start: cast.typeStart, end: end, tokenType: 'class' });
         }
 
@@ -216,9 +226,11 @@ const LgdSemanticTokensProvider = {
             return context.spans;
         }
 
+        const members = LgdClassMemberSemantics.create({ content: source, declarations: state.declarations,
+            externals: state.externals || new Map(), map: state.map, tree: tree });
         const identifiers = new Set();
         traverse(tree, {
-            /** @description Excludes ordinary identifier/property uses of contextual words and records parameter roles. */
+            /** @description Uses lexical bindings for parameter and class roles, leaving properties and value shadows unchanged. */
             Identifier: path =>
             {
                 if(!path.parentPath.isMetaProperty() || path.key !== 'meta')
@@ -231,9 +243,25 @@ const LgdSemanticTokensProvider = {
                 {
                     this.appendMappedSpan(context, path.node.start, path.node.end, 'parameter');
                 }
+                else if(path.isReferencedIdentifier() || path.isBindingIdentifier())
+                {
+                    const receiver = members.receiver(path);
+                    if(receiver?.kind === 'type')
+                    {
+                        this.appendMappedSpan(context, path.node.start, path.node.end, 'class');
+                    }
+                }
             }
         });
         this.collectNativeKeywords(tree.tokens, identifiers, context);
+        for(const site of state.constructionSites || [])
+        {
+            if(source.startsWith('new', site.start))
+            {
+                context.spans.push({ start: site.start, end: site.start + 'new'.length, tokenType: LgdKeywordFamilies.get('new').tokenType });
+            }
+        }
+
         return context.spans;
     },
 
@@ -274,8 +302,7 @@ const LgdSemanticTokensProvider = {
     },
 
     /**
-     * @description Collects every document span that names a type: typed parameter types
-     * from top-level function declarations and object methods, plus JSDoc type tags.
+     * @description Collects parsed annotation and declaration type spans, plus source JSDoc type tags.
      * @param {string} text the LGD document text.
      * @param {Array} declarations the parsed declarations.
      * @returns {Array} the sorted, deduplicated {start, end} spans.
@@ -285,6 +312,11 @@ const LgdSemanticTokensProvider = {
         const spans = [];
         for(const declaration of declarations)
         {
+            if(!declaration.kind && Number.isInteger(declaration.typeStart) && Number.isInteger(declaration.typeEnd))
+            {
+                spans.push({ start: declaration.typeStart, end: declaration.typeEnd });
+            }
+
             this.collectParamTypeSpans(declaration, spans);
             if(declaration.kind === 'class' || declaration.kind === 'interface' || declaration.kind === 'enum')
             {
@@ -306,6 +338,26 @@ const LgdSemanticTokensProvider = {
                 {
                     spans.push({ start: constructor.nameStart, end: constructor.nameEnd });
                 }
+            }
+        }
+
+        for(const span of spans)
+        {
+            const annotation = text.slice(span.start, span.end);
+            if(elementTypeName(annotation) === null)
+            {
+                continue;
+            }
+
+            let node = parseTypeName(annotation)?.annotation;
+            while(node && node.kind !== 'named')
+            {
+                node = node.element;
+            }
+
+            if(node)
+            {
+                span.end = span.start + node.end - node.start;
             }
         }
 

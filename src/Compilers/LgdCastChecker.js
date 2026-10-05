@@ -1,7 +1,7 @@
 const traverse = require('@babel/traverse').default;
 const LgdReturnChecker = require('./LgdReturnChecker');
 const LgdAccessibility = require('./LgdAccessibility');
-const { baseTypeName, isNullableType } = require('./LgdTypeMaps');
+const { baseTypeName, isNullableType, elementTypeName, arrayCompatibility } = require('./LgdTypeMaps');
 
 /** @description Checks known cast incompatibilities while leaving uncertain reference downcasts free of runtime overhead. */
 const LgdCastChecker = {
@@ -159,7 +159,8 @@ const LgdCastChecker = {
         const reference = nominal || !primitiveTypes.includes(expected);
         if(actual === 'null')
         {
-            return reference || isNullableType(cast.typeName);
+            const nullable = isNullableType(cast.typeName);
+            return elementTypeName(cast.typeName) !== null ? nullable : reference || nullable;
         }
 
         if(actual === 'undefined')
@@ -175,6 +176,18 @@ const LgdCastChecker = {
         if(expected === 'Object' && !nominal)
         {
             return true;
+        }
+
+        function compareElement(expectedElement, actualElement)
+        {
+            return context.members.compatible(expectedElement, actualElement, null, { nullable: false });
+        }
+
+        const array = arrayCompatibility(expected, actual, compareElement);
+
+        if(array !== null)
+        {
+            return array;
         }
 
         if(primitiveTypes.includes(expected) && !nominal)

@@ -1,3 +1,6 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const vscode = require('vscode');
 const manifest = require('../../../package.json');
 const { makeTextDocument } = require('./fakeVscode');
@@ -64,6 +67,96 @@ describe('LgdSemanticTokensProvider', () =>
         const defaults = manifest.contributes.configurationDefaults;
         expect(defaults['[lgd]']).toEqual({ 'editor.semanticHighlighting.enabled': true });
         expect(defaults['editor.semanticHighlighting.enabled']).toBeUndefined();
+    });
+
+    test.each([ 'Item', 'Calculator', 'Navigator' ].flatMap(name => [ 'oloo', 'class' ].map(model => [ name, model ])))('uses one class role for %s declarations, annotations and construction in %s output', async (className, javascriptObjectModel) =>
+    {
+        const source = `class ${className} {}\nconst ${className} original = new ${className}();\nconst value = original;`;
+        const service = LgdLanguageService.create(
+            { set: () => undefined, delete: () => undefined }, () => undefined,
+            () => ({ javascriptObjectModel: javascriptObjectModel })
+        );
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const names = tokens.pushed.filter(token => tokenText(document, token) === className);
+        expect(names.map(token => document.offsetAt(token.range.start))).toEqual(Array.from(source.matchAll(new RegExp(className, 'g')), match => match.index));
+        expect(names.every(token => token.tokenType === 'class')).toBe(true);
+        expect(tokens.pushed.filter(token => token.tokenType === 'class').map(token => tokenText(document, token))).toEqual([ className, className, className ]);
+    });
+
+    test.each([ 'Item', 'Calculator', 'Navigator' ])('colors resolved %s bindings while preserving values, properties and shadows', async className =>
+    {
+        const source = [
+            'class Item {}',
+            'const Alias = Item; new Alias();',
+            'const Item original = new Item();',
+            'const Capital = 1; console.log(Capital);',
+            'const holder = { Item: 1 }; console.log(holder.Item);',
+            'const text = "Item"; // Item',
+            'function read(Item) { const Copy = Item; return new Item(); }',
+            '{ const Item = 1; console.log(Item); }',
+            'let Mutable = Alias; Mutable = 1; console.log(Mutable);',
+            'const instance = original; console.log(instance);'
+        ].join('\n').replaceAll('Item', className);
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const types = tokens.pushed.filter(token => token.tokenType === 'class');
+        expect(types.map(token => tokenText(document, token))).toEqual([ className, 'Alias', className, 'Alias', className, className, 'Alias' ]);
+        const valueOffsets = [ source.indexOf('Capital ='),
+            source.indexOf(`holder.${className}`) + 'holder.'.length,
+            source.indexOf(`${className} = 1`),
+            source.indexOf(`console.log(${className})`) + 'console.log('.length ];
+        expect(types.every(token => !valueOffsets.includes(document.offsetAt(token.range.start)))).toBe(true);
+        const parameterOccurrences = 3;
+        expect(tokens.pushed.filter(token => tokenText(document, token) === className && token.tokenType === 'parameter')).toHaveLength(parameterOccurrences);
+    });
+
+    test('retains imported class aliases while excluding imported values and shadowed import names', async () =>
+    {
+        const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lgd-class-token-imports-'));
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const root = makeTextDocument(`file://${path.join(directory, 'Item.lgd')}`, 'class Item {} module.exports = Item;');
+        const value = makeTextDocument(`file://${path.join(directory, 'Count.lgd')}`, 'const Number count = 1; module.exports = count;');
+        const source = [ 'const Alias = require("./Item");',
+            'const Alias original = new Alias();',
+            'const Copy = Alias; new Copy();',
+            'const Count = require("./Count"); console.log(Count);',
+            'function read(Alias) { return new Alias(); }' ].join('\n');
+        const consumer = makeTextDocument(`file://${path.join(directory, 'Consumer.lgd')}`, source);
+        try
+        {
+            await service.openDocument(root);
+            await service.openDocument(value);
+            await service.openDocument(consumer);
+            const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(consumer);
+            expect(tokens.pushed.filter(token => token.tokenType === 'class').map(token => tokenText(consumer, token)))
+                .toEqual([ 'Alias', 'Alias', 'Alias', 'Copy', 'Alias', 'Copy' ]);
+        }
+        finally
+        {
+            await service.pendingDependencyUpdates;
+            await fs.promises.rm(directory, { recursive: true, force: true });
+        }
+    });
+
+    test.each([ 'Calculator', 'Navigator', 'LedgerEntry' ])('keeps %s class roles in fields, parameters, returns, casts and array types', async className =>
+    {
+        const source = [ `class ${className} { ${className}() {} }`,
+            `class Holder { ${className}? field; ${className}[] items = [];`,
+            `    ${className}? read(${className}? value) { return value; }`,
+            `    ${className}? assert(Object value) { return (${className}?) value; } }`,
+            `const ${className}[] records = [];` ].join('\n');
+        const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
+        const document = makeTextDocument(LGD_URI, source);
+        await service.openDocument(document);
+        const tokens = await LgdSemanticTokensProvider.create(service).provideDocumentSemanticTokens(document);
+        const names = tokens.pushed.filter(token => tokenText(document, token).startsWith(className));
+        expect(names.map(token => document.offsetAt(token.range.start))).toEqual(Array.from(source.matchAll(new RegExp(className, 'g')), match => match.index));
+        expect(names.every(token => token.tokenType === 'class')).toBe(true);
+        expect(tokens.pushed.filter(token => tokenText(document, token) === 'value').every(token => token.tokenType === 'parameter')).toBe(true);
     });
 
     test('reports class tokens for typed parameter types.', async () =>

@@ -20,7 +20,7 @@ const LgdClassFields = {
 
         if(head.groups.type === 'void' || !typeMaps.parseTypeName(head.groups.type))
         {
-            return { error: 'An LGD field requires a supported capitalized value type.', offset: start };
+            return { error: 'An LGD field requires a supported value type.', offset: start };
         }
 
         const typeStart = start + head[0].indexOf(head.groups.type);
@@ -67,17 +67,22 @@ const LgdClassFields = {
     /** @description Supplies C#-style zero defaults without sharing mutable initializer values. */
     fieldDefault(member)
     {
-        if(member.propertyTypeName === 'Number')
+        if(typeMaps.elementTypeName(member.propertyTypeName) !== null && !typeMaps.isNullableType(member.propertyTypeName))
+        {
+            return '[]';
+        }
+
+        if(typeMaps.baseTypeName(member.propertyTypeName) === 'Number' && !typeMaps.isNullableType(member.propertyTypeName))
         {
             return '0';
         }
 
-        if(member.propertyTypeName === 'Boolean')
+        if(typeMaps.baseTypeName(member.propertyTypeName) === 'Boolean' && !typeMaps.isNullableType(member.propertyTypeName))
         {
             return 'false';
         }
 
-        if(member.propertyTypeName === 'BigInt')
+        if(typeMaps.baseTypeName(member.propertyTypeName) === 'BigInt' && !typeMaps.isNullableType(member.propertyTypeName))
         {
             return '0n';
         }

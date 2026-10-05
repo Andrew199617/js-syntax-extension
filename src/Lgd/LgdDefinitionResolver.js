@@ -3,7 +3,7 @@ const vscode = require('vscode');
 const { parse } = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const { maskCode } = require('../Compilers/LgdInfer');
-const { baseTypeName } = require('../Compilers/LgdTypeMaps');
+const { rootTypeName } = require('../Compilers/LgdTypeMaps');
 const { collectScopes, collectBindings, visibleBindings } = require('../Compilers/LgdBaseChecker');
 
 /**
@@ -17,7 +17,7 @@ function isTypeReference(state, offset, name)
 {
     for(const declaration of state.declarations)
     {
-        if(baseTypeName(declaration.typeName) === name && offset >= declaration.typeStart && offset < declaration.typeEnd)
+        if(rootTypeName(declaration.typeName) === name && offset >= declaration.typeStart && offset < declaration.typeEnd)
         {
             return true;
         }
@@ -34,7 +34,7 @@ function isTypeReference(state, offset, name)
         {
             const propertyStart = declaration.initializerStart + member.propertyTypeStart;
             const propertyEnd = declaration.initializerStart + member.propertyTypeEnd;
-            if(baseTypeName(member.propertyTypeName) === name && offset >= propertyStart && offset < propertyEnd)
+            if(rootTypeName(member.propertyTypeName) === name && offset >= propertyStart && offset < propertyEnd)
             {
                 return true;
             }
@@ -50,7 +50,7 @@ function isTypeReference(state, offset, name)
 
             const returnStart = declaration.initializerStart + group.returnTypeStart;
             const returnEnd = declaration.initializerStart + group.returnTypeEnd;
-            if(baseTypeName(group.returnTypeName) === name && offset >= returnStart && offset < returnEnd)
+            if(rootTypeName(group.returnTypeName) === name && offset >= returnStart && offset < returnEnd)
             {
                 return true;
             }
@@ -59,7 +59,7 @@ function isTypeReference(state, offset, name)
             {
                 const start = declaration.initializerStart + parameter.typeStart;
                 const end = declaration.initializerStart + parameter.typeEnd;
-                if(baseTypeName(parameter.typeName) === name && offset >= start && offset < end)
+                if(rootTypeName(parameter.typeName) === name && offset >= start && offset < end)
                 {
                     return true;
                 }
@@ -207,7 +207,7 @@ async function resolveImportedDefinition(languageService, state, position)
     const bindings = collectBindings({ content: document.getText(), masked: sourceCode,
         declarations: state.declarations, scopes: scopes, externals: state.externals || new Map() });
     const erased = visibleBindings(bindings, offset).get(name);
-    const declaredType = erased?.kind === 'interface' || erased?.kind === 'enum';
+    const declaredType = [ 'class', 'interface', 'enum' ].includes(erased?.kind);
     if(declaredType && (isTypeReference(state, offset, name) || offset === erased.nameStart))
     {
         const text = erased.sourceText || document.getText();

@@ -54,13 +54,74 @@ describe('LGD brace placement and style variations', () =>
 
     test('supports multiline-only custom control wrapping', () =>
     {
-        const result = format('if(ready &&\nvalid) { act(); }', { braces: { style: 'attach', wrapping: { controlBlocks: 'nextLineIfMultiline' } } });
+        const result = format('if(ready &&\nvalid) { act(); }', { braces: { style: 'attach', wrapping: { controlBlocks: 'nextLineIfMultiline' } }, wrapping: { binaryOperations: 'preserve' } });
         expect(result).toContain('valid)\n{');
     });
 });
 
 describe('spacing, indentation and layout', () =>
 {
+    test('uses compact parentheses and spaced return defaults without explicit style rules', () =>
+    {
+        const source = 'function choose(value, fallback){return(value ?? (fallback));}\nfunction isReady(value){return !!(value);}';
+        const result = format(source);
+        expect(result).toContain('function choose(value, fallback)');
+        expect(result).toContain('return (value ?? (fallback));');
+        expect(result).toContain('return !!(value);');
+        const controls = format('if(ready){read(value);empty();}');
+        expect(controls).toContain('if(ready)');
+        expect(controls).toContain('read(value);');
+        const empty = format('function empty(){call();}');
+        expect(empty).toContain('empty()');
+        expect(empty).toContain('call();');
+        expect(format('Number value=(Number) "2";')).toContain('(Number)"2"');
+    });
+
+    test.each([ false, true ])('honors %s padding independently in every parenthesis context', padding =>
+    {
+        const source = 'class Example { Example(Number first, Number second) {} Number add(Number first, Number second) { if(first) { while(second) { call(first, second); break; } } for(let index = 0; index < 1; index++) { call(); } return(Number)(first + second); } Number empty() { return read(); } }';
+        const spacing = { insideDeclarationParens: padding, insideCallParens: padding, insideControlParens: padding, insideCastParens: padding, insideOtherParens: padding,
+            insideEmptyDeclarationParens: padding, insideEmptyCallParens: padding };
+        const result = format(source, { spacing: spacing });
+        const edge = padding ? ' ' : '';
+        expect(result).toContain(`Example(${edge}Number first, Number second${edge})`);
+        expect(result).toContain(`add(${edge}Number first, Number second${edge})`);
+        expect(result).toContain(`if(${edge}first${edge})`);
+        expect(result).toContain(`while(${edge}second${edge})`);
+        expect(result).toContain(`for(${edge}let index = 0; index < 1; index++${edge})`);
+        expect(result).toContain(`call(${edge}first, second${edge});`);
+        expect(result).toContain(`return (${edge}Number${edge})(${edge}first + second${edge});`);
+        expect(result).toContain(`empty(${edge})`);
+        expect(result).toContain(`read(${edge});`);
+    });
+
+    test('allows explicit false and family true choices independently of compact defaults', () =>
+    {
+        const source = 'function run(value){if(value){return(read(value));}}';
+        const options = { spacing: { afterReturnKeyword: false, insideDeclarationParens: false, insideControlParens: false, insideCallParens: false, insideOtherParens: false } };
+        const result = format(source, options);
+        expect(result).toContain('function run(value)');
+        expect(result).toContain('if(value)');
+        expect(result).toContain('return(read(value));');
+        expect(format('function run(value){return value;}', options)).toContain('return value;');
+        const configuration = { options: { spacing: { insideOtherParens: false } }, rules: { 'lgd.format.spacing': { options: { insideOtherParens: true, afterReturnKeyword: false } } } };
+        const overridden = LgdFormatter.format(source, configuration);
+        expect(overridden).toContain('return( read(value) );');
+        expect(LgdFormatter.format(overridden, configuration)).toBe(overridden);
+    });
+
+    test('distinguishes genuine return grouping from a method named return', () =>
+    {
+        const source = 'const receiver = { return(value){return(value);} };receiver.return(value);';
+        const result = format(source, { spacing: { beforeCallParen: false, insideCallParens: false, insideOtherParens: true } });
+        expect(result).toContain('return(value)');
+        expect(result).toContain('return ( value );');
+        expect(result).toContain('receiver.return(value);');
+        const findings = LgdFormatter.analyze('function run(value){return( value );}', { options: { spacing: { insideCallParens: false } } });
+        expect(findings.some(finding => finding.ruleId === 'lgd.format.spacing.afterReturnKeyword')).toBe(true);
+        expect(findings.some(finding => finding.ruleId === 'lgd.format.spacing.insideOtherParens')).toBe(true);
+    });
+
     test('has independent control, declaration and call parenthesis spacing', () =>
     {
         const result = format('function run(first,second){if(first){call(first,second);}}', { spacing: { afterControlKeywords: true, insideControlParens: true, beforeFunctionParen: true, insideDeclarationParens: true, insideCallParens: true } });
@@ -147,7 +208,7 @@ describe('wrapping and whitespace', () =>
 
     test.each([ 'before', 'after', 'beforeNonAssignment' ])('relocates wrapped binary operators %s', binaryOperators =>
     {
-        expect(format('const Boolean ready = first &&\nsecond;', { wrapping: { binaryOperators: binaryOperators } })).toContain('second');
+        expect(format('const Boolean ready = first &&\nsecond;', { wrapping: { binaryOperators: binaryOperators, binaryOperations: 'preserve' } })).toContain('second');
     });
 
     test('formats CRLF endings and final-newline choices outside opaque text', () =>

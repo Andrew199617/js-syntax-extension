@@ -6,7 +6,7 @@ const LgdSourceMap = require('../../../src/Compilers/LgdSourceMap');
 /** @description Opens the emitted mirror in TypeScript with strict null checking and real vscode declarations. */
 function createTypeService(code)
 {
-    const filename = path.join(__dirname, '../../fixtures/nullable-hover.js');
+    const filename = path.join(__dirname, '../../fixtures/nullable-hover.js').replaceAll('\\', '/');
     const options = { allowJs: true, checkJs: true, strictNullChecks: true, declaration: true, emitDeclarationOnly: true,
         skipLibCheck: true, types: [], target: typescript.ScriptTarget.ES2020, module: typescript.ModuleKind.CommonJS };
     const host = {
@@ -109,6 +109,50 @@ describe('LGD nullable output types', () =>
         {
             const messages = service.getSemanticDiagnostics(filename).map(diagnostic => typescript.flattenDiagnosticMessageText(diagnostic.messageText, ' '));
             expect(messages).toEqual([]);
+        }
+        finally
+        {
+            service.dispose();
+        }
+    });
+});
+
+describe('LGD postfix array mirror fidelity', () =>
+{
+    test.each([ 'oloo', 'class' ])('Preserves array hover, indexed element inference, native member completion and declarations with %s output.', javascriptObjectModel =>
+    {
+        const source = [
+            'class Reader {',
+            '    String[] read(String[] values) {',
+            '        const string[] lines = values;',
+            '        const string first = lines[0];',
+            '        lines.push(first);',
+            '        return lines;',
+            '    }',
+            '}',
+            'module.exports = Reader;'
+        ].join('\r\n');
+        const result = LgdCompiler.create().compileToJs(source, new Map(), { javascriptObjectModel: javascriptObjectModel });
+        expect(result.errors).toEqual([]);
+        const map = LgdSourceMap.create(result.mappings);
+        const { service, filename } = createTypeService(result.code);
+        try
+        {
+            for(const [ word, expected ] of [ [ 'read(', 'read(values: string[]): string[]' ], [ 'lines =', 'lines: string[]' ], [ 'first =', 'first: string' ] ])
+            {
+                const offset = map.toOutput(source.indexOf(word));
+                const info = service.getQuickInfoAtPosition(filename, offset);
+                expect(typescript.displayPartsToString(info.displayParts)).toContain(expected);
+                expect(map.toSource(offset)).toBe(source.indexOf(word));
+            }
+
+            const member = map.toOutput(source.indexOf('lines.push') + 'lines.'.length);
+            const completions = service.getCompletionsAtPosition(filename, member, {});
+            expect(completions.entries.map(entry => entry.name)).toEqual(expect.arrayContaining([ 'push', 'length', 'map' ]));
+            expect(service.getSyntacticDiagnostics(filename)).toEqual([]);
+            expect(service.getSemanticDiagnostics(filename)).toEqual([]);
+            const declarations = service.getEmitOutput(filename).outputFiles.find(file => file.name.endsWith('.d.ts'));
+            expect(declarations.text).toContain('read(values: string[]): string[]');
         }
         finally
         {

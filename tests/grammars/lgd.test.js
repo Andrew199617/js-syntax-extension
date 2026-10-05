@@ -11,6 +11,9 @@ const root = path.resolve(__dirname, '../..');
 // The LGD language grammar under test.
 const lgdScope = 'source.lgd';
 
+// Only generated constructor previews use this language; ordinary LGD files retain their grammar.
+const constructorScope = 'source.lgd.constructor';
+
 // Scope the LGD grammar assigns to type keywords in declaration heads.
 const typeScope = 'storage.type.lgd';
 
@@ -49,6 +52,19 @@ async function createRegistry()
             if(scope === lgdScope)
             {
                 return grammar;
+            }
+
+            if(scope === constructorScope)
+            {
+                const preview = manifest.contributes.grammars.find(candidate => candidate.scopeName === scope);
+                assert.ok(preview, 'Constructor preview grammar is registered');
+                assert.strictEqual(preview.language, 'lgd-constructor');
+                const language = manifest.contributes.languages.find(candidate => candidate.id === preview.language);
+                assert.ok(language, 'The Markdown fence language is registered');
+                assert.ok(!language.extensions, 'Constructor previews do not claim source files');
+                assert.ok(!preview.injectTo, 'Preview class roles do not leak into ordinary source');
+                const previewPath = path.join(root, preview.path);
+                return textmate.parseRawGrammar(await fs.readFile(previewPath, 'utf8'), previewPath);
             }
 
             if(scope === 'source.js')
@@ -122,6 +138,63 @@ describe('LGD TextMate grammar.', () =>
         {
             registry.dispose();
         }
+    });
+
+    test('gives constructor preview names and parameter annotations class roles across overload lines', async () =>
+    {
+        const preview = await registry.loadGrammar(constructorScope);
+        const tokens = tokenize(preview, 'new BaseCommand(String commandName, String title)\nnew BaseCommand()');
+        const names = tokens.filter(token => token.text === 'BaseCommand');
+        assert.strictEqual(names.length, 2);
+        assert.ok(names.every(token => token.scopes.includes('entity.name.type.class.lgd')));
+        assertScope(tokens, 'String', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'commandName', 'variable.parameter.js');
+        assertScope(tokens, 'title', 'variable.parameter.js');
+        assertScope(tokens, 'new', 'keyword.operator.new.js');
+        assertNoScope(tokens, 'BaseCommand', 'entity.name.function.js');
+    });
+
+    test.each([ 'Calculator', 'Navigator', 'LedgerEntry' ])('gives %s constructor preview arrays the same class role as scalar types', async className =>
+    {
+        const preview = await registry.loadGrammar(constructorScope);
+        const tokens = tokenize(preview, `new ${className}(${className}[] values, models.${className}?[] nested, string[] labels)`);
+        for(const type of [ className, `${className}[]`, `models.${className}?[]`, 'string[]' ])
+        {
+            assertScope(tokens, type, 'entity.name.type.class.lgd');
+        }
+
+        for(const name of [ 'values', 'nested', 'labels' ])
+        {
+            assertScope(tokens, name, 'variable.parameter.js');
+            assertNoScope(tokens, name, 'entity.name.type.class.lgd');
+        }
+    });
+
+    test('preserves constructor preview modifiers, nullable types, defaults, rest and destructuring scopes', async () =>
+    {
+        const preview = await registry.loadGrammar(constructorScope);
+        const tokens = tokenize(preview, [
+            'private lowercase(vscode.Position? position, Number attempts = 2, ...String tags)',
+            'new models.Command(String label = "BaseCommand", Object options = make(1), { title } = {})',
+            'new Command(...[title])'
+        ].join('\n'));
+        assertScope(tokens, 'private', 'storage.modifier.lgd');
+        assertScope(tokens, 'lowercase', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'models.Command', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'vscode.Position?', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'Number', 'entity.name.type.class.lgd');
+        assertScope(tokens, 'String', 'entity.name.type.class.lgd');
+        for(const name of [ 'position', 'attempts', 'tags', 'label', 'options', 'title' ])
+        {
+            assertScope(tokens, name, 'variable.parameter.js');
+            assertNoScope(tokens, name, 'entity.name.type.class.lgd');
+        }
+
+        assertScope(tokens, '2', 'constant.numeric.decimal.js');
+        assertScope(tokens, 'make', 'entity.name.function.js');
+        assertPartialScope(tokens, 'BaseCommand', 'string.quoted');
+        assertNoScope(tokens, 'BaseCommand', 'entity.name.type.class.lgd');
+        assertScope(tokens, '...', 'keyword.operator.rest.js');
     });
 
     test('highlights typed const locals, including their types and names inside methods', () =>

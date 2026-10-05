@@ -42,7 +42,7 @@ describe('Cast editor metadata.', () =>
         expect(tokens.pushed.some(token => document.offsetAt(token.range.start) === stringStart)).toBe(false);
     });
 
-    test('explains numeric conversion versus zero-runtime-check reference assertions on hover', async () =>
+    test('explains C-style numeric conversion versus compile-time reference casts on hover', async () =>
     {
         const source = 'class Item {}\nconst raw = {};\nconst item = (Item)raw;\nconst amount = (Number)"1";\nconst truthy = (Boolean)"false";\nconst nullable = (Boolean?)null;';
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);
@@ -53,15 +53,21 @@ describe('Cast editor metadata.', () =>
         const numeric = await provider.provideHover(document, document.positionAt(source.indexOf('(Number)') + 1));
         const truthy = await provider.provideHover(document, document.positionAt(source.indexOf('(Boolean)') + 1));
         const nullable = await provider.provideHover(document, document.positionAt(source.indexOf('(Boolean?)') + 1));
-        expect(truthy.contents).toContain('JavaScript Boolean truthiness');
+        expect(truthy.contents).toContain('Boolean using truthiness');
         expect(nullable.contents).toContain('Preserves null');
         expect(reference.contents).toContain('no runtime check');
-        expect(numeric.contents).toContain('JavaScript Number');
+        expect(numeric.contents).toContain('converts the value to Number');
         expect(numeric.contents).toContain('NaN');
         expect(document.getText(reference.range)).toBe('Item');
+        for(const hover of [ reference, numeric, truthy, nullable ])
+        {
+            expect(hover.contents).toContain('C-style cast');
+            expect(hover.contents).not.toContain('JavaScript');
+            expect(hover.contents).not.toContain('Asserts');
+        }
     });
 
-    test('describes a class named Boolean as an assertion', async () =>
+    test('describes a class named Boolean as a reference cast', async () =>
     {
         const source = 'class Boolean {} const raw = {}; const value = (Boolean)raw;';
         const service = LgdLanguageService.create({ set: () => undefined, delete: () => undefined }, () => undefined);

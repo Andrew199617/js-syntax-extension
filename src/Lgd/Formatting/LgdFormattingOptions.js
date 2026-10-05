@@ -26,7 +26,7 @@ const catalog = [
     {
         id: 'lgd.format.spacing', title: 'Horizontal spacing',
         defaults: {
-            afterControlKeywords: false, beforeFunctionParen: false, beforeMethodParen: false, beforeCallParen: false,
+            afterControlKeywords: false, afterReturnKeyword: true, beforeFunctionParen: false, beforeMethodParen: false, beforeCallParen: false,
             afterCast: false, insideCastParens: false, insideControlParens: false, insideDeclarationParens: false, insideCallParens: false, insideOtherParens: false,
             insideEmptyDeclarationParens: false, insideEmptyCallParens: false,
             beforeInheritanceColon: true, afterInheritanceColon: true, binaryOperators: 'both', beforeAssignment: true, afterAssignment: true,
@@ -38,7 +38,7 @@ const catalog = [
     },
     {
         id: 'lgd.format.lineBreaks', title: 'Block layout and blank lines',
-        defaults: { shortBlocks: 'never', shortFunctions: 'empty', shortLambdas: 'never', shortIfs: 'never', shortLoops: false, shortCases: false, embeddedStatementsSameLine: true, preserveSingleLineBlocks: false, preserveSingleLineStatements: false, objectMembers: 'preserve', importGroups: 'preserve', separateDefinitions: 'preserve', blankLinesBetweenClosingBraces: false, statementImmediatelyAfterBlock: true, blankLineAfterConstructorColon: true, blankLineAfterConditionalToken: true, blankLineAfterArrow: true, maxEmptyLines: 1, emptyLinesAtBlockStart: false, emptyLinesAtBlockEnd: false },
+        defaults: { shortBlocks: 'never', shortFunctions: 'empty', shortLambdas: 'never', shortIfs: 'never', shortLoops: false, shortCases: false, embeddedStatementsSameLine: true, preserveSingleLineBlocks: false, preserveSingleLineStatements: false, objectMembers: 'preserve', importGroups: 'preserve', separateDefinitions: 'always', blankLinesBetweenClosingBraces: false, statementImmediatelyAfterBlock: true, blankLineAfterConstructorColon: true, blankLineAfterConditionalToken: true, blankLineAfterArrow: true, maxEmptyLines: 1, emptyLinesAtBlockStart: false, emptyLinesAtBlockEnd: false },
         properties: {
             shortBlocks: { enum: [ 'preserve', 'never', 'empty', 'always' ] }, shortFunctions: { enum: [ 'preserve', 'never', 'empty', 'inline', 'all' ] }, shortLambdas: { enum: [ 'preserve', 'never', 'empty', 'inline', 'all' ] },
             shortIfs: { enum: [ 'preserve', 'never', 'withoutElse', 'all' ] }, shortLoops: { type: 'boolean' }, shortCases: { type: 'boolean' }, embeddedStatementsSameLine: { type: 'boolean' }, preserveSingleLineBlocks: { type: 'boolean' }, preserveSingleLineStatements: { type: 'boolean' },
@@ -47,9 +47,9 @@ const catalog = [
     },
     {
         id: 'lgd.format.wrapping', title: 'Argument and expression wrapping',
-        defaults: { columnLimit: 120, arguments: 'preserve', parameters: 'preserve', alignAfterOpenBracket: false, allowAllArgumentsOnNextLine: false, allowAllParametersOnNextLine: false, binaryOperators: 'preserve', binaryOperations: 'preserve', returnType: 'preserve', constructorInitializer: 'preserve' },
+        defaults: { columnLimit: 120, arguments: 'preserve', parameters: 'preserve', alignAfterOpenBracket: false, allowAllArgumentsOnNextLine: false, allowAllParametersOnNextLine: false, binaryOperators: 'beforeNonAssignment', binaryOperations: 'fit', returnType: 'preserve', constructorInitializer: 'preserve' },
         properties: {
-            columnLimit: { type: 'integer', minimum: 0, maximum: 1000 }, arguments: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, parameters: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, alignAfterOpenBracket: { type: 'boolean' }, allowAllArgumentsOnNextLine: { type: 'boolean' }, allowAllParametersOnNextLine: { type: 'boolean' }, binaryOperators: { enum: [ 'preserve', 'before', 'after', 'beforeNonAssignment' ] }, binaryOperations: { enum: [ 'preserve', 'respectPrecedence', 'onePerLine' ] }, returnType: { enum: [ 'preserve', 'sameLine', 'nextLine' ] }, constructorInitializer: { enum: [ 'preserve', 'beforeColon', 'afterColon' ] }
+            columnLimit: { type: 'integer', minimum: 0, maximum: 1000 }, arguments: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, parameters: { enum: [ 'preserve', 'binPack', 'onePerLine' ] }, alignAfterOpenBracket: { type: 'boolean' }, allowAllArgumentsOnNextLine: { type: 'boolean' }, allowAllParametersOnNextLine: { type: 'boolean' }, binaryOperators: { enum: [ 'preserve', 'before', 'after', 'beforeNonAssignment' ] }, binaryOperations: { enum: [ 'preserve', 'fit', 'respectPrecedence', 'onePerLine' ] }, returnType: { enum: [ 'preserve', 'sameLine', 'nextLine' ] }, constructorInitializer: { enum: [ 'preserve', 'beforeColon', 'afterColon' ] }
         }
     },
     {

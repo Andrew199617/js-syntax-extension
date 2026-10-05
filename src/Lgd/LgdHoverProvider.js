@@ -1,5 +1,7 @@
 const vscode = require('vscode');
 const LgdClassMemberLookup = require('./LgdClassMemberLookup');
+const LgdConstructorHover = require('./LgdConstructorHover');
+const LgdHoverDocumentation = require('./LgdHoverDocumentation');
 
 /** @import { Hover, Position, TextDocument } from 'vscode' */
 
@@ -61,14 +63,14 @@ const LgdHoverProvider = {
         {
             const numeric = !cast.target && (cast.typeName === 'Number' || cast.typeName === 'Number?');
             const boolean = !cast.target && (cast.typeName === 'Boolean' || cast.typeName === 'Boolean?');
-            let detail = 'Asserts the expression type for LGD. JavaScript keeps the original value; no runtime check is performed.';
+            let detail = 'C-style cast to the specified type for compile-time type compatibility. The value is unchanged; no runtime check is performed.';
             if(numeric)
             {
-                detail = 'Converts the value using JavaScript Number. Invalid numeric input can produce NaN.';
+                detail = 'C-style cast that converts the value to Number. Invalid numeric input can produce NaN.';
             }
             else if(boolean)
             {
-                detail = 'Converts the value using JavaScript Boolean truthiness. Empty strings are false; nonempty strings, including "false", are true.';
+                detail = 'C-style cast that converts the value to Boolean using truthiness. Empty strings are false; nonempty strings, including "false", are true.';
             }
 
             if((numeric || boolean) && cast.typeName.endsWith('?'))
@@ -80,6 +82,13 @@ const LgdHoverProvider = {
             return new vscode.Hover(markdown, new vscode.Range(document.positionAt(cast.typeStart), document.positionAt(cast.typeEnd)));
         }
 
+        const constructor = LgdConstructorHover.get(state, position);
+        if(constructor)
+        {
+            const range = new vscode.Range(document.positionAt(constructor.start), document.positionAt(constructor.end));
+            return new vscode.Hover(LgdConstructorHover.render(constructor), range);
+        }
+
         const wordRange = document.getWordRangeAtPosition(position);
         if(wordRange)
         {
@@ -89,7 +98,7 @@ const LgdHoverProvider = {
                 return new vscode.Hover(this.renderDeclaredField(declaredMember), wordRange);
             }
 
-            if(declaredMember && (this.hasExplicitVisibility(declaredMember) || this.hasDocumentation(declaredMember)))
+            if(declaredMember && (declaredMember.isConstructor || this.hasExplicitVisibility(declaredMember) || this.hasDocumentation(declaredMember)))
             {
                 return new vscode.Hover(this.renderDeclaredMember(declaredMember), wordRange);
             }
@@ -132,7 +141,7 @@ const LgdHoverProvider = {
 
         const hover = hovers[0];
         const range = hover.range ? this.languageService.toLgdRange(document.uri, hover.range) : null;
-        return new vscode.Hover(hover.contents, range);
+        return new vscode.Hover(LgdHoverDocumentation.deduplicate(hover.contents), range);
     },
 
     /**
@@ -305,6 +314,12 @@ const LgdHoverProvider = {
     renderDeclaredMemberSignature(detail)
     {
         const visibility = this.visibilityPrefix(detail);
+        if(detail.isConstructor)
+        {
+            const parameters = (detail.params || []).map(LgdConstructorHover.formatParameter).join(', ');
+            return [ '```lgd-constructor', `${visibility}${detail.name}(${parameters})`, '```' ].join('\n');
+        }
+
         if(detail.constructorSignatures?.length > 1)
         {
             const lines = detail.constructorSignatures.map(signature =>
@@ -318,11 +333,6 @@ const LgdHoverProvider = {
         }
 
         const params = (detail.params || []).map(this.formatTypedParameter).join(', ');
-        if(detail.isConstructor)
-        {
-            return [ '```lgd', `${visibility}${detail.name}(${params})`, '```' ].join('\n');
-        }
-
         const owner = detail.declaringType ? `${detail.declaringType}.` : '';
         const modifier = `${visibility}${detail.static ? 'static ' : ''}${detail.async ? 'async ' : ''}`;
         const type = detail.returnTypeName ? `${detail.returnTypeName} ` : '';
@@ -421,7 +431,8 @@ const LgdHoverProvider = {
                 return `    ${visibility}${member.name}${member.kind === 'method' ? '()' : type}${accessors},`;
             });
 
-            return [ '```lgd', `${modifier}${summary.kind} ${summary.name}${base} {`, ...lines, '}', '```' ].join('\n');
+            const signature = [ '```lgd', `${modifier}${summary.kind} ${summary.name}${base} {`, ...lines, '}', '```' ].join('\n');
+            return this.appendDocumentation(signature, summary);
         }
 
         const modifier = summary.readonly ? 'const ' : '';

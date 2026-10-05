@@ -1,4 +1,5 @@
 const LgdConstructorSignatures = require('./LgdConstructorSignatures');
+const LgdModuleBindings = require('./LgdModuleBindings');
 const { UNKNOWN, NULL, inferExpression, maskCode } = require('./LgdInfer');
 const { parseTypedParams, splitTopLevelChunks } = require('./LgdTypedParams');
 
@@ -150,7 +151,34 @@ function scopeAt(scopes, offset)
 function resolveExternal(declaration, externals)
 {
     const required = requirePattern.exec(declaration.initializerText || '');
-    return required && externals.has(required.groups.specifier) ? externals.get(required.groups.specifier) : declaration;
+    return required && LgdModuleBindings.required(externals, required.groups.specifier) || declaration;
+}
+
+/**
+ * @description Collects visible bindings, with closer lexical scopes overriding outer ones.
+ * @param {Array} bindings the declarations and JavaScript bindings.
+ * @param {number} offset the source offset to inspect.
+ * @returns {Map} visible names to declaration metadata.
+ */
+function visibleBindings(bindings, offset)
+{
+    const visible = new Map();
+    const ordered = bindings.filter(binding => binding.scope.start < offset && offset < binding.scope.end)
+        .sort((left, right) => left.scope.start - right.scope.start || left.offset - right.offset);
+    for(const binding of ordered)
+    {
+        for(const name of visible.keys())
+        {
+            if(name.startsWith(`${binding.name}.`))
+            {
+                visible.delete(name);
+            }
+        }
+
+        visible.set(binding.name, binding.declaration);
+    }
+
+    return visible;
 }
 
 /**
@@ -186,10 +214,24 @@ function collectBindings(context)
             declaration: resolveExternal(declaration, externals) });
     }
 
-    const otherPattern = (/\b(?:function\s*\*?\s*|class\s+)(?<name>[$A-Z_a-z][\w$]*)|\bimport\s+(?<imports>[^\n\r;]*?)\s+from\b/g);
+    for(const imported of LgdModuleBindings.imports(content))
+    {
+        const external = LgdModuleBindings.external(externals, imported.spec, imported.importedName);
+        const declaration = external || { typeName: UNKNOWN, unresolvedImport: imported };
+        bindings.push({ name: imported.name, offset: imported.nameStart, scope: scopes[0], declaration: declaration });
+        if(external?.kind === 'moduleNamespace')
+        {
+            for(const [ name, exported ] of external.moduleExports)
+            {
+                bindings.push({ name: `${imported.name}.${name}`, offset: imported.nameStart, scope: scopes[0], declaration: exported });
+            }
+        }
+    }
+
+    const otherPattern = (/\b(?:function\s*\*?\s*|class\s+)(?<name>[$A-Z_a-z][\w$]*)/g);
     for(const match of masked.matchAll(otherPattern))
     {
-        const names = match.groups.name ? [match.groups.name] : match.groups.imports.match(/[$A-Z_a-z][\w$]*/g) || [];
+        const names = [match.groups.name];
         for(const name of names)
         {
             if(!bindings.some(binding => binding.name === name && binding.offset >= match.index && binding.offset < match.index + match[0].length))
@@ -199,26 +241,25 @@ function collectBindings(context)
         }
     }
 
-    return bindings;
-}
-
-/**
- * @description Collects visible bindings, with closer lexical scopes overriding outer ones.
- * @param {Array} bindings the declarations and JavaScript bindings.
- * @param {number} offset the source offset to inspect.
- * @returns {Map} visible names to declaration metadata.
- */
-function visibleBindings(bindings, offset)
-{
-    const visible = new Map();
-    const ordered = bindings.filter(binding => binding.scope.start < offset && offset < binding.scope.end)
-        .sort((left, right) => left.scope.start - right.scope.start || left.offset - right.offset);
-    for(const binding of ordered)
+    for(const binding of bindings)
     {
-        visible.set(binding.name, binding.declaration);
+        const declaration = binding.declaration;
+        const alias = (/^\s*(?<name>[$A-Z_a-z][\w$]*(?:\.[$A-Z_a-z][\w$]*)*)\s*$/).exec(declaration.initializerText || '');
+        const immutable = (/\bconst\s/).test(masked.slice(binding.offset, binding.offset + 'const '.length));
+        const initializerEnd = binding.offset + (masked.slice(binding.offset).match(/^[^\n\r;]*/)?.[0].length || 0);
+        const terminated = masked[initializerEnd] === ';' || masked.slice(initializerEnd).trim() === '';
+        if(alias && immutable && terminated && binding.scope === scopes[0])
+        {
+            const visible = visibleBindings(bindings.filter(candidate => candidate !== binding && candidate.offset < binding.offset), binding.offset);
+            const target = visible.get(alias.groups.name);
+            if(target?.kind === 'class')
+            {
+                binding.declaration = target;
+            }
+        }
     }
 
-    return visible;
+    return bindings;
 }
 
 /**

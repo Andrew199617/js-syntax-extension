@@ -71,7 +71,7 @@ describe('LgdLanguageService', () =>
         expect(vscode.workspace.openTextDocument).toHaveBeenCalledTimes(1);
         expect(state.jsDocument.getText()).toContain('let value = 0;');
         expect(state.map).toBeTruthy();
-        expect(state.jsDocument.getText()).toContain('//# lgd-source="/workspace/examples/Calculator.lgd"');
+        expect(state.jsDocument.getText()).toContain(`//# lgd-source=${JSON.stringify(document.uri.fsPath)}`);
     });
 
     test('Reports unsupported inheritance while preserving the reported document mirror and unrelated hovers.', async () =>
@@ -212,6 +212,171 @@ describe('LgdLanguageService asynchronous lifecycle', () =>
         expect(current.jsDocument.getText()).toContain('let newValue = "ready";');
         expect(setCalls).toHaveLength(1);
         expect(setCalls[0].uri).toBe(reopened.uri);
+    });
+
+    test.each([ '\n', '\r\n' ])('Save As preserves saved and unsaved preview content while output models refresh with %j', async newline =>
+    {
+        const { service, errors, setCalls } = createService();
+        const options = { javascriptObjectModel: 'oloo' };
+        service.getOutputOptions = () => options;
+        const document = makeTextDocument(LGD_URI, [
+            'class Counter {',
+            '    Counter(Number value) { this.value = value; }',
+            '}'
+        ].join(newline));
+        const source = document.getText();
+        const state = await service.openDocument(document);
+        const originalMirror = state.jsDocument;
+        const savedText = originalMirror.getText();
+        const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lgd-saved-mirror-'));
+        const savedPath = path.join(directory, 'Preview.js');
+        try
+        {
+            await fs.promises.writeFile(savedPath, savedText);
+            const savedPreview = makeTextDocument(`file://${savedPath}`, `${savedText}// unsaved user note\n`);
+            const unsavedText = savedPreview.getText();
+            originalMirror.isClosed = true;
+            options.javascriptObjectModel = 'class';
+            await service.updateDocument(document);
+            const refreshedMirror = state.jsDocument;
+            expect(refreshedMirror).not.toBe(originalMirror);
+            expect(refreshedMirror.uri.scheme).toBe('untitled');
+            expect(refreshedMirror.getText()).toContain('class Counter');
+            expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
+
+            options.javascriptObjectModel = 'oloo';
+            await service.updateDocument(document);
+            expect(state.jsDocument).toBe(refreshedMirror);
+            expect(state.jsDocument.getText()).toContain('const Counter = {');
+            expect(vscode.workspace.openTextDocument).toHaveBeenCalledTimes(2);
+            expect(vscode.workspace.applyEdit).toHaveBeenCalledTimes(1);
+            expect(originalMirror.getText()).toBe(savedText);
+            expect(savedPreview.getText()).toBe(unsavedText);
+            expect(await fs.promises.readFile(savedPath, 'utf8')).toBe(savedText);
+            expect(document.getText()).toBe(source);
+            expect(errors).toEqual([]);
+            expect(setCalls.at(-1).diagnostics).toEqual([]);
+        }
+        finally
+        {
+            await fs.promises.rm(directory, { recursive: true, force: true });
+        }
+    });
+
+    test('a closed mirror URI recycled for another source is never edited through its stale document', async () =>
+    {
+        const { service, errors } = createService();
+        const original = makeTextDocument(LGD_URI, 'Number firstValue = 1;');
+        const originalState = await service.openDocument(original);
+        const closedMirror = originalState.jsDocument;
+        closedMirror.isClosed = true;
+        vscode.__reset();
+        const otherSource = makeTextDocument('file:///workspace/Other.lgd', 'String secondValue = "untouched";');
+        const otherState = await service.openDocument(otherSource);
+        const otherMirror = otherState.jsDocument;
+        const otherText = otherMirror.getText();
+        expect(otherMirror.uri.toString()).toBe(closedMirror.uri.toString());
+
+        original.setText('Boolean firstReady = true;');
+        await service.updateDocument(original);
+        expect(originalState.jsDocument).not.toBe(closedMirror);
+        expect(originalState.jsDocument.uri.toString()).not.toBe(otherMirror.uri.toString());
+        expect(originalState.jsDocument.getText()).toContain('let firstReady = true;');
+        expect(otherState.jsDocument).toBe(otherMirror);
+        expect(otherMirror.getText()).toBe(otherText);
+        expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
+        expect(errors).toEqual([]);
+    });
+
+    test('records normalized applied text without repeatedly replacing an unchanged CRLF mirror', async () =>
+    {
+        const { service } = createService();
+        const document = makeTextDocument(LGD_URI, 'Number value = 1;\r\nString label = "ready";\r\n');
+        const state = await service.openDocument(document);
+        const mirror = state.jsDocument;
+        await service.syncMirror(state, 'let value = 2;\nlet label = "updated";\n');
+        await service.syncMirror(state, 'let value = 3;\nlet label = "still ready";\n');
+        expect(state.jsDocument).toBe(mirror);
+        expect(state.jsDocument.getText()).toBe('let value = 3;\r\nlet label = "still ready";\r\n');
+        expect(vscode.workspace.openTextDocument).toHaveBeenCalledTimes(1);
+        expect(vscode.workspace.applyEdit).toHaveBeenCalledTimes(2);
+    });
+
+    test.each([ 'closed', 'saved', 'edited', 'plaintext', 'duplicated' ])('replaces the %s preview without modifying its content', async lifecycle =>
+    {
+        const { service, errors } = createService();
+        const document = makeTextDocument(LGD_URI, 'Number value = 1;');
+        const state = await service.openDocument(document);
+        if(lifecycle === 'saved')
+        {
+            state.jsDocument = makeTextDocument('file:///workspace/Preview.js', state.jsDocument.getText());
+        }
+
+        const preview = state.jsDocument;
+        if(lifecycle === 'closed')
+        {
+            preview.isClosed = true;
+        }
+        else if(lifecycle === 'plaintext')
+        {
+            preview.languageId = 'plaintext';
+        }
+        else if(lifecycle === 'duplicated')
+        {
+            preview.setText(preview.getText() + preview.getText());
+        }
+        else if(lifecycle === 'edited')
+        {
+            preview.setText(`${preview.getText()}// unsaved user note\n`);
+        }
+
+        const previewText = preview.getText();
+        document.setText('String label = "ready";');
+        await service.updateDocument(document);
+        expect(state.jsDocument).not.toBe(preview);
+        expect(state.jsDocument.languageId).toBe('javascript');
+        expect(state.jsDocument.getText()).toContain('let label = "ready";');
+        expect(preview.getText()).toBe(previewText);
+        expect(vscode.workspace.applyEdit).not.toHaveBeenCalled();
+        expect(errors).toEqual([]);
+
+        service.closeDocument(document);
+        const reopened = makeTextDocument(LGD_URI, 'Boolean ready = true;');
+        const current = await service.openDocument(reopened);
+        expect(current).not.toBe(state);
+        expect(current.jsDocument.getText()).toContain('let ready = true;');
+        expect(preview.getText()).toBe(previewText);
+    });
+
+    test.each([ 'closed', 'edited' ])('a preview %s during a rejected edit gets a fresh mirror', async lifecycle =>
+    {
+        const { service, errors, setCalls } = createService();
+        const document = makeTextDocument(LGD_URI, 'Number value = 1;');
+        const state = await service.openDocument(document);
+        const preview = state.jsDocument;
+        const previewText = preview.getText();
+        vscode.workspace.applyEdit.mockImplementationOnce(() =>
+        {
+            if(lifecycle === 'closed')
+            {
+                preview.isClosed = true;
+            }
+            else
+            {
+                preview.setText(`${preview.getText()}// unsaved user note\n`);
+            }
+
+            return Promise.resolve(false);
+        });
+
+        const expectedPreview = lifecycle === 'closed' ? previewText : `${previewText}// unsaved user note\n`;
+        document.setText('String label = "ready";');
+        await service.updateDocument(document);
+        expect(state.jsDocument).not.toBe(preview);
+        expect(state.jsDocument.getText()).toContain('let label = "ready";');
+        expect(preview.getText()).toBe(expectedPreview);
+        expect(errors).toEqual([]);
+        expect(setCalls.at(-1).diagnostics).toEqual([]);
     });
 
     test('a rejected mirror edit does not install mappings for unapplied code', async () =>

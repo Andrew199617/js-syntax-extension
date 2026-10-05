@@ -130,7 +130,7 @@ describe('LGD source visibility hovers and highlighting', () =>
             expect(state.errors).toEqual([]);
             const provider = LgdHoverProvider.create(service);
             const cases = [
-                [ 'create(1)', 'public static Root Root.create(Number seed)' ],
+                [ 'create(1)', 'Alias.create(Number seed)' ],
                 [ 'read(1)', 'public Number Root.read(Number amount)' ],
                 [ 'score;', 'Number Root.score { public get; private set; }' ],
                 [ 'shared;', 'public Number Root.shared { get; set; }' ]

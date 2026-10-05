@@ -2,7 +2,7 @@ const traverse = require('@babel/traverse').default;
 const LgdReturnChecker = require('./LgdReturnChecker');
 const LgdTypeChecker = require('./LgdTypeChecker');
 const { NULL } = require('./LgdInfer');
-const { isNullableType } = require('./LgdTypeMaps');
+const { isNullableType, elementTypeName } = require('./LgdTypeMaps');
 const { skipTrivia } = require('./LgdMethodSignature');
 
 /** @description Checks all writes against the annotation on their actual JavaScript lexical binding. */
@@ -80,7 +80,11 @@ const LgdAssignmentChecker = {
 
         if(target.isMemberExpression() || target.isOptionalMemberExpression())
         {
-            this.checkMemberTarget(target, value, context, options);
+            if(!this.checkArrayTarget(target, value, context, options))
+            {
+                this.checkMemberTarget(target, value, context, options);
+            }
+
             return;
         }
 
@@ -129,9 +133,10 @@ const LgdAssignmentChecker = {
         for(const type of new Set(types))
         {
             // Preserve legacy undefined assignments while keeping explicit Type? contracts precise.
-            const legacyUndefined = type === 'undefined' && !isNullableType(descriptor.typeName);
-            const inferred = type === 'null' || legacyUndefined ? NULL : type;
-            if(!LgdTypeChecker.isAssignableTo(descriptor, inferred, scope, context.externalsByName))
+            const legacyUndefined = type === 'undefined' && ![ 'array', 'ambient' ].includes(descriptor.kind) && !isNullableType(descriptor.typeName);
+            const legacyNull = type === 'null' && ![ 'array', 'ambient' ].includes(descriptor.kind);
+            const inferred = legacyNull || legacyUndefined ? NULL : type;
+            if(!LgdTypeChecker.isAssignableTo({ ...descriptor, freshArray: typeof value !== 'string' && value.isArrayExpression() }, inferred, scope, context.externalsByName))
             {
                 const keyword = descriptor.kind === 'keyword' && scope.get(type)?.kind === 'keyword';
                 const display = keyword ? scope.get(type).keyword : type;
@@ -147,6 +152,48 @@ const LgdAssignmentChecker = {
                 this.recordRejectedWrite(binding, value, type, context);
             }
         }
+    },
+
+    /** @description Checks numeric indexed writes against the container's immediate element contract. */
+    checkArrayTarget(target, value, context, options)
+    {
+        if(!target.node.computed || options.removing)
+        {
+            return false;
+        }
+
+        const signature = { declaration: {}, group: { params: [], async: false, assignment: true, arrayElements: true } };
+        const indexTypes = LgdReturnChecker.expressionTypes(target.get('property'), signature, context);
+        if(!indexTypes.every(type => type === 'Number'))
+        {
+            return false;
+        }
+
+        const containers = LgdReturnChecker.expressionTypes(target.get('object'), signature, context);
+        const elements = containers.map(type => elementTypeName(type));
+        if(elements.includes(null))
+        {
+            return false;
+        }
+
+        for(const expected of new Set(elements))
+        {
+            const contract = { ...signature, group: { ...signature.group, returnTypeName: expected } };
+            const types = typeof value === 'string' ? [value] : LgdReturnChecker.expressionTypes(value, contract, context);
+            for(const actual of new Set(types))
+            {
+                const typeOffset = context.map.toSource(target.get('object').node.start);
+                const freshArray = typeof value !== 'string' && value.isArrayExpression();
+                if(!context.members.compatible(expected, actual, target, { typeOffset: typeOffset, nullable: false, freshArray: freshArray }))
+                {
+                    const report = typeof value === 'string' ? target.node : value.node;
+                    options.errors.push({ offset: context.map.toSource(report.start), endOffset: context.map.toSource(report.end),
+                        code: 'lgd.assignment.typeMismatch', message: `Cannot assign ${actual} to ${expected} array element.` });
+                }
+            }
+        }
+
+        return true;
     },
 
     /** @description Validates typed member writes through their resolved instance or static owner. */
@@ -187,6 +234,7 @@ const LgdAssignmentChecker = {
         for(const type of new Set(types))
         {
             const compatibility = context.members.memberTypeOptions(resolved, value);
+            compatibility.freshArray = typeof value !== 'string' && value.isArrayExpression();
             if(!context.members.compatible(expected, type, target, compatibility))
             {
                 options.errors.push({ offset: context.map.toSource(reportNode.start), endOffset: context.map.toSource(reportNode.end),

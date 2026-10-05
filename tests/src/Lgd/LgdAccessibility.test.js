@@ -260,13 +260,23 @@ test('Rejects overriding an internal abstract accessor from another project.', a
 
 test('Uses canonical declaring ownership when a protected base is imported through a symlink.', async () =>
 {
-    const basePath = await write('Base.lgd', [
+    const basePath = await write('original/Base.lgd', [
         'class Base { protected Number read() { return 1; } }',
         'module.exports = Base;'
     ]);
-    await fs.symlink(basePath, path.join(directory, 'Alias.lgd'));
+    let importPath = './Alias.js';
+    if(process.platform === 'win32')
+    {
+        await fs.symlink(path.dirname(basePath), path.join(directory, 'alias'), 'junction');
+        importPath = './alias/Base.js';
+    }
+    else
+    {
+        await fs.symlink(basePath, path.join(directory, 'Alias.lgd'));
+    }
+
     const state = await open('Use.lgd', [
-        'const Base = require("./Alias.js");',
+        `const Base = require("${importPath}");`,
         'class Child : Base { Number value() { return this.read(); } }'
     ]);
     expect(state.errors).toEqual([]);

@@ -1,4 +1,5 @@
-const { baseTypeName, isNullableType } = require('./LgdTypeMaps');
+const LgdAmbientTypes = require('./LgdAmbientTypes');
+const { rootTypeName, sameTypeShape, canonicalTypeName } = require('./LgdTypeMaps');
 const LgdCastSyntax = require('./LgdCastSyntax');
 const { maskCode } = require('./LgdInfer');
 const { visibleBindings } = require('./LgdBaseChecker');
@@ -201,7 +202,7 @@ function ownContractsKnown(declaration, context)
         }
 
         const annotations = [ member.returnTypeName, member.propertyTypeName, ...member.params.map(parameter => parameter.typeName) ];
-        if(annotations.some(typeName => typeName && !builtinTypes.has(baseTypeName(typeName)) && !visible.has(baseTypeName(typeName).split('.')[0])))
+        if(annotations.some(typeName => typeName && !builtinTypes.has(rootTypeName(typeName)) && !visible.has(rootTypeName(typeName).split('.')[0])))
         {
             return false;
         }
@@ -327,7 +328,7 @@ function typeIdentity(typeName, signature, declaration, context)
         return null;
     }
 
-    typeName = baseTypeName(typeName);
+    typeName = rootTypeName(typeName);
     if(builtinTypes.has(typeName))
     {
         return typeName;
@@ -347,12 +348,12 @@ function typeIdentity(typeName, signature, declaration, context)
 function differentTypes(expected, actual, evidence)
 {
     const { contract, implementation, declaration, context } = evidence;
-    if(!expected || !actual || expected === actual)
+    if(!expected || !actual || canonicalTypeName(expected) === canonicalTypeName(actual))
     {
         return false;
     }
 
-    if(isNullableType(expected) !== isNullableType(actual))
+    if(!sameTypeShape(expected, actual))
     {
         return true;
     }
@@ -409,7 +410,7 @@ function bodySignatures(content, declarations, externals = new Map())
             {
                 const typeName = parameter.typeName || implemented.params[index]?.typeName || required.params[index]?.typeName || null;
                 const inheritedType = parameter.typeStart === -1 && typeName;
-                const opaqueType = Boolean(inheritedType && !builtinTypes.has(baseTypeName(typeName)) && !typeIdentity(typeName, required, declaration, context));
+                const opaqueType = Boolean(inheritedType && !builtinTypes.has(rootTypeName(typeName)) && !typeIdentity(typeName, required, declaration, context));
                 return { ...parameter, typeName: typeName, opaqueType: opaqueType };
             });
 
@@ -429,7 +430,7 @@ function bodySignatures(content, declarations, externals = new Map())
                 generator: member.generator,
                 accessor: member.accessor,
                 inherited: true,
-                opaqueReturn: !builtinTypes.has(baseTypeName(returnTypeName)) && !typeIdentity(returnTypeName, required, declaration, context),
+                opaqueReturn: !builtinTypes.has(rootTypeName(returnTypeName)) && !typeIdentity(returnTypeName, required, declaration, context),
                 reportStart: member.nameStart,
                 reportEnd: member.nameEnd
             };
@@ -694,7 +695,10 @@ function checkContractTypes(declaration, context, errors)
             start: declaration.initializerStart + member.propertyTypeStart, end: declaration.initializerStart + member.propertyTypeEnd });
         for(const annotation of annotations)
         {
-            if(annotation.name && !builtinTypes.has(baseTypeName(annotation.name)) && !visible.has(baseTypeName(annotation.name).split('.')[0]))
+            const ambient = context.externals.ambient || LgdAmbientTypes.forSource(context.externals.sourceContext?.sourcePath);
+            const builtin = annotation.name && builtinTypes.has(rootTypeName(annotation.name));
+            const known = annotation.name && (visible.has(rootTypeName(annotation.name).split('.')[0]) || ambient.resolve(rootTypeName(annotation.name)));
+            if(annotation.name && !builtin && !known)
             {
                 addError(errors, annotation, `Unknown contract type '${annotation.name}'.`, 'unknownType');
             }

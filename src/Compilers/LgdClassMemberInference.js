@@ -1,13 +1,20 @@
 const traverse = require('@babel/traverse').default;
 const LgdCastSyntax = require('./LgdCastSyntax');
+const LgdModuleBindings = require('./LgdModuleBindings');
 const { UNKNOWN, maskCode } = require('./LgdInfer');
-const { tsTypeMap, baseTypeName, isNullableType } = require('./LgdTypeMaps');
+const { tsTypeMap, baseTypeName, isNullableType, elementTypeName, canonicalTypeName, arrayCompatibility } = require('./LgdTypeMaps');
 
 /** @description Infers member values conservatively from shared class identities and mapped lexical effects. */
 const LgdClassMemberInference = {
     /** @description Resolves type objects and instances through actual bindings, factories, constructors, and typed fields. */
     receiver(path, visited = new Set())
     {
+        const indexed = this.arrayElementReceiver(path, visited);
+        if(indexed)
+        {
+            return indexed;
+        }
+
         const castReceiver = this.castReceiver(path);
         if(castReceiver)
         {
@@ -43,8 +50,13 @@ const LgdClassMemberInference = {
             if(callee.isIdentifier({ name: 'require' }) && !path.scope.getBinding('require'))
             {
                 const specifier = path.node.arguments[0];
-                const external = specifier?.type === 'StringLiteral' && this._context.externals.get(specifier.value);
-                return external?.kind === 'class' ? { declaration: external, kind: 'type' } : null;
+                const external = specifier?.type === 'StringLiteral' && LgdModuleBindings.required(this._context.externals, specifier.value);
+                if(external?.kind === 'class')
+                {
+                    return { declaration: external, kind: 'type' };
+                }
+
+                return external?.kind === 'moduleNamespace' ? { declaration: external, kind: 'namespace' } : null;
             }
 
             if(callee.isMemberExpression() || callee.isOptionalMemberExpression())
@@ -55,19 +67,124 @@ const LgdClassMemberInference = {
                     return { ...resolved.receiver, kind: 'instance' };
                 }
 
-                const type = resolved?.valid && !this._methodChanged(resolved) && this.memberType(resolved);
+                const array = elementTypeName(resolved?.member.returnTypeName) !== null;
+                const type = !array && resolved?.valid && !this._methodChanged(resolved) && this.memberType(resolved);
                 return type ? { declaration: type, kind: 'instance' } : null;
             }
         }
 
         if(path.isMemberExpression() || path.isOptionalMemberExpression())
         {
+            const object = path.get('object');
+            const requiredNamespace = object.isCallExpression() && object.get('callee').isIdentifier({ name: 'require' });
+            const canBeNamespace = object.isIdentifier() || requiredNamespace;
+            const namespace = canBeNamespace ? this.receiver(object, visited) : null;
+            const property = path.node.property;
+            let name = property.name;
+            if(path.node.computed)
+            {
+                const literal = property.type === 'StringLiteral' || property.type === 'NumericLiteral';
+                name = literal ? String(property.value) : null;
+            }
+
+            const exported = namespace?.kind === 'namespace' && namespace.declaration.moduleExports.get(name);
+            if(exported?.kind === 'class')
+            {
+                return { declaration: exported, kind: 'type', reference: `${namespace.reference}.${name}` };
+            }
+
             const resolved = this.resolve(path, visited);
-            const type = resolved?.valid && this.memberType(resolved);
+            const array = elementTypeName(resolved?.member.propertyTypeName || resolved?.member.typeName) !== null;
+            const type = !array && resolved?.valid && this.memberType(resolved);
             return type ? { declaration: type, kind: 'instance' } : null;
         }
 
         return null;
+    },
+
+    /** @description Recognizes numeric indexes without calling the expression inference graph recursively. */
+    arrayIndex(path)
+    {
+        if(!path.node.computed)
+        {
+            return false;
+        }
+
+        const property = path.get('property');
+        if(property.isNumericLiteral())
+        {
+            return true;
+        }
+
+        const binding = property.isIdentifier() && property.scope.getBinding(property.node.name);
+        const type = binding && this._context.bindings?.type(binding);
+        return canonicalTypeName(type) === 'Number';
+    },
+
+    /** @description Preserves container annotations and defining-source identity through nested indexed accesses. */
+    arrayInfo(path, visited)
+    {
+        if(path.isIdentifier())
+        {
+            const binding = path.scope.getBinding(path.node.name);
+            if(!binding || visited.has(binding))
+            {
+                return null;
+            }
+
+            const offset = this._context.map.toSource(binding.identifier.start);
+            const declaration = this._context.declarations.find(candidate => candidate.nameStart === offset);
+            const parameter = this._parameterType(binding, offset);
+            const typeName = declaration?.typeName || parameter?.typeName || this._context.bindings?.type(binding);
+            return { typeName: typeName, offset: parameter?.offset ?? declaration?.typeStart ?? this._offset(path) };
+        }
+
+        if(path.isMemberExpression() || path.isOptionalMemberExpression())
+        {
+            if(this.arrayIndex(path))
+            {
+                const container = this.arrayInfo(path.get('object'), visited);
+                const element = elementTypeName(container?.typeName);
+                return element ? { ...container, typeName: element } : null;
+            }
+
+            const member = this.resolve(path, visited);
+            if(member?.valid)
+            {
+                return { typeName: member.member.propertyTypeName || member.member.typeName,
+                    offset: this._memberTypeOffsets.get(member.member) ?? this._offset(path), identity: this.memberType(member) };
+            }
+        }
+
+        if(path.isCallExpression() || path.isOptionalCallExpression())
+        {
+            const callee = path.get('callee');
+            if(callee.isMemberExpression() || callee.isOptionalMemberExpression())
+            {
+                const member = this.resolve(callee, visited);
+                if(member?.valid && !this._methodChanged(member))
+                {
+                    return { typeName: member.member.returnTypeName,
+                        offset: this._memberTypeOffsets.get(member.member) ?? this._offset(path), identity: this.memberType(member) };
+                }
+            }
+        }
+
+        return null;
+    },
+
+    /** @description Resolves a nominal class array element without treating the container as a class instance. */
+    arrayElementReceiver(path, visited)
+    {
+        if(!path.isMemberExpression() && !path.isOptionalMemberExpression() || !this.arrayIndex(path))
+        {
+            return null;
+        }
+
+        const container = this.arrayInfo(path.get('object'), visited);
+        const element = elementTypeName(container?.typeName);
+        const type = element && elementTypeName(element) === null && (container.identity || this._type(element, container.offset));
+        return type ? { declaration: type, kind: 'instance' } : null;
     },
 
     /** @description Retains the asserted class identity for member access without constructing a new instance. */
@@ -376,6 +493,7 @@ const LgdClassMemberInference = {
     compatible(expected, inferred, path, options = {})
     {
         const { nullable = true, typeOffset = null, expectedIdentity = null, inferredIdentity = null, unresolvedIdentity = false } = options;
+        const freshArray = options.freshArray ?? path?.isArrayExpression?.() ?? false;
         if(inferred === UNKNOWN)
         {
             return true;
@@ -396,6 +514,16 @@ const LgdClassMemberInference = {
         if(expected === 'Object' || expected === inferred)
         {
             return true;
+        }
+
+        inferred = canonicalTypeName(inferred);
+        const compareElement = (expectedElement, actualElement) => this.compatible(expectedElement, actualElement, path, { ...options, nullable: false, freshArray: freshArray });
+
+        const array = arrayCompatibility(expected, inferred, compareElement, freshArray);
+
+        if(array !== null)
+        {
+            return array;
         }
 
         if(expected === 'void')

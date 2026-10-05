@@ -113,6 +113,36 @@ describe('LGD immutable variable declarations', () =>
         expect(result.code).toContain('export const value = 1;');
     });
 
+    test.each([
+        [ 'oloo', 'Calculator.create()' ],
+        [ 'class', 'Calculator.create()' ],
+        [ 'class', 'new Calculator()' ]
+    ])('compiles the readonly calculation to executable const with %s output and %s allocation', (mode, allocation) =>
+    {
+        const source = [
+            'class Calculator {',
+            '    Number calculate() {',
+            '        readonly Number amount = 2;',
+            '        const Number factor = 3;',
+            '        return amount * factor;',
+            '    }',
+            '}',
+            `const Calculator calculator = ${allocation};`,
+            'const Number result = calculator.calculate();',
+            'globalThis.calculation = result;'
+        ].join('\r\n');
+        const result = compile(source, mode);
+        expect(result.errors).toEqual([expect.objectContaining({ code: 'lgd.declaration.readonly', severity: 'warning' })]);
+        expect(result.code).toContain('const amount = 2;');
+        const context = {};
+        nodeVm.runInNewContext(result.code, context);
+        const expectedCalculation = 6;
+        expect(context.calculation).toBe(expectedCalculation);
+        const migrated = compile(source.replace('readonly Number amount', 'const Number amount'), mode);
+        expect(migrated.errors).toEqual([]);
+        expect(migrated.code).toBe(result.code);
+    });
+
     test('never migrates readonly member syntax and preserves getter-only contracts', () =>
     {
         const source = 'class Sample {\n    readonly Number value = 1;\n}';

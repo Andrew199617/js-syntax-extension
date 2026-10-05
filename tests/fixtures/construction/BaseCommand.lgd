@@ -1,0 +1,10 @@
+class BaseCommand {
+    BaseCommand(String commandName, String title) {
+        this.command = { title, command: commandName };
+    }
+    BaseCommand() {}
+    get String commandName() { return this.command.command; }
+}
+const BaseCommand full = new BaseCommand("lgd.run", "Run");
+const BaseCommand empty = new BaseCommand();
+module.exports = BaseCommand;

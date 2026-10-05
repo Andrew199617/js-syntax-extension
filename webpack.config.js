@@ -48,6 +48,18 @@ const extensionOutput = {
         await fs.copyFile(source, destination);
     },
 
+    /** @description Ships the checker runtime and standard declarations without bundling unused server/CLI runtimes. */
+    async copyTypescriptRuntime(source, output)
+    {
+        for(const filename of await fs.readdir(path.join(source, 'lib')))
+        {
+            if(filename === 'typescript.js' || filename.startsWith('lib.') && filename.endsWith('.d.ts'))
+            {
+                await this.copyAsset(path.join(source, 'lib', filename), path.join(output, 'node_modules/typescript/lib', filename));
+            }
+        }
+    },
+
     /** @description Adds the TypeScript server plugin, package manifest, and extension assets to the build output. */
     async prepareExtensionOutput(compilation)
     {
@@ -64,12 +76,17 @@ const extensionOutput = {
         await fs.mkdir(target, { recursive: true });
         await fs.copyFile(source, path.join(target, 'index.js'));
         await this.writeManifest(path.join(target, 'package.json'), pluginManifest);
+        const typescriptSource = path.dirname(require.resolve('typescript/package.json'));
+        await this.copyTypescriptRuntime(typescriptSource, output);
+        await this.copyAsset(path.join(typescriptSource, 'package.json'), path.join(output, 'node_modules/typescript/package.json'));
+        await this.copyAsset(path.join(typescriptSource, 'LICENSE.txt'), path.join(output, 'node_modules/typescript/LICENSE.txt'));
+        await this.copyAsset(path.join(typescriptSource, 'ThirdPartyNoticeText.txt'), path.join(output, 'node_modules/typescript/ThirdPartyNoticeText.txt'));
 
         // Application dependencies are bundled in extension.js; tsserver loads its own module.
         const outputManifest = {
             ...extensionManifest,
             main: `./${path.basename(extensionManifest.main)}`,
-            dependencies: { [pluginName]: extensionManifest.version }
+            dependencies: { [pluginName]: extensionManifest.version, typescript: extensionManifest.dependencies.typescript }
         };
         delete outputManifest.scripts;
         delete outputManifest.devDependencies;
@@ -120,7 +137,8 @@ const config = {
     devtool: 'source-map',
     plugins: [extensionOutput],
     externals: {
-        vscode: 'commonjs vscode'
+        vscode: 'commonjs vscode',
+        typescript: 'commonjs typescript'
     },
     resolve: {
         mainFields: [ 'browser', 'module', 'main' ],

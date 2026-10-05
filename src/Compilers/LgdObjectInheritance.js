@@ -8,15 +8,26 @@ const LgdObjectInheritance = {
         const tags = [];
         for(const line of LgdDocComment.lines(declaration.jsdoc || '/** */'))
         {
-            const match = (/^@(?<tag>extends|augments)\b(?:[\t ]*{(?<baseTypeName>[^\n\r}]*)})?/).exec(line.text);
+            const match = (/^@(?<tag>extends|augments)\b(?:[\t ]*\{(?<bracedType>[^\n\r}]*)\}|[\t ]+(?<bareType>[$\p{ID_Continue}.]+))?/u).exec(line.text);
             if(match)
             {
-                tags.push({ name: match.groups.tag, baseTypeName: match.groups.baseTypeName?.trim() || null,
+                tags.push({ name: match.groups.tag, baseTypeName: (match.groups.bracedType || match.groups.bareType)?.trim() || null,
                     offset: line.offset, endOffset: line.offset + match[0].length });
             }
         }
 
         return tags;
+    },
+
+    /** @description Removes documentation only when its type exactly repeats an explicit LGD class base. */
+    redundantTags(declaration)
+    {
+        if(declaration.kind !== 'class' || !declaration.baseName)
+        {
+            return [];
+        }
+
+        return this.tags(declaration).filter(tag => tag.baseTypeName === declaration.baseName);
     },
 
     /** @description Links reserved constructor spellings to conservative class migration strategies. */
@@ -50,6 +61,15 @@ const LgdObjectInheritance = {
             for(const tag of this.tags(declaration))
             {
                 const { baseTypeName, offset, endOffset } = tag;
+                if(this.redundantTags(declaration).some(candidate => candidate.offset === offset))
+                {
+                    errors.push({ offset: declaration.start + offset, endOffset: declaration.start + endOffset,
+                        code: 'lgd.class.inheritanceDoc', category: 'warning', severity: 'warning',
+                        message: `Base class is already declared; remove the redundant @${tag.name} JSDoc tag.`,
+                        quickFix: { kind: 'removeInheritanceDoc', declarationStart: declaration.start, name: declaration.name, baseTypeName: baseTypeName } });
+                    continue;
+                }
+
                 errors.push({
                     offset: declaration.start + offset,
                     endOffset: declaration.start + endOffset,

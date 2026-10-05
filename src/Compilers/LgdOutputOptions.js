@@ -18,6 +18,18 @@ const LgdOutputOptions = {
     },
 
 
+    /** @description Records only an implemented, valid JavaScript class construction model. */
+    constructionKind(options = {})
+    {
+        const resolved = this.resolve(options);
+        if(resolved.errors.length > 0)
+        {
+            return null;
+        }
+
+        return resolved.options.javascriptObjectModel === 'class' ? 'native' : 'factory';
+    },
+
     /** @description Validates output options, retaining safe defaults for invalid settings. */
     resolve(options = {})
     {

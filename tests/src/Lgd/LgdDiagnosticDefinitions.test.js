@@ -3,6 +3,7 @@ const LgdDiagnosticDefinitions = require('../../../src/Lgd/LgdDiagnosticDefiniti
 describe('LGD diagnostic definitions', () =>
 {
     test.each([
+        [ 'lgd.declaration.readonly', 'warning' ],
         [ 'lgd.output.syntax', 'syntax' ],
         [ 'lgd.output.nativeSyntax', 'syntax' ],
         [ 'lgd.assignment.typeMismatch', 'type' ],

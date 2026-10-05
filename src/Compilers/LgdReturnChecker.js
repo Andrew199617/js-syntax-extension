@@ -1,11 +1,12 @@
+const LgdAmbientTypes = require('./LgdAmbientTypes');
 const parser = require('@babel/parser');
 const LgdCastSyntax = require('./LgdCastSyntax');
 const LgdEnumSyntax = require('./LgdEnumSyntax');
 const traverse = require('@babel/traverse').default;
 const LgdSourceMap = require('./LgdSourceMap');
 const LgdReturnFlow = require('./LgdReturnFlow');
-const { inferExpression, maskCode, UNKNOWN } = require('./LgdInfer');
-const { tsTypeMap, baseTypeName, isNullableType } = require('./LgdTypeMaps');
+const { inferExpression, UNKNOWN } = require('./LgdInfer');
+const { tsTypeMap, baseTypeName, isNullableType, rootTypeName, elementTypeName, canonicalTypeName, arrayCompatibility } = require('./LgdTypeMaps');
 const LgdBindingFlow = require('./LgdBindingFlow');
 const LgdBindingTypes = require('./LgdBindingTypes');
 const LgdClassMemberSemantics = require('./LgdClassMemberSemantics');
@@ -39,6 +40,7 @@ const LgdReturnChecker = {
             tree: tree,
             flow: LgdBindingFlow.create(tree),
             externalsByName: new Map(),
+            ambient: externals.ambient || LgdAmbientTypes.forSource(externals.sourceContext?.sourcePath),
             externals: externals
         };
         for(const info of externals.values())
@@ -91,14 +93,15 @@ const LgdReturnChecker = {
         }
 
         const declared = group.returnTypeName;
-        const baseType = baseTypeName(declared);
+        const baseType = rootTypeName(declared);
         const root = baseType.split('.')[0];
         const binding = path.parentPath.scope.getBinding(root);
         const builtin = Object.hasOwn(tsTypeMap, baseType) || declared === 'void';
         const nominal = !declared.includes('.') && binding && context.bindings.descriptor(binding);
         const external = declared.includes('.') && binding;
         const erased = !builtin && !nominal && context.bindings.erasedType(baseType, typeStart);
-        const knownType = builtin || nominal || external || erased || group.opaqueReturn;
+        const ambient = !binding && context.ambient.resolve(rootTypeName(declared));
+        const knownType = builtin || nominal || external || erased || ambient || group.opaqueReturn;
         if(!knownType)
         {
             report(`Unknown return type '${declared}'.`);
@@ -122,9 +125,9 @@ const LgdReturnChecker = {
                 for(const type of new Set(types))
                 {
                     const nonnullable = type !== 'null' && type !== 'undefined';
-                    const returnContract = { nullable: false, typeOffset: typeStart };
+                    const returnContract = { nullable: false, typeOffset: typeStart, freshArray: argument.isArrayExpression() };
                     const inheritedCompatible = nonnullable && context.members.compatible(declared, type, argument, returnContract);
-                    if(!this.compatible(declared, type, group.opaqueReturn) && !inheritedCompatible)
+                    if(!this.compatible(declared, type, group.opaqueReturn, argument.isArrayExpression()) && !inheritedCompatible)
                     {
                         const node = argument.node || returned.node;
                         const error = {
@@ -221,7 +224,7 @@ const LgdReturnChecker = {
     },
 
     /** @description Checks known returned values without inventing types for unknown calls or members. */
-    compatible(declared, inferred, opaque = false)
+    compatible(declared, inferred, opaque = false, freshArray = false)
     {
         if(inferred === UNKNOWN)
         {
@@ -249,6 +252,13 @@ const LgdReturnChecker = {
             return true;
         }
 
+        inferred = canonicalTypeName(inferred);
+        const array = arrayCompatibility(declared, inferred, (expected, actual) => this.compatible(expected, actual, opaque, freshArray), freshArray);
+        if(array !== null)
+        {
+            return array;
+        }
+
         if(opaque)
         {
             const reference = [ 'Object', 'Array', 'Function' ].includes(inferred);
@@ -265,16 +275,33 @@ const LgdReturnChecker = {
     },
 
     /** @description Infers each possible expression result while retaining null and undefined distinctions. */
-    expressionTypes(path, signature, context, visited = new Set())
+    expressionTypes(path, signature, context, inference = null)
     {
-        if(visited.has(path.node))
+        inference ||= { active: new Set(), cache: new Map(), awaitedCache: new Map(), cycles: 0, scope: path.scope };
+        if(inference.active.has(path.node))
         {
+            inference.cycles++;
             return [UNKNOWN];
         }
 
-        const next = new Set(visited);
-        next.add(path.node);
-        const types = this._expressionTypes(path, signature, context, next);
+        const cache = signature.group.async ? inference.awaitedCache : inference.cache;
+        if(cache.has(path.node))
+        {
+            return cache.get(path.node);
+        }
+
+        const cycles = inference.cycles;
+        inference.active.add(path.node);
+        let types;
+        try
+        {
+            types = this._expressionTypes(path, signature, context, inference);
+        }
+        finally
+        {
+            inference.active.delete(path.node);
+        }
+
         const expanded = types.flatMap(type =>
         {
             if(isNullableType(type))
@@ -286,11 +313,21 @@ const LgdReturnChecker = {
         });
 
         const binding = path.isIdentifier() && path.scope.getBinding(path.node.name);
-        return binding ? context.flow.narrowTypes(path, binding, expanded) : expanded;
+        const narrowed = binding ? context.flow.narrowTypes(path, binding, expanded) : expanded;
+        const unique = [...new Set(narrowed)];
+
+        // Results that depend on an active cycle are branch-local, so never cache them.
+        // Other shared subgraphs can be reused within this request and async mode.
+        if(inference.cycles === cycles)
+        {
+            cache.set(path.node, unique);
+        }
+
+        return unique;
     },
 
     /** @description Infers one expression with branch-local cycle protection for binding origins. */
-    _expressionTypes(path, signature, context, visited)
+    _expressionTypes(path, signature, context, inference)
     {
         const cast = LgdCastSyntax.forPath(path, context);
         if(cast)
@@ -316,8 +353,53 @@ const LgdReturnChecker = {
             return [memberType];
         }
 
+        if(path.isArrayExpression())
+        {
+            if(elementTypeName(signature.group.returnTypeName) === null && !signature.group.arrayElements)
+            {
+                return ['Array'];
+            }
+
+            const elements = path.get('elements');
+            const types = elements.flatMap(element =>
+            {
+                if(!element.node)
+                {
+                    return ['undefined'];
+                }
+
+                if(element.isSpreadElement())
+                {
+                    return this.expressionTypes(element.get('argument'), signature, context, inference).map(type => elementTypeName(type) || UNKNOWN);
+                }
+
+                return this.expressionTypes(element, signature, context, inference);
+            });
+
+            return [...new Set(types.length === 0 ? [UNKNOWN] : types)].map(type => `${type}[]`);
+        }
+
+        if(path.isMemberExpression() || path.isOptionalMemberExpression())
+        {
+            const receiver = path.get('object');
+            const indexed = { ...signature, group: { ...signature.group, arrayElements: true } };
+            const receiverTypes = this.expressionTypes(receiver, indexed, context, inference);
+            const propertyTypes = path.node.computed && this.expressionTypes(path.get('property'), signature, context, inference);
+            const numericIndex = path.node.computed && propertyTypes.every(type => type === 'Number');
+            const length = !path.node.computed && path.node.property.name === 'length';
+            if(length && receiverTypes.every(type => elementTypeName(type) !== null || type === 'Array'))
+            {
+                return ['Number'];
+            }
+
+            if(numericIndex)
+            {
+                return receiverTypes.map(type => elementTypeName(type) || UNKNOWN);
+            }
+        }
+
         const literals = { NumericLiteral: 'Number', StringLiteral: 'String', BooleanLiteral: 'Boolean',
-            BigIntLiteral: 'BigInt', TemplateLiteral: 'String', ObjectExpression: 'Object', ArrayExpression: 'Array',
+            BigIntLiteral: 'BigInt', TemplateLiteral: 'String', ObjectExpression: 'Object',
             FunctionExpression: 'Function', ArrowFunctionExpression: 'Function' };
         if(literals[node.type])
         {
@@ -345,7 +427,10 @@ const LgdReturnChecker = {
 
         if(node.type === 'RegExpLiteral')
         {
-            return ['Object'];
+            const consumerScope = inference.scope || path.scope;
+            const shadowed = path.scope.getBinding('RegExp') || consumerScope.getBinding('RegExp');
+            const known = !shadowed && context.ambient.resolve('RegExp');
+            return [known ? 'RegExp' : 'Object'];
         }
 
         if(node.type === 'ThisExpression')
@@ -356,7 +441,7 @@ const LgdReturnChecker = {
 
         if(node.type === 'UpdateExpression')
         {
-            const types = this.expressionTypes(path.get('argument'), signature, context, visited);
+            const types = this.expressionTypes(path.get('argument'), signature, context, inference);
             const scope = context.bindings.scope(path);
             return types.map(inferred =>
             {
@@ -374,20 +459,20 @@ const LgdReturnChecker = {
         {
             if(node.operator === '=')
             {
-                return this.expressionTypes(path.get('right'), signature, context, visited);
+                return this.expressionTypes(path.get('right'), signature, context, inference);
             }
 
-            return this.operatorTypes(path, signature, context, visited);
+            return this.operatorTypes(path, signature, context, inference);
         }
 
         if(node.type === 'BinaryExpression' || node.type === 'LogicalExpression')
         {
-            return this.operatorTypes(path, signature, context, visited);
+            return this.operatorTypes(path, signature, context, inference);
         }
 
-        if(node.type === 'UnaryExpression' && node.operator === 'void')
+        if(node.type === 'UnaryExpression')
         {
-            return ['undefined'];
+            return this.unaryTypes(path, signature, context, inference);
         }
 
         if(node.type === 'ConditionalExpression')
@@ -395,23 +480,23 @@ const LgdReturnChecker = {
             const truth = context.flow.truth(path.get('test'));
             if(truth !== null)
             {
-                return this.expressionTypes(path.get(truth ? 'consequent' : 'alternate'), signature, context, visited);
+                return this.expressionTypes(path.get(truth ? 'consequent' : 'alternate'), signature, context, inference);
             }
 
-            return [ ...this.expressionTypes(path.get('consequent'), signature, context, visited),
-                ...this.expressionTypes(path.get('alternate'), signature, context, visited) ];
+            return [ ...this.expressionTypes(path.get('consequent'), signature, context, inference),
+                ...this.expressionTypes(path.get('alternate'), signature, context, inference) ];
         }
 
         if(node.type === 'SequenceExpression')
         {
             const expressions = path.get('expressions');
-            return this.expressionTypes(expressions[expressions.length - 1], signature, context, visited);
+            return this.expressionTypes(expressions[expressions.length - 1], signature, context, inference);
         }
 
         if(node.type === 'AwaitExpression')
         {
             const awaited = { ...signature, group: { ...signature.group, async: true } };
-            return this.expressionTypes(path.get('argument'), awaited, context, visited);
+            return this.expressionTypes(path.get('argument'), awaited, context, inference);
         }
 
         if(node.type === 'CallExpression')
@@ -424,36 +509,51 @@ const LgdReturnChecker = {
                 }
 
                 const argument = path.get('arguments')[0];
-                return argument ? this.expressionTypes(argument, signature, context, visited) : ['undefined'];
+                return argument ? this.expressionTypes(argument, signature, context, inference) : ['undefined'];
             }
 
-            return [this.methodCallType(path, signature, context)];
+            const declaredCall = this.methodCallType(path, signature, context);
+            if(declaredCall !== UNKNOWN)
+            {
+                return [declaredCall];
+            }
+
+            return this.ambientCallTypes(path, signature, context, inference) || [UNKNOWN];
         }
 
         if(node.type === 'Identifier')
         {
-            return this.identifierTypes(path, signature, context, visited);
+            return this.identifierTypes(path, signature, context, inference);
         }
 
-        const scope = new Map();
-        for(const [ name, binding ] of Object.entries(path.scope.getAllBindings()))
+        return [UNKNOWN];
+    },
+
+    /** @description Infers unary results from their operand without visiting unrelated lexical bindings. */
+    unaryTypes(path, signature, context, inference)
+    {
+        const operator = path.node.operator;
+        const fixedTypes = { void: 'undefined', typeof: 'String', delete: 'Boolean', '!': 'Boolean', '+': 'Number' };
+        if(Object.hasOwn(fixedTypes, operator))
         {
-            const types = this.currentBindingTypes({ path: path, binding: binding }, signature, context, visited);
-            const unique = new Set(types);
-            scope.set(name, { keyword: unique.size === 1 ? types[0] : UNKNOWN });
+            return [fixedTypes[operator]];
         }
 
-        const expression = context.code.slice(node.start, node.end);
-        const inferred = inferExpression(maskCode(expression, true), scope, new Map());
-        return [scope.has(inferred) ? scope.get(inferred).keyword : inferred];
+        const scope = context.bindings.scope(path);
+        return this.expressionTypes(path.get('argument'), signature, context, inference).map(inferred =>
+        {
+            const type = Object.hasOwn(tsTypeMap, inferred) ? inferred : scope.get(inferred)?.keyword || inferred;
+            const keyword = type === 'null' || type === 'undefined' ? 'Null' : type;
+            return inferExpression(`${operator} operand`, new Map([[ 'operand', { keyword: keyword } ]]), new Map());
+        });
     },
 
     /** @description Evaluates operator results from current operand values, not declaration labels. */
-    operatorTypes(path, signature, context, visited)
+    operatorTypes(path, signature, context, inference)
     {
         const operator = path.isAssignmentExpression() ? path.node.operator.slice(0, -1) : path.node.operator;
-        const left = this.expressionTypes(path.get('left'), signature, context, visited);
-        const right = this.expressionTypes(path.get('right'), signature, context, visited);
+        const left = this.expressionTypes(path.get('left'), signature, context, inference);
+        const right = this.expressionTypes(path.get('right'), signature, context, inference);
         if([ '&&', '||', '??' ].includes(operator))
         {
             const fact = operator === '??' ? context.flow.nullish(path.get('left')) : context.flow.truth(path.get('left'));
@@ -489,7 +589,7 @@ const LgdReturnChecker = {
     },
 
     /** @description Recovers diagnosed rejected writes for ordinary diagnostics while retaining runtime values for strict return proof. */
-    currentBindingTypes(point, signature, context, visited)
+    currentBindingTypes(point, signature, context, inference)
     {
         const { path, binding } = point;
         const declared = context.bindings.type(binding, signature);
@@ -498,6 +598,11 @@ const LgdReturnChecker = {
         if(declaration?.kind === 'class' || declaration?.kind === 'enum')
         {
             return [declared];
+        }
+
+        if(elementTypeName(declared) !== null)
+        {
+            return [canonicalTypeName(declared)];
         }
 
         const origins = context.flow.origins(path, binding);
@@ -513,7 +618,7 @@ const LgdReturnChecker = {
                 return [declared || UNKNOWN];
             }
 
-            const types = typeof origin === 'string' ? [origin] : this.expressionTypes(origin, signature, context, visited);
+            const types = typeof origin === 'string' ? [origin] : this.expressionTypes(origin, signature, context, inference);
             const key = typeof origin === 'string' ? origin : origin.node;
             const rejected = !context.strictReturnProof && context.rejectedWrites?.get(binding)?.get(key);
             if(!rejected)
@@ -560,6 +665,75 @@ const LgdReturnChecker = {
         }
 
         return inferred;
+    },
+
+    /** @description Resolves native member calls only for known, unchanged receiver types and supported overloads. */
+    ambientCallTypes(path, signature, context, inference)
+    {
+        if(context.strictReturnProof)
+        {
+            return null;
+        }
+
+        const callee = path.get('callee');
+        if(!callee.isMemberExpression() || callee.node.computed)
+        {
+            return null;
+        }
+
+        const receiver = callee.get('object');
+        const binding = receiver.isIdentifier() && receiver.scope.getBinding(receiver.node.name);
+        if(binding)
+        {
+            const owner = context.declarations.find(declaration => declaration.nameStart === context.map.toSource(binding.identifier.start));
+            if(owner && context.bindings.methodChanged(owner, callee.node.property.name))
+            {
+                return null;
+            }
+        }
+
+        const types = this.expressionTypes(receiver, signature, context, inference);
+        if(types.length === 0 || types.some(type => type === UNKNOWN || type === 'null' || type === 'undefined'))
+        {
+            return null;
+        }
+
+        const result = [];
+        const scope = context.bindings.scope(receiver);
+        const argumentTypes = path.get('arguments').map(argument =>
+        {
+            if(argument.isRegExpLiteral())
+            {
+                return ['RegExp'];
+            }
+
+            return this.expressionTypes(argument, signature, context, inference).map(type => scope.get(type)?.ref || scope.get(type)?.keyword || type);
+        });
+
+        for(const inferred of types)
+        {
+            const type = scope.get(inferred)?.ref || scope.get(inferred)?.keyword || inferred;
+            if(!context.bindings.nativeUnchanged(type))
+            {
+                return null;
+            }
+
+            const declared = binding && context.bindings.descriptor(binding);
+            if(declared && ![ 'keyword', 'ambient' ].includes(declared.kind))
+            {
+                return null;
+            }
+
+            const returns = context.ambient.memberReturnTypes(type, callee.node.property.name, argumentTypes);
+            if(!returns)
+            {
+                return null;
+            }
+
+            result.push(...returns);
+        }
+
+        return [...new Set(result)];
     },
 
     /** @description Resolves calls to annotated methods on the current or a directly bound object. */
@@ -652,7 +826,7 @@ const LgdReturnChecker = {
     },
 
     /** @description Resolves identifiers from their actual lexical binding and preserves shadowing. */
-    identifierTypes(path, signature, context, visited)
+    identifierTypes(path, signature, context, inference)
     {
         const binding = path.scope.getBinding(path.node.name);
         if(!binding)
@@ -660,7 +834,7 @@ const LgdReturnChecker = {
             return [path.node.name === 'undefined' ? 'undefined' : UNKNOWN];
         }
 
-        return this.currentBindingTypes({ path: path, binding: binding }, signature, context, visited);
+        return this.currentBindingTypes({ path: path, binding: binding }, signature, context, inference);
     }
 };
 

@@ -216,7 +216,7 @@ describe('Constructor value-return error quick fixes', () =>
         const [action] = await actionsFor(fixture, 'lgd.constructor.returnValue');
         expect(action.title).toBe('Remove redundant return this');
         await applyAction(fixture, action);
-        expect(fixture.document.getText()).toBe(source.replace('return this;', ''));
+        expect(fixture.document.getText()).toBe('class Command {\r\n    Command() {\r\n    }\r\n}');
         expect(fixture.diagnostics.get(fixture.document.uri.toString())).toEqual([]);
     });
 

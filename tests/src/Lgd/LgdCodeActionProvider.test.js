@@ -735,6 +735,9 @@ describe('Legacy readonly variable migration', () =>
     {
         const source = '/** Keep readonly in this documentation. */\r\nexport readonly Number count = 1;';
         const fixture = await openFixture(source);
+        const [diagnostic] = fixture.diagnostics.get(fixture.document.uri.toString());
+        expect(diagnostic).toMatchObject({ source: 'LGD', code: 'warning', severity: vscode.DiagnosticSeverity.Warning });
+        expect(fixture.document.getText(diagnostic.range)).toBe('readonly');
         const [action] = await actionsFor(fixture, 'lgd.declaration.readonly');
         expect(action.title).toBe('Replace readonly with const');
         await applyAction(fixture, action);

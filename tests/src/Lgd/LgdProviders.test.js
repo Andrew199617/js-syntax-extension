@@ -249,9 +249,9 @@ describe('LgdHoverProvider typed function parameters', () =>
 
     test('getTypeSummary includes the typed parameter signature', async () =>
     {
-        const { service } = await openTypedDocument();
+        const { service, document } = await openTypedDocument();
 
-        const summary = await service.getTypeSummary(LGD_URI, 'record');
+        const summary = await service.getTypeSummary(document.uri.toString(), 'record');
 
         expect(summary).toEqual({
             name: 'record',
@@ -269,7 +269,7 @@ describe('LgdHoverProvider typed function parameters', () =>
         const document = makeTextDocument(LGD_URI, UNTYPED_TEXT);
         await service.openDocument(document);
 
-        const summary = await service.getTypeSummary(LGD_URI, 'run');
+        const summary = await service.getTypeSummary(document.uri.toString(), 'run');
 
         expect(summary.params).toEqual([]);
     });
@@ -367,12 +367,12 @@ describe('LgdCompletionProvider', () =>
         expect(items.map(item => item.label)).toEqual([ 'host', 'connect' ]);
     });
 
-    test('returns null when the cursor is not after a member access', async () =>
+    test('returns null in a declaration binding name', async () =>
     {
         const { service, document } = await openObjectDocument(OBJECT_TEXT);
         const provider = LgdCompletionProvider.create(service);
 
-        const items = await provider.provideCompletionItems(document, new vscode.Position(0, 2));
+        const items = await provider.provideCompletionItems(document, new vscode.Position(0, 'Object co'.length));
 
         expect(items).toBeNull();
     });

@@ -2,6 +2,7 @@ const RemoveRedundantCastFix = require('./RemoveRedundantCastFix');
 const RenameClassConstructorFix = require('./RenameClassConstructorFix');
 const ReplaceConstructorReturnThisFix = require('./ReplaceConstructorReturnThisFix');
 const RemoveReturnDocTypeFix = require('./RemoveReturnDocTypeFix');
+const RemoveInheritanceDocFix = require('./RemoveInheritanceDocFix');
 const FormattingFix = require('./FormattingFix');
 const LgdFormattingPolicy = require('../Fixes/LgdFormattingPolicy');
 const ReplaceReadonlyLocalFix = require('./ReplaceReadonlyLocalFix');
@@ -24,6 +25,7 @@ function createQuickFixRegistry()
         { handler: new ReplaceConstructorReturnThisFix(), ruleId: 'constructor-return-value', automatic: true },
         { handler: new ReplaceReadonlyLocalFix(), ruleId: 'readonly-variable-declaration', automatic: true },
         { handler: new RemoveReturnDocTypeFix(), ruleId: 'return-type-documentation', automatic: true },
+        { handler: new RemoveInheritanceDocFix(), ruleId: 'inheritance-documentation', automatic: true },
         { handler: new MoveVirtualModifierFix(), ruleId: 'virtual-documentation', automatic: true },
         { handler: new ConvertObjectInheritanceFix(), ruleId: 'object-inheritance' },
         { handler: new ConvertObjectInheritanceFix(true), ruleId: 'object-inheritance', individualOnly: true },

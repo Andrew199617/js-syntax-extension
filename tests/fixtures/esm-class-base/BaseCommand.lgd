@@ -1,0 +1,14 @@
+/** @description Shared command identity and state. */
+class BaseCommand {
+    String commandName;
+    String title;
+
+    BaseCommand(String commandName, String title) {
+        this.commandName = commandName;
+        this.title = title;
+    }
+
+    virtual String readTitle() { return title; }
+}
+
+export default BaseCommand;

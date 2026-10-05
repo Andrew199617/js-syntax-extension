@@ -1,0 +1,2 @@
+String textLine = "key = value";
+Reg match = textLine.match(/=(\s*)/);

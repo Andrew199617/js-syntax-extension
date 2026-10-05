@@ -42,16 +42,10 @@ function decode(document, legend, tokens)
     return decoded;
 }
 
-async function run()
+/** @description Checks real VS Code hover providers and plugin semantic tokens for a JavaScript document. */
+async function verifyDocument(filename)
 {
-    const folder = vscode.workspace.workspaceFolders[0].uri.fsPath;
-    const extension = vscode.extensions.getExtension('learn-game-development.js-syntax-extension');
-    assert.ok(extension, 'Packaged extension is installed in the isolated extensions directory');
-    assert.equal(extension.packageJSON.version, '2.7.10');
-    await extension.activate();
-    const builtIn = vscode.extensions.getExtension('vscode.typescript-language-features');
-    await builtIn.activate();
-    const document = await vscode.workspace.openTextDocument(path.join(folder, 'sample.js'));
+    const document = await vscode.workspace.openTextDocument(filename);
     await vscode.window.showTextDocument(document);
     const range = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
     let decoded = [];
@@ -73,6 +67,13 @@ async function run()
     }
 
     const reports = decoded.filter(token => token.text === 'report');
+    if(reports.length !== 2)
+    {
+        const javascript = vscode.extensions.getExtension('vscode.typescript-language-features');
+        const failure = { filename: filename, language: document.languageId, tokens: decoded, javascriptActive: javascript?.isActive };
+        await fs.writeFile(path.join(path.dirname(filename), 'editor-failure.json'), JSON.stringify(failure, null, 2).replaceAll('\n', '\r\n'));
+    }
+
     assert.equal(reports.length, 2, JSON.stringify(decoded));
     assert.ok(reports.every(token => token.type === 'parameter'), JSON.stringify(decoded));
     assert.ok(reports[0].modifiers.includes('declaration'));
@@ -80,11 +81,47 @@ async function run()
     assert.equal(realFunction.type, 'function');
     assert.ok(realFunction.modifiers.includes('async'));
     assert.ok(realFunction.modifiers.includes('declaration'));
+
+    // The declaration must receive one hover, even after the TS plugin loads.
+    // Contributing built-in JS/JSX language IDs registers a second VS Code provider.
+    const hovers = await vscode.commands.executeCommand(
+        'vscode.executeHoverProvider',
+        document.uri,
+        document.positionAt(document.getText().indexOf('scanCandidates') + 1)
+    );
+    assert.equal(hovers.length, 1, `Expected one ${document.languageId} hover; received ${hovers.length}`);
+    const hoverText = hovers[0].contents.map(content => content.value || content).join('\n');
+    assert.ok(hoverText.includes('scanCandidates'), hoverText);
+    assert.ok(hoverText.includes('report'), hoverText);
+    return { language: document.languageId, tokens: decoded, hoverCount: hovers.length, hoverText: hoverText };
+}
+
+async function run()
+{
+    const folder = vscode.workspace.workspaceFolders[0].uri.fsPath;
+    const readiness = { workspace: folder, trusted: vscode.workspace.isTrusted };
+    await fs.writeFile(path.join(folder, 'editor-startup.json'), JSON.stringify(readiness, null, 2).replaceAll('\n', '\r\n'));
+    assert.ok(readiness.trusted, 'Trust the isolated fixture workspace before running native JS/JSX checks.');
+    const extension = vscode.extensions.getExtension('learn-game-development.js-syntax-extension');
+    assert.ok(extension, 'Packaged extension is installed in the isolated extensions directory');
+    await extension.activate();
+
+    const javascript = vscode.extensions.getExtension('vscode.typescript-language-features');
+    assert.ok(javascript, 'Built-in JavaScript and TypeScript support is available');
+    await javascript.activate();
+
+    // The host runner supplies identical sample.js and sample.jsx fixtures.
+    const samples = [];
+    for(const suffix of [ 'js', 'jsx' ])
+    {
+        samples.push(await verifyDocument(path.join(folder, `sample.${suffix}`)));
+    }
+
     const result = {
         vscode: vscode.version,
         extension: extension.packageJSON.version,
         extensionPath: extension.extensionPath,
-        tokens: decoded
+        samples: samples
     };
     await fs.writeFile(path.join(folder, 'editor-verification.json'), `${JSON.stringify(result, null, 2)}\r\n`);
     console.log(JSON.stringify(result, null, 2));

@@ -26,6 +26,10 @@ Native settings use the groups `braces`, `indentation`, `spacing`, `lineBreaks`,
 - `automatic`: eligible for automatic formatting as well as manual actions
 - Diagnostic severity does not imply permission to fix, and disabling a fix does not silence a diagnostic
 
+The default horizontal spacing leaves the interiors of declaration, call, control, cast and grouping parentheses unpadded, for example `choose(value, fallback)`, `if(ready)` and `return (value ?? (fallback));`. Empty declaration/call `()` is also unpadded. Each parenthesis context accepts explicit `true` or `false` padding overrides. `spacing.afterReturnKeyword` defaults to `true`; an explicit `false` removes only optional horizontal whitespace, preserving syntax-required separation and return line breaks. Imported parenthesis preferences, native options and family rule options override each corresponding default. ESLint `keyword-spacing` imports its `after` preference and the specific `overrides.return.after` preference.
+
+The default layout separates class constructors and methods with a blank line, keeping leading documentation with its member. Binary expressions use `wrapping.binaryOperations: "fit"`: short expressions such as `first > 0` stay on one line, unnecessary operator breaks are joined, and long expressions break at their outer precedence. `columnLimit: 0` removes the width limit. Comments and multiline literals remain protected. Explicit `preserve`, `respectPrecedence` (retains authored wrapping), or `onePerLine` choices and imported options override the defaults. `lineBreaks.separateDefinitions: "preserve"` or `"never"` retains or removes member gaps.
+
 ## Configuration correctness
 
 EditorConfig applies through matching sections and ancestor files. An `[*.cs]` section does **not** apply to `.lgd`; use an intentional `[*.lgd]` or shared matching section. `root = true` belongs before all sections. Later matching properties override earlier ones, `unset` cancels an inherited property, and unknown values must not invent behavior. The standard filename is `.editorconfig`. These rules come from the [EditorConfig documentation](https://editorconfig.org/) and [specification](https://spec.editorconfig.org/).
@@ -167,7 +171,7 @@ These are the actual native style choices. Values are under `formatting.options`
 | `lineBreaks.preserveSingleLineStatements` | `true`, `false` | `false` |
 | `lineBreaks.importGroups` | `preserve`, `origin`, `none` | `"preserve"` |
 | `lineBreaks.objectMembers` | `preserve`, `onePerLine`, `singleLine` | `"preserve"` |
-| `lineBreaks.separateDefinitions` | `preserve`, `always`, `never` | `"preserve"` |
+| `lineBreaks.separateDefinitions` | `preserve`, `always`, `never` | `"always"` |
 | `lineBreaks.blankLinesBetweenClosingBraces` | `true`, `false` | `false` |
 | `lineBreaks.statementImmediatelyAfterBlock` | `true`, `false` | `true` |
 | `lineBreaks.blankLineAfterConstructorColon` | `true`, `false` | `true` |
@@ -182,8 +186,8 @@ These are the actual native style choices. Values are under `formatting.options`
 | `wrapping.alignAfterOpenBracket` | `true`, `false` | `false` |
 | `wrapping.allowAllArgumentsOnNextLine` | `true`, `false` | `false` |
 | `wrapping.allowAllParametersOnNextLine` | `true`, `false` | `false` |
-| `wrapping.binaryOperators` | `preserve`, `before`, `after`, `beforeNonAssignment` | `"preserve"` |
-| `wrapping.binaryOperations` | `preserve`, `respectPrecedence`, `onePerLine` | `"preserve"` |
+| `wrapping.binaryOperators` | `preserve`, `before`, `after`, `beforeNonAssignment` | `"beforeNonAssignment"` |
+| `wrapping.binaryOperations` | `preserve`, `fit`, `respectPrecedence`, `onePerLine` | `"fit"` |
 | `wrapping.returnType` | `preserve`, `sameLine`, `nextLine` | `"preserve"` |
 | `wrapping.constructorInitializer` | `preserve`, `beforeColon`, `afterColon` | `"preserve"` |
 | `whitespace.fileHeader` | text, at most 4096 characters | `""` |

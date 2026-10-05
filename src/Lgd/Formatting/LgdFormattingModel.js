@@ -21,7 +21,7 @@ const LgdFormattingModel = {
             const model = {
                 source: source, parsed: parsed, casts: parsed.casts || [], emitted: emitted, tree: tree, map: LgdSourceMap.create(emitted.segments),
                 protected: [], nodes: [], braces: new Map(), parens: new Map(), controls: [], cases: [], labels: new Set(),
-                heritageColons: new Set(), constructorColons: new Set(), functionParens: new Set(), doWhileKeywords: new Set(),
+                heritageColons: new Set(), constructorColons: new Set(), functionParens: new Set(), doWhileKeywords: new Set(), returnKeywords: new Set(),
                 conditionalTokens: new Set(), returnTypes: new Set(), declarationHeads: [], declarationGaps: new Set(), importStarts: new Map(), importEnds: new Map()
             };
             this.collectNodes(model, tree, null, '');
@@ -354,7 +354,7 @@ const LgdFormattingModel = {
                 {
                     kind = previous.text === 'for' ? 'for' : 'control';
                 }
-                else if(previous && (/^(?:[$\p{ID_Start}]|\)|\])/u).test(previous.text))
+                else if(previous && !model.returnKeywords.has(previous.start) && (/^(?:[$\p{ID_Start}]|\)|\])/u).test(previous.text))
                 {
                     kind = 'call';
                 }
@@ -368,6 +368,11 @@ const LgdFormattingModel = {
     classifyNode(model, record)
     {
         const { node, parent, key, start, end } = record;
+        if(node.type === 'ReturnStatement' && model.source.startsWith('return', start))
+        {
+            model.returnKeywords.add(start);
+        }
+
         if(node.type === 'DoWhileStatement')
         {
             const body = this.range(model, node.body);

@@ -1,7 +1,7 @@
 const LgdConstructorSignatures = require('./LgdConstructorSignatures');
 const traverse = require('@babel/traverse').default;
 const { visibleBindings } = require('./LgdBaseChecker');
-const { baseTypeName } = require('./LgdTypeMaps');
+const { rootTypeName } = require('./LgdTypeMaps');
 
 /** @description Checks compile-time accessibility using source identities and the shared lexical member registry. */
 const LgdAccessibility = {
@@ -231,7 +231,7 @@ const LgdAccessibility = {
 
                 for(const type of types)
                 {
-                    const target = bindings.get(baseTypeName(type.name));
+                    const target = bindings.get(rootTypeName(type.name));
                     if(this.visibility(target || {}) !== 'internal')
                     {
                         continue;

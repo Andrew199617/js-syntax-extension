@@ -1,0 +1,20 @@
+const vscode = require("vscode");
+
+class LineArrays {
+    String[][] matrix = [["first"]];
+    String?[] optionalLabels = ["first", null];
+    String[]? cached = null;
+
+    string[] split(vscode.TextDocument document) {
+        const string[] lines = document.getText().split('\n');
+        return lines;
+    }
+
+    number[] sizes(string[] lines) {
+        const number[] sizes = [lines.length];
+        sizes[0] = lines.length;
+        return sizes;
+    }
+}
+
+module.exports = LineArrays;

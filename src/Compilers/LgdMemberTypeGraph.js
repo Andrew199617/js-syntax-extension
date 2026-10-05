@@ -1,4 +1,5 @@
 const LgdConstructorSignatures = require('./LgdConstructorSignatures');
+const LgdModuleBindings = require('./LgdModuleBindings');
 const LgdAccessibility = require('./LgdAccessibility');
 
 /** @description Preserves nominal member-result identities across files as an acyclic table of source-backed types. */
@@ -14,7 +15,7 @@ const LgdMemberTypeGraph = {
     imports(externals)
     {
         const types = new Map();
-        for(const external of externals.values())
+        for(const external of LgdModuleBindings.values(externals))
         {
             for(const declaration of [ external, ...external.typeTable || [] ])
             {

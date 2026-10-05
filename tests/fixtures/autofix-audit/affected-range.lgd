@@ -1,0 +1,27 @@
+class AuditExample
+{
+    readonly Number value;
+
+    AuditExample(Number initialValue)
+    {
+        this.value = initialValue;
+    }
+
+    Number sum(Number first, Number second)
+    {
+        return first + second;
+    }
+
+    Boolean isReady(Boolean enabled)
+    {
+        return enabled;
+    }
+}
+
+function choose(value)
+{
+    return value ? true : false;
+}
+
+// An individual action on choose must leave this function and AuditExample byte-for-byte unchanged.
+function untouched(){return 1;}

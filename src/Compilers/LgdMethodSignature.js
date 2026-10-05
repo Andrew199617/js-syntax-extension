@@ -87,7 +87,7 @@ function parseMethodHead(text)
         index = skipTrivia(text, index + name.length);
     }
 
-    if(text[index] !== '(' || name.includes('.') || isNullableType(name))
+    if(text[index] !== '(' || name.includes('.') || name.includes('[') || isNullableType(name))
     {
         return null;
     }

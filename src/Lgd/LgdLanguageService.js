@@ -1,12 +1,17 @@
+const LgdAmbientTypes = require('../Compilers/LgdAmbientTypes');
 const vscode = require('vscode');
 const path = require('path');
 const LgdProjectIdentity = require('../Compilers/LgdProjectIdentity');
+const LgdModuleBindings = require('../Compilers/LgdModuleBindings');
+const { collectContractBindings } = require('../Compilers/LgdContractBindings');
+const { visibleBindings } = require('../Compilers/LgdBaseChecker');
 const LgdExportCache = require('./LgdExportCache');
-const { getTypeSummary, getContractMetadata, getTypedMembers, getInterfaceMembers, getRuntimeMembers, filterThisMembers, filterDeclaredMembers } = require('./LgdContractEditor');
+const { getTypeSummary, getTypedMembers, getInterfaceMembers, getRuntimeMembers, filterThisMembers, filterDeclaredMembers } = require('./LgdContractEditor');
 const createLgdDiagnostics = require('./LgdDiagnostics');
 const settleEditorUpdate = require('./LgdEditorFailures');
 const LgdCompiler = require('../Compilers/LgdCompiler');
 const LgdSourceMap = require('../Compilers/LgdSourceMap');
+const LgdMirror = require('./LgdMirror');
 const { maskCode } = require('../Compilers/LgdInfer');
 const { baseTypeName } = require('../Compilers/LgdTypeMaps');
 const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
@@ -150,6 +155,7 @@ const LgdLanguageService = {
         state.errors = result.errors;
         state.declarations = result.allDeclarations;
         state.casts = result.casts || [];
+        state.constructionSites = result.constructionSites || [];
     },
 
     /**
@@ -184,9 +190,9 @@ const LgdLanguageService = {
 
         this.applyCompilation(state, result);
         const cached = this.exportCache.get(state.document.uri.fsPath);
-        if(!cached || cached.sourceText !== content)
+        if(!cached || cached.sourceText !== content || cached.constructionKind !== result.constructionKind)
         {
-            this.exportCache.set(state.document.uri.fsPath, { sourceText: content, parsed: result, projectId: identity.projectId });
+            this.exportCache.set(state.document.uri.fsPath, { sourceText: content, parsed: result, projectId: identity.projectId, constructionKind: result.constructionKind });
         }
 
         state.compiledVersion = version;
@@ -198,40 +204,12 @@ const LgdLanguageService = {
     },
 
     /**
-     * @description Creates the JavaScript mirror on first compile, or refreshes its content.
-     * Only the same open-document state may receive the result after awaiting creation;
-     * closing and reopening a source must never attach an earlier mirror to the new state.
+     * @description Refreshes the generated mirror without changing saved or user-edited previews.
      * @param {Object} state the document state.
      * @param {string} code the compiled JavaScript.
      * @returns {Promise<void>}
      */
-    async syncMirror(state, code)
-    {
-        if(state.jsDocument)
-        {
-            const edit = new vscode.WorkspaceEdit();
-            const fullRange = new vscode.Range(
-                state.jsDocument.positionAt(0),
-                state.jsDocument.positionAt(state.jsDocument.getText().length)
-            );
-            edit.replace(state.jsDocument.uri, fullRange, code);
-            const applied = await vscode.workspace.applyEdit(edit);
-            if(!applied)
-            {
-                throw new Error('LGD: Could not update the JavaScript mirror.');
-            }
-
-            return;
-        }
-
-        const created = await vscode.workspace.openTextDocument({ language: 'javascript', content: code });
-        const key = state.document.uri.toString();
-        const current = this.states.get(key);
-        if(current === state)
-        {
-            state.jsDocument = created;
-        }
-    },
+    syncMirror(state, code) { return LgdMirror.sync(this, state, code); },
 
     /**
      * @description Publishes LGD compiler errors as editor diagnostics on the LGD document.
@@ -304,7 +282,7 @@ const LgdLanguageService = {
 
     refreshDependents(sourcePath, previousSignature) { return LgdExportCache.refreshDependents(this, sourcePath, previousSignature); },
 
-    readExportDeclaration(sourcePath, visited = new Set()) { return LgdExportCache.readExportDeclaration(this, sourcePath, visited); },
+    readExportDeclaration(sourcePath, visited = new Set(), exportName = 'default') { return LgdExportCache.readExportDeclaration(this, sourcePath, visited, exportName); },
 
     /**
      * @description Builds the cross-file type map for a document's relative requires.
@@ -316,61 +294,90 @@ const LgdLanguageService = {
     {
         const externals = new Map();
         externals.sourceContext = await LgdProjectIdentity.resolve({ sourcePath: document.uri.fsPath });
+        externals.ambient = LgdAmbientTypes.forSource(document.uri.fsPath, LgdModuleBindings.imports(document.getText()));
         const dependencies = new Set();
         const fromDir = path.dirname(document.uri.fsPath);
         const resolving = new Set(visited);
         resolving.add(document.uri.fsPath);
         const text = document.getText();
         const code = maskCode(text, true);
-        const pattern = /\brequire\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\)/g;
-        let match = pattern.exec(text);
-        while(match)
+        const selectors = new Map();
+        function select(spec, name)
         {
-            if(!code.startsWith('require', match.index))
+            if(!selectors.has(spec))
             {
-                match = pattern.exec(text);
+                selectors.set(spec, new Set());
+            }
+
+            selectors.get(spec).add(name);
+        }
+
+        const pattern = /\brequire\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\)/g;
+        for(const match of text.matchAll(pattern))
+        {
+            if(code.startsWith('require', match.index))
+            {
+                select(match.groups.spec, 'default');
+                select(match.groups.spec, '*');
+            }
+        }
+
+        for(const imported of LgdModuleBindings.imports(text))
+        {
+            select(imported.spec, imported.importedName);
+        }
+
+        for(const reference of LgdModuleBindings.exports(text, []).values())
+        {
+            if(reference.spec)
+            {
+                select(reference.spec, reference.name);
+            }
+        }
+
+        externals.moduleExports = new Map();
+        for(const [ spec, names ] of selectors)
+        {
+            const sourcePath = this.resolveLgdSourcePath(fromDir, spec);
+            if(!sourcePath)
+            {
                 continue;
             }
 
-            const spec = match.groups.spec;
-            if(!externals.has(spec))
+            dependencies.add(sourcePath);
+            if(names.has('*') || names.has('default'))
             {
-                const sourcePath = this.resolveLgdSourcePath(fromDir, spec);
-                if(sourcePath)
+                const source = await this.readSourceEntry(sourcePath);
+                const exported = source ? LgdModuleBindings.exports(source.sourceText, source.parsed.declarations) : new Map();
+                const commonJs = source && LgdModuleBindings.moduleKind(source.sourceText, source.parsed.declarations) === 'commonjs';
+                const defaultReference = exported.get('default');
+                const defaultNamespace = commonJs && (!defaultReference || defaultReference.commonJsProperty);
+                if(names.has('*') || defaultNamespace)
                 {
-                    dependencies.add(sourcePath);
-                }
-
-                const exported = sourcePath ? await this.readExportDeclaration(sourcePath, resolving) : null;
-                if(exported)
-                {
-                    const entry = { exportName: exported.name, keyword: exported.keyword };
-                    if(exported.keyword === 'Object')
+                    for(const name of exported.keys())
                     {
-                        entry.accessibility = exported.accessibility;
-                        entry.explicitAccessibility = exported.explicitAccessibility;
-                        entry.projectId = exported.projectId;
-                        entry.ancestry = exported.ancestry;
-                        entry.typeTable = exported.typeTable;
-                        entry.constructorAccessibility = exported.constructorAccessibility;
-                        entry.sourcePath = exported.sourcePath;
-                        entry.sourceText = exported.sourceText;
-                        entry.kind = exported.kind;
-                        entry.enumValueType = exported.enumValueType;
-                        entry.baseName = exported.baseName;
-                        entry.members = exported.members;
-                        entry.constructorParams = exported.constructorParams;
-                        entry.constructorSignatures = exported.constructorSignatures;
-                        entry.methodSignatures = exported.methodSignatures;
-                        entry.methodsKnown = exported.methodsKnown;
-                        Object.assign(entry, getContractMetadata(exported));
+                        names.add(name);
                     }
-
-                    externals.set(spec, entry);
                 }
+
+                names.delete('*');
             }
 
-            match = pattern.exec(text);
+            const exports = new Map();
+            externals.moduleExports.set(spec, exports);
+            for(const name of names)
+            {
+                const exported = await this.readExportDeclaration(sourcePath, resolving, name);
+                if(exported)
+                {
+                    const entry = LgdExportCache.describeExternalType(exported);
+                    exports.set(name, entry);
+                    if(name === 'default')
+                    {
+                        externals.set(spec, entry);
+                    }
+                }
+            }
         }
 
         this.replaceDependencies(document.uri.fsPath, dependencies);
@@ -434,17 +441,9 @@ const LgdLanguageService = {
      */
     findImportedType(name, context)
     {
-        const code = maskCode(context.sourceText, true);
-        const pattern = /\b(?<keyword>const|let|var)\s+(?<name>[$A-Z_a-z][\w$]*)\s*=\s*(?<initializer>require\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)[^\\]|\\.)*)\k<quote>\s*\))/g;
-        for(const match of context.sourceText.matchAll(pattern))
-        {
-            if(match.groups.name === name && code.startsWith(match.groups.keyword, match.index))
-            {
-                return context.externals.get(match.groups.spec) || null;
-            }
-        }
-
-        return null;
+        const bindings = collectContractBindings(context.sourceText, context.declarations, context.externals);
+        const imported = visibleBindings(bindings, context.sourceText.length - 1).get(name);
+        return imported?.sourcePath ? imported : null;
     },
 
     /**

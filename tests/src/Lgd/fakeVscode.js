@@ -1,3 +1,7 @@
+const path = require('path');
+const { pathToFileURL } = require('url');
+const FakeMarkdownString = require('./fakeMarkdownString');
+
 /**
  * @description Makes a fake vscode Position.
  * @param {number} line the line.
@@ -92,6 +96,29 @@ function makeWorkspaceEdit()
 }
 
 /**
+ * @description Builds a file URI with native filesystem paths and escaped URL characters.
+ * @param {string} uriKey the file or untitled URI.
+ * @returns {object} the URI.
+ */
+function makeUri(uriKey)
+{
+    if(!uriKey.startsWith('file://'))
+    {
+        return { scheme: 'untitled', toString: () => uriKey, fsPath: uriKey };
+    }
+
+    let filename = decodeURIComponent(uriKey.slice('file://'.length));
+    if(process.platform === 'win32' && (/^\/[A-Za-z]:/).test(filename))
+    {
+        filename = filename.slice(1);
+    }
+
+    filename = path.resolve(filename);
+    const serialized = pathToFileURL(filename).toString();
+    return { scheme: 'file', toString: () => serialized, fsPath: filename };
+}
+
+/**
  * @description Makes a fake text document with working offset/position translation.
  * @param {string} uriKey the uri string.
  * @param {string} text the document text.
@@ -101,11 +128,9 @@ function makeTextDocument(uriKey, text)
 {
     let currentText = text;
     const document = {
-        uri: {
-            scheme: uriKey.startsWith('file://') ? 'file' : 'untitled',
-            toString: () => uriKey,
-            fsPath: uriKey.startsWith('file://') ? uriKey.slice('file://'.length) : uriKey
-        },
+        uri: makeUri(uriKey),
+        isClosed: false,
+        eol: text.includes('\r\n') ? 2 : 1,
 
         /**
          * @description Returns the document text, or the text inside a range.
@@ -280,14 +305,17 @@ function createFakeVscode(jestApi)
 {
     const registry = new Map();
     const api = {
+        Uri: { file: filename => makeUri(`file://${filename}`) },
         Position: makePosition,
         Range: makeRange,
         Location: makeLocation,
         Hover: makeHover,
+        MarkdownString: FakeMarkdownString,
         CompletionItem: makeCompletionItem,
-        CompletionItemKind: { Method: 1, Property: 9 },
+        CompletionItemKind: { Method: 1, Property: 9, Class: 6, Interface: 7, Enum: 12, Keyword: 13, Module: 8, TypeParameter: 24 },
         Diagnostic: makeDiagnostic,
         WorkspaceEdit: makeWorkspaceEdit,
+        EndOfLine: { CRLF: 2 },
         DiagnosticSeverity: { Error: 0, Warning: 1 },
         SemanticTokensLegend: makeSemanticTokensLegend,
         SemanticTokensBuilder: makeSemanticTokensBuilder,
@@ -300,7 +328,8 @@ function createFakeVscode(jestApi)
             {
                 const key = `untitled:mirror-${registry.size}`;
                 const document = makeTextDocument(key, options.content);
-                registry.set(document.uri, document);
+                document.languageId = options.language;
+                registry.set(document.uri.toString(), document);
 
                 return document;
             }),
@@ -308,13 +337,20 @@ function createFakeVscode(jestApi)
             {
                 for(const replacement of edit.replacements)
                 {
-                    const document = registry.get(replacement.uri);
+                    const document = registry.get(replacement.uri.toString());
+                    if(document?.isClosed)
+                    {
+                        return false;
+                    }
+
                     if(document)
                     {
                         const start = document.offsetAt(replacement.range.start);
                         const end = document.offsetAt(replacement.range.end);
                         const text = document.getText();
-                        document.setText(text.slice(0, start) + replacement.newText + text.slice(end));
+                        const newline = document.eol === api.EndOfLine.CRLF ? '\r\n' : '\n';
+                        const insertedText = replacement.newText.replace(/\r?\n/g, newline);
+                        document.setText(text.slice(0, start) + insertedText + text.slice(end));
                     }
                 }
 

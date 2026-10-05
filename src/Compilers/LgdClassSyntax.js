@@ -561,6 +561,20 @@ const LgdClassSyntax = {
         output.code += inner.code;
     },
 
+    /** @description Omits whitespace left by erased members while retaining every source comment. */
+    appendMemberPrefix(output, context, start, member)
+    {
+        const end = member.abstract ? member.erasureStart ?? member.start : member.start;
+        const erased = member.abstract || member.kind === 'field';
+        if(erased && context.content.slice(start, end).trim() === '')
+        {
+            this.appendGenerated(output, '', start, { end: end });
+            return;
+        }
+
+        this.appendSource(output, context, start, end);
+    },
+
     /** @description Emits a class as an object literal, retaining method descriptors and the create caller API. */
     emit(content, backend, declaration, compiler)
     {
@@ -586,11 +600,19 @@ const LgdClassSyntax = {
             }
         });
 
+        this.emitFactory(output, context);
         let cursor = declaration.initializerStart + 1;
         for(const member of declaration.classMembers)
         {
             const memberStart = member.abstract ? member.erasureStart : member.start;
-            this.appendSource(output, context, cursor, memberStart);
+            if(member === context.factoryMember)
+            {
+                this.appendSource(output, context, cursor, context.factoryPrefixStart);
+                cursor = member.bodyEnd;
+                continue;
+            }
+
+            this.appendMemberPrefix(output, context, cursor, member);
             if(member.abstract)
             {
                 this.appendGenerated(output, '', memberStart, { end: member.bodyEnd });
@@ -618,7 +640,7 @@ const LgdClassSyntax = {
             cursor = member.bodyEnd;
         }
 
-        if(!declaration.constructorMember)
+        if(!declaration.constructorMember && !context.factoryEmittedConstructor)
         {
             this.emitConstructor(output, context, null);
             this.appendGenerated(output, ',', cursor);
@@ -664,6 +686,44 @@ const LgdClassSyntax = {
         this.appendSource(output, context, cursor, member.bodyEnd);
     },
 
+    /** @description Emits the public factory first, preserving the existing object-base allocation path. */
+    emitFactory(output, context)
+    {
+        const declaration = context.declaration;
+        if(!declaration.baseName || declaration.baseIsLgdClass)
+        {
+            LgdClassConstructorEmitter.emitFactory(output, context);
+            return;
+        }
+
+        const newline = context.compiler.detectNewline(context.content);
+        const indent = `${declaration.indent}    `;
+        if(declaration.constructorMembers.length > 1)
+        {
+            this.appendGenerated(output, `${newline}${indent}`, declaration.nameStart);
+            LgdConstructorOverloadEmitter.emitDispatch(output, context, 'create');
+            return;
+        }
+
+        const member = declaration.constructorMember;
+        context.factoryMember = member;
+        context.factoryEmittedConstructor = true;
+        if(member)
+        {
+            context.factoryPrefixStart = LgdConstructorOverloadEmitter.memberPrefixStart(context, member);
+            const leading = context.content.slice(context.factoryPrefixStart, member.start);
+            const firstComment = leading.search(/\S/);
+            this.appendGenerated(output, `${newline}${indent}`, member.start);
+            if(firstComment !== -1)
+            {
+                this.appendSource(output, context, context.factoryPrefixStart + firstComment, member.start);
+            }
+        }
+
+        this.emitConstructor(output, context, member);
+        this.appendGenerated(output, ',', member?.bodyEnd ?? declaration.nameStart);
+    },
+
     /** @description Builds create() around base construction and runs the constructor body on its fresh instance. */
     emitConstructor(output, context, member)
     {
@@ -684,11 +744,6 @@ const LgdClassSyntax = {
         }
 
         const overloaded = declaration.constructorMembers?.length > 1;
-        if(overloaded && member === declaration.constructorMember)
-        {
-            LgdConstructorOverloadEmitter.emitDispatch(output, context, 'create');
-        }
-
         if(member)
         {
             this.appendGenerated(output, overloaded ? LgdConstructorOverloadEmitter.key(declaration, member, 'create') : 'create', member.nameStart, {

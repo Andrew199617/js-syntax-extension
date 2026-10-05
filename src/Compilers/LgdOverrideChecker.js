@@ -1,4 +1,4 @@
-const { baseTypeName, isNullableType } = require('./LgdTypeMaps');
+const { rootTypeName, sameTypeShape, canonicalTypeName } = require('./LgdTypeMaps');
 const { maskCode } = require('./LgdInfer');
 const { collectScopes, collectBindings, visibleBindings } = require('./LgdBaseChecker');
 const { parseMethodHead, parseTypedParams, splitTopLevelChunks } = require('./LgdTypedParams');
@@ -311,18 +311,18 @@ function addError(errors, member, message, details = {})
  */
 function differentKnownTypes(baseType, derivedType, context, inherited)
 {
-    if(!baseType || !derivedType || baseType === derivedType)
+    if(!baseType || !derivedType || canonicalTypeName(baseType) === canonicalTypeName(derivedType))
     {
         return false;
     }
 
-    if(isNullableType(baseType) !== isNullableType(derivedType))
+    if(!sameTypeShape(baseType, derivedType))
     {
         return true;
     }
 
-    baseType = baseTypeName(baseType);
-    derivedType = baseTypeName(derivedType);
+    baseType = rootTypeName(baseType);
+    derivedType = rootTypeName(derivedType);
     const baseOwner = context.declarations.find(declaration => declaration.name === inherited.declaredIn) || context.currentDeclaration;
     const baseVisible = visibleBindings(context.bindings, baseOwner.headStart ?? baseOwner.start);
     const derivedVisible = visibleBindings(context.bindings, context.currentDeclaration.headStart ?? context.currentDeclaration.start);

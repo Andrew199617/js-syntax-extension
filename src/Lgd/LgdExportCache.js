@@ -1,21 +1,61 @@
 const LgdConstructorSignatures = require('../Compilers/LgdConstructorSignatures');
+const { getContractMetadata } = require('./LgdContractEditor');
+const LgdModuleBindings = require('../Compilers/LgdModuleBindings');
+const { collectContractBindings } = require('../Compilers/LgdContractBindings');
+const { visibleBindings } = require('../Compilers/LgdBaseChecker');
 const fs = require('fs');
+const vscode = require('vscode');
+const LgdOutputOptions = require('../Compilers/LgdOutputOptions');
 const LgdProjectIdentity = require('../Compilers/LgdProjectIdentity');
 const LgdAccessibility = require('../Compilers/LgdAccessibility');
 const LgdMemberTypeGraph = require('../Compilers/LgdMemberTypeGraph');
 const LgdClassMemberSemantics = require('../Compilers/LgdClassMemberSemantics');
-const { maskCode } = require('../Compilers/LgdInfer');
 const { baseTypeName } = require('../Compilers/LgdTypeMaps');
 const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
 const LgdOverrideChecker = require('../Compilers/LgdOverrideChecker');
 const LgdContractChecker = require('../Compilers/LgdContractChecker');
 
+/** @description Copies established source-backed export metadata for compiler and editor consumers. */
+function describeExternalType(exported)
+{
+    const entry = { exportName: exported.name, keyword: exported.keyword };
+    if(exported.keyword === 'Object')
+    {
+        entry.accessibility = exported.accessibility;
+        entry.explicitAccessibility = exported.explicitAccessibility;
+        entry.projectId = exported.projectId;
+        entry.ancestry = exported.ancestry;
+        entry.typeTable = exported.typeTable;
+        entry.typeGraphIncomplete = exported.typeGraphIncomplete;
+        entry.constructorAccessibility = exported.constructorAccessibility;
+        entry.sourcePath = exported.sourcePath;
+        entry.sourceText = exported.sourceText;
+        entry.jsdoc = exported.jsdoc;
+        entry.kind = exported.kind;
+        entry.constructionKind = exported.constructionKind;
+        entry.moduleKind = exported.moduleKind;
+        entry.commonJsProperty = exported.commonJsProperty;
+        entry.enumValueType = exported.enumValueType;
+        entry.baseName = exported.baseName;
+        entry.members = exported.members;
+        entry.constructorParams = exported.constructorParams;
+        entry.constructorSignatures = exported.constructorSignatures;
+        entry.methodSignatures = exported.methodSignatures;
+        entry.methodsKnown = exported.methodsKnown;
+        Object.assign(entry, getContractMetadata(exported));
+    }
+
+    return entry;
+}
+
 /** @description Loads an unchanged source from cache, reading only changed on-disk files. */
 async function readSourceEntry(service, sourcePath)
 {
     const identity = await LgdProjectIdentity.resolve({ sourcePath: sourcePath });
+    const sourceDocument = service.openStatesByPath.get(sourcePath)?.document || { uri: vscode.Uri.file(sourcePath) };
+    const constructionKind = LgdOutputOptions.constructionKind(service.getOutputOptions(sourceDocument));
     let cached = service.exportCache.get(sourcePath);
-    if(cached && cached.projectId !== identity.projectId)
+    if(cached && (cached.projectId !== identity.projectId || cached.constructionKind !== constructionKind))
     {
         service.exportCache.delete(sourcePath);
         cached = null;
@@ -70,7 +110,7 @@ async function readSourceEntry(service, sourcePath)
         return cached;
     }
 
-    const entry = { sourceText: sourceText, diskStamp: diskStamp, projectId: identity.projectId,
+    const entry = { sourceText: sourceText, diskStamp: diskStamp, projectId: identity.projectId, constructionKind: constructionKind,
         parsed: service.compiler.parse(sourceText, new Map(), identity) };
     service.exportCache.set(sourcePath, entry);
     return entry;
@@ -127,10 +167,11 @@ function exportSignature(service, exported)
     }));
 
     return JSON.stringify({
-        name: exported.name, typeName: exported.typeName, keyword: exported.keyword,
+        name: exported.name, jsdoc: exported.jsdoc, typeName: exported.typeName, keyword: exported.keyword,
         accessibility: exported.accessibility, projectId: exported.projectId, ancestry: exported.ancestry,
         constructorAccessibility: exported.constructorAccessibility, typeTable: exported.typeTable,
-        kind: exported.kind, baseName: exported.baseName, abstract: exported.abstract,
+        kind: exported.kind, constructionKind: exported.constructionKind, moduleKind: exported.moduleKind, commonJsProperty: exported.commonJsProperty,
+        baseName: exported.baseName, abstract: exported.abstract,
         contractKind: exported.contractKind, interfaceNames: exported.interfaceNames,
         contractSignatures: exported.contractSignatures, contractsKnown: exported.contractsKnown,
         constructorParams: constructors, constructorSignatures: exported.constructorSignatures,
@@ -199,6 +240,8 @@ function invalidateDependentExports(service, sourcePath)
             if(cached)
             {
                 cached.exported = undefined;
+                cached.namedExports = undefined;
+                cached.signatures = undefined;
             }
         }
     }
@@ -206,11 +249,37 @@ function invalidateDependentExports(service, sourcePath)
     return signatures;
 }
 
+/** @description Refreshes every explicit export signature so named imports participate in incremental invalidation. */
+async function readModuleSignature(service, sourcePath)
+{
+    const cached = await service.readSourceEntry(sourcePath);
+    if(!cached)
+    {
+        return 'null';
+    }
+
+    const names = new Set([ 'default', ...LgdModuleBindings.exports(cached.sourceText, cached.parsed.declarations).keys() ]);
+    for(const name of names)
+    {
+        await service.readExportDeclaration(sourcePath, new Set(), name);
+    }
+
+    return service.exportCache.get(sourcePath)?.signature || 'null';
+}
+
+/** @description Records each selector separately while preserving a stable whole-module signature. */
+function recordSignature(service, cached, exportName, exported)
+{
+    cached.signatures ||= new Map();
+    cached.signatures.set(exportName, service.exportSignature(exported));
+    cached.signature = JSON.stringify([...cached.signatures].sort(([left], [right]) => left.localeCompare(right)));
+}
+
 /** @description Rechecks open consumers and traverses descendants only when exported signatures change. */
 async function refreshDependents(service, sourcePath, previousSignature)
 {
-    const exported = await service.readExportDeclaration(sourcePath);
-    if(service.exportSignature(exported) === previousSignature)
+    const signature = await readModuleSignature(service, sourcePath);
+    if(signature === previousSignature)
     {
         return;
     }
@@ -222,8 +291,8 @@ async function refreshDependents(service, sourcePath, previousSignature)
     {
         if(current !== sourcePath)
         {
-            const refreshed = await service.readExportDeclaration(current);
-            if(service.exportSignature(refreshed) === previousSignatures.get(current))
+            const refreshed = await readModuleSignature(service, current);
+            if(refreshed === previousSignatures.get(current))
             {
                 continue;
             }
@@ -250,19 +319,15 @@ async function refreshDependents(service, sourcePath, previousSignature)
 
 /**
  * @description Reads a sibling .lgd file and finds the declaration it exports.
- * Unreadable files and files without a plain `module.exports = Name` export yield null.
+ * Unreadable files and unsupported or absent explicit exports yield null.
  * @param {Object} service the owning language service and its incremental state.
  * @param {string} sourcePath the absolute .lgd source path.
  * @param {Set} visited the source paths already being resolved, to stop circular imports.
+ * @param {string} exportName the explicit export selector, defaulting to CommonJS or ESM default.
  * @returns {Object|null} the exported type, constructor signature and source location, or null.
  */
-async function readExportDeclaration(service, sourcePath, visited = new Set())
+async function readExportDeclaration(service, sourcePath, visited = new Set(), exportName = 'default')
 {
-    if(visited.has(sourcePath))
-    {
-        return null;
-    }
-
     const resolving = new Set(visited);
     resolving.add(sourcePath);
     const cached = await service.readSourceEntry(sourcePath);
@@ -271,32 +336,60 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
         return null;
     }
 
-    if(cached.exported !== undefined)
+    const previous = exportName === 'default' ? cached.exported : cached.namedExports?.get(exportName);
+    if(previous !== undefined)
     {
-        return cached.exported;
+        return previous;
     }
 
     const targetText = cached.sourceText;
-    const exportMatch = (/\bmodule\.exports\s*=\s*(?<name>[$A-Z_a-z][\w$]*)\s*(?:;|$)/).exec(maskCode(targetText, true));
-    if(!exportMatch)
+    const parsed = cached.parsed;
+    const reference = LgdModuleBindings.exports(targetText, parsed.declarations).get(exportName);
+    const moduleKind = LgdModuleBindings.moduleKind(targetText, parsed.declarations);
+    if(!reference)
     {
-        cached.exported = null;
-        cached.signature = 'null';
+        recordSignature(service, cached, exportName, null);
         return null;
     }
 
-    const parsed = cached.parsed;
-    const declaration = parsed.declarations.find(candidate => candidate.name === exportMatch.groups.name);
-    if(!declaration)
+    const declaration = !reference.spec && parsed.declarations.find(candidate => candidate.name === reference.name);
+    if(visited.has(sourcePath) && !declaration)
     {
         return null;
+    }
+
+    if(visited.has(sourcePath))
+    {
+        // Preserve the nominal identity at an import back-edge. Its full member
+        // record replaces this reference when that defining source completes.
+        if(declaration?.kind !== 'class')
+        {
+            return null;
+        }
+
+        return { name: declaration.name, typeName: declaration.typeName, kind: 'class', keyword: 'Object', constructionKind: cached.constructionKind, moduleKind: moduleKind, commonJsProperty: reference.commonJsProperty,
+            sourcePath: declaration.sourceIdentityPath || sourcePath, nameStart: declaration.nameStart,
+            nameEnd: declaration.nameEnd, projectId: cached.projectId, members: [], methodSignatures: [],
+            methodsKnown: false, contractsKnown: false, typeGraphIncomplete: true };
     }
 
     const document = { uri: { fsPath: sourcePath }, getText: () => targetText };
     const externals = await service.collectExternalTypes(document, resolving);
     if(service.exportCache.get(sourcePath) !== cached)
     {
-        return service.readExportDeclaration(sourcePath, visited);
+        return service.readExportDeclaration(sourcePath, visited, exportName);
+    }
+
+    if(!declaration)
+    {
+        const imported = reference.spec
+            ? LgdModuleBindings.external(externals, reference.spec, reference.name)
+            : visibleBindings(collectContractBindings(targetText, parsed.allDeclarations, externals), targetText.length - 1).get(reference.name);
+        const exported = imported?.sourcePath
+            ? { ...imported, name: imported.name || imported.exportName, moduleKind: moduleKind, commonJsProperty: reference.commonJsProperty }
+            : null;
+        recordSignature(service, cached, exportName, exported);
+        return exported;
     }
 
     const context = { declarations: parsed.allDeclarations, externals: externals, sourceText: targetText, sourcePath: declaration.sourceIdentityPath || sourcePath };
@@ -307,9 +400,13 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
     const registry = LgdClassMemberSemantics.create({ content: targetText, declarations: parsed.allDeclarations, externals: externals });
     const exported = {
         name: declaration.name,
+        jsdoc: declaration.jsdoc,
         typeName: declaration.typeName,
         keyword: keywords.includes(baseTypeName(declaration.typeName)) ? baseTypeName(declaration.typeName) : 'Object',
         kind: declaration.kind,
+        constructionKind: declaration.kind === 'class' ? cached.constructionKind : null,
+        moduleKind: moduleKind,
+        commonJsProperty: reference.commonJsProperty,
         accessibility: declaration.accessibility || 'public',
         explicitAccessibility: declaration.accessibilityStart !== null,
         projectId: cached.projectId,
@@ -329,12 +426,22 @@ async function readExportDeclaration(service, sourcePath, visited = new Set())
         nameStart: declaration.nameStart,
         nameEnd: declaration.nameEnd
     };
-    cached.signature = service.exportSignature(exported);
+    recordSignature(service, cached, exportName, exported);
 
-    // An incomplete/cyclic ancestry depends on the active resolution path, so only cache its parse.
-    if(methods.methodsKnown && contracts.contractsKnown || exported.keyword !== 'Object')
+    // Incomplete ancestry and unresolved import back-edges depend on the active
+    // resolution path. Cache only once every referenced type record is complete.
+    const completeTypes = !exported.typeTable.some(type => type.typeGraphIncomplete);
+    if(completeTypes && (methods.methodsKnown && contracts.contractsKnown || exported.keyword !== 'Object'))
     {
-        cached.exported = exported;
+        if(exportName === 'default')
+        {
+            cached.exported = exported;
+        }
+        else
+        {
+            cached.namedExports ||= new Map();
+            cached.namedExports.set(exportName, exported);
+        }
     }
 
     return exported;
@@ -351,6 +458,7 @@ async function refreshProjectIdentities(service)
 }
 
 module.exports = {
+    describeExternalType: describeExternalType,
     refreshProjectIdentities: refreshProjectIdentities,
     readExportDeclaration: readExportDeclaration,
     readSourceEntry: readSourceEntry,

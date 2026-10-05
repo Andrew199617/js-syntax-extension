@@ -1,0 +1,2890 @@
+{
+  "inspectedBaseline": "fe56a9db8eba3896141002656c980f6c17216551",
+  "codeCommit": "ad86ada",
+  "spacingCommit": "7a06bec628f2064bd253c8cbc54c1c62b2c9d1c5",
+  "counts": {
+    "handlers": 142,
+    "distinctRules": 140,
+    "nativeHandlers": 16,
+    "nativeRules": 14,
+    "formattingFamilies": 10,
+    "formattingLeaves": 116
+  },
+  "sources": [
+    "src/Lgd/QuickFixes/QuickFixRegistry.js",
+    "src/Lgd/LgdDiagnosticDefinitions.js",
+    "src/Lgd/Formatting/LgdFormattingOptions.js",
+    "src/Lgd/Fixes/LgdFormattingPolicy.js",
+    "src/Editors/VSCode/LgdFixService.js"
+  ],
+  "caveats": [
+    "Automatic-safe certification never bypasses global autoFix plus effective fix:automatic.",
+    "Registry inspection and existing regression tests are not proof of every native UI action or every overlapping leaf combination.",
+    "Style cleanup is limited to whitespace inside the original edit and its touching whitespace; separate semantic styles require their own explicitly enabled actions."
+  ],
+  "nativeActions": [
+    {
+      "ruleId": "unnecessary-reference-cast",
+      "actionKind": "removeRedundantCast",
+      "strategy": "RemoveRedundantCastFix",
+      "certifiedAutomatic": true,
+      "individualOnly": false,
+      "preferred": true,
+      "manualBatchDefault": "manual",
+      "diagnosticIds": [
+        "lgd.cast.redundant"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/RemoveRedundantCastFix.js",
+      "testEvidence": [
+        "tests/src/Compilers/LgdRedundantCasts.test.js",
+        "tests/src/Lgd/LgdCastEditor.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "class-constructor-name",
+      "actionKind": "renameClassConstructor",
+      "strategy": "RenameClassConstructorFix",
+      "certifiedAutomatic": false,
+      "individualOnly": false,
+      "preferred": false,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.constructor.name"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/RenameClassConstructorFix.js",
+      "testEvidence": [
+        "tests/src/Lgd/LgdPartialClassMigration.test.js",
+        "tests/src/Lgd/LgdFixAudit.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "constructor-return-value",
+      "actionKind": "replaceConstructorReturnThis",
+      "strategy": "ReplaceConstructorReturnThisFix",
+      "certifiedAutomatic": true,
+      "individualOnly": false,
+      "preferred": true,
+      "manualBatchDefault": "manual",
+      "diagnosticIds": [
+        "lgd.constructor.returnValue"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/ReplaceConstructorReturnThisFix.js",
+      "testEvidence": [
+        "tests/src/Compilers/LgdConstructorReturns.test.js",
+        "tests/src/Lgd/LgdReturnDocFix.test.js",
+        "tests/src/Lgd/LgdFixService.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "readonly-variable-declaration",
+      "actionKind": "replaceReadonlyLocal",
+      "strategy": "ReplaceReadonlyLocalFix",
+      "certifiedAutomatic": true,
+      "individualOnly": false,
+      "preferred": true,
+      "manualBatchDefault": "manual",
+      "diagnosticIds": [
+        "lgd.declaration.readonly"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/ReplaceReadonlyLocalFix.js",
+      "testEvidence": [
+        "tests/src/Lgd/LgdCodeActionProvider.test.js",
+        "tests/src/Lgd/LgdFixService.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "return-type-documentation",
+      "actionKind": "removeReturnDocType",
+      "strategy": "RemoveReturnDocTypeFix",
+      "certifiedAutomatic": true,
+      "individualOnly": false,
+      "preferred": true,
+      "manualBatchDefault": "manual",
+      "diagnosticIds": [
+        "lgd.jsdoc.returnType"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/RemoveReturnDocTypeFix.js",
+      "testEvidence": [
+        "tests/src/Lgd/LgdReturnDocFix.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "inheritance-documentation",
+      "actionKind": "removeInheritanceDoc",
+      "strategy": "RemoveInheritanceDocFix",
+      "certifiedAutomatic": true,
+      "individualOnly": false,
+      "preferred": true,
+      "manualBatchDefault": "manual",
+      "diagnosticIds": [
+        "lgd.class.inheritanceDoc"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/RemoveInheritanceDocFix.js",
+      "testEvidence": [
+        "tests/src/Lgd/LgdFixAudit.test.js",
+        "tests/src/Compilers/LgdObjectInheritance.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "virtual-documentation",
+      "actionKind": "moveVirtualModifier",
+      "strategy": "MoveVirtualModifierFix",
+      "certifiedAutomatic": true,
+      "individualOnly": false,
+      "preferred": true,
+      "manualBatchDefault": "manual",
+      "diagnosticIds": [
+        "lgd.jsdoc.virtual"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/MoveVirtualModifierFix.js",
+      "testEvidence": [
+        "tests/src/Compilers/LgdVirtualDocChecker.test.js",
+        "tests/src/Lgd/LgdCodeActionProvider.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "object-inheritance",
+      "actionKind": "convertObjectInheritance",
+      "strategy": "ConvertObjectInheritanceFix",
+      "certifiedAutomatic": false,
+      "individualOnly": false,
+      "preferred": false,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.object.inheritance",
+        "lgd.class.inheritanceDoc",
+        "lgd.constructor.factory",
+        "lgd.constructor.returnValue"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/ConvertObjectInheritanceFix.js",
+      "testEvidence": [
+        "tests/src/Lgd/LgdObjectInheritanceFix.test.js",
+        "tests/src/Lgd/LgdPartialClassMigration.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "object-inheritance",
+      "actionKind": "prepareObjectInheritance",
+      "strategy": "ConvertObjectInheritanceFix",
+      "certifiedAutomatic": false,
+      "individualOnly": true,
+      "preferred": false,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.object.inheritance",
+        "lgd.class.inheritanceDoc",
+        "lgd.constructor.factory",
+        "lgd.constructor.returnValue"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/ConvertObjectInheritanceFix.js",
+      "testEvidence": [
+        "tests/src/Lgd/LgdObjectInheritanceFix.test.js",
+        "tests/src/Lgd/LgdPartialClassMigration.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "missing-override",
+      "actionKind": "addOverride",
+      "strategy": "AddOverrideFix",
+      "certifiedAutomatic": false,
+      "individualOnly": false,
+      "preferred": true,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.override.required"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/AddOverrideFix.js",
+      "testEvidence": [
+        "tests/src/Compilers/LgdOverrideChecker.test.js",
+        "tests/src/Lgd/LgdCodeActionProvider.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "nonvirtual-base",
+      "actionKind": "makeBaseVirtual",
+      "strategy": "MakeBaseVirtualFix",
+      "certifiedAutomatic": false,
+      "individualOnly": false,
+      "preferred": false,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.override.nonVirtual"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/MakeBaseVirtualFix.js",
+      "testEvidence": [
+        "tests/src/Lgd/LgdCodeActionProvider.test.js",
+        "tests/src/Lgd/LgdFixService.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "extra-base-arguments",
+      "actionKind": "removeExtraBaseArguments",
+      "strategy": "RemoveExtraBaseArgumentsFix",
+      "certifiedAutomatic": false,
+      "individualOnly": false,
+      "preferred": false,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.base.argumentCount"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/RemoveExtraBaseArgumentsFix.js",
+      "testEvidence": [
+        "tests/src/Lgd/LgdCodeActionProvider.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "parameter-type",
+      "actionKind": "changeParameterType",
+      "strategy": "ChangeParameterTypeFix",
+      "certifiedAutomatic": false,
+      "individualOnly": false,
+      "preferred": false,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.assignment.typeMismatch"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/ChangeParameterTypeFix.js",
+      "testEvidence": [
+        "tests/src/Compilers/LgdParameterTypeFix.test.js",
+        "tests/src/Lgd/LgdCodeActionProvider.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "parameter-type",
+      "actionKind": "changeParameterAndReturnType",
+      "strategy": "ChangeParameterAndReturnTypeFix",
+      "certifiedAutomatic": false,
+      "individualOnly": true,
+      "preferred": false,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.assignment.typeMismatch"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/ChangeParameterAndReturnTypeFix.js",
+      "testEvidence": [
+        "tests/src/Compilers/LgdReturnTypeFix.test.js",
+        "tests/src/Lgd/LgdCodeActionProvider.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "return-type",
+      "actionKind": "changeReturnType",
+      "strategy": "ChangeReturnTypeFix",
+      "certifiedAutomatic": false,
+      "individualOnly": false,
+      "preferred": false,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.return.typeMismatch"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/ChangeReturnTypeFix.js",
+      "testEvidence": [
+        "tests/src/Compilers/LgdReturnTypeFix.test.js",
+        "tests/src/Lgd/LgdCodeActionProvider.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    },
+    {
+      "ruleId": "static-member-receiver",
+      "actionKind": "useStaticTypeReceiver",
+      "strategy": "UseStaticTypeReceiverFix",
+      "certifiedAutomatic": false,
+      "individualOnly": false,
+      "preferred": false,
+      "manualBatchDefault": "off",
+      "diagnosticIds": [
+        "lgd.member.receiverKind"
+      ],
+      "strategySource": "src/Lgd/QuickFixes/UseStaticTypeReceiverFix.js",
+      "testEvidence": [
+        "tests/src/Lgd/LgdStaticReceiverFix.test.js"
+      ],
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits"
+    }
+  ],
+  "formattingFamilies": [
+    {
+      "ruleId": "lgd.format.braces",
+      "defaults": {
+        "style": "allman",
+        "wrapping": {},
+        "beforeElse": true,
+        "beforeCatch": true,
+        "beforeFinally": true,
+        "beforeWhile": false
+      },
+      "properties": {
+        "style": {
+          "enum": [
+            "attach",
+            "allman",
+            "stroustrup",
+            "linux",
+            "mozilla",
+            "webkit",
+            "gnu",
+            "whitesmiths",
+            "custom"
+          ]
+        },
+        "wrapping": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "classes": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "interfaces": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "enums": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "constructors": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "methods": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "accessors": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "functions": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "lambdas": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "controlBlocks": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "switchBlocks": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "caseBlocks": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "tryBlocks": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "elseBlocks": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "catchBlocks": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "finallyBlocks": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "objectLiterals": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            },
+            "objectPatterns": {
+              "enum": [
+                "inherit",
+                "sameLine",
+                "nextLine",
+                "nextLineIndented",
+                "nextLineIfMultiline"
+              ]
+            }
+          }
+        },
+        "beforeElse": {
+          "type": "boolean"
+        },
+        "beforeCatch": {
+          "type": "boolean"
+        },
+        "beforeFinally": {
+          "type": "boolean"
+        },
+        "beforeWhile": {
+          "type": "boolean"
+        }
+      },
+      "leaves": [
+        "lgd.format.braces.beforeElse",
+        "lgd.format.braces.beforeCatch",
+        "lgd.format.braces.beforeFinally",
+        "lgd.format.braces.beforeWhile",
+        "lgd.format.braces.classes",
+        "lgd.format.braces.interfaces",
+        "lgd.format.braces.enums",
+        "lgd.format.braces.constructors",
+        "lgd.format.braces.methods",
+        "lgd.format.braces.accessors",
+        "lgd.format.braces.functions",
+        "lgd.format.braces.lambdas",
+        "lgd.format.braces.controlBlocks",
+        "lgd.format.braces.switchBlocks",
+        "lgd.format.braces.caseBlocks",
+        "lgd.format.braces.tryBlocks",
+        "lgd.format.braces.elseBlocks",
+        "lgd.format.braces.catchBlocks",
+        "lgd.format.braces.finallyBlocks",
+        "lgd.format.braces.objectLiterals",
+        "lgd.format.braces.objectPatterns"
+      ]
+    },
+    {
+      "ruleId": "lgd.format.indentation",
+      "defaults": {
+        "style": "space",
+        "size": 4,
+        "tabWidth": 4,
+        "continuation": 4,
+        "constructorInitializer": 4,
+        "tabUsage": "always",
+        "caseLabels": true,
+        "caseContents": true,
+        "caseBlocks": true,
+        "labels": "preserve"
+      },
+      "properties": {
+        "style": {
+          "enum": [
+            "space",
+            "tab"
+          ]
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "tabWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "continuation": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "constructorInitializer": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "tabUsage": {
+          "enum": [
+            "indentation",
+            "continuation",
+            "always"
+          ]
+        },
+        "caseLabels": {
+          "type": "boolean"
+        },
+        "caseContents": {
+          "type": "boolean"
+        },
+        "caseBlocks": {
+          "type": "boolean"
+        },
+        "labels": {
+          "enum": [
+            "preserve",
+            "flushLeft",
+            "oneLess"
+          ]
+        }
+      },
+      "leaves": [
+        "lgd.format.indentation.style",
+        "lgd.format.indentation.size",
+        "lgd.format.indentation.tabWidth",
+        "lgd.format.indentation.continuation",
+        "lgd.format.indentation.constructorInitializer",
+        "lgd.format.indentation.tabUsage",
+        "lgd.format.indentation.caseLabels",
+        "lgd.format.indentation.caseContents",
+        "lgd.format.indentation.caseBlocks",
+        "lgd.format.indentation.labels"
+      ]
+    },
+    {
+      "ruleId": "lgd.format.spacing",
+      "defaults": {
+        "afterControlKeywords": false,
+        "afterReturnKeyword": true,
+        "beforeFunctionParen": false,
+        "beforeMethodParen": false,
+        "beforeCallParen": false,
+        "afterCast": false,
+        "insideCastParens": false,
+        "insideControlParens": true,
+        "insideDeclarationParens": true,
+        "insideCallParens": true,
+        "insideOtherParens": true,
+        "insideEmptyDeclarationParens": false,
+        "insideEmptyCallParens": false,
+        "beforeInheritanceColon": true,
+        "afterInheritanceColon": true,
+        "binaryOperators": "both",
+        "beforeAssignment": true,
+        "afterAssignment": true,
+        "beforeComma": false,
+        "afterComma": true,
+        "beforeDot": false,
+        "afterDot": false,
+        "beforeForSemicolon": false,
+        "afterForSemicolon": true,
+        "beforeSquareBracket": false,
+        "insideSquareBrackets": false,
+        "insideEmptySquareBrackets": false,
+        "declarations": "normalize",
+        "insideObjectBraces": true,
+        "insideEmptyBlockBraces": true,
+        "insideEmptyObjectBraces": false
+      },
+      "properties": {
+        "afterControlKeywords": {
+          "type": "boolean"
+        },
+        "afterReturnKeyword": {
+          "type": "boolean"
+        },
+        "beforeFunctionParen": {
+          "type": "boolean"
+        },
+        "beforeMethodParen": {
+          "type": "boolean"
+        },
+        "beforeCallParen": {
+          "type": "boolean"
+        },
+        "afterCast": {
+          "type": "boolean"
+        },
+        "insideCastParens": {
+          "type": "boolean"
+        },
+        "insideControlParens": {
+          "type": "boolean"
+        },
+        "insideDeclarationParens": {
+          "type": "boolean"
+        },
+        "insideCallParens": {
+          "type": "boolean"
+        },
+        "insideOtherParens": {
+          "type": "boolean"
+        },
+        "insideEmptyDeclarationParens": {
+          "type": "boolean"
+        },
+        "insideEmptyCallParens": {
+          "type": "boolean"
+        },
+        "beforeInheritanceColon": {
+          "type": "boolean"
+        },
+        "afterInheritanceColon": {
+          "type": "boolean"
+        },
+        "binaryOperators": {
+          "enum": [
+            "both",
+            "none",
+            "preserve"
+          ]
+        },
+        "beforeAssignment": {
+          "type": "boolean"
+        },
+        "afterAssignment": {
+          "type": "boolean"
+        },
+        "beforeComma": {
+          "type": "boolean"
+        },
+        "afterComma": {
+          "type": "boolean"
+        },
+        "beforeDot": {
+          "type": "boolean"
+        },
+        "afterDot": {
+          "type": "boolean"
+        },
+        "beforeForSemicolon": {
+          "type": "boolean"
+        },
+        "afterForSemicolon": {
+          "type": "boolean"
+        },
+        "beforeSquareBracket": {
+          "type": "boolean"
+        },
+        "insideSquareBrackets": {
+          "type": "boolean"
+        },
+        "insideEmptySquareBrackets": {
+          "type": "boolean"
+        },
+        "declarations": {
+          "enum": [
+            "normalize",
+            "preserve"
+          ]
+        },
+        "insideObjectBraces": {
+          "type": "boolean"
+        },
+        "insideEmptyBlockBraces": {
+          "type": "boolean"
+        },
+        "insideEmptyObjectBraces": {
+          "type": "boolean"
+        }
+      },
+      "leaves": [
+        "lgd.format.spacing.afterControlKeywords",
+        "lgd.format.spacing.afterReturnKeyword",
+        "lgd.format.spacing.beforeFunctionParen",
+        "lgd.format.spacing.beforeMethodParen",
+        "lgd.format.spacing.beforeCallParen",
+        "lgd.format.spacing.afterCast",
+        "lgd.format.spacing.insideCastParens",
+        "lgd.format.spacing.insideControlParens",
+        "lgd.format.spacing.insideDeclarationParens",
+        "lgd.format.spacing.insideCallParens",
+        "lgd.format.spacing.insideOtherParens",
+        "lgd.format.spacing.insideEmptyDeclarationParens",
+        "lgd.format.spacing.insideEmptyCallParens",
+        "lgd.format.spacing.beforeInheritanceColon",
+        "lgd.format.spacing.afterInheritanceColon",
+        "lgd.format.spacing.binaryOperators",
+        "lgd.format.spacing.beforeAssignment",
+        "lgd.format.spacing.afterAssignment",
+        "lgd.format.spacing.beforeComma",
+        "lgd.format.spacing.afterComma",
+        "lgd.format.spacing.beforeDot",
+        "lgd.format.spacing.afterDot",
+        "lgd.format.spacing.beforeForSemicolon",
+        "lgd.format.spacing.afterForSemicolon",
+        "lgd.format.spacing.beforeSquareBracket",
+        "lgd.format.spacing.insideSquareBrackets",
+        "lgd.format.spacing.insideEmptySquareBrackets",
+        "lgd.format.spacing.declarations",
+        "lgd.format.spacing.insideObjectBraces",
+        "lgd.format.spacing.insideEmptyBlockBraces",
+        "lgd.format.spacing.insideEmptyObjectBraces"
+      ]
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks",
+      "defaults": {
+        "shortBlocks": "never",
+        "shortFunctions": "empty",
+        "shortLambdas": "never",
+        "shortIfs": "never",
+        "shortLoops": false,
+        "shortCases": false,
+        "embeddedStatementsSameLine": true,
+        "preserveSingleLineBlocks": false,
+        "preserveSingleLineStatements": false,
+        "objectMembers": "preserve",
+        "importGroups": "preserve",
+        "separateDefinitions": "always",
+        "blankLinesBetweenClosingBraces": false,
+        "statementImmediatelyAfterBlock": true,
+        "blankLineAfterConstructorColon": true,
+        "blankLineAfterConditionalToken": true,
+        "blankLineAfterArrow": true,
+        "maxEmptyLines": 1,
+        "emptyLinesAtBlockStart": false,
+        "emptyLinesAtBlockEnd": false
+      },
+      "properties": {
+        "shortBlocks": {
+          "enum": [
+            "preserve",
+            "never",
+            "empty",
+            "always"
+          ]
+        },
+        "shortFunctions": {
+          "enum": [
+            "preserve",
+            "never",
+            "empty",
+            "inline",
+            "all"
+          ]
+        },
+        "shortLambdas": {
+          "enum": [
+            "preserve",
+            "never",
+            "empty",
+            "inline",
+            "all"
+          ]
+        },
+        "shortIfs": {
+          "enum": [
+            "preserve",
+            "never",
+            "withoutElse",
+            "all"
+          ]
+        },
+        "shortLoops": {
+          "type": "boolean"
+        },
+        "shortCases": {
+          "type": "boolean"
+        },
+        "embeddedStatementsSameLine": {
+          "type": "boolean"
+        },
+        "preserveSingleLineBlocks": {
+          "type": "boolean"
+        },
+        "preserveSingleLineStatements": {
+          "type": "boolean"
+        },
+        "importGroups": {
+          "enum": [
+            "preserve",
+            "origin",
+            "none"
+          ]
+        },
+        "objectMembers": {
+          "enum": [
+            "preserve",
+            "onePerLine",
+            "singleLine"
+          ]
+        },
+        "separateDefinitions": {
+          "enum": [
+            "preserve",
+            "always",
+            "never"
+          ]
+        },
+        "blankLinesBetweenClosingBraces": {
+          "type": "boolean"
+        },
+        "statementImmediatelyAfterBlock": {
+          "type": "boolean"
+        },
+        "blankLineAfterConstructorColon": {
+          "type": "boolean"
+        },
+        "blankLineAfterConditionalToken": {
+          "type": "boolean"
+        },
+        "blankLineAfterArrow": {
+          "type": "boolean"
+        },
+        "maxEmptyLines": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "emptyLinesAtBlockStart": {
+          "type": "boolean"
+        },
+        "emptyLinesAtBlockEnd": {
+          "type": "boolean"
+        }
+      },
+      "leaves": [
+        "lgd.format.lineBreaks.shortBlocks",
+        "lgd.format.lineBreaks.shortFunctions",
+        "lgd.format.lineBreaks.shortLambdas",
+        "lgd.format.lineBreaks.shortIfs",
+        "lgd.format.lineBreaks.shortLoops",
+        "lgd.format.lineBreaks.shortCases",
+        "lgd.format.lineBreaks.embeddedStatementsSameLine",
+        "lgd.format.lineBreaks.preserveSingleLineBlocks",
+        "lgd.format.lineBreaks.preserveSingleLineStatements",
+        "lgd.format.lineBreaks.importGroups",
+        "lgd.format.lineBreaks.objectMembers",
+        "lgd.format.lineBreaks.separateDefinitions",
+        "lgd.format.lineBreaks.blankLinesBetweenClosingBraces",
+        "lgd.format.lineBreaks.statementImmediatelyAfterBlock",
+        "lgd.format.lineBreaks.blankLineAfterConstructorColon",
+        "lgd.format.lineBreaks.blankLineAfterConditionalToken",
+        "lgd.format.lineBreaks.blankLineAfterArrow",
+        "lgd.format.lineBreaks.maxEmptyLines",
+        "lgd.format.lineBreaks.emptyLinesAtBlockStart",
+        "lgd.format.lineBreaks.emptyLinesAtBlockEnd"
+      ]
+    },
+    {
+      "ruleId": "lgd.format.wrapping",
+      "defaults": {
+        "columnLimit": 120,
+        "arguments": "preserve",
+        "parameters": "preserve",
+        "alignAfterOpenBracket": false,
+        "allowAllArgumentsOnNextLine": false,
+        "allowAllParametersOnNextLine": false,
+        "binaryOperators": "beforeNonAssignment",
+        "binaryOperations": "fit",
+        "returnType": "preserve",
+        "constructorInitializer": "preserve"
+      },
+      "properties": {
+        "columnLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "arguments": {
+          "enum": [
+            "preserve",
+            "binPack",
+            "onePerLine"
+          ]
+        },
+        "parameters": {
+          "enum": [
+            "preserve",
+            "binPack",
+            "onePerLine"
+          ]
+        },
+        "alignAfterOpenBracket": {
+          "type": "boolean"
+        },
+        "allowAllArgumentsOnNextLine": {
+          "type": "boolean"
+        },
+        "allowAllParametersOnNextLine": {
+          "type": "boolean"
+        },
+        "binaryOperators": {
+          "enum": [
+            "preserve",
+            "before",
+            "after",
+            "beforeNonAssignment"
+          ]
+        },
+        "binaryOperations": {
+          "enum": [
+            "preserve",
+            "fit",
+            "respectPrecedence",
+            "onePerLine"
+          ]
+        },
+        "returnType": {
+          "enum": [
+            "preserve",
+            "sameLine",
+            "nextLine"
+          ]
+        },
+        "constructorInitializer": {
+          "enum": [
+            "preserve",
+            "beforeColon",
+            "afterColon"
+          ]
+        }
+      },
+      "leaves": [
+        "lgd.format.wrapping.columnLimit",
+        "lgd.format.wrapping.arguments",
+        "lgd.format.wrapping.parameters",
+        "lgd.format.wrapping.alignAfterOpenBracket",
+        "lgd.format.wrapping.allowAllArgumentsOnNextLine",
+        "lgd.format.wrapping.allowAllParametersOnNextLine",
+        "lgd.format.wrapping.binaryOperators",
+        "lgd.format.wrapping.binaryOperations",
+        "lgd.format.wrapping.returnType",
+        "lgd.format.wrapping.constructorInitializer"
+      ]
+    },
+    {
+      "ruleId": "lgd.format.whitespace",
+      "defaults": {
+        "fileHeader": "",
+        "endOfLine": "preserve",
+        "finalNewline": "preserve",
+        "trimTrailingWhitespace": true
+      },
+      "properties": {
+        "fileHeader": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "endOfLine": {
+          "enum": [
+            "preserve",
+            "lf",
+            "crlf",
+            "cr"
+          ]
+        },
+        "finalNewline": {
+          "enum": [
+            "preserve",
+            "always",
+            "never"
+          ]
+        },
+        "trimTrailingWhitespace": {
+          "type": "boolean"
+        }
+      },
+      "leaves": [
+        "lgd.format.whitespace.fileHeader",
+        "lgd.format.whitespace.endOfLine",
+        "lgd.format.whitespace.finalNewline",
+        "lgd.format.whitespace.trimTrailingWhitespace"
+      ]
+    },
+    {
+      "ruleId": "lgd.format.bracesRequired",
+      "defaults": {
+        "mode": "preserve"
+      },
+      "properties": {
+        "mode": {
+          "enum": [
+            "preserve",
+            "always",
+            "multiLine"
+          ]
+        }
+      },
+      "leaves": [
+        "lgd.format.bracesRequired.mode"
+      ]
+    },
+    {
+      "ruleId": "lgd.format.expressions",
+      "defaults": {
+        "coalesce": "preserve",
+        "nullPropagation": "preserve",
+        "conditionalCall": "preserve",
+        "booleanSimplification": "preserve",
+        "compoundAssignment": "preserve",
+        "inferredMemberNames": "preserve",
+        "conditionalReturn": "preserve",
+        "conditionalAssignment": "preserve",
+        "interpolation": "preserve",
+        "parenthesesArithmetic": "preserve",
+        "parenthesesRelational": "preserve",
+        "parenthesesOtherBinary": "preserve",
+        "parenthesesOther": "preserve",
+        "lambdaBodies": "preserve"
+      },
+      "properties": {
+        "lambdaBodies": {
+          "enum": [
+            "preserve",
+            "always",
+            "when_on_single_line",
+            "never"
+          ]
+        },
+        "coalesce": {
+          "enum": [
+            "preserve",
+            "prefer"
+          ]
+        },
+        "nullPropagation": {
+          "enum": [
+            "preserve",
+            "prefer"
+          ]
+        },
+        "conditionalCall": {
+          "enum": [
+            "preserve",
+            "prefer"
+          ]
+        },
+        "booleanSimplification": {
+          "enum": [
+            "preserve",
+            "prefer"
+          ]
+        },
+        "compoundAssignment": {
+          "enum": [
+            "preserve",
+            "prefer"
+          ]
+        },
+        "inferredMemberNames": {
+          "enum": [
+            "preserve",
+            "prefer"
+          ]
+        },
+        "conditionalReturn": {
+          "enum": [
+            "preserve",
+            "prefer"
+          ]
+        },
+        "conditionalAssignment": {
+          "enum": [
+            "preserve",
+            "prefer"
+          ]
+        },
+        "interpolation": {
+          "enum": [
+            "preserve",
+            "prefer"
+          ]
+        },
+        "parenthesesArithmetic": {
+          "enum": [
+            "preserve",
+            "always_for_clarity",
+            "never_if_unnecessary"
+          ]
+        },
+        "parenthesesRelational": {
+          "enum": [
+            "preserve",
+            "always_for_clarity",
+            "never_if_unnecessary"
+          ]
+        },
+        "parenthesesOtherBinary": {
+          "enum": [
+            "preserve",
+            "always_for_clarity",
+            "never_if_unnecessary"
+          ]
+        },
+        "parenthesesOther": {
+          "enum": [
+            "preserve",
+            "always_for_clarity",
+            "never_if_unnecessary"
+          ]
+        }
+      },
+      "leaves": [
+        "lgd.format.expressions.lambdaBodies",
+        "lgd.format.expressions.coalesce",
+        "lgd.format.expressions.nullPropagation",
+        "lgd.format.expressions.conditionalCall",
+        "lgd.format.expressions.booleanSimplification",
+        "lgd.format.expressions.compoundAssignment",
+        "lgd.format.expressions.inferredMemberNames",
+        "lgd.format.expressions.conditionalReturn",
+        "lgd.format.expressions.conditionalAssignment",
+        "lgd.format.expressions.interpolation",
+        "lgd.format.expressions.parenthesesArithmetic",
+        "lgd.format.expressions.parenthesesRelational",
+        "lgd.format.expressions.parenthesesOtherBinary",
+        "lgd.format.expressions.parenthesesOther"
+      ]
+    },
+    {
+      "ruleId": "lgd.format.declarations",
+      "defaults": {
+        "modifierOrder": {},
+        "accessibility": "preserve",
+        "localTypes": "preserve"
+      },
+      "properties": {
+        "modifierOrder": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "public": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "private": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "protected": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "internal": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "static": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "abstract": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "virtual": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "override": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "readonly": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "async": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "accessibility": {
+          "enum": [
+            "preserve",
+            "always",
+            "for_non_interface_members"
+          ]
+        },
+        "localTypes": {
+          "enum": [
+            "preserve",
+            "explicit",
+            "inferred"
+          ]
+        }
+      },
+      "leaves": [
+        "lgd.format.declarations.modifierOrder",
+        "lgd.format.declarations.accessibility",
+        "lgd.format.declarations.localTypes"
+      ]
+    },
+    {
+      "ruleId": "lgd.format.cleanup",
+      "defaults": {
+        "unusedLocals": "preserve",
+        "unreachableStatements": "preserve"
+      },
+      "properties": {
+        "unusedLocals": {
+          "enum": [
+            "preserve",
+            "remove"
+          ]
+        },
+        "unreachableStatements": {
+          "enum": [
+            "preserve",
+            "remove"
+          ]
+        }
+      },
+      "leaves": [
+        "lgd.format.cleanup.unusedLocals",
+        "lgd.format.cleanup.unreachableStatements"
+      ]
+    }
+  ],
+  "formattingHandlerPolicy": {
+    "kind": "format:<ruleId>",
+    "certifiedAutomatic": true,
+    "preferred": true,
+    "manualBatchDefault": "manual",
+    "globalFormattingDefault": "disabled",
+    "automaticDefault": "disabled"
+  },
+  "formattingRuleEvidence": [
+    {
+      "ruleId": "lgd.format.braces.beforeElse",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.beforeCatch",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.beforeFinally",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.beforeWhile",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.classes",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.interfaces",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.enums",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.constructors",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.methods",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.accessors",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.functions",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.lambdas",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.controlBlocks",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.switchBlocks",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.caseBlocks",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.tryBlocks",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.elseBlocks",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.catchBlocks",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.finallyBlocks",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.objectLiterals",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.braces.objectPatterns",
+      "familyRuleId": "lgd.format.braces",
+      "effectiveDefault": "inherit location-aware brace preset",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.style",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": "space",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.size",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": 4,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": true,
+      "policyRegressionEvidence": "tests/src/Lgd/LgdFixAudit.test.js",
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.tabWidth",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": 4,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.continuation",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": 4,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.constructorInitializer",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": 4,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.tabUsage",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": "always",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.caseLabels",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.caseContents",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.caseBlocks",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.indentation.labels",
+      "familyRuleId": "lgd.format.indentation",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.afterControlKeywords",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.afterReturnKeyword",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.beforeFunctionParen",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.beforeMethodParen",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.beforeCallParen",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.afterCast",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideCastParens",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideControlParens",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideDeclarationParens",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideCallParens",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideOtherParens",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideEmptyDeclarationParens",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideEmptyCallParens",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.beforeInheritanceColon",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.afterInheritanceColon",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.binaryOperators",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": "both",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.beforeAssignment",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.afterAssignment",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.beforeComma",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.afterComma",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.beforeDot",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.afterDot",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.beforeForSemicolon",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.afterForSemicolon",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.beforeSquareBracket",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideSquareBrackets",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideEmptySquareBrackets",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.declarations",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": "normalize",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideObjectBraces",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideEmptyBlockBraces",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.spacing.insideEmptyObjectBraces",
+      "familyRuleId": "lgd.format.spacing",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.shortBlocks",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": "never",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.shortFunctions",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": "empty",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": true,
+      "policyRegressionEvidence": "tests/src/Lgd/LgdFixAudit.test.js",
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.shortLambdas",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": "never",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.shortIfs",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": "never",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": true,
+      "policyRegressionEvidence": "tests/src/Lgd/LgdFixAudit.test.js",
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.shortLoops",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": true,
+      "policyRegressionEvidence": "tests/src/Lgd/LgdFixAudit.test.js",
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.shortCases",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.embeddedStatementsSameLine",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.preserveSingleLineBlocks",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": true,
+      "policyRegressionEvidence": "tests/src/Lgd/LgdFixAudit.test.js",
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.preserveSingleLineStatements",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.importGroups",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.objectMembers",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.separateDefinitions",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": "always",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.blankLinesBetweenClosingBraces",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.statementImmediatelyAfterBlock",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.blankLineAfterConstructorColon",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.blankLineAfterConditionalToken",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.blankLineAfterArrow",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.maxEmptyLines",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": 1,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.emptyLinesAtBlockStart",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": true,
+      "policyRegressionEvidence": "tests/src/Lgd/LgdFixAudit.test.js",
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.lineBreaks.emptyLinesAtBlockEnd",
+      "familyRuleId": "lgd.format.lineBreaks",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": true,
+      "policyRegressionEvidence": "tests/src/Lgd/LgdFixAudit.test.js",
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.columnLimit",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": 120,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": true,
+      "policyRegressionEvidence": "tests/src/Lgd/LgdFixAudit.test.js",
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.arguments",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.parameters",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.alignAfterOpenBracket",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.allowAllArgumentsOnNextLine",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.allowAllParametersOnNextLine",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": false,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.binaryOperators",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": "beforeNonAssignment",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.binaryOperations",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": "fit",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.returnType",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.wrapping.constructorInitializer",
+      "familyRuleId": "lgd.format.wrapping",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.whitespace.fileHeader",
+      "familyRuleId": "lgd.format.whitespace",
+      "effectiveDefault": "",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.whitespace.endOfLine",
+      "familyRuleId": "lgd.format.whitespace",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.whitespace.finalNewline",
+      "familyRuleId": "lgd.format.whitespace",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.whitespace.trimTrailingWhitespace",
+      "familyRuleId": "lgd.format.whitespace",
+      "effectiveDefault": true,
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": true,
+      "policyRegressionEvidence": "tests/src/Lgd/LgdFixAudit.test.js",
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.bracesRequired.mode",
+      "familyRuleId": "lgd.format.bracesRequired",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.lambdaBodies",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.coalesce",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.nullPropagation",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.conditionalCall",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.booleanSimplification",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.compoundAssignment",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.inferredMemberNames",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.conditionalReturn",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.conditionalAssignment",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.interpolation",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.parenthesesArithmetic",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.parenthesesRelational",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.parenthesesOtherBinary",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.expressions.parenthesesOther",
+      "familyRuleId": "lgd.format.expressions",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.declarations.modifierOrder",
+      "familyRuleId": "lgd.format.declarations",
+      "effectiveDefault": {},
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": false,
+      "scalarMatrixEvidence": null,
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.declarations.accessibility",
+      "familyRuleId": "lgd.format.declarations",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.declarations.localTypes",
+      "familyRuleId": "lgd.format.declarations",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.cleanup.unusedLocals",
+      "familyRuleId": "lgd.format.cleanup",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    },
+    {
+      "ruleId": "lgd.format.cleanup.unreachableStatements",
+      "familyRuleId": "lgd.format.cleanup",
+      "effectiveDefault": "preserve",
+      "catalogAndSchemaEvidence": "tests/src/Lgd/LgdFixConfiguration.test.js",
+      "scalarOptionFixedPointAndSignatureMatrix": true,
+      "scalarMatrixEvidence": "tests/src/Lgd/Formatting/LgdFormatter.test.js",
+      "fixOffSeverityOffSaveManualRegression": false,
+      "policyRegressionEvidence": null,
+      "verifiedByAndrew": false,
+      "nativeEditorVerification": "pending for these new commits",
+      "coverageLimit": "One-option mixed-syntax fixed-point tests are not exhaustive policy or context interaction proof."
+    }
+  ],
+  "verification": {
+    "combinedCode": "38a3583ba0fbc29f3aed7e7615caa1649457d471",
+    "testSuites": 105,
+    "tests": 3324,
+    "lintFiles": 297,
+    "lintErrors": 0,
+    "lintWarnings": 0,
+    "webpackBuild": "passed",
+    "nativeUI": "not performed by this audit task"
+  },
+  "settingsAndEntryPointEvidence": [
+    {
+      "topic": "Strict configuration, extends/overrides, imported preference precedence, dirty/stale configuration, hard exclusions",
+      "evidence": "tests/src/Lgd/LgdFixConfiguration.test.js; tests/src/Lgd/Formatting/LgdFormattingSources.test.js"
+    },
+    {
+      "topic": "Individual diagnostic transport, dependency/contract guards, cancellation, async source races",
+      "evidence": "tests/src/Lgd/LgdCodeActionProvider.test.js; tests/src/Lgd/DiagnosticQuickFix.test.js"
+    },
+    {
+      "topic": "Document/project/solution scope, review/cancel, queue serialization, manifest identity, automatic safe-only iteration",
+      "evidence": "tests/src/Lgd/LgdFixService.test.js"
+    },
+    {
+      "topic": "Atomic multi-edit conflicts and stale cross-document snapshots",
+      "evidence": "tests/src/Lgd/LgdFixPlan.test.js"
+    },
+    {
+      "topic": "LF/CRLF metadata, per-rule EOL opt-out, protected literals/comments/format-off regions",
+      "evidence": "tests/src/Lgd/LgdFixEdits.test.js"
+    },
+    {
+      "topic": "Local composition: LF/CRLF/CR, independent rule opt-out, no unrelated semantic/header changes, fixed point, snapshots",
+      "evidence": "tests/src/Lgd/LgdFixComposition.test.js"
+    },
+    {
+      "topic": "Nine missing-contributor regressions in fix-off/severity-off/save-manual modes; independent allowed fixes continue",
+      "evidence": "tests/src/Lgd/LgdFixAudit.test.js"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+// Each unknown property used to expand every unrelated local in the loop.
+class PropertyReader
+{
+    Number read(Object document, Boolean ready)
+    {
+        while(ready)
+        {
+            const String text0 = document.section0.body.text;
+            const String text1 = document.section1.body.text;
+            const String text2 = document.section2.body.text;
+            const String text3 = document.section3.body.text;
+            const String text4 = document.section4.body.text;
+            const String text5 = document.section5.body.text;
+            const String text6 = document.section6.body.text;
+            const String text7 = document.section7.body.text;
+            const String text8 = document.section8.body.text;
+            const String text9 = document.section9.body.text;
+            const String text10 = document.section10.body.text;
+            const String text11 = document.section11.body.text;
+            Number count = "wrong"; // Keep the independent error.
+        }
+        return 1;
+    }
+}

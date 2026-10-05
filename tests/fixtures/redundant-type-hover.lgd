@@ -1,0 +1,12 @@
+Object position = { line: 7 };
+const Number currentLine = position.line;
+currentLine;
+
+/**
+ * Current editor line.
+ * @type {number}
+ * @see position.line
+ * @deprecated Use the current editor position.
+ */
+const Number documentedLine = position.line;
+documentedLine;

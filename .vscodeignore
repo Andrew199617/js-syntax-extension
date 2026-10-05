@@ -12,6 +12,12 @@ src/
 node_modules/**
 !node_modules/lgd-callback-parameter-highlighting/index.js
 !node_modules/lgd-callback-parameter-highlighting/package.json
+!node_modules/typescript/package.json
+!node_modules/typescript/LICENSE.txt
+!node_modules/typescript/ThirdPartyNoticeText.txt
+!node_modules/typescript/lib/typescript.js
+!node_modules/typescript/lib/lib.*.d.ts
+!node_modules/typescript/lib/lib.d.ts
 **/*.vsix
 **/*.map
 artifacts/**

@@ -22,8 +22,10 @@
  * scope checker.
  */
 
+const LgdModuleBindings = require('./LgdModuleBindings');
+const LgdAmbientTypes = require('./LgdAmbientTypes');
 const { UNKNOWN, NULL, inferExpression, maskCode } = require('./LgdInfer');
-const { baseTypeName, isNullableType } = require('./LgdTypeMaps');
+const { baseTypeName, isNullableType, rootTypeName, elementTypeName, canonicalTypeName, arrayCompatibility } = require('./LgdTypeMaps');
 
 /** @description The eight LGD type keywords; anything else in type position is a name or dotted type. */
 const typeKeywords = [ 'Number', 'String', 'Boolean', 'BigInt', 'Symbol', 'Object', 'Array', 'Function' ];
@@ -42,6 +44,66 @@ const requireCallPattern = /\brequire\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)
  */
 
 /**
+ * @description Resolves a function parameter type name against the scope, mirroring declaration resolution.
+ * @param {string|null} typeName the parameter type name, or null for untyped parameters.
+ * @param {Map} scope declared variable names to {keyword, readonly, kind, typeName, ref} entries.
+ * @param {Array} errors the error list to append to.
+ * @param {number} offset the offset of the type name for error reporting.
+ * @returns {Object} the {keyword, readonly, kind, typeName, ref} parameter entry.
+ */
+function resolveParamType(typeName, scope, errors, offset)
+{
+    if(!typeName)
+    {
+        return { keyword: UNKNOWN, readonly: false, kind: 'keyword', typeName: UNKNOWN, ref: null };
+    }
+
+    const baseType = rootTypeName(typeName);
+    if(elementTypeName(typeName) !== null)
+    {
+        const element = resolveParamType(elementTypeName(typeName), scope, errors, offset);
+        return { keyword: 'Array', readonly: false, kind: 'array', typeName: typeName, ref: null, element: element };
+    }
+
+    if(typeKeywords.includes(baseType))
+    {
+        return { keyword: baseType, readonly: false, kind: 'keyword', typeName: typeName, ref: null };
+    }
+
+    if(typeName.includes('.'))
+    {
+        const head = typeName.slice(0, typeName.indexOf('.'));
+        const ambient = scope.ambient || LgdAmbientTypes.forSource();
+        if(!scope.has(head) && ambient.resolve(baseType))
+        {
+            return { keyword: 'Object', readonly: false, kind: 'ambient', typeName: typeName, ref: baseType };
+        }
+
+        if(!scope.has(head))
+        {
+            errors.push({ message: `Unknown type '${typeName}'.`, offset: offset });
+            return { keyword: UNKNOWN, readonly: false, kind: 'unknown', typeName: typeName, ref: null };
+        }
+
+        return { keyword: 'Object', readonly: false, kind: 'opaque', typeName: typeName, ref: null };
+    }
+
+    const target = scope.get(baseType);
+    if(!target && (scope.ambient || LgdAmbientTypes.forSource()).resolve(baseType))
+    {
+        return { keyword: 'Object', readonly: false, kind: 'ambient', typeName: typeName, ref: baseType };
+    }
+
+    if(!target)
+    {
+        errors.push({ message: `Unknown type '${typeName}'.`, offset: offset });
+        return { keyword: UNKNOWN, readonly: false, kind: 'unknown', typeName: typeName, ref: null };
+    }
+
+    return { keyword: target.keyword || 'Object', readonly: false, kind: 'nominal', typeName: typeName, ref: baseType };
+}
+
+/**
  * @description Resolves a declaration's type name to a checkable type descriptor.
  * Keywords check as before; a declared name checks nominally; a dotted name is an
  * opaque external type; a self-named declaration (M M = ...) defines its own type.
@@ -54,7 +116,13 @@ const requireCallPattern = /\brequire\(\s*(?<quote>["'])(?<spec>(?:(?!\k<quote>)
 function resolveDeclaredType(declaration, scope, errors)
 {
     const typeName = declaration.typeName;
-    const baseType = baseTypeName(typeName);
+    const baseType = rootTypeName(typeName);
+    if(elementTypeName(typeName) !== null)
+    {
+        const element = resolveParamType(elementTypeName(typeName), scope, errors, declaration.typeStart);
+        return { kind: 'array', keyword: 'Array', ref: null, typeName: typeName, element: element };
+    }
+
     if(typeKeywords.includes(baseType))
     {
         return { kind: 'keyword', keyword: baseType, ref: null, typeName: typeName };
@@ -63,6 +131,12 @@ function resolveDeclaredType(declaration, scope, errors)
     if(typeName.includes('.'))
     {
         const head = typeName.slice(0, typeName.indexOf('.'));
+        const ambient = scope.ambient || LgdAmbientTypes.forSource();
+        if(!scope.has(head) && ambient.resolve(baseType))
+        {
+            return { keyword: 'Object', readonly: false, kind: 'ambient', typeName: typeName, ref: baseType };
+        }
+
         if(!scope.has(head))
         {
             errors.push({ message: `Unknown type '${typeName}'.`, offset: declaration.typeStart });
@@ -78,6 +152,11 @@ function resolveDeclaredType(declaration, scope, errors)
     }
 
     const target = scope.get(baseType);
+    if(!target && (scope.ambient || LgdAmbientTypes.forSource()).resolve(baseType))
+    {
+        return { keyword: 'Object', readonly: false, kind: 'ambient', typeName: typeName, ref: baseType };
+    }
+
     if(!target)
     {
         errors.push({ message: `Unknown type '${typeName}'.`, offset: declaration.typeStart });
@@ -85,49 +164,6 @@ function resolveDeclaredType(declaration, scope, errors)
     }
 
     return { kind: 'nominal', keyword: target.keyword, ref: baseType, typeName: typeName };
-}
-
-/**
- * @description Resolves a function parameter type name against the scope, mirroring declaration resolution.
- * @param {string|null} typeName the parameter type name, or null for untyped parameters.
- * @param {Map} scope declared variable names to {keyword, readonly, kind, typeName, ref} entries.
- * @param {Array} errors the error list to append to.
- * @param {number} offset the offset of the type name for error reporting.
- * @returns {Object} the {keyword, readonly, kind, typeName, ref} parameter entry.
- */
-function resolveParamType(typeName, scope, errors, offset)
-{
-    if(!typeName)
-    {
-        return { keyword: UNKNOWN, readonly: false, kind: 'keyword', typeName: UNKNOWN, ref: null };
-    }
-
-    const baseType = baseTypeName(typeName);
-    if(typeKeywords.includes(baseType))
-    {
-        return { keyword: baseType, readonly: false, kind: 'keyword', typeName: typeName, ref: null };
-    }
-
-    if(typeName.includes('.'))
-    {
-        const head = typeName.slice(0, typeName.indexOf('.'));
-        if(!scope.has(head))
-        {
-            errors.push({ message: `Unknown type '${typeName}'.`, offset: offset });
-            return { keyword: UNKNOWN, readonly: false, kind: 'unknown', typeName: typeName, ref: null };
-        }
-
-        return { keyword: 'Object', readonly: false, kind: 'opaque', typeName: typeName, ref: null };
-    }
-
-    const target = scope.get(baseType);
-    if(!target)
-    {
-        errors.push({ message: `Unknown type '${typeName}'.`, offset: offset });
-        return { keyword: UNKNOWN, readonly: false, kind: 'unknown', typeName: typeName, ref: null };
-    }
-
-    return { keyword: target.keyword || 'Object', readonly: false, kind: 'nominal', typeName: typeName, ref: baseType };
 }
 
 /**
@@ -166,19 +202,74 @@ function functionEnclosesOffset(typedFunction, offset)
  */
 function isAssignableTo(resolved, inferred, scope, externalsByName)
 {
+    if(inferred === NULL && resolved.kind === 'ambient')
+    {
+        return isNullableType(resolved.typeName);
+    }
+
     if(inferred === UNKNOWN || inferred === NULL || resolved.kind === 'unknown')
     {
         return true;
     }
 
+    if(inferred === 'null')
+    {
+        return isNullableType(resolved.typeName);
+    }
+
     if(inferred === 'undefined')
     {
-        return !isNullableType(resolved.typeName);
+        return ![ 'array', 'ambient' ].includes(resolved.kind) && !isNullableType(resolved.typeName);
     }
 
     if(isNullableType(inferred))
     {
+        if(resolved.kind === 'ambient' && !isNullableType(resolved.typeName))
+        {
+            return false;
+        }
+
         return isAssignableTo(resolved, baseTypeName(inferred), scope, externalsByName);
+    }
+
+    inferred = canonicalTypeName(inferred);
+    if(resolved.kind === 'ambient')
+    {
+        const actual = scope.get(inferred)?.typeName || inferred;
+        return (scope.ambient || LgdAmbientTypes.forSource()).assignable(baseTypeName(resolved.typeName), baseTypeName(actual)) ?? false;
+    }
+
+    if(resolved.keyword === 'Object' && resolved.kind === 'keyword')
+    {
+        return true;
+    }
+
+    const ambient = scope.ambient || LgdAmbientTypes.forSource();
+    const actualType = scope.get(inferred)?.ref || inferred;
+    const knownAmbient = ambient.resolve(actualType);
+    if(resolved.kind === 'array' && knownAmbient)
+    {
+        const compatible = ambient.assignable(resolved.typeName, actualType);
+        if(compatible !== null)
+        {
+            return compatible;
+        }
+    }
+
+    const array = arrayCompatibility(resolved.typeName, inferred, (expected, actual) =>
+    {
+        const element = resolveParamType(expected, scope, [], 0);
+        if(actual === 'null' || actual === 'undefined')
+        {
+            return actual === 'null' && isNullableType(expected);
+        }
+
+        return isAssignableTo({ ...element, freshArray: resolved.freshArray }, actual, scope, externalsByName);
+    }, resolved.freshArray);
+
+    if(array !== null)
+    {
+        return array;
     }
 
     const entry = scope.get(inferred) || externalsByName.get(inferred) || null;
@@ -225,7 +316,7 @@ function isAssignableTo(resolved, inferred, scope, externalsByName)
  */
 function effectiveKeyword(resolved, inferred, scope, externalsByName)
 {
-    if(resolved.kind === 'keyword' || resolved.kind === 'nominal' || resolved.kind === 'opaque')
+    if(resolved.kind === 'keyword' || resolved.kind === 'array' || resolved.kind === 'nominal' || resolved.kind === 'opaque' || resolved.kind === 'ambient')
     {
         return resolved.keyword;
     }
@@ -404,6 +495,7 @@ function scopeAtOffset(context, offset)
         scope.set(binding.name, binding.entry);
     }
 
+    scope.ambient = context.scope.ambient;
     return scope;
 }
 
@@ -453,6 +545,7 @@ function checkTypes(content, declarations, externals = new Map())
 {
     const errors = [];
     const scope = new Map();
+    scope.ambient = externals.ambient || LgdAmbientTypes.forSource(externals.sourceContext?.sourcePath);
     const declarationEntry = new Map();
     const masked = maskCode(content, true);
     const declarationScopes = collectDeclarationScopes(declarations, masked);
@@ -472,6 +565,17 @@ function checkTypes(content, declarations, externals = new Map())
         {
             scope.set(requiredName, { keyword: 'Object', readonly: false, kind: 'opaque',
                 typeName: requiredName, ref: null });
+        }
+    }
+
+    for(const imported of LgdModuleBindings.imports(content))
+    {
+        const external = LgdModuleBindings.external(externals, imported.spec, imported.importedName);
+        if(external)
+        {
+            const kind = external.kind === 'moduleNamespace' ? 'opaque' : 'self';
+            scope.set(imported.name, { keyword: external.keyword || 'Object', readonly: true, kind: kind,
+                typeName: imported.name, ref: null });
         }
     }
 

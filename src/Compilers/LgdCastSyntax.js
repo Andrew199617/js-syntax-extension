@@ -1,7 +1,8 @@
+const LgdAmbientTypes = require('./LgdAmbientTypes');
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const { maskCode } = require('./LgdInfer');
-const { parseTypeName, baseTypeName, tsTypeMap, toTsType } = require('./LgdTypeMaps');
+const { parseTypeName, baseTypeName, rootTypeName, typeNamePattern, elementTypeName, tsTypeMap, toTsType } = require('./LgdTypeMaps');
 const { skipTrivia } = require('./LgdMethodSignature');
 const { skipRegexLiteral } = require('./LgdTypedParams');
 const { collectContractBindings } = require('./LgdContractBindings');
@@ -37,7 +38,7 @@ const LgdCastSyntax = {
     /** @description Avoids building lexical context for files without a possible type-cast head. */
     hasHeads(masked)
     {
-        return (/\(\s*(?:[$A-Z_a-z][\w$]*\.)*[A-Z][\w$]*\??\s*\)/).test(masked);
+        return new RegExp(`\\(\\s*${typeNamePattern}\\s*\\)`).test(masked);
     },
 
     /** @description Distinguishes an expression prefix from a call, parameter list, or control-flow condition. */
@@ -158,14 +159,18 @@ const LgdCastSyntax = {
             const sourceStart = map.toSource(start);
             const sourceTypeStart = map.toSource(typeStart);
             const visible = visibleBindings(bindings, sourceTypeStart);
-            const base = baseTypeName(type.typeName);
+            const base = rootTypeName(type.typeName);
             const target = visible.get(base);
             const builtin = Object.hasOwn(tsTypeMap, base);
             const nominal = target?.kind === 'class' || target?.kind === 'interface' || target?.contractKind === 'interface' || target?.kind === 'enum';
             const selfType = Boolean(target?.name && target.name === baseTypeName(target.typeName));
             const root = base.split('.')[0];
             const qualified = base.includes('.') && visible.has(root);
-            const known = builtin && !visible.has(base) || nominal || selfType;
+            const rootBinding = visible.get(root);
+            const importedRoot = rootBinding?.unresolvedImport;
+            const registry = externals.ambient || LgdAmbientTypes.forSource(externals.sourceContext?.sourcePath);
+            const ambient = (!rootBinding || importedRoot) && registry.resolve(rootTypeName(type.typeName));
+            const known = Boolean(builtin && !visible.has(base) || nominal || selfType || ambient);
             const ambiguous = (/^[%&(*+./<=>?[^`|-]/).test(rest);
             if(ambiguous && !known || !ambiguous && !(/^[\w!"$'`{~]/).test(rest))
             {
@@ -180,7 +185,7 @@ const LgdCastSyntax = {
             }
 
             candidates.push({ start: sourceStart, typeStart: sourceTypeStart, typeEnd: map.toSource(type.end - 1) + 1,
-                typeName: type.typeName, target: target || null, known: known || qualified,
+                typeName: type.typeName, target: elementTypeName(type.typeName) !== null ? null : target || null, known: known || qualified,
                 outputStart: start, outputHeadEnd: close + 1, headEnd: map.toSource(close + 1), operandStart: operandStart });
             const head = lexical.slice(start, close + 1).replace(/[^\n\r]/g, ' ');
             lexical = `${lexical.slice(0, start)}~${head.slice(1)}${lexical.slice(close + 1)}`;

@@ -1,0 +1,12 @@
+class Command {
+    /** @returns {Command} */
+    Command(Boolean stop) {
+        if(stop) return this;
+        return this;
+    }
+    /** @virtual */
+    Number run() {
+        readonly Number amount = 2;
+        return amount;
+    }
+}

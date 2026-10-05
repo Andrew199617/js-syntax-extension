@@ -1,0 +1,3 @@
+import * as types from "./Types";
+types.Item[] items = [types.Item.create()];
+String wrong = items[0].score;

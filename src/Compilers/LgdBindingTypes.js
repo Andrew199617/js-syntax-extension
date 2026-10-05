@@ -1,13 +1,14 @@
 const LgdEnumSyntax = require('./LgdEnumSyntax');
+const LgdModuleBindings = require('./LgdModuleBindings');
 const traverse = require('@babel/traverse').default;
-const { tsTypeMap, baseTypeName } = require('./LgdTypeMaps');
+const { tsTypeMap, baseTypeName, elementTypeName, restTypeName } = require('./LgdTypeMaps');
 const { UNKNOWN } = require('./LgdInfer');
 const { skipTrivia } = require('./LgdMethodSignature');
 const { collectContractBindings } = require('./LgdContractBindings');
 const { visibleBindings } = require('./LgdBaseChecker');
 
 /** @description Native objects whose known behavior is used by expression inference. */
-const inferredNatives = [ 'Array', 'Function', 'Promise' ];
+const inferredNatives = [ 'Array', 'Function', 'Promise', 'String', 'Number', 'Boolean', 'BigInt', 'Symbol' ];
 
 /** @description Unshadowed global namespaces can expose those same native objects. */
 const globalNamespaces = [ 'globalThis', 'global', 'window', 'self' ];
@@ -191,7 +192,12 @@ const LgdBindingTypes = {
         const baseType = baseTypeName(type);
         const descriptor = { keyword: UNKNOWN, readonly: Boolean(declaration?.readonly), kind: 'unknown', typeName: type, ref: null };
         this._entries.set(binding, descriptor);
-        if(Object.hasOwn(tsTypeMap, baseType) && !importedClass && declaration?.kind !== 'class')
+        if(elementTypeName(type) !== null)
+        {
+            descriptor.kind = 'array';
+            descriptor.keyword = 'Array';
+        }
+        else if(Object.hasOwn(tsTypeMap, baseType) && !importedClass && declaration?.kind !== 'class')
         {
             descriptor.kind = 'keyword';
             descriptor.keyword = baseType;
@@ -203,7 +209,10 @@ const LgdBindingTypes = {
         }
         else if(type.includes('.'))
         {
-            descriptor.kind = 'opaque';
+            const rootBinding = binding.scope.getBinding(baseType.split('.')[0]);
+            const imported = rootBinding?.path.isImportSpecifier() || rootBinding?.path.isImportDefaultSpecifier() || rootBinding?.path.isImportNamespaceSpecifier();
+            const ambient = (!rootBinding || imported) && context.ambient.resolve(baseType);
+            descriptor.kind = ambient ? 'ambient' : 'opaque';
             descriptor.keyword = 'Object';
         }
         else
@@ -211,7 +220,13 @@ const LgdBindingTypes = {
             const typeScope = binding.kind === 'param' ? binding.scope.parent : binding.scope;
             const typeBinding = typeScope?.getBinding(baseType);
             const target = typeBinding && this.descriptor(typeBinding);
-            if(target)
+            if(!typeBinding && context.ambient.resolve(baseType))
+            {
+                descriptor.kind = 'ambient';
+                descriptor.keyword = 'Object';
+                descriptor.ref = baseType;
+            }
+            else if(target)
             {
                 descriptor.kind = 'nominal';
                 descriptor.keyword = target.keyword;
@@ -224,6 +239,12 @@ const LgdBindingTypes = {
 
     _importedClass(binding)
     {
+        const imported = LgdModuleBindings.forBinding(binding, this._context.externals);
+        if(imported?.kind === 'class')
+        {
+            return imported;
+        }
+
         if(!binding.constant || !binding.path.isVariableDeclarator())
         {
             return null;
@@ -247,6 +268,7 @@ const LgdBindingTypes = {
     {
         const context = this._context;
         const scope = new Map(context.externalsByName);
+        scope.ambient = context.ambient;
         for(const [ name, binding ] of Object.entries(path.scope.getAllBindings()))
         {
             if(Object.hasOwn(tsTypeMap, name))
@@ -300,7 +322,7 @@ const LgdBindingTypes = {
 
                 if(parameter)
                 {
-                    return parameter.rest ? 'Array' : parameter.typeName;
+                    return parameter.rest ? restTypeName(parameter.typeName) : parameter.typeName;
                 }
             }
         }
@@ -314,7 +336,7 @@ const LgdBindingTypes = {
         const bodyStart = context.map.toOutput(signature.declaration.initializerStart + signature.group.bodyStart);
         if(parameter?.typeStart === -1 && binding.scope.path.node.body.start === bodyStart)
         {
-            return parameter.rest ? 'Array' : parameter.typeName;
+            return parameter.rest ? restTypeName(parameter.typeName) : parameter.typeName;
         }
 
         return null;
