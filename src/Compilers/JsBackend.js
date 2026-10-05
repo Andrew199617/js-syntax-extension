@@ -4,6 +4,7 @@ const LgdSourceMap = require('./LgdSourceMap');
 
 /** @description Length of the JSDoc closing marker, stripped before merging the synthetic type tag. */
 const jsdocCloseLength = 2;
+const LgdMethodDocumentation = require('./LgdMethodDocumentation');
 
 /**
  * @description Emits JavaScript for LGD typed declarations.
@@ -134,6 +135,15 @@ const JsBackend = {
                 returnTypeName: physical.returnTypeName || inherited.returnTypeName });
         }
 
+        for(const documented of declaration.methodDocumentation || [])
+        {
+            const documentation = documented.documentation;
+            if(documentation && (documentation.inherit || documentation.description || documentation.returns || Object.values(documentation.params).some(Boolean)))
+            {
+                groups.set(documented.methodStart, { ...documented, ...groups.get(documented.methodStart), documentation: documentation });
+            }
+        }
+
         return [...groups.values()];
     },
 
@@ -152,7 +162,8 @@ const JsBackend = {
         const linePrefix = before.slice(lineStart);
         const indent = (/^[\t ]*$/).test(linePrefix) ? linePrefix : declaration.indent;
         const start = docblock ? docblock.index : group.methodStart;
-        const jsdoc = docblock ? docblock[0].trimEnd() : '/** */';
+        const original = docblock ? docblock[0].trimEnd() : '/** */';
+        const jsdoc = LgdMethodDocumentation.merge(original, group.documentation, indent, this.newline);
         const parameters = this.mergeMethodParams(jsdoc, group.params, indent);
         const comment = this.mergeMethodReturn(parameters, group, indent);
         const prefix = declaration.initializerText.slice(0, start);

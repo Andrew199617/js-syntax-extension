@@ -2,6 +2,7 @@ const LgdConstructorSignatures = require('../Compilers/LgdConstructorSignatures'
 const { getConstructorParams } = require('../Compilers/LgdBaseChecker');
 const LgdClassMemberSemantics = require('../Compilers/LgdClassMemberSemantics');
 const LgdContractChecker = require('../Compilers/LgdContractChecker');
+const LgdClassMemberLookup = require('./LgdClassMemberLookup');
 
 /**
  * @description Describes a declared name for hover and completions: its type and members.
@@ -134,7 +135,8 @@ function getRuntimeMembers(declaration, context, getObjectMembers)
         const described = LgdClassMemberSemantics.describeMembers(context.sourceText, context.declarations, declaration, context.externals);
         return getObjectMembers(declaration).map(member =>
         {
-            const description = described.find(candidate => candidate.name === member.name);
+            const sourceMember = described.find(candidate => candidate.name === member.name);
+            const description = LgdClassMemberLookup.withInheritedSignature(sourceMember, declaration);
             return { ...member, ...description, declaringSourcePath: description?.declaringSourcePath || context.sourcePath || null };
         });
     }

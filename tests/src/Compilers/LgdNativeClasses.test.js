@@ -244,7 +244,7 @@ describe('LGD native JavaScript class output.', () =>
             'interface ICounter { Number read(); String label { get; set; } }',
             'abstract class AbstractCounter : ICounter {',
             '    AbstractCounter() { this.value = 2; }',
-            '    /** Contract documentation must be erased. */',
+            '    /** Reads the current count. */',
             '    abstract Number read();',
             '    abstract String label { get; set; }',
             '}',
@@ -259,7 +259,8 @@ describe('LGD native JavaScript class output.', () =>
         expect(maskCode(result.code, true)).not.toContain('ICounter');
         expect(result.code).not.toContain('extends ICounter');
         expect(result.code).not.toContain('abstract');
-        expect(result.code).not.toContain('Contract documentation');
+        expect(result.code.slice(0, result.code.indexOf('class Counter extends'))).not.toContain('Reads the current count.');
+        expect(result.code.slice(result.code.indexOf('class Counter extends'))).toContain('Reads the current count.');
         const context = { module: { exports: null } };
         virtualMachine.runInNewContext(result.code, context);
         const instance = context.module.exports.create();

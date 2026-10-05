@@ -89,7 +89,7 @@ const LgdHoverProvider = {
                 return new vscode.Hover(this.renderDeclaredField(declaredMember), wordRange);
             }
 
-            if(declaredMember && this.hasExplicitVisibility(declaredMember))
+            if(declaredMember && (this.hasExplicitVisibility(declaredMember) || this.hasDocumentation(declaredMember)))
             {
                 return new vscode.Hover(this.renderDeclaredMember(declaredMember), wordRange);
             }
@@ -165,6 +165,11 @@ const LgdHoverProvider = {
             return null;
         }
 
+        if(detail.kind === 'method')
+        {
+            return this.hasDocumentation(detail) ? new vscode.Hover(this.renderMethodSummary(detail), wordRange) : null;
+        }
+
         return new vscode.Hover(this.renderPropertySummary(detail), wordRange);
     },
 
@@ -212,7 +217,8 @@ const LgdHoverProvider = {
         const modifier = `${this.visibilityPrefix(detail)}${detail.static ? 'static ' : ''}${detail.readonly ? 'readonly ' : ''}`;
         const owner = detail.declaringType ? `${detail.declaringType}.` : '';
         const type = detail.propertyTypeName || detail.typeName;
-        return [ '```lgd', `${modifier}${type} ${owner}${detail.name}`, '```' ].join('\n');
+        const signature = [ '```lgd', `${modifier}${type} ${owner}${detail.name}`, '```' ].join('\n');
+        return this.appendDocumentation(signature, detail);
     },
 
     /** @description Distinguishes written visibility and accessor restrictions from the unchanged public default. */
@@ -251,8 +257,52 @@ const LgdHoverProvider = {
         return accessors.length > 0 ? ` { ${accessors.join(' ')} }` : '';
     },
 
-    /** @description Shows explicit source method, accessor, and constructor signatures before mirror fallbacks. */
+    /** @description Detects method prose that needs a source-backed hover even without explicit visibility. */
+    hasDocumentation(detail)
+    {
+        const documentation = detail.documentation;
+        return Boolean(documentation && (documentation.description || documentation.returns || Object.values(documentation.params || {}).some(Boolean)));
+    },
+
+    /** @description Appends effective source documentation to a member signature. */
+    appendDocumentation(signature, detail)
+    {
+        if(!this.hasDocumentation(detail))
+        {
+            return signature;
+        }
+
+        const documentation = detail.documentation;
+        const paragraphs = [signature];
+        if(documentation.description)
+        {
+            paragraphs.push(documentation.description);
+        }
+
+        for(const [ name, description ] of Object.entries(documentation.params || {}))
+        {
+            if(description)
+            {
+                paragraphs.push(`**@param** \`${name}\` - ${description}`);
+            }
+        }
+
+        if(documentation.returns)
+        {
+            paragraphs.push(`**@returns** - ${documentation.returns}`);
+        }
+
+        return paragraphs.join('\n\n');
+    },
+
+    /** @description Shows source-backed member signatures together with their effective documentation. */
     renderDeclaredMember(detail)
+    {
+        return this.appendDocumentation(this.renderDeclaredMemberSignature(detail), detail);
+    },
+
+    /** @description Shows explicit source method, accessor, and constructor signatures before mirror fallbacks. */
+    renderDeclaredMemberSignature(detail)
     {
         const visibility = this.visibilityPrefix(detail);
         if(detail.constructorSignatures?.length > 1)
@@ -304,7 +354,8 @@ const LgdHoverProvider = {
      */
     renderMethodSummary(detail)
     {
-        return [ '```lgd', `(method) ${this.visibilityPrefix(detail)}${detail.name}()`, '```' ].join('\n');
+        const signature = [ '```lgd', `(method) ${this.visibilityPrefix(detail)}${detail.name}()`, '```' ].join('\n');
+        return this.appendDocumentation(signature, detail);
     },
 
     /**
@@ -317,11 +368,13 @@ const LgdHoverProvider = {
         const type = detail.typeName ? `: ${detail.typeName}` : '';
         if(!detail.properties || detail.properties.length === 0)
         {
-            return [ '```lgd', `(property) ${this.visibilityPrefix(detail)}${detail.name}${type}`, '```' ].join('\n');
+            const signature = [ '```lgd', `(property) ${this.visibilityPrefix(detail)}${detail.name}${type}`, '```' ].join('\n');
+            return this.appendDocumentation(signature, detail);
         }
 
         const lines = detail.properties.map(property => `    ${property},`);
-        return [ '```lgd', `(property) ${this.visibilityPrefix(detail)}${detail.name}${type} {`, ...lines, '}', '```' ].join('\n');
+        const signature = [ '```lgd', `(property) ${this.visibilityPrefix(detail)}${detail.name}${type} {`, ...lines, '}', '```' ].join('\n');
+        return this.appendDocumentation(signature, detail);
     },
 
     /**

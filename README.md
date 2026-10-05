@@ -400,6 +400,14 @@ function process(item) {
 
 Repeat on nested conditions to flatten a tree. JavaScript, JSX, TypeScript, and TSX are supported, including multiline conditions and `else` branches. The action preserves comments, literal contents, and indentation. It retains a block when removing it would change variable scope, and is only offered when an early exit preserves the surrounding control flow.
 
+## Overridden method documentation
+
+An undocumented class method inherits its base method's description, parameter descriptions, and return description, including through relative LGD imports and multiple levels of inheritance. Parameter descriptions follow their position when an override renames a parameter. Both JavaScript object models and LGD hovers use the resolved documentation.
+
+A method's own nonempty JSDoc takes precedence as a whole. Use a standalone `@inheritdoc` block tag (also accepted as `@inheritDoc`) to select the base documentation instead, even when the override has its own description or tags. Source comments are preserved. Leading summary text and `@description` / `@desc` are supported; LGD signature annotations remain authoritative for types.
+
+This resolves instance methods against their class base. It does not choose documentation from implemented interfaces, static methods, constructors, or accessors, and does not implement named/inline TSDoc `{@inheritDoc ...}` references.
+
 ## JSDoc import highlighting
 
 JSDoc imports such as `/** @import { Node as AstNode } from 'estree' */` now highlight imported names, aliases, `as`/`from`, and module strings using normal import theme scopes. Supports JavaScript and JSX, including multiline, default and namespace imports. Reload VS Code after installing the updated VSIX. Colors follow your theme; no settings changes are needed for this syntax rule.

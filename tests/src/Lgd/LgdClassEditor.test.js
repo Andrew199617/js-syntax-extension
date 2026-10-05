@@ -118,6 +118,126 @@ describe('LGD class editor integration', () =>
         expect(summary.kind).toBeUndefined();
     });
 
+    test('shows inherited method prose on declarations, this, base and typed instance accesses', async () =>
+    {
+        const source = [
+            'class Parent {',
+            '  /**',
+            '   * @description Describes the selected label.',
+            '   * @param label The label to describe.',
+            '   * @returns The formatted label.',
+            '   */',
+            '  virtual String describe(String label) { return label; }',
+            '}',
+            'class Child : Parent {',
+            '  override String describe(String label) { return base.describe(label); }',
+            '  String call(String label) { return this.describe(label); }',
+            '}',
+            'Child child = Child.create();',
+            'child.describe("ready");'
+        ].join('\n');
+        const { service, document } = await openClassDocument(source);
+        const provider = LgdHoverProvider.create(service);
+        const accesses = [
+            [ 'override String describe', 'override String '.length ],
+            [ 'base.describe', 'base.'.length ],
+            [ 'this.describe', 'this.'.length ],
+            [ 'child.describe', 'child.'.length ]
+        ];
+
+        for(const [ phrase, delta ] of accesses)
+        {
+            const hover = await provider.provideHover(document, positionIn(document, phrase, delta));
+            expect(hover.contents).toContain('Describes the selected label.');
+            expect(hover.contents).toContain('**@param** `label` - The label to describe.');
+            expect(hover.contents).toContain('**@returns** - The formatted label.');
+        }
+
+        const detail = service.getThisMemberDetail(document, positionIn(document, 'this.describe'), 'describe');
+        expect(detail.documentation.description).toBe('Describes the selected label.');
+        const summary = await service.getTypeSummary(document.uri, 'Child');
+        expect(summary.members.find(member => member.name === 'describe').documentation).toEqual(detail.documentation);
+        expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+    });
+
+    test('retains checked abstract signature types alongside inherited prose on untyped overrides', async () =>
+    {
+        const { service, document } = await openClassDocument([
+            'abstract class Parent {',
+            '  /**',
+            '   * @description Describes the selected label.',
+            '   * @param label The label to describe.',
+            '   * @returns The formatted label.',
+            '   */',
+            '  abstract String describe(String label);',
+            '}',
+            'class Child : Parent {',
+            '  override describe(selected) { return selected; }',
+            '  String call(String label) { return this.describe(label); }',
+            '}',
+            'Child child = Child.create();',
+            'child.describe("ready");'
+        ].join('\n'));
+        const provider = LgdHoverProvider.create(service);
+        const accesses = [
+            [ 'override describe', 'override '.length ],
+            [ 'this.describe', 'this.'.length ],
+            [ 'child.describe', 'child.'.length ]
+        ];
+
+        for(const [ phrase, delta ] of accesses)
+        {
+            const hover = await provider.provideHover(document, positionIn(document, phrase, delta));
+            expect([ phrase, hover.contents ]).toEqual([ phrase, expect.stringContaining('String Child.describe(String selected)') ]);
+            expect(hover.contents).toContain('Describes the selected label.');
+            expect(hover.contents).toContain('**@param** `selected` - The label to describe.');
+            expect(hover.contents).toContain('**@returns** - The formatted label.');
+        }
+
+        const detail = service.getThisMemberDetail(document, positionIn(document, 'this.describe'), 'describe');
+        expect(detail.returnTypeName).toBe('String');
+        expect(detail.params).toEqual([expect.objectContaining({ name: 'selected', typeName: 'String' })]);
+    });
+
+    test('keeps own method prose unless an explicit inheritdoc marker selects the inherited docs', async () =>
+    {
+        const source = [
+            'class Parent {',
+            '  /**',
+            '   * @description Parent description.',
+            '   * @param label Parent parameter prose.',
+            '   * @returns Shared return prose.',
+            '   */',
+            '  virtual String describe(String label) { return label; }',
+            '}',
+            'class Child : Parent {',
+            '  /**',
+            '   * @description Child description.',
+            '   * @param label Child parameter prose.',
+            '   */',
+            '  public override String describe(String label) { return label; }',
+            '}'
+        ].join('\n');
+        const { service, document } = await openClassDocument(source);
+        const hover = await LgdHoverProvider.create(service).provideHover(document, positionIn(document, 'describe(String'));
+
+        expect(hover.contents).toContain('public String Child.describe(String label)');
+        expect(hover.contents).toContain('Child description.');
+        expect(hover.contents).toContain('Child parameter prose.');
+        expect(hover.contents).not.toContain('Shared return prose.');
+        expect(hover.contents).not.toContain('Parent description.');
+        expect(hover.contents).not.toContain('Parent parameter prose.');
+
+        const explicitSource = source.replace('   * @description Child description.', '   * @inheritdoc\n   * @description Child description.');
+        const inherited = await openClassDocument(explicitSource);
+        const inheritedHover = await LgdHoverProvider.create(inherited.service).provideHover(inherited.document, positionIn(inherited.document, 'describe(String'));
+        expect(inheritedHover.contents).toContain('Parent description.');
+        expect(inheritedHover.contents).toContain('Parent parameter prose.');
+        expect(inheritedHover.contents).toContain('Shared return prose.');
+        expect(inheritedHover.contents).not.toContain('Child description.');
+        expect(inheritedHover.contents).not.toContain('Child parameter prose.');
+    });
+
     test('marks class names, base names and constructors as types while leaving methods to the grammar', async () =>
     {
         const { service, document } = await openClassDocument();
@@ -208,6 +328,54 @@ describe('LGD class cross-file metadata', () =>
         expect(definitions).toHaveLength(1);
         expect(definitions[0].uri.fsPath).toBe(path.join(directory, 'Middle.lgd'));
         expect(definitions[0].range.start).toEqual(expect.objectContaining({ line: 1, character: 'class '.length }));
+    });
+
+    test('refreshes inherited hover prose when an imported ancestor documentation changes', async () =>
+    {
+        const rootPath = path.join(directory, 'Root.lgd');
+        const rootSource = [
+            'class Root {',
+            '  /**',
+            '   * @description Original description.',
+            '   * @param label Original parameter prose.',
+            '   * @returns Original return prose.',
+            '   */',
+            '  virtual String describe(String label) { return label; }',
+            '}',
+            'module.exports = Root;'
+        ].join('\n');
+        await fs.promises.writeFile(rootPath, rootSource);
+        await fs.promises.writeFile(path.join(directory, 'Middle.lgd'), [
+            'const Root = require("./Root.js");',
+            'class Middle : Root {',
+            '  override String describe(String label) { return base.describe(label); }',
+            '}',
+            'module.exports = Middle;'
+        ].join('\n'));
+        const { service, document } = await openClassDocument([
+            'const Middle = require("./Middle.js");',
+            'class Child : Middle {',
+            '  override String describe(String label) { return base.describe(label); }',
+            '  String call(String label) { return this.describe(label); }',
+            '}'
+        ].join('\n'), `file://${path.join(directory, 'Child.lgd')}`);
+        const provider = LgdHoverProvider.create(service);
+        const position = positionIn(document, 'this.describe', 'this.'.length);
+        const initial = await provider.provideHover(document, position);
+        expect(initial.contents).toContain('Original description.');
+        expect(initial.contents).toContain('Original parameter prose.');
+        expect(initial.contents).toContain('Original return prose.');
+
+        await fs.promises.writeFile(rootPath, rootSource.replace(/Original/g, 'Updated'));
+        await service.invalidateFile(rootPath);
+
+        const refreshed = await provider.provideHover(document, position);
+        expect(refreshed.contents).toContain('Updated description.');
+        expect(refreshed.contents).toContain('Updated parameter prose.');
+        expect(refreshed.contents).toContain('Updated return prose.');
+        expect(refreshed.contents).not.toContain('Original');
+        const summary = await service.getTypeSummary(document.uri, 'Middle');
+        expect(summary.members.find(member => member.name === 'describe').documentation.description).toBe('Updated description.');
     });
 
     test('provides known OLOO base signatures to compiler diagnostics', async () =>

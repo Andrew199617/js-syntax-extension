@@ -10,6 +10,7 @@ const { tsTypeMap, baseTypeName } = require('./LgdTypeMaps');
 const LgdSourceMap = require('./LgdSourceMap');
 const { skipTrivia } = require('./LgdMethodSignature');
 const LgdInterfaceErasure = require('./LgdInterfaceErasure');
+const LgdMethodDocumentation = require('./LgdMethodDocumentation');
 
 /** @description Shares lexical class member identities between emission, type checking, and editor metadata. */
 const LgdClassMemberSemantics = {
@@ -22,11 +23,18 @@ const LgdClassMemberSemantics = {
         registry._context = context;
         registry._bindings = collectContractBindings(context.content, context.declarations, context.externals || new Map());
         registry._tables = new Map();
+        registry._documentationAttachments = LgdMethodDocumentation.attachments(context.content);
         registry._memberTypes = new WeakMap();
         registry._declaringTypes = new WeakMap();
         registry._externalTypes = LgdMemberTypeGraph.imports(context.externals || new Map());
         registry._memberTypeOffsets = new WeakMap();
         return registry;
+    },
+
+    /** @description Resolves documentation with the same lexical ancestry used by member lookup. */
+    prepareDocumentation(content, declarations, externals)
+    {
+        LgdMethodDocumentation.prepare(declarations, this.create({ content: content, declarations: declarations, externals: externals }));
     },
 
     /** @description Describes own and inherited members without leaking parser offsets into export signatures. */
@@ -71,7 +79,9 @@ const LgdClassMemberSemantics = {
                 : null;
             const referenceDefault = ![ 'Number', 'Boolean', 'BigInt' ].includes(member.propertyTypeName);
             const defaultNull = member.kind === 'field' && (initializer === 'null' || initializer === null && referenceDefault);
+            const ownDocumentation = LgdMethodDocumentation.own(this._context.content, member, this._documentationAttachments);
             const description = {
+                documentation: LgdMethodDocumentation.resolve(ownDocumentation, member, previous),
                 name: member.name, kind: member.kind, typeName: valueType,
                 propertyTypeName: member.propertyTypeName || null, returnTypeName: member.returnTypeName || null,
                 defaultNull: defaultNull, static: Boolean(member.static), readonly: Boolean(member.readonly), async: Boolean(member.async),

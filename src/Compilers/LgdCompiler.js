@@ -330,6 +330,7 @@ const LgdCompiler = {
         }
 
         const inheritedReturnSignatures = LgdContractChecker.bodySignatures(content, found, externals);
+        LgdClassMemberSemantics.prepareDocumentation(content, found, externals);
         const declarations = this.buildTree(found);
         const hasBaseCalls = LgdBaseCalls.hasCalls(content, found);
         const standaloneCandidates = LgdStandaloneReturnChecker.hasCandidates(content);

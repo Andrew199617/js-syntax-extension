@@ -551,8 +551,8 @@ const LgdLanguageService = {
     },
 
     /**
-     * @description Finds the detail for one instance property at a `this.` access: the
-     * constructor-assigned member with its declared type and literal shape.
+     * @description Finds the source detail for an instance method or property at a `this.` access,
+     * including effective documentation and constructor-assigned property shapes.
      * @param {TextDocument} document the LGD document.
      * @param {Position} position the cursor position inside the member access.
      * @param {string} name the accessed member name.
@@ -575,8 +575,8 @@ const LgdLanguageService = {
         const members = this.getDeclaredMembers(declaration, this.getMemberContext(state));
         const found = members.find(member =>
         {
-            const hasDetail = member.typeName || member.properties;
-            return member.name === name && [ 'property', 'field' ].includes(member.kind) && !member.static && hasDetail;
+            const hasDetail = member.kind === 'method' || member.typeName || member.properties;
+            return member.name === name && [ 'method', 'property', 'field' ].includes(member.kind) && !member.static && hasDetail;
         });
 
         return found || null;
